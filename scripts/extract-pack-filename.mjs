@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { basename } from "node:path";
 import { parsePnpmPackOutput } from "./pack-json.mjs";
 
 let input = "";
@@ -13,5 +14,5 @@ process.stdin.on("end", () => {
   if (!filename) {
     throw new Error("pnpm pack JSON did not include a filename.");
   }
-  process.stdout.write(`${filename}\n`);
+  process.stdout.write(`${basename(filename)}\n`);
 });
