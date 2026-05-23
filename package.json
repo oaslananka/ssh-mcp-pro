@@ -1,0 +1,207 @@
+{
+  "name": "ssh-mcp-pro",
+  "version": "1.0.0",
+  "mcpName": "io.github.oaslananka/ssh-mcp-pro",
+  "description": "Model Context Protocol (MCP) SSH client server for remote automation",
+  "type": "module",
+  "packageManager": "pnpm@11.0.9",
+  "main": "dist/index.js",
+  "exports": "./dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "docs",
+    "!docs/api",
+    "examples",
+    "AGENTS.md",
+    "ARCHITECTURE.md",
+    "SECURITY_DECISIONS.md",
+    "MIGRATION.md",
+    "mcp.json",
+    "server.json",
+    "README.md",
+    "LICENSE",
+    "REGISTRY_SUBMISSION.md",
+    "registry"
+  ],
+  "bin": {
+    "ssh-mcp-pro": "dist/index.js",
+    "ssh-mcp-pro-agent": "dist/agent-bin.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json -w",
+    "dev:control-plane": "pnpm run build && node scripts/dev-control-plane.mjs",
+    "dev:agent": "pnpm run build && node scripts/dev-agent.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=unit --runInBand",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --testPathPatterns=unit --runInBand",
+    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=integration --runInBand",
+    "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=e2e --runInBand",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --fix",
+    "lint:staged": "node scripts/run-staged-checks.mjs --lint-only",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.{mjs,cjs}\" \".github/workflows/*.{yml,yaml}\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.{mjs,cjs}\" \".github/workflows/*.{yml,yaml}\"",
+    "format:staged": "node scripts/run-staged-checks.mjs",
+    "prepare": "node scripts/setup-git-hooks.mjs",
+    "prepack": "pnpm run build && pnpm run sync-version -- --check && pnpm run validate:mcp-metadata && pnpm run validate:chatgpt-app && pnpm run validate:claude-connector",
+    "prepublishOnly": "pnpm run check",
+    "docker:ssh-fixture:up": "node scripts/docker-ssh-fixture.mjs up",
+    "docker:ssh-fixture:down": "node scripts/docker-ssh-fixture.mjs down",
+    "e2e:docker": "node scripts/docker-ssh-fixture.mjs run e2e",
+    "integration:docker": "node scripts/docker-ssh-fixture.mjs run integration",
+    "docs": "pnpm exec typedoc --options typedoc.json",
+    "docs:check": "pnpm exec typedoc --options typedoc.json --treatWarningsAsErrors",
+    "start:http": "node dist/render-http.js",
+    "setup:chatgpt": "node scripts/setup-chatgpt.mjs",
+    "sync-version": "node scripts/sync-version.mjs",
+    "validate:mcp-metadata": "node scripts/validate-mcp-metadata.mjs",
+    "validate:chatgpt-app": "node scripts/validate-chatgpt-app.mjs",
+    "validate:claude-connector": "node scripts/validate-claude-connector.mjs",
+    "check:doc-language": "node scripts/check-doc-language.mjs",
+    "check:rulesets": "node scripts/check-rulesets.mjs",
+    "lint:commits": "node scripts/lint-commits.mjs",
+    "lint:pr-title": "node scripts/lint-pr-title.mjs",
+    "test:pr-title-lint": "node scripts/test-pr-title-lint.mjs",
+    "verify:actions-runtime": "node scripts/verify-actions-runtime.mjs",
+    "review:threads": "node scripts/check-review-threads.mjs",
+    "release:state": "node scripts/release-state.mjs",
+    "check:npm-name": "node scripts/check-npm-name.mjs ssh-mcp-pro",
+    "audit": "pnpm audit --audit-level moderate",
+    "licenses:check": "node scripts/check-licenses.mjs",
+    "pack:check": "node scripts/check-package-contents.mjs",
+    "pack:install-smoke": "node scripts/check-package-install-smoke.mjs",
+    "check:quality": "pnpm run format:check && pnpm run check:doc-language && pnpm run check:rulesets && pnpm run verify:actions-runtime && pnpm run lint && pnpm run typecheck && pnpm run audit && pnpm run licenses:check",
+    "check:package": "pnpm run build && pnpm run sync-version -- --check && pnpm run validate:mcp-metadata && pnpm run validate:chatgpt-app && pnpm run validate:claude-connector && pnpm run docs:check && pnpm run pack:check && pnpm run pack:install-smoke",
+    "check:push": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm test",
+    "check": "pnpm run check:quality && pnpm run test:coverage && pnpm run check:package",
+    "hook:pre-commit": "pnpm run format:staged",
+    "hook:pre-push": "pnpm run check:push",
+    "release:dry-run": "node scripts/validate-release-please.mjs && node scripts/release-state.mjs --offline --json && pnpm run check:package",
+    "sbom": "node scripts/generate-sbom.mjs"
+  },
+  "keywords": [
+    "mcp",
+    "ssh",
+    "copilot",
+    "automation",
+    "remote",
+    "model-context-protocol",
+    "github-copilot",
+    "ssh-client",
+    "devops",
+    "infrastructure"
+  ],
+  "author": "Osman Aslan <oaslananka>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oaslananka/ssh-mcp-pro.git"
+  },
+  "homepage": "https://github.com/oaslananka/ssh-mcp-pro#readme",
+  "bugs": {
+    "url": "https://github.com/oaslananka/ssh-mcp-pro/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0",
+    "pnpm": "^11.0.9"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.218.0",
+    "@opentelemetry/resources": "^2.7.1",
+    "@opentelemetry/sdk-node": "^0.218.0",
+    "@opentelemetry/semantic-conventions": "^1.41.1",
+    "jose": "6.2.3",
+    "node-ssh": "^13.2.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@jest/globals": "^30.4.1",
+    "@types/node": "^24.12.4",
+    "@types/ssh2": "^1.15.5",
+    "@typescript-eslint/eslint-plugin": "^8.59.4",
+    "@typescript-eslint/parser": "^8.59.4",
+    "eslint": "^9.39.4",
+    "jest": "^30.4.2",
+    "prettier": "^3.8.3",
+    "ts-jest": "^29.4.11",
+    "typedoc": "0.28.19",
+    "typescript": "^5.9.3"
+  },
+  "jest": {
+    "preset": "ts-jest/presets/default-esm",
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
+    "testEnvironment": "node",
+    "setupFiles": [
+      "<rootDir>/test/setup-logs.ts"
+    ],
+    "testMatch": [
+      "<rootDir>/test/**/*.test.ts"
+    ],
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    },
+    "transform": {
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {
+          "useESM": true,
+          "tsconfig": "tsconfig.test.json",
+          "diagnostics": {
+            "ignoreCodes": [
+              151002
+            ]
+          }
+        }
+      ]
+    },
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/**/*.d.ts",
+      "!src/index.ts",
+      "!src/server-http.ts",
+      "!src/render-http.ts",
+      "!src/remote/agent-executor.ts",
+      "!src/remote/agent-cli.ts",
+      "!src/remote/config.ts",
+      "!src/remote/control-plane.ts",
+      "!src/remote/mcp-tools.ts",
+      "!src/remote/store.ts",
+      "!src/remote/util.ts",
+      "!src/remote/websocket.ts"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html",
+      "cobertura"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 85,
+        "functions": 85,
+        "lines": 90,
+        "statements": 90
+      }
+    },
+    "reporters": [
+      "default",
+      [
+        "<rootDir>/scripts/junit-reporter.cjs",
+        {
+          "outputDirectory": "test-results",
+          "outputName": "junit.xml"
+        }
+      ]
+    ]
+  }
+}

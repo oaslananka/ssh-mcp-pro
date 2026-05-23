@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a reproducible defect in ssh-mcp-pro.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a defect. Include enough detail for a maintainer to reproduce it safely.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output from `ssh-mcp-pro --version` or the npm package version.
+      placeholder: "2.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: transport
+    attributes:
+      label: Transport
+      options:
+        - stdio
+        - Streamable HTTP
+        - legacy SSE
+        - not transport-specific
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Redact hostnames, usernames, tokens, and private paths.
+      placeholder: |
+        1. Configure ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Node/pnpm versions, OS, SSH server type, and relevant policy settings.
+    validations:
+      required: true

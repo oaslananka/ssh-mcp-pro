@@ -1,0 +1,119 @@
+name: MCP Registry Metadata
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/mcp-registry.yml
+      - mcp.json
+      - package.json
+      - pnpm-lock.yaml
+      - registry/ssh-mcp-pro/mcp.json
+      - scripts/validate-mcp-metadata.mjs
+      - server.json
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/mcp-registry.yml
+      - mcp.json
+      - package.json
+      - pnpm-lock.yaml
+      - registry/ssh-mcp-pro/mcp.json
+      - scripts/validate-mcp-metadata.mjs
+      - server.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-registry-metadata-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  NODE_VERSION: 24.15.0
+  PNPM_VERSION: 11.0.9
+
+jobs:
+  validate:
+    name: Validate MCP Registry metadata
+    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: Enable pnpm
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare "pnpm@${PNPM_VERSION}" --activate
+
+      - name: Install
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+
+      - name: Validate local metadata
+        run: |
+          set -euo pipefail
+          pnpm run validate:mcp-metadata
+
+      - name: Verify registry authority model
+        run: |
+          set -euo pipefail
+          server_name="$(node -e "console.log(require('./server.json').name)")"
+          case "${server_name}" in
+            io.github.oaslananka/*)
+              echo "Registry name uses the project GitHub namespace; CI validates metadata only."
+              ;;
+            *)
+              echo "Unsupported MCP Registry namespace: ${server_name}" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Check published registry record
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs";
+
+          const server = JSON.parse(readFileSync("server.json", "utf8"));
+          const encodedName = encodeURIComponent(server.name);
+          const url = `https://registry.modelcontextprotocol.io/v0.1/servers/${encodedName}/versions/latest`;
+          const response = await fetch(url, {
+            headers: { accept: "application/json" },
+            signal: AbortSignal.timeout(20_000),
+          });
+
+          if (response.status === 404) {
+            console.log(`No published registry record exists yet for ${server.name}.`);
+            process.exit(0);
+          }
+
+          if (!response.ok) {
+            throw new Error(`Registry latest lookup failed with HTTP ${response.status}`);
+          }
+
+          const body = await response.json();
+          const publishedName = body?.server?.name ?? body?.name;
+          if (publishedName && publishedName !== server.name) {
+            throw new Error(`Registry latest returned ${publishedName}, expected ${server.name}`);
+          }
+
+          console.log(`Registry latest record is reachable for ${server.name}.`);
+          NODE

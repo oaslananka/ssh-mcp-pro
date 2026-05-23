@@ -1,0 +1,30 @@
+repos:
+  - repo: local
+    hooks:
+      - id: pnpm-format-check
+        name: pnpm format check
+        entry: pnpm run format:check
+        language: system
+        pass_filenames: false
+        stages: [pre-commit, manual]
+
+      - id: pnpm-lint
+        name: pnpm lint
+        entry: pnpm run lint
+        language: system
+        pass_filenames: false
+        stages: [pre-commit, manual]
+
+      - id: pnpm-typecheck
+        name: pnpm typecheck
+        entry: pnpm run typecheck
+        language: system
+        pass_filenames: false
+        stages: [pre-push, manual]
+
+      - id: pnpm-unit-tests
+        name: pnpm unit tests
+        entry: pnpm test
+        language: system
+        pass_filenames: false
+        stages: [pre-push, manual]

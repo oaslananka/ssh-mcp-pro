@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">ssh-mcp-pro</title>
+  <desc id="desc">Terminal prompt with a shield</desc>
+  <rect width="512" height="512" rx="96" fill="#111827"/>
+  <path d="M112 160h288c17.7 0 32 14.3 32 32v128c0 17.7-14.3 32-32 32H112c-17.7 0-32-14.3-32-32V192c0-17.7 14.3-32 32-32Z" fill="#f8fafc"/>
+  <path d="m132 221 50 35-50 35" fill="none" stroke="#111827" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M214 304h86" fill="none" stroke="#111827" stroke-width="28" stroke-linecap="round"/>
+  <path d="M344 210 392 230v46c0 40-22 67-48 80-26-13-48-40-48-80v-46l48-20Z" fill="#0f766e"/>
+  <path d="m324 278 16 16 31-40" fill="none" stroke="#f8fafc" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

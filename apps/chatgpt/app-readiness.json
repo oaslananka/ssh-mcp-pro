@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "publishReady": false,
+  "sourceRepository": "https://github.com/oaslananka/ssh-mcp-pro",
+  "automationRepository": "https://github.com/oaslananka/ssh-mcp-pro",
+  "supportUrl": "https://github.com/oaslananka/ssh-mcp-pro/issues",
+  "securityUrl": "https://github.com/oaslananka/ssh-mcp-pro/security/advisories/new",
+  "privacyUrl": "https://github.com/oaslananka/ssh-mcp-pro/blob/main/SECURITY.md",
+  "termsUrl": "https://github.com/oaslananka/ssh-mcp-pro/blob/main/LICENSE",
+  "mcp": {
+    "serverName": "io.github.oaslananka/ssh-mcp-pro",
+    "packageName": "ssh-mcp-pro",
+    "version": "1.0.0",
+    "localCommand": "ssh-mcp-pro",
+    "localResourcePath": "/mcp",
+    "transports": [
+      "stdio",
+      "streamable-http"
+    ],
+    "legacySse": "compatibility-only",
+    "recommendedProductionTransport": "streamable-http"
+  },
+  "app": {
+    "name": "ssh-mcp-pro",
+    "description": "Secure SSH inspection and policy-controlled planning through MCP.",
+    "categories": [
+      "Developer Tools",
+      "Productivity"
+    ],
+    "icon": "apps/chatgpt/icon.svg",
+    "defaultProfile": "chatgpt"
+  },
+  "connector": {
+    "runtimeProfile": "chatgpt",
+    "credentialProviders": [
+      "agent",
+      "command"
+    ],
+    "credentialEntryInChat": false,
+    "protectedResourceMetadata": "/.well-known/oauth-protected-resource",
+    "productionAuth": "oauth-jwks",
+    "developmentAuth": "bearer"
+  },
+  "security": {
+    "readOnlyDefaultProfile": true,
+    "hostAllowlistRequired": true,
+    "strictHostKeyVerificationDefault": true,
+    "credentialEntryInChat": false,
+    "privateKeysInChat": false,
+    "rawCommandExecutionDefault": false,
+    "destructiveToolsRequirePolicyAllow": true,
+    "destructiveToolsRequireExplicitConfirmation": true,
+    "nonLoopbackHttpRequiresBearerAndOrigins": true,
+    "nonLoopbackHttpRequiresRemoteSafeProfile": true,
+    "nonLoopbackHttpRequiresStrictHostKeyPolicy": true,
+    "auditLogsEnabled": true,
+    "redactionRequired": true
+  },
+  "submission": {
+    "dashboardConfigured": false,
+    "publicHttpsMcpEndpoint": "https://sshautomator.oaslananka.dev/mcp",
+    "domainVerificationConfigured": false,
+    "componentCspConfigured": false,
+    "privacyPolicyReviewed": false,
+    "screenshotsPrepared": false,
+    "reviewTestCasesPrepared": false,
+    "oauthConfigured": false
+  },
+  "toolProfiles": [
+    {
+      "name": "chatgpt",
+      "enabledByDefault": true,
+      "tools": [
+        "connector_status",
+        "ssh_hosts_list",
+        "ssh_policy_explain",
+        "ssh_host_inspect",
+        "ssh_mutation_plan"
+      ],
+      "hiddenTools": [
+        "ssh_open_session",
+        "proc_exec",
+        "proc_sudo",
+        "fs_write",
+        "fs_rmrf",
+        "file_upload",
+        "file_download",
+        "tunnel_open_local",
+        "tunnel_open_remote"
+      ],
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    }
+  ]
+}

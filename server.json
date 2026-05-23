@@ -1,0 +1,76 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.oaslananka/ssh-mcp-pro",
+  "title": "ssh-mcp-pro",
+  "description": "Secure MCP SSH automation server with policy controls, resources, prompts, stdio, and HTTP.",
+  "repository": {
+    "url": "https://github.com/oaslananka/ssh-mcp-pro",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "ssh-mcp-pro",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      }
+    },
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "ssh-mcp-pro",
+      "version": "1.0.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://127.0.0.1:{--port}/mcp"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "--transport=http"
+        },
+        {
+          "type": "named",
+          "name": "--host",
+          "value": "127.0.0.1"
+        },
+        {
+          "type": "named",
+          "name": "--port",
+          "valueHint": "port",
+          "default": "3000"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "SSH_MCP_HTTP_ALLOWED_ORIGINS",
+          "description": "Comma-separated allowed browser origins for Streamable HTTP clients. Keep this restricted when not using loopback.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "SSH_MCP_HTTP_BEARER_TOKEN_FILE",
+          "description": "Path to a bearer token file. Required for non-loopback HTTP bindings.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "SSH_MCP_HTTP_PUBLIC_URL",
+          "description": "Stable HTTPS public /mcp URL. Required for non-loopback HTTP bindings.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "SSH_MCP_HTTP_TRUST_PROXY",
+          "description": "Set to true only behind a trusted reverse proxy that controls forwarded headers.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

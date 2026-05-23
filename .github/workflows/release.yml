@@ -1,0 +1,159 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PNPM_VERSION: 11.0.9
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    name: Release Please
+    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      major: ${{ steps.release.outputs.major }}
+      minor: ${{ steps.release.outputs.minor }}
+      patch: ${{ steps.release.outputs.patch }}
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  release-assets:
+    name: Build, Publish, and Verify Release
+    needs:
+      - release
+    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' && needs.release.outputs.release_created == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: npm-production
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          persist-credentials: false
+          ref: ${{ github.sha }}
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24.15.0
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+
+      - name: Enable pnpm
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare "pnpm@${PNPM_VERSION}" --activate
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release quality
+        run: pnpm run check
+
+      - name: Build release assets
+        id: pack
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          pnpm run sbom
+          PACKAGE_FILE="$(
+            pnpm pack --pack-destination artifacts --json |
+              node scripts/extract-pack-filename.mjs
+          )"
+          sha256sum "artifacts/${PACKAGE_FILE}" > "artifacts/${PACKAGE_FILE}.sha256"
+          sha256sum artifacts/sbom.cdx.json > artifacts/sbom.cdx.json.sha256
+          echo "package_file=${PACKAGE_FILE}" >> "$GITHUB_OUTPUT"
+
+      - name: Attest package artifact
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26
+        with:
+          subject-path: artifacts/${{ steps.pack.outputs.package_file }}
+
+      - name: Attest SBOM
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26
+        with:
+          sbom-path: artifacts/sbom.cdx.json
+          subject-path: artifacts/${{ steps.pack.outputs.package_file }}
+
+      - name: Attach assets to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          gh release upload "$RELEASE_TAG" artifacts/* --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Publish to npm with trusted publishing
+        if: ${{ vars.AUTO_RELEASE_PUBLISH == 'true' }}
+        env:
+          PACKAGE_FILE: ${{ steps.pack.outputs.package_file }}
+        run: |
+          set -euo pipefail
+          unset NODE_AUTH_TOKEN NPM_CONFIG_USERCONFIG
+          pnpm publish "./artifacts/${PACKAGE_FILE}" --access public --provenance --no-git-checks
+
+      - name: Verify npm package
+        if: ${{ vars.AUTO_RELEASE_PUBLISH == 'true' }}
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          unset NODE_AUTH_TOKEN NPM_CONFIG_USERCONFIG
+          for attempt in {1..18}; do
+            if published_version="$(pnpm view "ssh-mcp-pro@${VERSION}" version --silent 2>npm-view.err)"; then
+              if [[ "$published_version" == "$VERSION" ]]; then
+                echo "Verified ssh-mcp-pro@${VERSION} on npm."
+                exit 0
+              fi
+              echo "npm returned version '${published_version}', expected '${VERSION}'." >&2
+            else
+              echo "npm view did not find ssh-mcp-pro@${VERSION} on attempt ${attempt}." >&2
+              if [[ -s npm-view.err ]]; then
+                cat npm-view.err >&2
+              fi
+            fi
+
+            if [[ "$attempt" == "18" ]]; then
+              echo "ssh-mcp-pro@${VERSION} was not verifiable on npm after retries." >&2
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Record npm publish skip
+        if: ${{ vars.AUTO_RELEASE_PUBLISH != 'true' }}
+        run: |
+          set -euo pipefail
+          echo "npm publishing is disabled by AUTO_RELEASE_PUBLISH."

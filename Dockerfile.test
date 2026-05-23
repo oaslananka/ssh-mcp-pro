@@ -1,0 +1,32 @@
+# Dockerfile for E2E testing ssh-mcp-pro against SSH server
+FROM node:24-alpine@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f
+
+LABEL org.opencontainers.image.title="ssh-mcp-pro-test-runner" \
+      org.opencontainers.image.description="SSH test image for ssh-mcp-pro integration checks" \
+      org.opencontainers.image.url="https://github.com/oaslananka/ssh-mcp-pro" \
+      org.opencontainers.image.documentation="https://github.com/oaslananka/ssh-mcp-pro/blob/main/docs/docker.md" \
+      org.opencontainers.image.source="https://github.com/oaslananka/ssh-mcp-pro" \
+      org.opencontainers.image.licenses="MIT"
+
+WORKDIR /app
+
+# Copy package files first for better layer caching
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+
+# Install dependencies
+RUN corepack enable \
+  && corepack prepare pnpm@11.0.9 --activate \
+  && pnpm install --frozen-lockfile --ignore-scripts
+
+# Copy source and test files
+COPY src/ ./src/
+COPY test/ ./test/
+COPY tsconfig.json ./
+COPY tsconfig.test.json ./
+
+# Build TypeScript
+RUN pnpm run build && chown -R node:node /app
+USER node
+
+# Default command runs E2E tests
+CMD ["pnpm", "run", "test:e2e"]

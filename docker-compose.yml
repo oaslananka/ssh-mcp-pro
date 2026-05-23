@@ -1,0 +1,83 @@
+# Docker test environment for ssh-mcp-pro
+
+name: ssh-mcp-pro
+
+services:
+  control-plane:
+    profiles: ["remote-agent"]
+    image: ssh-mcp-pro:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - SSH_MCP_REMOTE_AGENT_CONTROL_PLANE=true
+      - SSH_MCP_HTTP_HOST=0.0.0.0
+      - SSH_MCP_HTTP_PORT=3000
+      - PUBLIC_BASE_URL=http://localhost:3000
+      - MCP_RESOURCE_URL=http://localhost:3000/mcp
+      - DATABASE_URL=file:/app/data/ssh-mcp-pro.db
+      - AUTH_ALLOW_ALL_USERS=false
+      - AUTH_ALLOWED_GITHUB_LOGINS=${AUTH_ALLOWED_GITHUB_LOGINS:-}
+      - AUTH_ALLOWED_GITHUB_IDS=${AUTH_ALLOWED_GITHUB_IDS:-}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - GITHUB_CALLBACK_URL=${GITHUB_CALLBACK_URL:-http://localhost:3000/oauth/callback/github}
+    ports:
+      - "3000:3000"
+    volumes:
+      - control-plane-data:/app/data
+    command: ["http", "--host", "0.0.0.0", "--port", "3000"]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ssh-server:
+    image: lscr.io/linuxserver/openssh-server:latest@sha256:792bb9969a6751f9be2dcecdebd166f75c51187628f1be48ac9c9b3776561c16
+    container_name: ssh-mcp-pro-test
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=UTC
+      - SUDO_ACCESS=true
+      - PASSWORD_ACCESS=true
+      - USER_PASSWORD=testpass
+      - USER_NAME=testuser
+    ports:
+      - "2222:2222"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2222"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  # Optional: Run tests against the SSH server
+  test-runner:
+    image: ssh-mcp-pro-test-runner:local
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    depends_on:
+      ssh-server:
+        condition: service_healthy
+    environment:
+      - RUN_SSH_E2E=1
+      - RUN_SSH_INTEGRATION=1
+      - TEST_SSH_HOST=ssh-server
+      - TEST_SSH_PORT=2222
+      - TEST_SSH_USER=testuser
+      - TEST_SSH_PASS=testpass
+    command: sh -lc "pnpm run test:e2e && pnpm run test:integration"
+
+volumes:
+  control-plane-data:

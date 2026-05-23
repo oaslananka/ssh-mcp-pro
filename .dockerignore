@@ -1,0 +1,15 @@
+.git
+.github
+.changeset
+coverage
+dist
+docs/api
+node_modules
+npm-debug.log*
+test-results
+artifacts
+*.tgz
+*.sarif
+.env
+.env.*
+!.env.example

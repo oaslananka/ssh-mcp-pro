@@ -1,0 +1,21 @@
+{
+  "name": "ssh-mcp-pro",
+  "display_name": "ssh-mcp-pro",
+  "description": "Secure MCP SSH automation server with policy controls, resources, prompts, stdio, and HTTP.",
+  "version": "1.0.0",
+  "author": "Osman Aslan",
+  "license": "MIT",
+  "runtime": "node",
+  "entrypoint": "dist/index.js",
+  "transport": "stdio",
+  "platforms": [
+    "linux",
+    "macos",
+    "windows"
+  ],
+  "capabilities": {
+    "tools": true,
+    "resources": true,
+    "prompts": true
+  }
+}

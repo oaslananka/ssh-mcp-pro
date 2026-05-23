@@ -1,0 +1,27 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/index.ts",
+    "src/audit.ts",
+    "src/config.ts",
+    "src/container.ts",
+    "src/mcp.ts",
+    "src/metrics.ts",
+    "src/policy.ts",
+    "src/rate-limiter.ts",
+    "src/session.ts",
+    "src/types.ts",
+    "src/tools/types.ts",
+    "src/tunnel.ts"
+  ],
+  "entryPointStrategy": "expand",
+  "out": "docs/api",
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "skipErrorChecking": false,
+  "readme": "README.md",
+  "plugin": [],
+  "name": "ssh-mcp-pro API",
+  "includeVersion": true,
+  "sourceLinkTemplate": "https://github.com/oaslananka/ssh-mcp-pro/blob/{gitRevision}/{path}#L{line}"
+}

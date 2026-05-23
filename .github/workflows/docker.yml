@@ -1,0 +1,109 @@
+name: Docker
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+    tags:
+      - "v*.*.*"
+      - "ssh-mcp-pro-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: ghcr.io/oaslananka/ssh-mcp-pro
+
+concurrency:
+  group: docker-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build and smoke image
+    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          persist-credentials: false
+
+      - name: Build local image
+        run: docker build -t ssh-mcp-pro:local .
+
+      - name: Smoke CLI
+        run: |
+          docker run --rm ssh-mcp-pro:local --version
+          docker run --rm ssh-mcp-pro:local --help
+
+      - name: Smoke image labels
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.title" }}')" = "ssh-mcp-pro"
+          test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.source" }}')" = "https://github.com/oaslananka/ssh-mcp-pro"
+
+  publish-ghcr:
+    name: Publish GHCR image
+    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' && github.event_name == 'push' && github.ref_type == 'tag' && (startsWith(github.ref_name, 'v') || startsWith(github.ref_name, 'ssh-mcp-pro-v')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    needs:
+      - build
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release tag
+        run: |
+          set -euo pipefail
+          VERSION_TAG="${GITHUB_REF_NAME}"
+          if ! echo "$VERSION_TAG" | grep -Eq '^(v|ssh-mcp-pro-v)[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "release tag must be v2.1.1 or ssh-mcp-pro-v2.1.1."
+            exit 1
+          fi
+          git rev-parse -q --verify "refs/tags/${VERSION_TAG}" >/dev/null
+
+      - name: Log in to GHCR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GHCR_ACTOR: ${{ github.actor }}
+        run: echo "$GH_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
+
+      - name: Build and push image
+        run: |
+          set -euo pipefail
+          VERSION_TAG="${GITHUB_REF_NAME}"
+          case "$VERSION_TAG" in
+            v*)
+              VERSION="${VERSION_TAG#v}"
+              ;;
+            ssh-mcp-pro-v*)
+              VERSION="${VERSION_TAG#ssh-mcp-pro-v}"
+              ;;
+            *)
+              echo "unsupported release tag: ${VERSION_TAG}"
+              exit 1
+              ;;
+          esac
+          docker build \
+            --build-arg VCS_REF="$(git rev-list -n 1 "$VERSION_TAG")" \
+            --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -t "${IMAGE_NAME}:${VERSION}" \
+            -t "${IMAGE_NAME}:${VERSION_TAG}" \
+            .
+          docker push "${IMAGE_NAME}:${VERSION}"
+          docker push "${IMAGE_NAME}:${VERSION_TAG}"

@@ -1,0 +1,53 @@
+{
+  "release-type": "node",
+  "bootstrap-sha": "d83e9a9df3367bed011917b87904b2104d07f3df",
+  "pull-request-header": "Release pull request.",
+  "pull-request-footer": "Release prepared by release automation.",
+  "packages": {
+    ".": {
+      "package-name": "ssh-mcp-pro",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "mcp.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "server.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "server.json",
+          "jsonpath": "$.packages[0].version"
+        },
+        {
+          "type": "json",
+          "path": "server.json",
+          "jsonpath": "$.packages[1].version"
+        },
+        {
+          "type": "json",
+          "path": "registry/ssh-mcp-pro/mcp.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "apps/chatgpt/app-readiness.json",
+          "jsonpath": "$.mcp.version"
+        },
+        {
+          "type": "json",
+          "path": "apps/claude/connector-readiness.json",
+          "jsonpath": "$.mcp.version"
+        },
+        {
+          "type": "generic",
+          "path": "src/mcp.ts"
+        }
+      ]
+    }
+  }
+}
