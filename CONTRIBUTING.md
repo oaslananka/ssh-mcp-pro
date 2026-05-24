@@ -110,6 +110,31 @@ Use these commands when a change touches package contents, metadata, generated d
 
 Do not publish packages manually from a feature branch. The release workflow and maintainers own publication.
 
+## Release Process
+
+Release PRs are created by release-please from Conventional Commit history. When a release PR is merged, `.github/workflows/release.yml` creates the GitHub release and builds the release artifacts.
+
+Automatic npm publishing is opt-in:
+
+- Create or update the `npm-production` GitHub environment.
+- In that environment, add an environment variable named `AUTO_RELEASE_PUBLISH` with the exact value `true`.
+- Configure the package on npmjs.com for trusted publishing with GitHub Actions:
+  - Owner: `oaslananka`
+  - Repository: `ssh-mcp-pro`
+  - Workflow filename: `release.yml`
+  - Environment name: `npm-production`
+  - Allowed action: `npm publish`
+- Keep the release job on GitHub-hosted runners with `id-token: write`; npm trusted publishing uses OIDC and does not require a long-lived npm automation token.
+- Confirm `package.json` `repository.url` still matches `https://github.com/oaslananka/ssh-mcp-pro`.
+
+If `AUTO_RELEASE_PUBLISH` is not set to `true`, the workflow records that npm publishing was skipped after attaching release assets to the GitHub release. To publish manually from a verified release artifact, download the tarball into `artifacts/`, verify the checksum attached to the GitHub release, then run:
+
+```bash
+pnpm publish ./artifacts/<tarball> --access public --provenance
+```
+
+Use manual publishing only for a release artifact that was produced by the release workflow. Do not run `pnpm publish` from feature branches or dirty worktrees.
+
 ## Docker Fixture Commands
 
 | Command | Purpose |
