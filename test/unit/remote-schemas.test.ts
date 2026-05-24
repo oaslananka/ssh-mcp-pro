@@ -11,6 +11,7 @@ import {
   parseActionResultEnvelope,
   parseAgentHelloEnvelope,
   parseAgentPolicy,
+  parseControlPlaneEnvelope,
   parsePolicyUpdateEnvelope,
 } from "../../src/remote/schemas.js";
 import type {
@@ -97,5 +98,45 @@ describe("remote protocol schemas", () => {
     expect(parsePolicyUpdateEnvelope(update).policy.profile).toBe("operations");
     expect(() => parseActionRequestEnvelope({ ...action, tool: "ssh_open_session" })).toThrow();
     expect(() => parseActionResultEnvelope({ ...result, error_code: "BAD_CODE" })).toThrow();
+  });
+
+  test("parses only control-plane-to-agent envelope types for routing", () => {
+    const action: ActionRequestEnvelope = {
+      type: "action.request",
+      action_id: "act_route",
+      agent_id: "agt_test",
+      user_id: "github:1",
+      tool: "get_system_status",
+      capability: "system.read",
+      args: {},
+      policy_version: 1,
+      issued_at: nowIso(),
+      deadline: new Date(Date.now() + 30_000).toISOString(),
+      nonce: randomToken(16),
+      signature: "sig",
+    };
+    const update: PolicyUpdateEnvelope = {
+      type: "policy.update",
+      agent_id: "agt_test",
+      policy: createAgentPolicy("operations"),
+      policy_version: 2,
+      issued_at: nowIso(),
+      nonce: randomToken(16),
+      signature: "sig",
+    };
+    const hello: AgentHelloEnvelope = {
+      type: "agent.hello",
+      agent_id: "agt_test",
+      timestamp: nowIso(),
+      nonce: randomToken(16),
+      capabilities: ["system.read"],
+      agent_version: "test",
+      host,
+      signature: "sig",
+    };
+
+    expect(parseControlPlaneEnvelope(action).type).toBe("action.request");
+    expect(parseControlPlaneEnvelope(update).type).toBe("policy.update");
+    expect(() => parseControlPlaneEnvelope(hello)).toThrow();
   });
 });

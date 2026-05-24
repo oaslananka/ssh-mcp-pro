@@ -105,6 +105,11 @@ export const policyUpdateEnvelopeSchema = z
   })
   .strict();
 
+export const controlPlaneEnvelopeSchema = z.discriminatedUnion("type", [
+  actionRequestEnvelopeSchema,
+  policyUpdateEnvelopeSchema,
+]);
+
 export function parseAgentHostMetadata(value: unknown): AgentHostMetadata {
   return agentHostMetadataSchema.parse(value);
 }
@@ -127,4 +132,10 @@ export function parseActionResultEnvelope(value: unknown): ActionResultEnvelope 
 
 export function parsePolicyUpdateEnvelope(value: unknown): PolicyUpdateEnvelope {
   return policyUpdateEnvelopeSchema.parse(value);
+}
+
+export function parseControlPlaneEnvelope(
+  value: unknown,
+): ActionRequestEnvelope | PolicyUpdateEnvelope {
+  return controlPlaneEnvelopeSchema.parse(value);
 }

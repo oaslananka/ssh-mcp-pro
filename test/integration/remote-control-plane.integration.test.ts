@@ -14,13 +14,8 @@ import {
   verifyEnvelope,
 } from "../../src/remote/crypto.js";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
-import type {
-  ActionRequestEnvelope,
-  AgentHelloEnvelope,
-  AgentPolicy,
-  PolicyUpdateEnvelope,
-  RemoteConfig,
-} from "../../src/remote/types.js";
+import { parseControlPlaneEnvelope } from "../../src/remote/schemas.js";
+import type { AgentHelloEnvelope, AgentPolicy, RemoteConfig } from "../../src/remote/types.js";
 
 interface RuntimeWebSocket {
   onopen: (() => void) | null;
@@ -417,22 +412,20 @@ describe("remote control plane and outbound agent flow", () => {
               resolve();
               return;
             }
-            if (payload.type === "policy.update") {
-              const update = payload as unknown as PolicyUpdateEnvelope;
-              expect(
-                verifyEnvelope(update as unknown as Record<string, unknown>, controlPlanePublicKey),
-              ).toBe(true);
+            const envelope = parseControlPlaneEnvelope(payload);
+            if (
+              !verifyEnvelope(envelope as unknown as Record<string, unknown>, controlPlanePublicKey)
+            ) {
+              throw new Error("control-plane envelope signature verification failed");
+            }
+            if (envelope.type === "policy.update") {
+              const update = envelope;
               policy = update.policy;
               executor.updatePolicy(policy);
               return;
             }
-            if (payload.type === "action.request") {
-              const action = payload as unknown as ActionRequestEnvelope;
-              expect(
-                verifyEnvelope(action as unknown as Record<string, unknown>, controlPlanePublicKey),
-              ).toBe(true);
-              ws.send(JSON.stringify(await executor.execute(action)));
-            }
+            const action = envelope;
+            ws.send(JSON.stringify(await executor.execute(action)));
           })().catch(reject);
         };
         ws.onerror = (error) => reject(new Error(String(error)));
