@@ -11,9 +11,11 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { AppContainer } from "../../src/container.js";
+import { ConfigManager, type ServerConfig } from "../../src/config.js";
 import { createTestContainer } from "./helpers.js";
 import { logger } from "../../src/logging.js";
 import { SERVER_NAME, SERVER_VERSION, SSHMCPServer } from "../../src/mcp.js";
+import { RateLimiter } from "../../src/rate-limiter.js";
 
 type PackageMetadata = {
   name: string;
@@ -79,6 +81,24 @@ function getHandlers(server: SSHMCPServer) {
 async function destroyContainer(container: AppContainer): Promise<void> {
   container.rateLimiter.destroy();
   await container.sessionManager.destroy();
+}
+
+function enabledRateLimitConfig(overrides: Partial<ServerConfig["rateLimit"]> = {}) {
+  return {
+    enabled: true,
+    maxRequests: 100,
+    perSession: {
+      enabled: true,
+      maxRequests: 50,
+      windowMs: 60_000,
+    },
+    windowMs: 60_000,
+    ...overrides,
+  };
+}
+
+function parseToolPayload(result: { content: Array<{ text: string }> }) {
+  return JSON.parse(result.content[0]?.text ?? "{}") as Record<string, unknown>;
 }
 
 describe("SSHMCPServer", () => {
@@ -330,11 +350,11 @@ describe("SSHMCPServer", () => {
       ...base,
       config: {
         get: vi.fn((key: string) =>
-          key === "rateLimit" ? { enabled: true } : base.config.get(key as never),
+          key === "rateLimit" ? enabledRateLimitConfig() : base.config.get(key as never),
         ),
         getAll: vi.fn(() => ({
           ...base.config.getAll(),
-          rateLimit: { enabled: true, maxRequests: 100, windowMs: 60_000 },
+          rateLimit: enabledRateLimitConfig(),
         })),
       },
       rateLimiter: {
@@ -348,7 +368,7 @@ describe("SSHMCPServer", () => {
 
     await expect(
       handlers.get(CallToolRequestSchema)?.({
-        params: { name: "ssh_list_sessions", arguments: {} },
+        params: { name: "ssh_list_sessions", arguments: { sessionId: "session-1" } },
       }),
     ).resolves.toEqual(
       expect.objectContaining({
@@ -362,6 +382,165 @@ describe("SSHMCPServer", () => {
     );
 
     expect(container.rateLimiter.check as any).toHaveBeenCalledWith("global");
+    expect(container.rateLimiter.check as any).toHaveBeenCalledTimes(1);
+
+    await destroyContainer(base);
+  });
+
+  test("returns a session-scoped rate limit error without exhausting the global limit", async () => {
+    const base = createTestContainer();
+    const rateLimitConfig = enabledRateLimitConfig({
+      perSession: {
+        enabled: true,
+        maxRequests: 2,
+        windowMs: 1_000,
+      },
+    });
+    const container = {
+      ...base,
+      config: {
+        get: vi.fn((key: string) =>
+          key === "rateLimit" ? rateLimitConfig : base.config.get(key as never),
+        ),
+        getAll: vi.fn(() => ({
+          ...base.config.getAll(),
+          rateLimit: rateLimitConfig,
+        })),
+      },
+      rateLimiter: {
+        check: vi
+          .fn()
+          .mockReturnValueOnce({ allowed: true, resetIn: 60_000 })
+          .mockReturnValueOnce({ allowed: false, resetIn: 321 }),
+        destroy: vi.fn(),
+      },
+    } as unknown as AppContainer;
+
+    const server = new SSHMCPServer(container);
+    const handlers = getHandlers(server);
+    const result = (await handlers.get(CallToolRequestSchema)?.({
+      params: { name: "proc_exec", arguments: { sessionId: "session-1", command: "uptime" } },
+    })) as {
+      content: Array<{ text: string }>;
+      isError?: boolean;
+    };
+
+    expect(result.isError).toBe(true);
+    expect(parseToolPayload(result)).toEqual(
+      expect.objectContaining({
+        code: "ERATELIMIT",
+        error: true,
+        resetIn: 321,
+        scope: "session",
+        sessionId: "session-1",
+      }),
+    );
+    expect(container.rateLimiter.check as any).toHaveBeenNthCalledWith(1, "global");
+    expect(container.rateLimiter.check as any).toHaveBeenNthCalledWith(2, "session:session-1", {
+      maxRequests: 2,
+      windowMs: 1_000,
+    });
+
+    await destroyContainer(base);
+  });
+
+  test("keeps session rate limit buckets isolated and resets them after the session window", async () => {
+    let now = 10_000;
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
+    const container = createTestContainer({
+      config: new ConfigManager({
+        rateLimit: {
+          enabled: true,
+          maxRequests: 100,
+          perSession: {
+            enabled: true,
+            maxRequests: 1,
+            windowMs: 50,
+          },
+          windowMs: 1_000,
+        },
+      }),
+      rateLimiter: new RateLimiter({
+        maxRequests: 100,
+        windowMs: 1_000,
+        blockOnLimit: true,
+      }),
+    });
+    const server = new SSHMCPServer(container);
+    const handlers = getHandlers(server);
+
+    try {
+      const firstSessionA = (await handlers.get(CallToolRequestSchema)?.({
+        params: { name: "ssh_list_sessions", arguments: { sessionId: "session-a" } },
+      })) as { isError?: boolean };
+      const secondSessionA = (await handlers.get(CallToolRequestSchema)?.({
+        params: { name: "ssh_list_sessions", arguments: { sessionId: "session-a" } },
+      })) as { isError?: boolean; content: Array<{ text: string }> };
+      const firstSessionB = (await handlers.get(CallToolRequestSchema)?.({
+        params: { name: "ssh_list_sessions", arguments: { sessionId: "session-b" } },
+      })) as { isError?: boolean };
+
+      now += 60;
+
+      const sessionAAfterReset = (await handlers.get(CallToolRequestSchema)?.({
+        params: { name: "ssh_list_sessions", arguments: { sessionId: "session-a" } },
+      })) as { isError?: boolean };
+
+      expect(firstSessionA.isError).toBeUndefined();
+      expect(secondSessionA.isError).toBe(true);
+      expect(parseToolPayload(secondSessionA)).toEqual(
+        expect.objectContaining({
+          scope: "session",
+          sessionId: "session-a",
+        }),
+      );
+      expect(firstSessionB.isError).toBeUndefined();
+      expect(sessionAAfterReset.isError).toBeUndefined();
+    } finally {
+      await destroyContainer(container);
+      nowSpy.mockRestore();
+    }
+  });
+
+  test("skips the session limiter when per-session limits are disabled", async () => {
+    const base = createTestContainer();
+    const rateLimitConfig = enabledRateLimitConfig({
+      perSession: {
+        enabled: false,
+        maxRequests: 1,
+        windowMs: 50,
+      },
+    });
+    const container = {
+      ...base,
+      config: {
+        get: vi.fn((key: string) =>
+          key === "rateLimit" ? rateLimitConfig : base.config.get(key as never),
+        ),
+        getAll: vi.fn(() => ({
+          ...base.config.getAll(),
+          rateLimit: rateLimitConfig,
+        })),
+      },
+      rateLimiter: {
+        check: vi.fn(() => ({ allowed: true, resetIn: 60_000 })),
+        destroy: vi.fn(),
+      },
+    } as unknown as AppContainer;
+
+    const server = new SSHMCPServer(container);
+    const handlers = getHandlers(server);
+    const result = (await handlers.get(CallToolRequestSchema)?.({
+      params: { name: "ssh_list_sessions", arguments: { sessionId: "session-disabled" } },
+    })) as {
+      content: Array<{ text: string }>;
+      isError?: boolean;
+    };
+
+    expect(result.isError).toBeUndefined();
+    expect(parseToolPayload(result)).toEqual(expect.objectContaining({ count: 0 }));
+    expect(container.rateLimiter.check as any).toHaveBeenCalledWith("global");
+    expect(container.rateLimiter.check as any).toHaveBeenCalledTimes(1);
 
     await destroyContainer(base);
   });
@@ -372,11 +551,11 @@ describe("SSHMCPServer", () => {
       ...base,
       config: {
         get: vi.fn((key: string) =>
-          key === "rateLimit" ? { enabled: true } : base.config.get(key as never),
+          key === "rateLimit" ? enabledRateLimitConfig() : base.config.get(key as never),
         ),
         getAll: vi.fn(() => ({
           ...base.config.getAll(),
-          rateLimit: { enabled: true, maxRequests: 100, windowMs: 60_000 },
+          rateLimit: enabledRateLimitConfig(),
         })),
       },
       rateLimiter: {

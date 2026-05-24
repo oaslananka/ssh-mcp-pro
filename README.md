@@ -96,6 +96,9 @@ All `SSH_MCP_*` environment variables parsed by `src/config.ts` are listed below
 | `SSH_MCP_DEBUG` | `false` | Enables debug-oriented configuration behavior. |
 | `SSH_MCP_RATE_LIMIT` | `true` | Enables the global MCP request rate limiter. |
 | `SSH_MCP_RATE_LIMIT_MAX` | `100` | Maximum requests per rate-limit window. |
+| `SSH_MCP_RATE_LIMIT_PER_SESSION` | `true` | Enables per-session MCP request rate limiting when tool arguments include `sessionId`. |
+| `SSH_MCP_RATE_LIMIT_PER_SESSION_MAX` | `50` | Maximum requests per SSH session per rate-limit window. |
+| `SSH_MCP_RATE_LIMIT_PER_SESSION_WINDOW_MS` | `60000` | Per-session rate-limit window in milliseconds. |
 | `SSH_MCP_RATE_LIMIT_WINDOW_MS` | `60000` | Rate-limit window in milliseconds. |
 | `SSH_MCP_STRICT_HOST_KEY` | unset | Legacy boolean alias for strict vs insecure host-key checking. |
 | `SSH_MCP_HOST_KEY_POLICY` | `strict` | Host-key mode: `strict`, `accept-new`, or `insecure`. |

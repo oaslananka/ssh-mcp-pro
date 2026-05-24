@@ -105,6 +105,11 @@ export function createTestContainer(overrides: Partial<AppContainer> = {}): AppC
       rateLimit: {
         enabled: false,
         maxRequests: 1_000,
+        perSession: {
+          enabled: true,
+          maxRequests: 50,
+          windowMs: 60_000,
+        },
         windowMs: 60_000,
       },
     });

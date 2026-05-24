@@ -14,6 +14,9 @@ describe("ConfigManager", () => {
     delete process.env.SSH_MCP_DEBUG;
     delete process.env.SSH_MCP_RATE_LIMIT;
     delete process.env.SSH_MCP_RATE_LIMIT_MAX;
+    delete process.env.SSH_MCP_RATE_LIMIT_PER_SESSION;
+    delete process.env.SSH_MCP_RATE_LIMIT_PER_SESSION_MAX;
+    delete process.env.SSH_MCP_RATE_LIMIT_PER_SESSION_WINDOW_MS;
     delete process.env.SSH_MCP_RATE_LIMIT_WINDOW_MS;
     delete process.env.SSH_MCP_STRICT_HOST_KEY;
     delete process.env.STRICT_HOST_KEY_CHECKING;
@@ -75,6 +78,11 @@ describe("ConfigManager", () => {
     expect(config.get("maxSessions")).toBe(20);
     expect(config.get("debug")).toBe(false);
     expect(config.get("rateLimit").enabled).toBe(true);
+    expect(config.get("rateLimit").perSession).toEqual({
+      enabled: true,
+      maxRequests: 50,
+      windowMs: 60000,
+    });
     expect(config.get("security").hostKeyPolicy).toBe("strict");
     expect(config.get("security").allowRootLogin).toBe(false);
     expect(config.get("policy").allowRawSudo).toBe(false);
@@ -195,6 +203,9 @@ describe("ConfigManager", () => {
     );
 
     process.env.SSH_MCP_RATE_LIMIT_MAX = "250";
+    process.env.SSH_MCP_RATE_LIMIT_PER_SESSION = "false";
+    process.env.SSH_MCP_RATE_LIMIT_PER_SESSION_MAX = "25";
+    process.env.SSH_MCP_RATE_LIMIT_PER_SESSION_WINDOW_MS = "15000";
     process.env.SSH_MCP_RATE_LIMIT_WINDOW_MS = "30000";
     process.env.KNOWN_HOSTS_PATH = knownHosts;
     process.env.SSH_MCP_ALLOWED_CIPHERS = "aes256-gcm@openssh.com\nchacha20-poly1305@openssh.com";
@@ -222,6 +233,11 @@ describe("ConfigManager", () => {
       expect(config.get("rateLimit")).toEqual({
         enabled: true,
         maxRequests: 250,
+        perSession: {
+          enabled: false,
+          maxRequests: 25,
+          windowMs: 15000,
+        },
         windowMs: 30000,
       });
       expect(config.get("security")).toEqual(
@@ -303,7 +319,12 @@ describe("ConfigManager", () => {
 
     const config = new ConfigManager({
       maxSessions: 99,
-      rateLimit: { enabled: true, maxRequests: 5, windowMs: 1000 },
+      rateLimit: {
+        enabled: true,
+        maxRequests: 5,
+        perSession: { enabled: true, maxRequests: 2, windowMs: 500 },
+        windowMs: 1000,
+      },
       security: {
         allowedCiphers: ["aes256-gcm"],
         allowRootLogin: false,
@@ -316,6 +337,11 @@ describe("ConfigManager", () => {
     expect(config.get("rateLimit")).toEqual({
       enabled: true,
       maxRequests: 5,
+      perSession: {
+        enabled: true,
+        maxRequests: 2,
+        windowMs: 500,
+      },
       windowMs: 1000,
     });
     expect(config.get("security")).toEqual({
@@ -359,6 +385,7 @@ describe("ConfigManager", () => {
 
     expect(Object.isFrozen(all)).toBe(true);
     expect(Object.isFrozen(all.rateLimit)).toBe(true);
+    expect(Object.isFrozen(all.rateLimit.perSession)).toBe(true);
     expect(Object.isFrozen(all.security)).toBe(true);
     expect(all).not.toBe(config.getAll());
   });
@@ -367,13 +394,23 @@ describe("ConfigManager", () => {
     const config = new ConfigManager();
     config.update({
       debug: true,
-      rateLimit: { enabled: false, maxRequests: 25, windowMs: 5000 },
+      rateLimit: {
+        enabled: false,
+        maxRequests: 25,
+        perSession: { enabled: true, maxRequests: 10, windowMs: 500 },
+        windowMs: 5000,
+      },
     });
 
     expect(config.get("debug")).toBe(true);
     expect(config.get("rateLimit")).toEqual({
       enabled: false,
       maxRequests: 25,
+      perSession: {
+        enabled: true,
+        maxRequests: 10,
+        windowMs: 500,
+      },
       windowMs: 5000,
     });
   });

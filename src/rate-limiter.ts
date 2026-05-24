@@ -22,11 +22,14 @@ export interface RateLimitResult {
   blocked: boolean;
 }
 
+export type RateLimitCheckOptions = Partial<Pick<RateLimiterConfig, "maxRequests" | "windowMs">>;
+
 /**
  * Rate limiter using the Sliding Window Log algorithm.
  */
 export class RateLimiter {
   private readonly logs = new Map<string, number[]>();
+  private readonly keyWindowMs = new Map<string, number>();
   private readonly config: RateLimiterConfig;
   private cleanupTimer: NodeJS.Timeout | undefined;
 
@@ -44,9 +47,12 @@ export class RateLimiter {
   /**
    * Check if request is allowed under the rate limit
    */
-  check(key: string): RateLimitResult {
+  check(key: string, options: RateLimitCheckOptions = {}): RateLimitResult {
+    const maxRequests = options.maxRequests ?? this.config.maxRequests;
+    const windowMs = options.windowMs ?? this.config.windowMs;
     const now = Date.now();
-    const cutoff = now - this.config.windowMs;
+    const cutoff = now - windowMs;
+    this.keyWindowMs.set(key, windowMs);
 
     let log = this.logs.get(key);
     if (!log) {
@@ -63,14 +69,14 @@ export class RateLimiter {
     }
 
     const count = log.length;
-    if (count >= this.config.maxRequests) {
+    if (count >= maxRequests) {
       const oldestInWindow = log[0] ?? now;
-      const resetIn = oldestInWindow + this.config.windowMs - now;
+      const resetIn = oldestInWindow + windowMs - now;
 
       logger.warn("Rate limit exceeded (sliding window)", {
         key,
         count,
-        max: this.config.maxRequests,
+        max: maxRequests,
         resetIn,
       });
 
@@ -86,8 +92,8 @@ export class RateLimiter {
 
     return {
       allowed: true,
-      remaining: Math.max(0, this.config.maxRequests - log.length),
-      resetIn: this.config.windowMs,
+      remaining: Math.max(0, maxRequests - log.length),
+      resetIn: windowMs,
       blocked: false,
     };
   }
@@ -97,15 +103,21 @@ export class RateLimiter {
    */
   reset(key: string): void {
     this.logs.delete(key);
+    this.keyWindowMs.delete(key);
     logger.debug("Rate limit reset", { key });
   }
 
   /**
    * Get current usage for a key
    */
-  getUsage(key: string): { count: number; remaining: number; resetIn: number } | null {
+  getUsage(
+    key: string,
+    options: RateLimitCheckOptions = {},
+  ): { count: number; remaining: number; resetIn: number } | null {
+    const maxRequests = options.maxRequests ?? this.config.maxRequests;
+    const windowMs = options.windowMs ?? this.keyWindowMs.get(key) ?? this.config.windowMs;
     const now = Date.now();
-    const cutoff = now - this.config.windowMs;
+    const cutoff = now - windowMs;
     const log = this.logs.get(key);
     if (!log) {
       return null;
@@ -119,8 +131,8 @@ export class RateLimiter {
     const oldestInWindow = activeLog[0] ?? now;
     return {
       count: activeLog.length,
-      remaining: Math.max(0, this.config.maxRequests - activeLog.length),
-      resetIn: oldestInWindow + this.config.windowMs - now,
+      remaining: Math.max(0, maxRequests - activeLog.length),
+      resetIn: oldestInWindow + windowMs - now,
     };
   }
 
@@ -128,13 +140,16 @@ export class RateLimiter {
    * Cleanup expired logs
    */
   private pruneExpiredLogs(): void {
-    const cutoff = Date.now() - this.config.windowMs;
+    const now = Date.now();
     let cleaned = 0;
 
     for (const [key, log] of this.logs) {
-      const activeLog = log.filter((timestamp) => timestamp > cutoff);
+      const windowMs = this.keyWindowMs.get(key) ?? this.config.windowMs;
+      const keyCutoff = now - windowMs;
+      const activeLog = log.filter((timestamp) => timestamp > keyCutoff);
       if (activeLog.length === 0) {
         this.logs.delete(key);
+        this.keyWindowMs.delete(key);
         cleaned++;
         continue;
       }
@@ -155,5 +170,6 @@ export class RateLimiter {
       this.cleanupTimer = undefined;
     }
     this.logs.clear();
+    this.keyWindowMs.clear();
   }
 }

@@ -39,6 +39,8 @@ Core request flow:
 
 `SSHMCPServer` wraps the MCP SDK `Server`. It exposes tools, resources, and prompts over stdio by default and can be connected to another transport through `connect()`.
 
+Tool calls pass through a global sliding-window rate limit first. Calls whose arguments include a top-level `sessionId` then pass through a second configurable `session:<id>` window so one busy SSH session cannot exhaust the entire server budget.
+
 `ToolRegistry` owns provider registration and dispatch. It supports compatibility aliases such as `ssh.openSession` -> `ssh_open_session`, filters tool exposure through the configured tool profile, and converts thrown project errors into structured MCP error results.
 
 ## Policy Engine
@@ -96,6 +98,6 @@ Rationale:
 
 - Keeps local stdio usage dependency-free.
 - Gives deterministic unit-test behavior.
-- Limits accidental tool-call bursts without requiring network infrastructure.
+- Limits accidental global and per-session tool-call bursts without requiring network infrastructure.
 
 Consequence: Multi-instance HTTP deployments need an external rate-limiting layer at the reverse proxy or platform edge if they require global limits.

@@ -16,9 +16,52 @@ import { getMCPPrompt, listMCPPrompts } from "./prompts.js";
 import { withSpan } from "./telemetry.js";
 import { createToolRegistry } from "./tools/index.js";
 import type { ToolProfile } from "./connector-profile.js";
+import type { RateLimitResult } from "./rate-limiter.js";
 
 export const SERVER_VERSION = "1.0.0"; // x-release-please-version
 export const SERVER_NAME = "io.github.oaslananka/ssh-mcp-pro";
+
+function getSessionIdFromArgs(args: unknown): string | undefined {
+  if (typeof args !== "object" || args === null || Array.isArray(args)) {
+    return undefined;
+  }
+
+  const sessionId = (args as { sessionId?: unknown }).sessionId;
+  if (typeof sessionId !== "string" || sessionId.length === 0) {
+    return undefined;
+  }
+
+  return sessionId;
+}
+
+function rateLimitErrorResult(
+  toolName: string,
+  rateCheck: Pick<RateLimitResult, "resetIn">,
+  scope: "global" | "session",
+  sessionId?: string,
+) {
+  const payload = {
+    error: true,
+    code: "ERATELIMIT",
+    message:
+      scope === "session" && sessionId
+        ? `Rate limit exceeded for session ${sessionId} while calling tool: ${toolName}`
+        : `Rate limit exceeded for tool: ${toolName}`,
+    resetIn: rateCheck.resetIn,
+    scope,
+    ...(sessionId ? { sessionId } : {}),
+  };
+
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify(payload, null, 2),
+      },
+    ],
+    isError: true,
+  };
+}
 
 export class SSHMCPServer {
   private readonly server: Server;
@@ -132,28 +175,27 @@ export class SSHMCPServer {
           span.setAttribute("mcp.request.kind", "call_tool");
           span.setAttribute("mcp.tool.name", name);
 
-          if (this.container.config.get("rateLimit").enabled) {
+          const rateLimit = this.container.config.get("rateLimit");
+          if (rateLimit.enabled) {
             const rateCheck = this.container.rateLimiter.check("global");
             if (!rateCheck.allowed) {
               span.setAttribute("mcp.rate_limited", true);
-              return {
-                content: [
-                  {
-                    type: "text" as const,
-                    text: JSON.stringify(
-                      {
-                        error: true,
-                        code: "ERATELIMIT",
-                        message: `Rate limit exceeded for tool: ${name}`,
-                        resetIn: rateCheck.resetIn,
-                      },
-                      null,
-                      2,
-                    ),
-                  },
-                ],
-                isError: true,
-              };
+              span.setAttribute("mcp.rate_limit.scope", "global");
+              return rateLimitErrorResult(name, rateCheck, "global");
+            }
+
+            const sessionId = getSessionIdFromArgs(args);
+            if (sessionId && rateLimit.perSession.enabled) {
+              const sessionCheck = this.container.rateLimiter.check(`session:${sessionId}`, {
+                maxRequests: rateLimit.perSession.maxRequests,
+                windowMs: rateLimit.perSession.windowMs,
+              });
+              if (!sessionCheck.allowed) {
+                span.setAttribute("mcp.rate_limited", true);
+                span.setAttribute("mcp.rate_limit.scope", "session");
+                span.setAttribute("mcp.session.id", sessionId);
+                return rateLimitErrorResult(name, sessionCheck, "session", sessionId);
+              }
             }
           }
 
