@@ -6,6 +6,8 @@ const CONTAINER_NAME = "ssh-mcp-pro-test";
 const SSH_HOST = "127.0.0.1";
 const SSH_PORT = 2222;
 const WAIT_TIMEOUT_MS = Number.parseInt(process.env.SSH_FIXTURE_TIMEOUT_MS ?? "120000", 10);
+const UP_ATTEMPTS = Number.parseInt(process.env.SSH_FIXTURE_UP_ATTEMPTS ?? "3", 10);
+const UP_RETRY_DELAY_MS = Number.parseInt(process.env.SSH_FIXTURE_UP_RETRY_DELAY_MS ?? "5000", 10);
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
@@ -94,12 +96,34 @@ async function waitForSshFixture() {
   );
 }
 
+async function composeUpWithRetry() {
+  const attempts = Math.max(1, UP_ATTEMPTS);
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const status = compose(["up", "-d", "ssh-server"]);
+    if (status === 0) {
+      return 0;
+    }
+
+    if (attempt === attempts) {
+      return status;
+    }
+
+    console.warn(
+      `docker compose up failed with exit code ${status}; retrying in ${UP_RETRY_DELAY_MS}ms (${attempt}/${attempts})`,
+    );
+    down({ bestEffort: true });
+    await sleep(UP_RETRY_DELAY_MS);
+  }
+
+  return 1;
+}
+
 async function up() {
-  const status = compose(["up", "-d", "ssh-server"]);
+  const status = await composeUpWithRetry();
   if (status !== 0) {
     process.exit(status);
   }
-
   await waitForSshFixture();
 }
 
