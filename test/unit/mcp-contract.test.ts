@@ -93,13 +93,9 @@ describe("MCP tool contracts", () => {
 
         assertToolCallResult(result, tool.name);
         if (!result.isError) {
-          const validateOutput = ajv.compile(tool.outputSchema);
           expect(
-            validateOutput(result.structuredContent),
-            `${tool.name}.structuredContent must satisfy outputSchema:\n${ajv.errorsText(
-              validateOutput.errors,
-              { separator: "\n" },
-            )}`,
+            ajv.validate(tool.outputSchema, result.structuredContent),
+            `${tool.name}.structuredContent must satisfy outputSchema:\n${formatAjvErrors()}`,
           ).toBe(true);
         }
       }
