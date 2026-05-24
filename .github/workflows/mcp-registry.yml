@@ -9,6 +9,7 @@ on:
       - package.json
       - pnpm-lock.yaml
       - registry/ssh-mcp-pro/mcp.json
+      - scripts/check-mcp-registry-record.mjs
       - scripts/validate-mcp-metadata.mjs
       - server.json
   push:
@@ -20,6 +21,7 @@ on:
       - package.json
       - pnpm-lock.yaml
       - registry/ssh-mcp-pro/mcp.json
+      - scripts/check-mcp-registry-record.mjs
       - scripts/validate-mcp-metadata.mjs
       - server.json
 
@@ -93,31 +95,4 @@ jobs:
       - name: Check published registry record
         run: |
           set -euo pipefail
-          node --input-type=module <<'NODE'
-          import { readFileSync } from "node:fs";
-
-          const server = JSON.parse(readFileSync("server.json", "utf8"));
-          const encodedName = encodeURIComponent(server.name);
-          const url = `https://registry.modelcontextprotocol.io/v0.1/servers/${encodedName}/versions/latest`;
-          const response = await fetch(url, {
-            headers: { accept: "application/json" },
-            signal: AbortSignal.timeout(20_000),
-          });
-
-          if (response.status === 404) {
-            console.log(`No published registry record exists yet for ${server.name}.`);
-            process.exit(0);
-          }
-
-          if (!response.ok) {
-            throw new Error(`Registry latest lookup failed with HTTP ${response.status}`);
-          }
-
-          const body = await response.json();
-          const publishedName = body?.server?.name ?? body?.name;
-          if (publishedName && publishedName !== server.name) {
-            throw new Error(`Registry latest returned ${publishedName}, expected ${server.name}`);
-          }
-
-          console.log(`Registry latest record is reachable for ${server.name}.`);
-          NODE
+          pnpm run validate:mcp-registry

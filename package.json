@@ -58,6 +58,7 @@
     "setup:chatgpt": "node scripts/setup-chatgpt.mjs",
     "sync-version": "node scripts/sync-version.mjs",
     "validate:mcp-metadata": "node scripts/validate-mcp-metadata.mjs",
+    "validate:mcp-registry": "node scripts/check-mcp-registry-record.mjs",
     "validate:chatgpt-app": "node scripts/validate-chatgpt-app.mjs",
     "validate:claude-connector": "node scripts/validate-claude-connector.mjs",
     "check:doc-language": "node scripts/check-doc-language.mjs",
