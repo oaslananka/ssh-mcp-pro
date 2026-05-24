@@ -129,6 +129,7 @@
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.59.4",
     "@vitest/coverage-v8": "^4.1.7",
+    "ajv": "^8.20.0",
     "eslint": "^9.39.4",
     "fast-check": "^4.8.0",
     "prettier": "^3.8.3",
