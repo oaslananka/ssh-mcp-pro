@@ -10,11 +10,7 @@ function isRegistryUnavailableError(error) {
     return false;
   }
 
-  return (
-    error.name === "AbortError" ||
-    error.name === "TimeoutError" ||
-    (error.name === "TypeError" && error.message.includes("fetch failed"))
-  );
+  return error.name === "AbortError" || error.name === "TimeoutError";
 }
 
 function formatError(error) {
@@ -28,14 +24,13 @@ function formatError(error) {
 export async function checkPublishedRegistryRecord({
   fetchImpl = globalThis.fetch,
   logger = console,
-  serverName = DEFAULT_SERVER_NAME,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 } = {}) {
   if (typeof fetchImpl !== "function") {
     throw new Error("A fetch implementation is required.");
   }
 
-  const url = `${REGISTRY_BASE_URL}/servers/${encodeURIComponent(serverName)}/versions/latest`;
+  const url = `${REGISTRY_BASE_URL}/servers/${encodeURIComponent(DEFAULT_SERVER_NAME)}/versions/latest`;
 
   let response;
   try {
@@ -46,20 +41,20 @@ export async function checkPublishedRegistryRecord({
   } catch (error) {
     if (isRegistryUnavailableError(error)) {
       logger.warn(
-        `MCP Registry latest lookup unavailable for ${serverName}: ${formatError(
+        `MCP Registry latest lookup unavailable for ${DEFAULT_SERVER_NAME}: ${formatError(
           error,
         )}. Local metadata validation already passed; skipping published record check.`,
       );
 
-      return { status: "unavailable", serverName, url };
+      return { status: "unavailable", serverName: DEFAULT_SERVER_NAME, url };
     }
 
     throw error;
   }
 
   if (response.status === 404) {
-    logger.log(`No published registry record exists yet for ${serverName}.`);
-    return { status: "missing", serverName, url };
+    logger.log(`No published registry record exists yet for ${DEFAULT_SERVER_NAME}.`);
+    return { status: "missing", serverName: DEFAULT_SERVER_NAME, url };
   }
 
   if (!response.ok) {
@@ -68,12 +63,12 @@ export async function checkPublishedRegistryRecord({
 
   const body = await response.json();
   const publishedName = body?.server?.name ?? body?.name;
-  if (publishedName && publishedName !== serverName) {
-    throw new Error(`Registry latest returned ${publishedName}, expected ${serverName}`);
+  if (publishedName && publishedName !== DEFAULT_SERVER_NAME) {
+    throw new Error(`Registry latest returned ${publishedName}, expected ${DEFAULT_SERVER_NAME}`);
   }
 
-  logger.log(`Registry latest record is reachable for ${serverName}.`);
-  return { status: "reachable", serverName, url };
+  logger.log(`Registry latest record is reachable for ${DEFAULT_SERVER_NAME}.`);
+  return { status: "reachable", serverName: DEFAULT_SERVER_NAME, url };
 }
 
 async function main() {

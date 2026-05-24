@@ -9,7 +9,6 @@ type CheckResult = {
 type CheckPublishedRegistryRecord = (options: {
   fetchImpl: typeof fetch;
   logger: Pick<Console, "log" | "warn">;
-  serverName?: string;
   timeoutMs?: number;
 }) => Promise<CheckResult>;
 
@@ -34,7 +33,6 @@ describe("MCP Registry published record check", () => {
     const result = await checkPublishedRegistryRecord({
       fetchImpl,
       logger,
-      serverName: "io.github.oaslananka/ssh-mcp-pro",
     });
 
     expect(result.status).toBe("missing");
@@ -84,7 +82,6 @@ describe("MCP Registry published record check", () => {
     const result = await checkPublishedRegistryRecord({
       fetchImpl,
       logger,
-      serverName: "io.github.oaslananka/ssh-mcp-pro",
       timeoutMs: 1,
     });
 
@@ -110,7 +107,6 @@ describe("MCP Registry published record check", () => {
       checkPublishedRegistryRecord({
         fetchImpl,
         logger: console,
-        serverName: "io.github.oaslananka/ssh-mcp-pro",
       }),
     ).rejects.toThrow(
       "Registry latest returned io.github.someone-else/ssh-mcp-pro, expected io.github.oaslananka/ssh-mcp-pro",
