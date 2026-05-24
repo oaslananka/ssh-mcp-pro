@@ -168,6 +168,150 @@ describe("createTransferService", () => {
     expect(readFile).not.toHaveBeenCalled();
   });
 
+  test("rejects uploads when local file content changes after sizing", async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "transfer-test-"));
+    const localPath = path.join(tempDir, "upload.txt");
+    fs.writeFileSync(localPath, "safe");
+    const writeFile = jest.fn(
+      (
+        _remotePath: string,
+        _data: Buffer,
+        _options: object,
+        callback: (err?: Error | null) => void,
+      ) => callback(null),
+    );
+    const readFile = jest.fn(
+      (_remotePath: string, callback: (err: Error | null, data: Buffer) => void) =>
+        callback(null, Buffer.from("safe")),
+    );
+    const fileHandle = {
+      stat: jest.fn(async () => ({ size: 4, isFile: () => true })),
+      readFile: jest.fn(async () => Buffer.from("expanded")),
+      close: jest.fn(async () => undefined),
+    };
+    const openSpy = jest.spyOn(fs.promises, "open").mockResolvedValue(fileHandle as never);
+
+    try {
+      const service = createTransferService({
+        sessionManager: {
+          getSession: () =>
+            ({
+              info: createSessionInfo(),
+              sftp: { readFile, writeFile },
+            }) as any,
+        },
+        metrics: createTransferMetrics(),
+        policy: createAllowPolicy(),
+        config: createTestConfig(),
+      });
+
+      await expect(
+        service.uploadFileWithProgress(localPath, "/tmp/upload.txt", {
+          sessionId: "session-1",
+        }),
+      ).rejects.toThrow("changed while it was read");
+      expect(writeFile).not.toHaveBeenCalled();
+      expect(fileHandle.close).toHaveBeenCalledTimes(1);
+    } finally {
+      openSpy.mockRestore();
+    }
+  });
+
+  test("rejects upload sources that are not regular files", async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "transfer-test-"));
+    const localPath = path.join(tempDir, "upload.txt");
+    fs.writeFileSync(localPath, "safe");
+    const writeFile = jest.fn(
+      (
+        _remotePath: string,
+        _data: Buffer,
+        _options: object,
+        callback: (err?: Error | null) => void,
+      ) => callback(null),
+    );
+    const readFile = jest.fn();
+    const fileHandle = {
+      stat: jest.fn(async () => ({ size: 4, isFile: () => false })),
+      readFile: jest.fn(async () => Buffer.from("safe")),
+      close: jest.fn(async () => undefined),
+    };
+    const openSpy = jest.spyOn(fs.promises, "open").mockResolvedValue(fileHandle as never);
+
+    try {
+      const service = createTransferService({
+        sessionManager: {
+          getSession: () =>
+            ({
+              info: createSessionInfo(),
+              sftp: { readFile, writeFile },
+            }) as any,
+        },
+        metrics: createTransferMetrics(),
+        policy: createAllowPolicy(),
+        config: createTestConfig(),
+      });
+
+      await expect(
+        service.uploadFileWithProgress(localPath, "/tmp/upload.txt", {
+          sessionId: "session-1",
+        }),
+      ).rejects.toThrow("not a regular file");
+      expect(fileHandle.readFile).not.toHaveBeenCalled();
+      expect(writeFile).not.toHaveBeenCalled();
+      expect(fileHandle.close).toHaveBeenCalledTimes(1);
+    } finally {
+      openSpy.mockRestore();
+    }
+  });
+
+  test("wraps local upload read errors with filesystem context", async () => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "transfer-test-"));
+    const localPath = path.join(tempDir, "upload.txt");
+    fs.writeFileSync(localPath, "safe");
+    const writeFile = jest.fn(
+      (
+        _remotePath: string,
+        _data: Buffer,
+        _options: object,
+        callback: (err?: Error | null) => void,
+      ) => callback(null),
+    );
+    const readFile = jest.fn();
+    const fileHandle = {
+      stat: jest.fn(async () => ({ size: 4, isFile: () => true })),
+      readFile: jest.fn(async () => {
+        throw new Error("read failed");
+      }),
+      close: jest.fn(async () => undefined),
+    };
+    const openSpy = jest.spyOn(fs.promises, "open").mockResolvedValue(fileHandle as never);
+
+    try {
+      const service = createTransferService({
+        sessionManager: {
+          getSession: () =>
+            ({
+              info: createSessionInfo(),
+              sftp: { readFile, writeFile },
+            }) as any,
+        },
+        metrics: createTransferMetrics(),
+        policy: createAllowPolicy(),
+        config: createTestConfig(),
+      });
+
+      await expect(
+        service.uploadFileWithProgress(localPath, "/tmp/upload.txt", {
+          sessionId: "session-1",
+        }),
+      ).rejects.toThrow("could not be read for upload");
+      expect(writeFile).not.toHaveBeenCalled();
+      expect(fileHandle.close).toHaveBeenCalledTimes(1);
+    } finally {
+      openSpy.mockRestore();
+    }
+  });
+
   test("checks local upload source policy before reading", async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "transfer-test-"));
     const { allowed, forbidden } = makeDirs(tempDir);

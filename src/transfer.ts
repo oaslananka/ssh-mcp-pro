@@ -61,6 +61,11 @@ interface LocalWritePath {
   action: Extract<PolicyAction, "transfer.local.create" | "transfer.local.overwrite">;
 }
 
+interface StableLocalFileRead {
+  content: Buffer;
+  size: number;
+}
+
 function sha256(data: Buffer): string {
   return createHash("sha256").update(data).digest("hex");
 }
@@ -146,6 +151,49 @@ async function authorizeLocalReadPath(
     mode,
   });
   return canonicalPath;
+}
+
+async function readStableLocalFile(
+  canonicalLocalPath: string,
+  maxTransferBytes: number,
+): Promise<StableLocalFileRead> {
+  const noFollowFlag =
+    (fs.constants as typeof fs.constants & { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0;
+  const flags = fs.constants.O_RDONLY | noFollowFlag;
+  let handle: Awaited<ReturnType<typeof fs.promises.open>> | undefined;
+
+  try {
+    handle = await fs.promises.open(canonicalLocalPath, flags);
+    const stats = await handle.stat();
+    if (!stats.isFile()) {
+      throw createFilesystemError(`Local path ${canonicalLocalPath} is not a regular file`);
+    }
+    if (stats.size > maxTransferBytes) {
+      throw createFilesystemError(
+        `Transfer exceeds maxTransferBytes (${maxTransferBytes})`,
+        "Use a smaller file or raise SSH_MCP_MAX_TRANSFER_BYTES intentionally.",
+      );
+    }
+
+    const content = await handle.readFile();
+    if (content.length !== stats.size) {
+      throw createFilesystemError(
+        `Local file ${canonicalLocalPath} changed while it was read`,
+        "Retry the upload after the file is stable.",
+      );
+    }
+    return { content, size: stats.size };
+  } catch (error) {
+    if (error instanceof SSHMCPError) {
+      throw error;
+    }
+    throw createFilesystemError(
+      `Local path ${canonicalLocalPath} could not be read for upload`,
+      error instanceof Error ? error.message : undefined,
+    );
+  } finally {
+    await handle?.close();
+  }
 }
 
 async function authorizeLocalWritePath(
@@ -252,15 +300,10 @@ export function createTransferService({
     const filename = path.basename(canonicalLocalPath);
 
     try {
-      const stats = await fs.promises.stat(canonicalLocalPath);
-      const totalSize = stats.size;
-      if (totalSize > config.maxTransferBytes) {
-        throw createFilesystemError(
-          `Transfer exceeds maxTransferBytes (${config.maxTransferBytes})`,
-          "Use a smaller file or raise SSH_MCP_MAX_TRANSFER_BYTES intentionally.",
-        );
-      }
-      const fileContent = await fs.promises.readFile(canonicalLocalPath);
+      const { content: fileContent, size: totalSize } = await readStableLocalFile(
+        canonicalLocalPath,
+        config.maxTransferBytes,
+      );
       const localSha256 = sha256(fileContent);
 
       await sftpWriteFile(session.sftp, remotePath, fileContent);

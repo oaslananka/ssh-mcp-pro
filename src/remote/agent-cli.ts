@@ -10,11 +10,7 @@ import {
   verifyEnvelope,
   type PemKeyPair,
 } from "./crypto.js";
-import {
-  parseActionRequestEnvelope,
-  parseAgentPolicy,
-  parsePolicyUpdateEnvelope,
-} from "./schemas.js";
+import { parseControlPlaneEnvelope, parseAgentPolicy } from "./schemas.js";
 import type { AgentHelloEnvelope, AgentHostMetadata, AgentPolicy } from "./types.js";
 
 interface AgentConfigFile {
@@ -220,27 +216,32 @@ async function runAgent(): Promise<void> {
         if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
           return;
         }
-        const record = payload as Record<string, unknown>;
-        if (record.type === "policy.update") {
-          const update = parsePolicyUpdateEnvelope(record);
-          if (
-            update.agent_id === config.agentId &&
-            verifyEnvelope(
-              update as unknown as Record<string, unknown>,
-              config.controlPlanePublicKeyPem,
-            )
-          ) {
-            config.policy = update.policy;
-            executor.updatePolicy(update.policy);
-            saveConfig(config);
-          }
+        let envelope: ReturnType<typeof parseControlPlaneEnvelope>;
+        try {
+          envelope = parseControlPlaneEnvelope(payload);
+        } catch {
           return;
         }
-        if (record.type !== "action.request") {
+        if (envelope.agent_id !== config.agentId) {
           return;
         }
-        const action = parseActionRequestEnvelope(record);
-        if (action.agent_id !== config.agentId || seenActions.has(action.action_id)) {
+        if (
+          !verifyEnvelope(
+            envelope as unknown as Record<string, unknown>,
+            config.controlPlanePublicKeyPem,
+          )
+        ) {
+          return;
+        }
+        if (envelope.type === "policy.update") {
+          const update = envelope;
+          config.policy = update.policy;
+          executor.updatePolicy(update.policy);
+          saveConfig(config);
+          return;
+        }
+        const action = envelope;
+        if (seenActions.has(action.action_id)) {
           return;
         }
         if (new Date(action.deadline).getTime() < Date.now()) {
@@ -249,14 +250,6 @@ async function runAgent(): Promise<void> {
         if (
           action.policy_version !== config.policy.version &&
           action.policy_version !== config.policy.version + 1
-        ) {
-          return;
-        }
-        if (
-          !verifyEnvelope(
-            action as unknown as Record<string, unknown>,
-            config.controlPlanePublicKeyPem,
-          )
         ) {
           return;
         }
