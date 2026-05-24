@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { SpanStatusCode, trace, type Span, type SpanOptions } from "@opentelemetry/api";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import {
@@ -64,6 +65,15 @@ describe("telemetry helpers", () => {
     expect(normalizeOtlpEndpoint("http://localhost:4318/v1/traces")).toBe(
       "http://localhost:4318/v1/traces",
     );
+  });
+
+  test("uses non-deprecated semantic convention constants", () => {
+    const source = readFileSync(new URL("../../src/telemetry.ts", import.meta.url), "utf8");
+
+    expect(source).not.toContain("SEMRESATTRS_");
+    expect(source).toContain("ATTR_SERVICE_NAME");
+    expect(source).toContain("ATTR_SERVICE_VERSION");
+    expect(source).toContain("ATTR_DEPLOYMENT_ENVIRONMENT_NAME");
   });
 
   test("derives enabled config from env and trims override values", () => {
