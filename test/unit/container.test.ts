@@ -1,6 +1,7 @@
 import { describe, expect, test } from "@jest/globals";
 import { ConfigManager } from "../../src/config.js";
-import { createContainer, createTestContainer } from "../../src/container.js";
+import { createContainer } from "../../src/container.js";
+import { createTestContainer } from "./helpers.js";
 import { MetricsCollector } from "../../src/metrics.js";
 
 describe("createContainer", () => {

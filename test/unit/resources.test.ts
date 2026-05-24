@@ -1,5 +1,6 @@
 import { afterAll, describe, expect, test } from "@jest/globals";
-import { createTestContainer, type AppContainer } from "../../src/container.js";
+import type { AppContainer } from "../../src/container.js";
+import { createTestContainer } from "./helpers.js";
 import { listResources, readResource } from "../../src/resources.js";
 
 const CANONICAL_RESOURCE_URIS = [

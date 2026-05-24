@@ -1,6 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import { createTestContainer } from "../../../src/container.js";
+import { createTestContainer } from "../helpers.js";
 import { createToolRegistry } from "../../../src/tools/index.js";
 import { ToolRegistry } from "../../../src/tools/registry.js";
 import type { ToolProvider } from "../../../src/tools/types.js";

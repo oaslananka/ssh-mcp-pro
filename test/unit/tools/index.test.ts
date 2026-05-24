@@ -1,5 +1,5 @@
 import { describe, expect, test } from "@jest/globals";
-import { createTestContainer } from "../../../src/container.js";
+import { createTestContainer } from "../helpers.js";
 import { createToolRegistry } from "../../../src/tools/index.js";
 
 describe("createToolRegistry", () => {

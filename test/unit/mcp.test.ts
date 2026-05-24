@@ -10,7 +10,8 @@ import {
   ReadResourceRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { createTestContainer, type AppContainer } from "../../src/container.js";
+import type { AppContainer } from "../../src/container.js";
+import { createTestContainer } from "./helpers.js";
 import { logger } from "../../src/logging.js";
 import { SERVER_NAME, SERVER_VERSION, SSHMCPServer } from "../../src/mcp.js";
 

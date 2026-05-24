@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, jest, test } from "@jest/globals";
-import { createTestContainer } from "../../../src/container.js";
+import { createTestContainer } from "../helpers.js";
 
 const getConfiguredHosts = jest.fn<() => Promise<string[]>>();
 const resolveConnectorCredentials = jest.fn<() => Promise<any>>();
