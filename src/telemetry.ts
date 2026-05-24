@@ -9,9 +9,9 @@ import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import {
-  SEMRESATTRS_DEPLOYMENT_ENVIRONMENT,
-  SEMRESATTRS_SERVICE_NAME,
-  SEMRESATTRS_SERVICE_VERSION,
+  ATTR_DEPLOYMENT_ENVIRONMENT_NAME,
+  ATTR_SERVICE_NAME,
+  ATTR_SERVICE_VERSION,
 } from "@opentelemetry/semantic-conventions";
 import { logger } from "./logging.js";
 
@@ -70,14 +70,14 @@ export function initTelemetry(overrides: Partial<Omit<TelemetryConfig, "enabled"
   }
 
   const resourceAttributes: Attributes = {
-    [SEMRESATTRS_SERVICE_NAME]: telemetryConfig.serviceName,
+    [ATTR_SERVICE_NAME]: telemetryConfig.serviceName,
   };
 
   if (telemetryConfig.serviceVersion) {
-    resourceAttributes[SEMRESATTRS_SERVICE_VERSION] = telemetryConfig.serviceVersion;
+    resourceAttributes[ATTR_SERVICE_VERSION] = telemetryConfig.serviceVersion;
   }
   if (telemetryConfig.environment) {
-    resourceAttributes[SEMRESATTRS_DEPLOYMENT_ENVIRONMENT] = telemetryConfig.environment;
+    resourceAttributes[ATTR_DEPLOYMENT_ENVIRONMENT_NAME] = telemetryConfig.environment;
   }
 
   const exporter = new OTLPTraceExporter({
