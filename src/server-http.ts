@@ -20,6 +20,7 @@ import {
   oauthWwwAuthenticateHeader,
   validateHttpStartupConfig,
 } from "./http-security.js";
+import { attachRateLimitHeaders, buildRateLimitHeaders } from "./http-rate-limit.js";
 import { createRemoteControlPlane } from "./remote/control-plane.js";
 import { loadRemoteConfig } from "./remote/config.js";
 import { userSafeError } from "./remote/util.js";
@@ -176,6 +177,12 @@ function protectedResourceMetadata(req: IncomingMessage): Record<string, unknown
     scopes_supported: authConfig.oauthRequiredScopes,
     authorization_servers: authConfig.oauthIssuer ? [authConfig.oauthIssuer] : [],
   };
+}
+
+function attachCurrentRateLimitHeaders(res: ServerResponse): void {
+  attachRateLimitHeaders(res, () =>
+    buildRateLimitHeaders(container.rateLimiter, container.config.get("rateLimit")),
+  );
 }
 
 function oauthChallengeHeader(req: IncomingMessage): string {
@@ -373,6 +380,7 @@ const httpServer = createServer((req, res) => {
   void (async () => {
     try {
       const requestUrl = new URL(req.url ?? endpoint, "http://localhost");
+      attachCurrentRateLimitHeaders(res);
 
       if (remoteControlPlanePromise) {
         const remoteControlPlane = await remoteControlPlanePromise;

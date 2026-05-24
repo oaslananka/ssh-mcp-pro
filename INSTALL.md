@@ -104,6 +104,10 @@ ssh-mcp-pro \
   --tool-profile remote-safe
 ```
 
+When rate limiting is enabled, HTTP responses include
+`X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`
+headers for the global MCP request budget.
+
 Register that HTTP endpoint with Codex:
 
 ```bash
