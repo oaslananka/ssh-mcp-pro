@@ -18,6 +18,10 @@ ssh-mcp-pro --version
 
 ## Codex Setup
 
+Codex supports MCP servers through `~/.codex/config.toml` and the `codex mcp`
+CLI. The commands below use the Codex CLI path and match the current Codex MCP
+command shape.
+
 Register the server with Codex:
 
 ```bash
@@ -42,6 +46,124 @@ Optional hardened setup:
 ```bash
 codex mcp remove ssh-mcp
 codex mcp add ssh-mcp --env SSH_MCP_HOST_KEY_POLICY=strict -- ssh-mcp-pro
+```
+
+### ssh-mcp-pro CLI Reference
+
+`ssh-mcp-pro --help` prints the supported server entry points. The exact help
+snapshot is included at the end of this guide for diff-based validation.
+
+Server modes:
+
+- `ssh-mcp-pro` starts the MCP server over stdio.
+- `ssh-mcp-pro stdio` starts the MCP server over stdio.
+- `ssh-mcp-pro http` starts the Streamable HTTP server.
+- `ssh-mcp-pro --transport=http` starts the Streamable HTTP server.
+- `ssh-mcp-pro --stdio` forces stdio mode.
+
+Supported aliases:
+
+- `-h` is equivalent to `--help`.
+- `-v` is equivalent to `--version`.
+- `ssh-mcp-pro --transport=stdio` is equivalent to `ssh-mcp-pro stdio`.
+
+HTTP flags:
+
+- `--host 127.0.0.1` sets the HTTP bind host.
+- `--port 3000` sets the HTTP bind port.
+- `--bearer-token-file /path/token` loads the HTTP bearer token from a file.
+- `--enable-legacy-sse` enables the legacy SSE endpoints.
+- `--tool-profile remote-safe` selects the exposed tool profile.
+- `--connector-credential-provider agent` selects the connector credential
+  provider.
+
+### HTTP Transport
+
+Use the HTTP transport when the MCP client connects over Streamable HTTP instead
+of spawning a local stdio process. Bind to loopback unless the deployment also
+sets the production HTTP security environment variables documented in
+`README.md`.
+
+Create a bearer token file with restrictive permissions:
+
+```bash
+install -m 700 -d /tmp/ssh-mcp-pro
+printf '%s' "<replace-with-random-token>" > /tmp/ssh-mcp-pro/bearer-token
+chmod 600 /tmp/ssh-mcp-pro/bearer-token
+```
+
+Start the HTTP server:
+
+```bash
+ssh-mcp-pro \
+  --transport=http \
+  --host 127.0.0.1 \
+  --port 3000 \
+  --bearer-token-file /tmp/ssh-mcp-pro/bearer-token \
+  --tool-profile remote-safe
+```
+
+Register that HTTP endpoint with Codex:
+
+```bash
+export SSH_MCP_HTTP_BEARER_TOKEN="<same-random-token>"
+codex mcp add ssh-mcp-http \
+  --url http://127.0.0.1:3000/mcp \
+  --bearer-token-env-var SSH_MCP_HTTP_BEARER_TOKEN
+```
+
+Optional HTTP flags:
+
+- `--enable-legacy-sse` enables the legacy SSE endpoints for older clients.
+- `--connector-credential-provider agent` enables connector credential lookup
+  through enrolled remote agents.
+
+### Tool Profiles
+
+The `--tool-profile <profile>` flag limits exposed tools, resources, and prompts
+for connector-oriented clients. Valid values are:
+
+- `full`
+- `remote-safe`
+- `chatgpt`
+- `claude`
+- `remote-readonly`
+- `remote-broker`
+
+Use `remote-safe` for HTTP deployments unless you have a controlled environment
+that requires the full SSH, process, filesystem, transfer, ensure, tunnel,
+connector, and system tool surface.
+
+### Remote Agent CLI
+
+`ssh-mcp-pro-agent` runs the no-custody outbound agent used by the remote
+control plane. A typical enrollment flow uses a one-time token created by the
+control plane:
+
+```bash
+npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent enroll \
+  --server https://control.example.com \
+  --token <one-time-token> \
+  --alias prod-bastion
+```
+
+Run the enrolled agent:
+
+```bash
+npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent run
+```
+
+Check enrollment status:
+
+```bash
+ssh-mcp-pro-agent status
+```
+
+Service helpers print platform-specific installation or removal instructions:
+
+```bash
+ssh-mcp-pro-agent install-service
+ssh-mcp-pro-agent uninstall-service
 ```
 
 ## VS Code Setup
@@ -392,3 +514,34 @@ RUN_SSH_E2E=1 pnpm run test:e2e
 MIT License - Copyright (c) 2025 Osman Aslan (oaslananka)
 
 See LICENSE file for full license text.
+
+## CLI Help Snapshot
+
+This snapshot mirrors `node dist/index.js --help` except for the version banner
+above the usage block.
+
+```text
+Usage:
+  ssh-mcp-pro             Start MCP server over stdio (default)
+  ssh-mcp-pro stdio       Start MCP server over stdio
+  ssh-mcp-pro http        Start Streamable HTTP server
+  ssh-mcp-pro --transport=http Start Streamable HTTP server
+  ssh-mcp-pro-agent enroll --server <url> --token <token> --alias <alias>
+  ssh-mcp-pro-agent run        Run the no-custody outbound agent
+  ssh-mcp-pro-agent status     Show local agent enrollment status
+  ssh-mcp-pro --help      Show this help
+  ssh-mcp-pro --version   Show version
+  ssh-mcp-pro --stdio     Force stdio mode (default)
+  ssh-mcp-pro --host 127.0.0.1 --port 3000
+  ssh-mcp-pro --bearer-token-file /path/token --enable-legacy-sse
+  ssh-mcp-pro --transport=http --tool-profile remote-safe
+  ssh-mcp-pro --transport=http --connector-credential-provider agent
+
+Examples:
+  Run as MCP stdio server: ssh-mcp-pro
+  Enroll remote agent: npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent enroll --server <url> --token <token> --alias <alias>
+  Run remote agent: npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent run
+  Claude/VS Code config snippet:
+    { "servers": { "ssh-mcp": { "type": "stdio", "command": "ssh-mcp-pro", "args": [] }}}
+  Debug: MCP_STDIO=1 ssh-mcp-pro
+```
