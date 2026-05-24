@@ -41,6 +41,8 @@ Core request flow:
 
 Tool calls pass through a global sliding-window rate limit first. Calls whose arguments include a top-level `sessionId` then pass through a second configurable `session:<id>` window so one busy SSH session cannot exhaust the entire server budget.
 
+Streamable HTTP responses also include `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers derived from the current global limiter usage so HTTP clients can observe budget state before a hard rate-limit error.
+
 `ToolRegistry` owns provider registration and dispatch. It supports compatibility aliases such as `ssh.openSession` -> `ssh_open_session`, filters tool exposure through the configured tool profile, and converts thrown project errors into structured MCP error results.
 
 ## Policy Engine
