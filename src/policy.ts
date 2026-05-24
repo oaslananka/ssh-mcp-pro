@@ -521,7 +521,9 @@ export class PolicyEngine {
   }
 
   check(context: PolicyContext): PolicyDecision {
-    return this.evaluate(context);
+    const decision = this.evaluate(context);
+    this.observer?.(decision, context);
+    return decision;
   }
 
   explain(context: PolicyContext): PolicyDecision {
