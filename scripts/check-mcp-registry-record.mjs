@@ -1,9 +1,19 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const REGISTRY_BASE_URL = "https://registry.modelcontextprotocol.io/v0.1";
 const DEFAULT_SERVER_NAME = "io.github.oaslananka/ssh-mcp-pro";
+const REGISTRY_LATEST_URL =
+  "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.oaslananka%2Fssh-mcp-pro/versions/latest";
 const DEFAULT_TIMEOUT_MS = 20_000;
+
+export function assertExpectedRegistryServerName({ serverPath = "server.json" } = {}) {
+  const server = JSON.parse(readFileSync(serverPath, "utf8"));
+
+  if (server.name !== DEFAULT_SERVER_NAME) {
+    throw new Error(`${serverPath} name must be ${DEFAULT_SERVER_NAME} for registry validation.`);
+  }
+}
 
 function isRegistryUnavailableError(error) {
   if (!(error instanceof Error)) {
@@ -30,11 +40,9 @@ export async function checkPublishedRegistryRecord({
     throw new Error("A fetch implementation is required.");
   }
 
-  const url = `${REGISTRY_BASE_URL}/servers/${encodeURIComponent(DEFAULT_SERVER_NAME)}/versions/latest`;
-
   let response;
   try {
-    response = await fetchImpl(url, {
+    response = await fetchImpl(REGISTRY_LATEST_URL, {
       headers: { accept: "application/json" },
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -46,7 +54,7 @@ export async function checkPublishedRegistryRecord({
         )}. Local metadata validation already passed; skipping published record check.`,
       );
 
-      return { status: "unavailable", serverName: DEFAULT_SERVER_NAME, url };
+      return { status: "unavailable", serverName: DEFAULT_SERVER_NAME, url: REGISTRY_LATEST_URL };
     }
 
     throw error;
@@ -54,7 +62,7 @@ export async function checkPublishedRegistryRecord({
 
   if (response.status === 404) {
     logger.log(`No published registry record exists yet for ${DEFAULT_SERVER_NAME}.`);
-    return { status: "missing", serverName: DEFAULT_SERVER_NAME, url };
+    return { status: "missing", serverName: DEFAULT_SERVER_NAME, url: REGISTRY_LATEST_URL };
   }
 
   if (!response.ok) {
@@ -68,10 +76,11 @@ export async function checkPublishedRegistryRecord({
   }
 
   logger.log(`Registry latest record is reachable for ${DEFAULT_SERVER_NAME}.`);
-  return { status: "reachable", serverName: DEFAULT_SERVER_NAME, url };
+  return { status: "reachable", serverName: DEFAULT_SERVER_NAME, url: REGISTRY_LATEST_URL };
 }
 
 async function main() {
+  assertExpectedRegistryServerName();
   await checkPublishedRegistryRecord();
 }
 

@@ -1,4 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 type CheckResult = {
   status: "missing" | "reachable" | "unavailable";
@@ -19,6 +22,17 @@ async function loadChecker(): Promise<CheckPublishedRegistryRecord> {
   };
 
   return module.checkPublishedRegistryRecord;
+}
+
+async function loadRegistryServerNameAssertion(): Promise<
+  (options: { serverPath: string }) => void
+> {
+  const scriptUrl = new URL("../../scripts/check-mcp-registry-record.mjs", import.meta.url);
+  const module = (await import(scriptUrl.href)) as {
+    assertExpectedRegistryServerName: (options: { serverPath: string }) => void;
+  };
+
+  return module.assertExpectedRegistryServerName;
 }
 
 describe("MCP Registry published record check", () => {
@@ -63,6 +77,22 @@ describe("MCP Registry published record check", () => {
         headers: { accept: "application/json" },
       }),
     );
+  });
+
+  test("fails before lookup when server.json drifts from the registry target", async () => {
+    const assertExpectedRegistryServerName = await loadRegistryServerNameAssertion();
+    const tempDir = mkdtempSync(join(tmpdir(), "ssh-mcp-registry-"));
+    const serverPath = join(tempDir, "server.json");
+
+    try {
+      writeFileSync(serverPath, JSON.stringify({ name: "io.github.oaslananka/renamed" }));
+
+      expect(() => assertExpectedRegistryServerName({ serverPath })).toThrow(
+        "server.json name must be io.github.oaslananka/ssh-mcp-pro for registry validation.",
+      );
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
   test("does not fail CI when the registry servers API times out", async () => {
