@@ -63,7 +63,7 @@ Create or edit your MCP configuration file. You can do this in two ways:
 ```json
 {
   "mcp.servers": {
-    "ssh-tool": {
+    "ssh-mcp-pro": {
       "type": "stdio",
       "command": "ssh-mcp-pro",
       "args": []
@@ -79,7 +79,7 @@ Create a `mcp.json` file in your workspace or user settings directory:
 ```json
 {
   "mcpServers": {
-    "ssh-tool": {
+    "ssh-mcp-pro": {
       "command": "ssh-mcp-pro",
       "args": [],
       "transport": {
@@ -108,7 +108,7 @@ For a repository-scoped setup that can be shared with the workspace, create
 ```json
 {
   "servers": {
-    "ssh-mcp": {
+    "ssh-mcp-pro": {
       "type": "stdio",
       "command": "ssh-mcp-pro",
       "args": []
@@ -118,13 +118,13 @@ For a repository-scoped setup that can be shared with the workspace, create
 ```
 
 For a personal setup, run `MCP: Open User Configuration` from the VS Code
-command palette and add the same `ssh-mcp` server to the user `mcp.json`.
+command palette and add the same `ssh-mcp-pro` server to the user `mcp.json`.
 Older Copilot Chat documentation may refer to personal VS Code `settings.json`;
 prefer the dedicated user MCP configuration when your VS Code version provides
 it.
 
 To verify the server, run `MCP: List Servers` from the command palette or open
-Copilot Chat in Agent mode, select the tools button, and confirm `ssh-mcp` is
+Copilot Chat in Agent mode, select the tools button, and confirm `ssh-mcp-pro` is
 listed. If the server is stopped, use the Start control shown in the MCP
 configuration file.
 
@@ -136,7 +136,7 @@ For GitHub Copilot CLI, a repository-level MCP configuration can live in
 ```json
 {
   "mcpServers": {
-    "ssh-mcp": {
+    "ssh-mcp-pro": {
       "type": "local",
       "command": "ssh-mcp-pro",
       "args": [],
@@ -149,23 +149,25 @@ For GitHub Copilot CLI, a repository-level MCP configuration can live in
 For a user-level Copilot CLI setup, run:
 
 ```bash
-copilot mcp add ssh-mcp --tools "*" -- ssh-mcp-pro
+copilot mcp add ssh-mcp-pro --tools "*" -- ssh-mcp-pro
 ```
 
 This writes the server to `~/.copilot/mcp-config.json`. Verify with:
 
 ```bash
 copilot mcp list
-copilot mcp get ssh-mcp
+copilot mcp get ssh-mcp-pro
 ```
 
 For Copilot cloud agent on GitHub.com, add the same `mcpServers` shape in the
 repository's Copilot Cloud agent MCP configuration and keep the `tools` field
 explicit. After assigning an issue to Copilot, open the Copilot session logs and
-expand the Start MCP Servers step to confirm the `ssh-mcp` tools were started.
+expand the Start MCP Servers step to confirm the `ssh-mcp-pro` tools were
+started.
 
 The `codex mcp add` commands in the Codex Setup section remain correct for
-Codex-based workspace agents. For GitHub Copilot CLI, use `copilot mcp add`.
+Codex-based workspace agents and intentionally keep the existing `ssh-mcp`
+Codex alias. For GitHub Copilot CLI, use `copilot mcp add`.
 
 ## Claude Desktop, Antigravity, and Other MCP Clients
 
@@ -177,7 +179,7 @@ Example `servers` schema:
 ```json
 {
   "servers": {
-    "ssh-mcp": {
+    "ssh-mcp-pro": {
       "type": "stdio",
       "command": "ssh-mcp-pro",
       "args": []
@@ -191,7 +193,7 @@ Example `mcpServers` schema:
 ```json
 {
   "mcpServers": {
-    "ssh-mcp-server": {
+    "ssh-mcp-pro": {
       "command": "pnpm",
       "args": ["dlx", "ssh-mcp-pro"]
     }
