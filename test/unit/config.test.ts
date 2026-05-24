@@ -14,7 +14,9 @@ describe("ConfigManager", () => {
     delete process.env.SSH_MCP_DEBUG;
     delete process.env.SSH_MCP_RATE_LIMIT;
     delete process.env.SSH_MCP_RATE_LIMIT_MAX;
+    delete process.env.SSH_MCP_RATE_LIMIT_PER_SESSION;
     delete process.env.SSH_MCP_RATE_LIMIT_PER_SESSION_MAX;
+    delete process.env.SSH_MCP_RATE_LIMIT_PER_SESSION_WINDOW_MS;
     delete process.env.SSH_MCP_RATE_LIMIT_WINDOW_MS;
     delete process.env.SSH_MCP_STRICT_HOST_KEY;
     delete process.env.STRICT_HOST_KEY_CHECKING;
@@ -201,7 +203,9 @@ describe("ConfigManager", () => {
     );
 
     process.env.SSH_MCP_RATE_LIMIT_MAX = "250";
+    process.env.SSH_MCP_RATE_LIMIT_PER_SESSION = "false";
     process.env.SSH_MCP_RATE_LIMIT_PER_SESSION_MAX = "25";
+    process.env.SSH_MCP_RATE_LIMIT_PER_SESSION_WINDOW_MS = "15000";
     process.env.SSH_MCP_RATE_LIMIT_WINDOW_MS = "30000";
     process.env.KNOWN_HOSTS_PATH = knownHosts;
     process.env.SSH_MCP_ALLOWED_CIPHERS = "aes256-gcm@openssh.com\nchacha20-poly1305@openssh.com";
@@ -230,9 +234,9 @@ describe("ConfigManager", () => {
         enabled: true,
         maxRequests: 250,
         perSession: {
-          enabled: true,
+          enabled: false,
           maxRequests: 25,
-          windowMs: 60000,
+          windowMs: 15000,
         },
         windowMs: 30000,
       });

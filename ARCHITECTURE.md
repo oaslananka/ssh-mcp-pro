@@ -39,7 +39,7 @@ Core request flow:
 
 `SSHMCPServer` wraps the MCP SDK `Server`. It exposes tools, resources, and prompts over stdio by default and can be connected to another transport through `connect()`.
 
-Tool calls pass through a global sliding-window rate limit first. Calls whose arguments include a top-level `sessionId` then pass through a second `session:<id>` window so one busy SSH session cannot exhaust the entire server budget.
+Tool calls pass through a global sliding-window rate limit first. Calls whose arguments include a top-level `sessionId` then pass through a second configurable `session:<id>` window so one busy SSH session cannot exhaust the entire server budget.
 
 `ToolRegistry` owns provider registration and dispatch. It supports compatibility aliases such as `ssh.openSession` -> `ssh_open_session`, filters tool exposure through the configured tool profile, and converts thrown project errors into structured MCP error results.
 

@@ -502,6 +502,49 @@ describe("SSHMCPServer", () => {
     }
   });
 
+  test("skips the session limiter when per-session limits are disabled", async () => {
+    const base = createTestContainer();
+    const rateLimitConfig = enabledRateLimitConfig({
+      perSession: {
+        enabled: false,
+        maxRequests: 1,
+        windowMs: 50,
+      },
+    });
+    const container = {
+      ...base,
+      config: {
+        get: vi.fn((key: string) =>
+          key === "rateLimit" ? rateLimitConfig : base.config.get(key as never),
+        ),
+        getAll: vi.fn(() => ({
+          ...base.config.getAll(),
+          rateLimit: rateLimitConfig,
+        })),
+      },
+      rateLimiter: {
+        check: vi.fn(() => ({ allowed: true, resetIn: 60_000 })),
+        destroy: vi.fn(),
+      },
+    } as unknown as AppContainer;
+
+    const server = new SSHMCPServer(container);
+    const handlers = getHandlers(server);
+    const result = (await handlers.get(CallToolRequestSchema)?.({
+      params: { name: "ssh_list_sessions", arguments: { sessionId: "session-disabled" } },
+    })) as {
+      content: Array<{ text: string }>;
+      isError?: boolean;
+    };
+
+    expect(result.isError).toBeUndefined();
+    expect(parseToolPayload(result)).toEqual(expect.objectContaining({ count: 0 }));
+    expect(container.rateLimiter.check as any).toHaveBeenCalledWith("global");
+    expect(container.rateLimiter.check as any).toHaveBeenCalledTimes(1);
+
+    await destroyContainer(base);
+  });
+
   test("delegates allowed rate-limited calls and defaults missing arguments", async () => {
     const base = createTestContainer();
     const container = {

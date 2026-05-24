@@ -286,9 +286,17 @@ export class ConfigManager {
       process.env.SSH_MCP_RATE_LIMIT_MAX,
       config.rateLimit.maxRequests,
     );
+    config.rateLimit.perSession.enabled = parseBoolean(
+      process.env.SSH_MCP_RATE_LIMIT_PER_SESSION,
+      config.rateLimit.perSession.enabled,
+    );
     config.rateLimit.perSession.maxRequests = parseInteger(
       process.env.SSH_MCP_RATE_LIMIT_PER_SESSION_MAX,
       config.rateLimit.perSession.maxRequests,
+    );
+    config.rateLimit.perSession.windowMs = parseInteger(
+      process.env.SSH_MCP_RATE_LIMIT_PER_SESSION_WINDOW_MS,
+      config.rateLimit.perSession.windowMs,
     );
     config.rateLimit.windowMs = parseInteger(
       process.env.SSH_MCP_RATE_LIMIT_WINDOW_MS,
