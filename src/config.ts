@@ -38,6 +38,11 @@ export interface ServerConfig {
     enabled: boolean;
     maxRequests: number;
     windowMs: number;
+    perSession: {
+      enabled: boolean;
+      maxRequests: number;
+      windowMs: number;
+    };
   };
   /** Security settings */
   security: {
@@ -96,6 +101,11 @@ export const DEFAULT_CONFIG: ServerConfig = {
     enabled: true,
     maxRequests: 100,
     windowMs: 60000,
+    perSession: {
+      enabled: true,
+      maxRequests: 50,
+      windowMs: 60000,
+    },
   },
   security: {
     allowRootLogin: false,
@@ -233,7 +243,10 @@ export class ConfigManager {
     // Start with defaults
     const config: ServerConfig = {
       ...DEFAULT_CONFIG,
-      rateLimit: { ...DEFAULT_CONFIG.rateLimit },
+      rateLimit: {
+        ...DEFAULT_CONFIG.rateLimit,
+        perSession: { ...DEFAULT_CONFIG.rateLimit.perSession },
+      },
       security: {
         ...DEFAULT_CONFIG.security,
         allowedCiphers: [...DEFAULT_CONFIG.security.allowedCiphers],
@@ -272,6 +285,10 @@ export class ConfigManager {
     config.rateLimit.maxRequests = parseInteger(
       process.env.SSH_MCP_RATE_LIMIT_MAX,
       config.rateLimit.maxRequests,
+    );
+    config.rateLimit.perSession.maxRequests = parseInteger(
+      process.env.SSH_MCP_RATE_LIMIT_PER_SESSION_MAX,
+      config.rateLimit.perSession.maxRequests,
     );
     config.rateLimit.windowMs = parseInteger(
       process.env.SSH_MCP_RATE_LIMIT_WINDOW_MS,
@@ -474,13 +491,19 @@ export class ConfigManager {
       ],
     };
 
+    const rateLimit = {
+      ...config.rateLimit,
+      ...overrides.rateLimit,
+      perSession: {
+        ...config.rateLimit.perSession,
+        ...overrides.rateLimit?.perSession,
+      },
+    };
+
     return {
       ...config,
       ...overrides,
-      rateLimit: {
-        ...config.rateLimit,
-        ...overrides.rateLimit,
-      },
+      rateLimit,
       security,
       policy,
       http: {
@@ -518,7 +541,10 @@ export class ConfigManager {
   getAll(): Readonly<ServerConfig> {
     return Object.freeze({
       ...this.config,
-      rateLimit: Object.freeze({ ...this.config.rateLimit }),
+      rateLimit: Object.freeze({
+        ...this.config.rateLimit,
+        perSession: Object.freeze({ ...this.config.rateLimit.perSession }),
+      }),
       security: Object.freeze({
         ...this.config.security,
         allowedCiphers: [...this.config.security.allowedCiphers],
@@ -602,13 +628,19 @@ export class ConfigManager {
       ],
     };
 
+    const rateLimit = {
+      ...this.config.rateLimit,
+      ...updates.rateLimit,
+      perSession: {
+        ...this.config.rateLimit.perSession,
+        ...updates.rateLimit?.perSession,
+      },
+    };
+
     this.config = {
       ...this.config,
       ...updates,
-      rateLimit: {
-        ...this.config.rateLimit,
-        ...updates.rateLimit,
-      },
+      rateLimit,
       security,
       policy,
       http: {

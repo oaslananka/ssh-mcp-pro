@@ -47,6 +47,11 @@ integrationDescribe("MCP integration tests", () => {
       rateLimit: {
         enabled: false,
         maxRequests: 5,
+        perSession: {
+          enabled: true,
+          maxRequests: 50,
+          windowMs: 60_000,
+        },
         windowMs: 1000,
       },
     });
@@ -112,6 +117,11 @@ integrationDescribe("MCP integration tests", () => {
       rateLimit: {
         enabled: true,
         maxRequests: 1,
+        perSession: {
+          enabled: true,
+          maxRequests: 50,
+          windowMs: 60_000,
+        },
         windowMs: 60_000,
       },
     });
