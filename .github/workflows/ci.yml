@@ -122,15 +122,15 @@ jobs:
 
       - name: Upload JUnit results
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: junit-node-${{ matrix.node }}
+          name: junit-node-${{ matrix.node_major }}
           path: test-results/**/*.xml
           if-no-files-found: warn
 
       - name: Upload coverage artifact
         if: ${{ !cancelled() && matrix.node == '24.15.0' }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: coverage
           path: coverage
@@ -182,9 +182,61 @@ jobs:
 
       - name: Upload integration JUnit results
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: junit-integration
+          path: test-results/**/*.xml
+          if-no-files-found: warn
+
+  e2e:
+    name: SSH E2E
+    if: >-
+      ${{
+        github.event_name != 'pull_request' ||
+        github.event.pull_request.draft == false
+      }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24.15.0
+          package-manager-cache: false
+
+      - name: Enable pnpm
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@11.0.9 --activate
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Start SSH fixture
+        run: pnpm run docker:ssh-fixture:up
+
+      - name: Run E2E tests
+        run: pnpm run test:e2e
+        env:
+          RUN_SSH_E2E: "1"
+          TEST_SSH_HOST: localhost
+          TEST_SSH_PORT: "2222"
+          TEST_SSH_USER: testuser
+          TEST_SSH_PASS: testpass
+
+      - name: Stop SSH fixture
+        if: ${{ !cancelled() }}
+        run: pnpm run docker:ssh-fixture:down
+
+      - name: Upload E2E JUnit results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: junit-e2e
           path: test-results/**/*.xml
           if-no-files-found: warn
 
@@ -202,6 +254,7 @@ jobs:
       - quality
       - unit
       - integration
+      - e2e
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
@@ -236,7 +289,7 @@ jobs:
           sha256sum "artifacts/$PACKAGE_FILE" > "artifacts/$PACKAGE_FILE.sha256"
 
       - name: Upload release verification artifacts
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: release-verification
           path: artifacts
