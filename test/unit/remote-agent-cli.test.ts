@@ -10,7 +10,11 @@ import {
   verifyEnvelope,
 } from "../../src/remote/crypto.js";
 import { createAgentPolicy } from "../../src/remote/policy.js";
-import type { ActionRequestEnvelope, AgentPolicy } from "../../src/remote/types.js";
+import type {
+  ActionRequestEnvelope,
+  AgentPolicy,
+  PolicyUpdateEnvelope,
+} from "../../src/remote/types.js";
 import { AGENT_ENROLL_COMMAND, LEGACY_AGENT_COMMAND_PATTERN } from "./helpers.js";
 
 const originalAgentConfig = process.env.SSHAUTOMATOR_AGENT_CONFIG;
@@ -220,6 +224,69 @@ describe("remote agent CLI", () => {
     );
   });
 
+  test("surfaces enrollment HTTP errors and malformed enrollment responses", async () => {
+    process.env.SSHAUTOMATOR_AGENT_CONFIG = path.join(
+      mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-cli-")),
+      "agent.json",
+    );
+    globalThis.fetch = vi.fn(async () => {
+      return new Response(JSON.stringify({ error: "token expired" }), {
+        status: 401,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    await expect(
+      runAgentCli(["enroll", "--server", "https://sshautomator.example", "--token", "expired"]),
+    ).rejects.toThrow('HTTP 401: {"error":"token expired"}');
+
+    globalThis.fetch = vi.fn(async () => {
+      return new Response(
+        JSON.stringify({
+          alias: "missing-agent-id",
+          control_plane_public_key: generateEd25519PemKeyPair().publicKeyPem,
+          policy: createAgentPolicy("operations"),
+          websocket_url: "wss://sshautomator.example/api/agents/connect",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as typeof fetch;
+
+    await expect(
+      runAgentCli(["enroll", "--server", "https://sshautomator.example", "--token", "valid"]),
+    ).rejects.toThrow("agent_id is required");
+  });
+
+  test("reports service guidance and missing enrollment status", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-cli-"));
+    process.env.SSHAUTOMATOR_AGENT_CONFIG = path.join(dir, "missing-agent.json");
+    const stdout = captureStdout();
+    try {
+      await runAgentCli(["status"]);
+      await runAgentCli(["install-service"]);
+      await runAgentCli(["uninstall-service"]);
+    } finally {
+      stdout.restore();
+    }
+
+    const output = stdout.read();
+    expect(output).toContain("Agent is not enrolled.");
+    expect(output).toContain("Create a systemd service with ExecStart:");
+    expect(output).toContain("ssh-mcp-pro-agent run");
+    expect(output).toContain("Agent=not-enrolled");
+    expect(output).toContain("Disable and remove the systemd service");
+  });
+
+  test("fails clearly when the runtime WebSocket implementation is unavailable", async () => {
+    const configPath = agentConfigPath();
+    writeAgentConfig(configPath, {});
+    (globalThis as { WebSocket?: unknown }).WebSocket = undefined;
+
+    await expect(runAgentCli(["run"])).rejects.toThrow(
+      "This Node.js runtime does not expose WebSocket. Use Node 22.22+ or Node 24.",
+    );
+  });
+
   test("run connects outbound, sends a signed hello, and signs action results", async () => {
     const configPath = agentConfigPath();
     const agentKeys = generateEd25519PemKeyPair();
@@ -317,5 +384,167 @@ describe("remote agent CLI", () => {
       stdout.restore();
     }
     expect(stdout.read()).toContain("Agent connected: agt_online");
+  });
+
+  test("run ignores invalid control-plane messages and applies signed policy updates", async () => {
+    const configPath = agentConfigPath();
+    const agentKeys = generateEd25519PemKeyPair();
+    const controlPlaneKeys = generateEd25519PemKeyPair();
+    const initialPolicy = createAgentPolicy("read-only");
+    const updatedPolicy: AgentPolicy = { ...createAgentPolicy("full-admin"), version: 2 };
+    writeAgentConfig(configPath, {
+      agentId: "agt_policy_update",
+      alias: "policy",
+      policy: initialPolicy,
+      controlPlanePublicKeyPem: controlPlaneKeys.publicKeyPem,
+      privateKeyPem: agentKeys.privateKeyPem,
+      publicKeyPem: agentKeys.publicKeyPem,
+    });
+
+    class FakeWebSocket {
+      static instances: FakeWebSocket[] = [];
+      onopen: (() => void) | null = null;
+      onmessage: ((event: { data: unknown }) => void) | null = null;
+      onerror: ((event: unknown) => void) | null = null;
+      onclose: (() => void) | null = null;
+      readonly sent: string[] = [];
+
+      constructor(readonly url: string) {
+        FakeWebSocket.instances.push(this);
+      }
+
+      send(data: string): void {
+        this.sent.push(data);
+      }
+
+      close(): void {
+        this.onclose?.();
+      }
+    }
+    (globalThis as { WebSocket?: unknown }).WebSocket = FakeWebSocket;
+    const stdout = captureStdout();
+    let runPromise: Promise<void> | undefined;
+    let socket: FakeWebSocket | undefined;
+    try {
+      runPromise = runAgentCli(["run"]);
+      socket = FakeWebSocket.instances[0];
+      socket?.onopen?.();
+      await waitFor(() => (socket?.sent.length ?? 0) >= 1);
+
+      socket?.onmessage?.({ data: JSON.stringify(null) });
+      socket?.onmessage?.({ data: JSON.stringify({ type: "policy.update" }) });
+
+      const unsignedAction: ActionRequestEnvelope = {
+        type: "action.request",
+        action_id: "act_unsigned",
+        agent_id: "agt_policy_update",
+        user_id: "github:169144131",
+        tool: "run_shell",
+        capability: "shell.exec",
+        args: { command: "node -e \"process.stdout.write('ignored')\"" },
+        policy_version: 1,
+        issued_at: nowIso(),
+        deadline: new Date(Date.now() + 30_000).toISOString(),
+        nonce: "nonce-unsigned-action",
+        signature: "not-a-valid-signature",
+      };
+      socket?.onmessage?.({ data: JSON.stringify(unsignedAction) });
+
+      const update: PolicyUpdateEnvelope = {
+        type: "policy.update",
+        agent_id: "agt_policy_update",
+        policy: updatedPolicy,
+        policy_version: updatedPolicy.version,
+        issued_at: nowIso(),
+        nonce: "nonce-policy-update",
+        signature: "",
+      };
+      update.signature = signEnvelope(
+        update as unknown as Record<string, unknown>,
+        controlPlaneKeys.privateKeyPem,
+      );
+      socket?.onmessage?.({ data: JSON.stringify(update) });
+      await waitFor(() => {
+        const persisted = JSON.parse(readFileSync(configPath, "utf8")) as { policy: AgentPolicy };
+        return persisted.policy.profile === "full-admin";
+      });
+
+      const wrongAgentUpdate: PolicyUpdateEnvelope = {
+        ...update,
+        agent_id: "agt_other",
+        nonce: "nonce-policy-other",
+        signature: "",
+      };
+      wrongAgentUpdate.signature = signEnvelope(
+        wrongAgentUpdate as unknown as Record<string, unknown>,
+        controlPlaneKeys.privateKeyPem,
+      );
+      socket?.onmessage?.({ data: JSON.stringify(wrongAgentUpdate) });
+
+      const action: ActionRequestEnvelope = {
+        type: "action.request",
+        action_id: "act_after_policy_update",
+        agent_id: "agt_policy_update",
+        user_id: "github:169144131",
+        tool: "run_shell",
+        capability: "shell.exec",
+        args: {
+          command: "node -e \"process.stdout.write('updated-policy')\"",
+          timeout_seconds: 10,
+        },
+        policy_version: updatedPolicy.version,
+        issued_at: nowIso(),
+        deadline: new Date(Date.now() + 30_000).toISOString(),
+        nonce: "nonce-action-updated-policy",
+        signature: "",
+      };
+      action.signature = signEnvelope(
+        action as unknown as Record<string, unknown>,
+        controlPlaneKeys.privateKeyPem,
+      );
+      const expiredAction: ActionRequestEnvelope = {
+        ...action,
+        action_id: "act_expired",
+        deadline: new Date(Date.now() - 30_000).toISOString(),
+        nonce: "nonce-action-expired",
+        signature: "",
+      };
+      expiredAction.signature = signEnvelope(
+        expiredAction as unknown as Record<string, unknown>,
+        controlPlaneKeys.privateKeyPem,
+      );
+      const wrongVersionAction: ActionRequestEnvelope = {
+        ...action,
+        action_id: "act_wrong_version",
+        policy_version: 999,
+        nonce: "nonce-action-wrongver",
+        signature: "",
+      };
+      wrongVersionAction.signature = signEnvelope(
+        wrongVersionAction as unknown as Record<string, unknown>,
+        controlPlaneKeys.privateKeyPem,
+      );
+
+      socket?.onmessage?.({ data: JSON.stringify(expiredAction) });
+      socket?.onmessage?.({ data: JSON.stringify(wrongVersionAction) });
+      socket?.onmessage?.({ data: JSON.stringify(action) });
+      await waitFor(() => (socket?.sent.length ?? 0) >= 2);
+      socket?.onmessage?.({ data: JSON.stringify(action) });
+
+      const result = JSON.parse(socket?.sent[1] ?? "{}") as Record<string, unknown>;
+      expect(result).toMatchObject({
+        type: "action.result",
+        action_id: "act_after_policy_update",
+        status: "ok",
+        stdout: "updated-policy",
+      });
+      expect(socket?.sent).toHaveLength(2);
+    } finally {
+      socket?.close();
+      if (runPromise) {
+        await runPromise;
+      }
+      stdout.restore();
+    }
   });
 });

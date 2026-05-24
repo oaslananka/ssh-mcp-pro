@@ -60,6 +60,50 @@ describe("remote agent executor", () => {
     expect(result.stdout).toBe("ok");
   });
 
+  test("policy updates take effect before executing commands in a requested cwd", async () => {
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-"));
+    const keyPair = generateEd25519PemKeyPair();
+    const executor = new AgentExecutor(createAgentPolicy("read-only"), keyPair.privateKeyPem);
+    executor.updatePolicy(createAgentPolicy("full-admin"));
+
+    const result = await executor.execute(
+      action("run_shell", "shell.exec", {
+        command: 'node -e "process.stdout.write(process.cwd())"',
+        cwd: tempDir,
+        timeout_seconds: 10,
+      }),
+    );
+
+    expect(result.status).toBe("ok");
+    expect(result.stdout).toBe(tempDir);
+  });
+
+  test("reports basic system status and tails allowed log files", async () => {
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-"));
+    const target = path.join(tempDir, "service.log");
+    writeFileSync(target, ["one", "two", "three"].join("\n"));
+    const keyPair = generateEd25519PemKeyPair();
+    const policy = mergeCustomPolicy({
+      profile: "read-only",
+      capabilities: createAgentPolicy("read-only").capabilities,
+      allowPaths: [tempDir.replace(/\\/gu, "/")],
+      denyPaths: ["/"],
+    });
+    const executor = new AgentExecutor(policy, keyPair.privateKeyPem);
+
+    const status = await executor.execute(
+      action("get_system_status", "system.read", { timeout_seconds: 10 }),
+    );
+    const logs = await executor.execute(
+      action("tail_logs", "logs.read", { unit_or_file: target, timeout_seconds: 10 }),
+    );
+
+    expect(status.status).toBe("ok");
+    expect(status.stdout).toContain(os.type() === "Windows_NT" ? "" : "Linux");
+    expect(logs.status).toBe("ok");
+    expect(logs.stdout).toContain("three");
+  });
+
   test("file writes are path scoped and use local policy", async () => {
     const tempDir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-"));
     const target = path.join(tempDir, "state.txt");
@@ -102,6 +146,42 @@ describe("remote agent executor", () => {
     expect(result.stdout).toContain("truncated");
   });
 
+  test("marks output truncated when the local policy allows zero output bytes", async () => {
+    const keyPair = generateEd25519PemKeyPair();
+    const policy = mergeCustomPolicy({
+      profile: "full-admin",
+      capabilities: createAgentPolicy("full-admin").capabilities,
+      maxOutputBytes: 0,
+    });
+    const executor = new AgentExecutor(policy, keyPair.privateKeyPem);
+
+    const result = await executor.execute(
+      action("run_shell", "shell.exec", {
+        command: "node -e \"process.stdout.write('hidden')\"",
+        timeout_seconds: 10,
+      }),
+    );
+
+    expect(result.status).toBe("ok");
+    expect(result.truncated).toBe(true);
+    expect(result.stdout).toBe("");
+  });
+
+  test("returns exit code 124 when bounded command execution times out", async () => {
+    const keyPair = generateEd25519PemKeyPair();
+    const executor = new AgentExecutor(createAgentPolicy("full-admin"), keyPair.privateKeyPem);
+
+    const result = await executor.execute(
+      action("run_shell", "shell.exec", {
+        command: 'node -e "setTimeout(() => undefined, 5000)"',
+        timeout_seconds: 0,
+      }),
+    );
+
+    expect(result.status).toBe("ok");
+    expect(result.exit_code).toBe(124);
+  });
+
   test("streams file reads up to the configured output limit", async () => {
     const tempDir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-"));
     const target = path.join(tempDir, "large.txt");
@@ -122,6 +202,136 @@ describe("remote agent executor", () => {
     expect(Buffer.byteLength(result.stdout ?? "", "utf8")).toBeLessThanOrEqual(48);
     expect((result.stdout ?? "").startsWith("x".repeat(16))).toBe(true);
     expect(result.stdout).toContain("truncated");
+  });
+
+  test("returns signed policy errors for denied paths and missing log targets", async () => {
+    const keyPair = generateEd25519PemKeyPair();
+    const executor = new AgentExecutor(createAgentPolicy("read-only"), keyPair.privateKeyPem);
+    const fileExecutor = new AgentExecutor(createAgentPolicy("operations"), keyPair.privateKeyPem);
+    const writeExecutor = new AgentExecutor(createAgentPolicy("full-admin"), keyPair.privateKeyPem);
+
+    await expect(
+      executor.execute(action("tail_logs", "logs.read", { unit_or_file: "", timeout_seconds: 10 })),
+    ).resolves.toMatchObject({
+      status: "error",
+      error_code: "POLICY_DENIED",
+      message: "unit_or_file is required",
+    });
+
+    await expect(
+      fileExecutor.execute(action("file_read", "files.read", { path: "/etc/passwd" })),
+    ).resolves.toMatchObject({
+      status: "error",
+      error_code: "POLICY_DENIED",
+      message: "Path is not allowed by local policy",
+    });
+    await expect(
+      fileExecutor.execute(
+        action("tail_logs", "logs.read", { unit_or_file: "/etc/syslog", timeout_seconds: 10 }),
+      ),
+    ).resolves.toMatchObject({
+      status: "error",
+      error_code: "POLICY_DENIED",
+      message: "Log path is not allowed by local policy",
+    });
+    await expect(
+      writeExecutor.execute(action("file_write", "files.write", { path: "/etc/ssh-mcp-pro" })),
+    ).resolves.toMatchObject({
+      status: "error",
+      error_code: "POLICY_DENIED",
+      message: "Path is not allowed by local policy",
+    });
+    await expect(
+      fileExecutor.execute(
+        action("restart_service", "service.manage", {
+          service: "sshd",
+          timeout_seconds: 10,
+        }),
+      ),
+    ).resolves.toMatchObject({
+      status: "error",
+      error_code: "POLICY_DENIED",
+      message: "Service is not allowed by local policy",
+    });
+    await expect(
+      fileExecutor.execute(
+        action("docker_logs", "docker.manage", {
+          container: "app",
+          timeout_seconds: 10,
+        }),
+      ),
+    ).resolves.toMatchObject({
+      status: "error",
+      error_code: "POLICY_DENIED",
+      message: "Container is not allowed by local policy",
+    });
+    await expect(
+      fileExecutor.execute(
+        action("docker_restart", "docker.manage", {
+          container: "app",
+          timeout_seconds: 10,
+        }),
+      ),
+    ).resolves.toMatchObject({
+      status: "error",
+      error_code: "POLICY_DENIED",
+      message: "Container is not allowed by local policy",
+    });
+    const unsupported = {
+      ...action("get_system_status", "system.read", { timeout_seconds: 10 }),
+      tool: "unsupported_tool" as RemoteToolName,
+    } satisfies ActionRequestEnvelope;
+    await expect(fileExecutor.execute(unsupported)).resolves.toMatchObject({
+      status: "error",
+      error_code: "UNSUPPORTED_PLATFORM",
+      message: "Unsupported action unsupported_tool",
+    });
+  });
+
+  test("dispatches docker and privileged shell tools through bounded command execution", async () => {
+    const keyPair = generateEd25519PemKeyPair();
+    const executor = new AgentExecutor(createAgentPolicy("full-admin"), keyPair.privateKeyPem);
+
+    await expect(
+      executor.execute(action("docker_ps", "docker.manage", { timeout_seconds: 1 })),
+    ).resolves.toMatchObject({
+      status: "ok",
+      truncated: false,
+    });
+    await expect(
+      executor.execute(
+        action("docker_logs", "docker.manage", {
+          container: "missing-container",
+          lines: 999,
+          timeout_seconds: 1,
+        }),
+      ),
+    ).resolves.toMatchObject({
+      status: "ok",
+      truncated: false,
+    });
+    await expect(
+      executor.execute(
+        action("docker_restart", "docker.manage", {
+          container: "missing-container",
+          timeout_seconds: 1,
+        }),
+      ),
+    ).resolves.toMatchObject({
+      status: "ok",
+      truncated: false,
+    });
+    await expect(
+      executor.execute(
+        action("run_shell_as_root", "sudo.exec", {
+          command: "true",
+          timeout_seconds: 1,
+        }),
+      ),
+    ).resolves.toMatchObject({
+      status: "ok",
+      truncated: false,
+    });
   });
 
   test("rejects unsafe service, container, and log identifiers before spawning commands", async () => {
