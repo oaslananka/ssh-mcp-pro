@@ -12,8 +12,26 @@ type ExecResponse = {
   stderr?: string;
 };
 
+type CapturedConnectConfig = Record<string, unknown> & {
+  hostVerifier?: (fingerprint: string) => boolean;
+};
+
 function createExecMap(entries: Record<string, ExecResponse | Error>) {
   return new Map<string, ExecResponse | Error>(Object.entries(entries));
+}
+
+function mockConnectWithHostVerification(fingerprint: string) {
+  vi.spyOn(NodeSSH.prototype, "connect").mockImplementationOnce(async function (
+    this: NodeSSH,
+    config: unknown,
+  ) {
+    (this as NodeSSH & { __connectConfig?: unknown }).__connectConfig = config;
+    const verifier = (config as CapturedConnectConfig).hostVerifier;
+    if (!verifier?.(fingerprint)) {
+      throw new Error("host key mismatch");
+    }
+    return this;
+  });
 }
 
 function knownHostFingerprint(keyBlob: string, encoding: "base64" | "hex" = "base64") {
@@ -372,6 +390,47 @@ describe("SessionManager", () => {
     );
   });
 
+  test("uses deprecated strictHostKeyChecking only when hostKeyPolicy is omitted", async () => {
+    const legacyStrictSession = await manager.openSession({
+      host: "legacy-strict.example",
+      username: "demo",
+      password: "secret",
+      auth: "password",
+      strictHostKeyChecking: true,
+    });
+    const legacyStrictConfig = (
+      manager.getSession(legacyStrictSession.sessionId)?.ssh as NodeSSH & {
+        __connectConfig?: Record<string, unknown>;
+      }
+    ).__connectConfig;
+
+    expect(legacyStrictSession.hostKeyPolicy).toBe("strict");
+    expect(legacyStrictConfig).toEqual(
+      expect.objectContaining({
+        hostHash: "sha256",
+        hostVerifier: expect.any(Function),
+      }),
+    );
+
+    const legacyInsecureSession = await manager.openSession({
+      host: "legacy-insecure.example",
+      username: "demo",
+      password: "secret",
+      auth: "password",
+      strictHostKeyChecking: false,
+    });
+    const legacyInsecureConfig = (
+      manager.getSession(legacyInsecureSession.sessionId)?.ssh as NodeSSH & {
+        __connectConfig?: Record<string, unknown>;
+      }
+    ).__connectConfig;
+
+    expect(legacyInsecureSession.hostKeyPolicy).toBe("insecure");
+    expect(
+      (legacyInsecureConfig?.hostVerifier as (fingerprint: string) => boolean)("anything"),
+    ).toBe(true);
+  });
+
   test("supports fingerprint pinning and explain-mode root denial", async () => {
     const pinned = await manager.openSession({
       host: "pinned.example",
@@ -419,6 +478,87 @@ describe("SessionManager", () => {
         wouldConnect: false,
       }),
     );
+  });
+
+  test("accepts strict known_hosts entries with supported host key types", async () => {
+    const keyBlob = Buffer.from("supported-host-key").toString("base64");
+    const knownHostsPath = path.join(tempDir, "supported_known_hosts");
+    fs.writeFileSync(knownHostsPath, `supported.example ssh-ed25519 ${keyBlob}\n`, "utf8");
+    mockConnectWithHostVerification(knownHostFingerprint(keyBlob));
+
+    await expect(
+      manager.openSession({
+        host: "supported.example",
+        username: "demo",
+        password: "secret",
+        auth: "password",
+        knownHostsPath,
+      }),
+    ).resolves.toEqual(expect.objectContaining({ host: "supported.example" }));
+  });
+
+  test("rejects strict known_hosts entries with unknown host key types as EHOSTKEY", async () => {
+    const keyBlob = Buffer.from("unknown-host-key").toString("base64");
+    const knownHostsPath = path.join(tempDir, "unknown_known_hosts");
+    fs.writeFileSync(knownHostsPath, `unknown.example ssh-unknown ${keyBlob}\n`, "utf8");
+    mockConnectWithHostVerification(knownHostFingerprint(keyBlob));
+
+    await expect(
+      manager.openSession({
+        host: "unknown.example",
+        username: "demo",
+        password: "secret",
+        auth: "password",
+        knownHostsPath,
+      }),
+    ).rejects.toMatchObject({ code: "EHOSTKEY" });
+  });
+
+  test("skips host key verification when hostKeyPolicy is insecure", async () => {
+    mockConnectWithHostVerification("untrusted-fingerprint");
+
+    await expect(
+      manager.openSession({
+        host: "skip-host-key.example",
+        username: "demo",
+        password: "secret",
+        auth: "password",
+        hostKeyPolicy: "insecure",
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        host: "skip-host-key.example",
+        hostKeyPolicy: "insecure",
+      }),
+    );
+  });
+
+  test("rejects expectedHostKeySha256 mismatches with EHOSTKEY", async () => {
+    mockConnectWithHostVerification("different");
+
+    await expect(
+      manager.openSession({
+        host: "pinned-mismatch.example",
+        username: "demo",
+        password: "secret",
+        auth: "password",
+        expectedHostKeySha256: "SHA256:abc123",
+      }),
+    ).rejects.toMatchObject({ code: "EHOSTKEY" });
+  });
+
+  test("accepts expectedHostKeySha256 matches without throwing", async () => {
+    mockConnectWithHostVerification("abc123");
+
+    await expect(
+      manager.openSession({
+        host: "pinned-match.example",
+        username: "demo",
+        password: "secret",
+        auth: "password",
+        expectedHostKeySha256: "SHA256:abc123",
+      }),
+    ).resolves.toEqual(expect.objectContaining({ host: "pinned-match.example" }));
   });
 
   test("supports key and agent authentication paths", async () => {
