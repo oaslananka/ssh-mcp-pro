@@ -520,6 +520,12 @@ export class PolicyEngine {
     return decision;
   }
 
+  check(context: PolicyContext): PolicyDecision {
+    const decision = this.evaluate(context);
+    this.observer?.(decision, context);
+    return decision;
+  }
+
   explain(context: PolicyContext): PolicyDecision {
     const decision = this.evaluate({ ...context, mode: "explain" });
     this.observer?.(decision, { ...context, mode: "explain" });

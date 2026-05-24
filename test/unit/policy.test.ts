@@ -487,4 +487,32 @@ describe("PolicyEngine", () => {
       expect.objectContaining({ action: "proc.sudo" }),
     );
   });
+
+  test("check reports non-throwing decisions to the observer", () => {
+    const observer = vi.fn();
+    const engine = new PolicyEngine(policy().getEffectivePolicy(), observer);
+
+    const denied = engine.check({
+      action: "proc.sudo",
+      command: "id",
+      rawSudo: true,
+    });
+    const allowed = engine.check({
+      action: "proc.exec",
+      command: "echo ok",
+    });
+
+    expect(denied).toEqual(expect.objectContaining({ allowed: false }));
+    expect(allowed).toEqual(expect.objectContaining({ allowed: true }));
+    expect(observer).toHaveBeenNthCalledWith(
+      1,
+      denied,
+      expect.objectContaining({ action: "proc.sudo" }),
+    );
+    expect(observer).toHaveBeenNthCalledWith(
+      2,
+      allowed,
+      expect.objectContaining({ action: "proc.exec" }),
+    );
+  });
 });
