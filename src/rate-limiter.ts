@@ -32,6 +32,7 @@ export class RateLimiter {
   private readonly keyWindowMs = new Map<string, number>();
   private readonly config: RateLimiterConfig;
   private cleanupTimer: NodeJS.Timeout | undefined;
+  private destroyed = false;
 
   constructor(config: Partial<RateLimiterConfig> = {}) {
     this.config = {
@@ -48,6 +49,16 @@ export class RateLimiter {
    * Check if request is allowed under the rate limit
    */
   check(key: string, options: RateLimitCheckOptions = {}): RateLimitResult {
+    if (this.destroyed) {
+      logger.warn("Rate limit check attempted after limiter destroy", { key });
+      return {
+        allowed: false,
+        remaining: 0,
+        resetIn: 0,
+        blocked: true,
+      };
+    }
+
     const maxRequests = options.maxRequests ?? this.config.maxRequests;
     const windowMs = options.windowMs ?? this.config.windowMs;
     const now = Date.now();
@@ -171,5 +182,6 @@ export class RateLimiter {
     }
     this.logs.clear();
     this.keyWindowMs.clear();
+    this.destroyed = true;
   }
 }
