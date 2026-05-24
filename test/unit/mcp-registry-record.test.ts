@@ -12,6 +12,7 @@ type CheckResult = {
 type CheckPublishedRegistryRecord = (options: {
   fetchImpl: typeof fetch;
   logger: Pick<Console, "log" | "warn">;
+  serverPath?: string;
   timeoutMs?: number;
 }) => Promise<CheckResult>;
 
@@ -22,17 +23,6 @@ async function loadChecker(): Promise<CheckPublishedRegistryRecord> {
   };
 
   return module.checkPublishedRegistryRecord;
-}
-
-async function loadRegistryServerNameAssertion(): Promise<
-  (options: { serverPath: string }) => void
-> {
-  const scriptUrl = new URL("../../scripts/check-mcp-registry-record.mjs", import.meta.url);
-  const module = (await import(scriptUrl.href)) as {
-    assertExpectedRegistryServerName: (options: { serverPath: string }) => void;
-  };
-
-  return module.assertExpectedRegistryServerName;
 }
 
 describe("MCP Registry published record check", () => {
@@ -57,39 +47,56 @@ describe("MCP Registry published record check", () => {
     );
   });
 
-  test("uses the repo registry name by default", async () => {
+  test("reads server.json before using the mapped registry URL", async () => {
     const checkPublishedRegistryRecord = await loadChecker();
     const fetchImpl = vi.fn(async () => new Response("not found", { status: 404 }));
     const logger = {
       log: vi.fn(),
       warn: vi.fn(),
     };
+    const tempDir = mkdtempSync(join(tmpdir(), "ssh-mcp-registry-"));
+    const serverPath = join(tempDir, "server.json");
 
-    const result = await checkPublishedRegistryRecord({
-      fetchImpl,
-      logger,
-    });
+    try {
+      writeFileSync(serverPath, JSON.stringify({ name: "io.github.oaslananka/ssh-mcp-pro" }));
 
-    expect(result.serverName).toBe("io.github.oaslananka/ssh-mcp-pro");
-    expect(fetchImpl).toHaveBeenCalledWith(
-      "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.oaslananka%2Fssh-mcp-pro/versions/latest",
-      expect.objectContaining({
-        headers: { accept: "application/json" },
-      }),
-    );
+      const result = await checkPublishedRegistryRecord({
+        fetchImpl,
+        logger,
+        serverPath,
+      });
+
+      expect(result.serverName).toBe("io.github.oaslananka/ssh-mcp-pro");
+      expect(fetchImpl).toHaveBeenCalledWith(
+        "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.oaslananka%2Fssh-mcp-pro/versions/latest",
+        expect.objectContaining({
+          headers: { accept: "application/json" },
+        }),
+      );
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
   });
 
-  test("fails before lookup when server.json drifts from the registry target", async () => {
-    const assertExpectedRegistryServerName = await loadRegistryServerNameAssertion();
+  test("fails before lookup when server.json is not mapped to a registry target", async () => {
+    const checkPublishedRegistryRecord = await loadChecker();
+    const fetchImpl = vi.fn(async () => new Response("not found", { status: 404 }));
     const tempDir = mkdtempSync(join(tmpdir(), "ssh-mcp-registry-"));
     const serverPath = join(tempDir, "server.json");
 
     try {
       writeFileSync(serverPath, JSON.stringify({ name: "io.github.oaslananka/renamed" }));
 
-      expect(() => assertExpectedRegistryServerName({ serverPath })).toThrow(
-        "server.json name must be io.github.oaslananka/ssh-mcp-pro for registry validation.",
+      await expect(
+        checkPublishedRegistryRecord({
+          fetchImpl,
+          logger: console,
+          serverPath,
+        }),
+      ).rejects.toThrow(
+        `${serverPath} name io.github.oaslananka/renamed is not mapped to a published registry URL.`,
       );
+      expect(fetchImpl).not.toHaveBeenCalled();
     } finally {
       rmSync(tempDir, { recursive: true, force: true });
     }

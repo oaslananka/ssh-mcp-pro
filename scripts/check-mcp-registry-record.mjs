@@ -2,17 +2,32 @@
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
-const DEFAULT_SERVER_NAME = "io.github.oaslananka/ssh-mcp-pro";
-const REGISTRY_LATEST_URL =
-  "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.oaslananka%2Fssh-mcp-pro/versions/latest";
+const PUBLISHED_REGISTRY_TARGETS = new Map([
+  [
+    "io.github.oaslananka/ssh-mcp-pro",
+    "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.oaslananka%2Fssh-mcp-pro/versions/latest",
+  ],
+]);
 const DEFAULT_TIMEOUT_MS = 20_000;
 
-export function assertExpectedRegistryServerName({ serverPath = "server.json" } = {}) {
+export function resolvePublishedRegistryTarget({ serverPath = "server.json" } = {}) {
   const server = JSON.parse(readFileSync(serverPath, "utf8"));
+  const serverName = server?.name;
 
-  if (server.name !== DEFAULT_SERVER_NAME) {
-    throw new Error(`${serverPath} name must be ${DEFAULT_SERVER_NAME} for registry validation.`);
+  if (typeof serverName !== "string" || serverName.length === 0) {
+    throw new Error(`${serverPath} must define a non-empty string name for registry validation.`);
   }
+
+  const registryLatestUrl = PUBLISHED_REGISTRY_TARGETS.get(serverName);
+  if (!registryLatestUrl) {
+    throw new Error(`${serverPath} name ${serverName} is not mapped to a published registry URL.`);
+  }
+
+  return { serverName, registryLatestUrl };
+}
+
+export function assertExpectedRegistryServerName(options = {}) {
+  resolvePublishedRegistryTarget(options);
 }
 
 function isRegistryUnavailableError(error) {
@@ -34,35 +49,38 @@ function formatError(error) {
 export async function checkPublishedRegistryRecord({
   fetchImpl = globalThis.fetch,
   logger = console,
+  serverPath = "server.json",
   timeoutMs = DEFAULT_TIMEOUT_MS,
 } = {}) {
   if (typeof fetchImpl !== "function") {
     throw new Error("A fetch implementation is required.");
   }
 
+  const { serverName, registryLatestUrl } = resolvePublishedRegistryTarget({ serverPath });
+
   let response;
   try {
-    response = await fetchImpl(REGISTRY_LATEST_URL, {
+    response = await fetchImpl(registryLatestUrl, {
       headers: { accept: "application/json" },
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (error) {
     if (isRegistryUnavailableError(error)) {
       logger.warn(
-        `MCP Registry latest lookup unavailable for ${DEFAULT_SERVER_NAME}: ${formatError(
+        `MCP Registry latest lookup unavailable for ${serverName}: ${formatError(
           error,
         )}. Local metadata validation already passed; skipping published record check.`,
       );
 
-      return { status: "unavailable", serverName: DEFAULT_SERVER_NAME, url: REGISTRY_LATEST_URL };
+      return { status: "unavailable", serverName, url: registryLatestUrl };
     }
 
     throw error;
   }
 
   if (response.status === 404) {
-    logger.log(`No published registry record exists yet for ${DEFAULT_SERVER_NAME}.`);
-    return { status: "missing", serverName: DEFAULT_SERVER_NAME, url: REGISTRY_LATEST_URL };
+    logger.log(`No published registry record exists yet for ${serverName}.`);
+    return { status: "missing", serverName, url: registryLatestUrl };
   }
 
   if (!response.ok) {
@@ -71,16 +89,15 @@ export async function checkPublishedRegistryRecord({
 
   const body = await response.json();
   const publishedName = body?.server?.name ?? body?.name;
-  if (publishedName && publishedName !== DEFAULT_SERVER_NAME) {
-    throw new Error(`Registry latest returned ${publishedName}, expected ${DEFAULT_SERVER_NAME}`);
+  if (publishedName && publishedName !== serverName) {
+    throw new Error(`Registry latest returned ${publishedName}, expected ${serverName}`);
   }
 
-  logger.log(`Registry latest record is reachable for ${DEFAULT_SERVER_NAME}.`);
-  return { status: "reachable", serverName: DEFAULT_SERVER_NAME, url: REGISTRY_LATEST_URL };
+  logger.log(`Registry latest record is reachable for ${serverName}.`);
+  return { status: "reachable", serverName, url: registryLatestUrl };
 }
 
 async function main() {
-  assertExpectedRegistryServerName();
   await checkPublishedRegistryRecord();
 }
 
