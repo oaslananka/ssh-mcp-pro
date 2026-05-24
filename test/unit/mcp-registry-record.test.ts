@@ -9,7 +9,7 @@ type CheckResult = {
 type CheckPublishedRegistryRecord = (options: {
   fetchImpl: typeof fetch;
   logger: Pick<Console, "log" | "warn">;
-  serverName: string;
+  serverName?: string;
   timeoutMs?: number;
 }) => Promise<CheckResult>;
 
@@ -42,6 +42,28 @@ describe("MCP Registry published record check", () => {
     expect(result.url).toContain("io.github.oaslananka%2Fssh-mcp-pro");
     expect(logger.log).toHaveBeenCalledWith(
       "No published registry record exists yet for io.github.oaslananka/ssh-mcp-pro.",
+    );
+  });
+
+  test("uses the repo registry name by default", async () => {
+    const checkPublishedRegistryRecord = await loadChecker();
+    const fetchImpl = vi.fn(async () => new Response("not found", { status: 404 }));
+    const logger = {
+      log: vi.fn(),
+      warn: vi.fn(),
+    };
+
+    const result = await checkPublishedRegistryRecord({
+      fetchImpl,
+      logger,
+    });
+
+    expect(result.serverName).toBe("io.github.oaslananka/ssh-mcp-pro");
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.oaslananka%2Fssh-mcp-pro/versions/latest",
+      expect.objectContaining({
+        headers: { accept: "application/json" },
+      }),
     );
   });
 
