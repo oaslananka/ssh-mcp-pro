@@ -12,8 +12,37 @@ import type {
 } from "./types.js";
 
 type SqlValue = string | number | null;
+type DatabaseSyncConstructor = typeof import("node:sqlite").DatabaseSync;
+type NodeSqliteModule = { DatabaseSync: unknown };
+
+type RemoteStoreOptions = {
+  loadSqlite?: () => NodeSqliteModule;
+};
+
 const require = createRequire(import.meta.url);
-const { DatabaseSync } = require("node:sqlite") as typeof import("node:sqlite");
+
+function loadNodeSqlite(): NodeSqliteModule {
+  return require("node:sqlite") as NodeSqliteModule;
+}
+
+function resolveDatabaseSync(
+  loadSqlite: () => NodeSqliteModule = loadNodeSqlite,
+): DatabaseSyncConstructor {
+  try {
+    const { DatabaseSync } = loadSqlite();
+    if (typeof DatabaseSync !== "function") {
+      throw new TypeError("DatabaseSync is not a constructor");
+    }
+    return DatabaseSync as DatabaseSyncConstructor;
+  } catch (error) {
+    throw new Error(
+      `node:sqlite is not available in this Node.js build (${process.version}). ` +
+        "This feature requires Node.js >=22.13.0. " +
+        "See ARCHITECTURE.md for the better-sqlite3 fallback path.",
+      { cause: error },
+    );
+  }
+}
 
 function dbPathFromUrl(databaseUrl: string): string {
   if (databaseUrl === ":memory:" || databaseUrl === "file::memory:") {
@@ -43,13 +72,14 @@ function tokenUseConflict(message: string): Error & { code: string; status: numb
 }
 
 export class RemoteStore {
-  private readonly db: InstanceType<typeof DatabaseSync>;
+  private readonly db: InstanceType<DatabaseSyncConstructor>;
 
-  constructor(databaseUrl: string) {
+  constructor(databaseUrl: string, options: RemoteStoreOptions = {}) {
     const filePath = dbPathFromUrl(databaseUrl);
     if (filePath !== ":memory:") {
       mkdirSync(path.dirname(path.resolve(filePath)), { recursive: true });
     }
+    const DatabaseSync = resolveDatabaseSync(options.loadSqlite);
     this.db = new DatabaseSync(filePath);
     this.db.exec("PRAGMA foreign_keys = ON");
     this.migrate();

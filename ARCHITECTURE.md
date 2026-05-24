@@ -101,3 +101,43 @@ Rationale:
 - Limits accidental global and per-session tool-call bursts without requiring network infrastructure.
 
 Consequence: Multi-instance HTTP deployments need an external rate-limiting layer at the reverse proxy or platform edge if they require global limits.
+
+## ADR-003: `better-sqlite3` Fallback For RemoteStore
+
+Status: contingency.
+
+Context: `node:sqlite` is the default storage adapter. Startup now validates that the current Node.js build exposes a constructable `DatabaseSync` before opening the control-plane database. If that check fails on a supported deployment target, the maintained native fallback is `better-sqlite3`.
+
+Decision: Keep `node:sqlite` as the default and document a direct fallback patch that can be applied if a pinned Node.js build removes or materially changes the API.
+
+Fallback steps:
+
+1. Install the fallback dependency:
+
+   ```bash
+   pnpm add better-sqlite3@^11.0.0
+   ```
+
+2. Replace the `createRequire`-based `node:sqlite` loader in `src/remote/store.ts` with:
+
+   ```typescript
+   import Database from "better-sqlite3";
+   ```
+
+3. Replace the `DatabaseSync` constructor call with:
+
+   ```typescript
+   this.db = new Database(filePath);
+   ```
+
+4. Keep the existing `prepare().get()`, `prepare().run()`, and `exec()` call sites. The `better-sqlite3` synchronous API supports the same access pattern used by `RemoteStore`.
+
+5. Run the full verification chain on the affected Node.js versions before widening the runtime matrix:
+
+   ```bash
+   pnpm run typecheck
+   pnpm test
+   pnpm run check
+   ```
+
+Consequence: The default install remains native-dependency-free. The fallback path is documented with copy-paste steps, but adopting it must be accompanied by a dependency review, lockfile update, CI coverage, and release notes.

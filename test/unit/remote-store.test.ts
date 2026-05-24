@@ -8,6 +8,27 @@ import { RemoteStore } from "../../src/remote/store.js";
 const now = "2026-01-01T00:00:00.000Z";
 
 describe("remote durable store", () => {
+  test("throws actionable startup error when node:sqlite cannot provide DatabaseSync", () => {
+    expect(
+      () =>
+        new RemoteStore(":memory:", {
+          loadSqlite: () => ({ DatabaseSync: undefined }),
+        }),
+    ).toThrow("node:sqlite is not available in this Node.js build");
+    expect(
+      () =>
+        new RemoteStore(":memory:", {
+          loadSqlite: () => ({ DatabaseSync: undefined }),
+        }),
+    ).toThrow("This feature requires Node.js >=22.13.0");
+    expect(
+      () =>
+        new RemoteStore(":memory:", {
+          loadSqlite: () => ({ DatabaseSync: undefined }),
+        }),
+    ).toThrow("See ARCHITECTURE.md for the better-sqlite3 fallback path.");
+  });
+
   test("enforces single-use authorization codes atomically", () => {
     const store = new RemoteStore(":memory:");
     store.insertAuthorizationCode({
