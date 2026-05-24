@@ -94,6 +94,79 @@ Create a `mcp.json` file in your workspace or user settings directory:
 
 After configuring, restart VS Code to load the MCP server.
 
+## GitHub Copilot Setup
+
+GitHub Copilot can use MCP servers from VS Code, GitHub Copilot CLI, and
+Copilot cloud agent contexts. Use the configuration location that matches the
+client you are using.
+
+### Copilot Chat in VS Code
+
+For a repository-scoped setup that can be shared with the workspace, create
+`.vscode/mcp.json`:
+
+```json
+{
+  "servers": {
+    "ssh-mcp": {
+      "type": "stdio",
+      "command": "ssh-mcp-pro",
+      "args": []
+    }
+  }
+}
+```
+
+For a personal setup, run `MCP: Open User Configuration` from the VS Code
+command palette and add the same `ssh-mcp` server to the user `mcp.json`.
+Older Copilot Chat documentation may refer to personal VS Code `settings.json`;
+prefer the dedicated user MCP configuration when your VS Code version provides
+it.
+
+To verify the server, run `MCP: List Servers` from the command palette or open
+Copilot Chat in Agent mode, select the tools button, and confirm `ssh-mcp` is
+listed. If the server is stopped, use the Start control shown in the MCP
+configuration file.
+
+### GitHub Copilot CLI and Cloud Agent
+
+For GitHub Copilot CLI, a repository-level MCP configuration can live in
+`.mcp.json` or `.github/mcp.json` and uses the `mcpServers` key:
+
+```json
+{
+  "mcpServers": {
+    "ssh-mcp": {
+      "type": "local",
+      "command": "ssh-mcp-pro",
+      "args": [],
+      "tools": ["*"]
+    }
+  }
+}
+```
+
+For a user-level Copilot CLI setup, run:
+
+```bash
+copilot mcp add ssh-mcp --tools "*" -- ssh-mcp-pro
+```
+
+This writes the server to `~/.copilot/mcp-config.json`. Verify with:
+
+```bash
+copilot mcp list
+copilot mcp get ssh-mcp
+```
+
+For Copilot cloud agent on GitHub.com, add the same `mcpServers` shape in the
+repository's Copilot Cloud agent MCP configuration and keep the `tools` field
+explicit. After assigning an issue to Copilot, open the Copilot session logs and
+expand the Start MCP Servers step to confirm the `ssh-mcp` tools were started.
+
+The `codex mcp add` commands in the Codex Setup section remain correct for
+Codex-based workspace agents. For GitHub Copilot CLI, use `copilot mcp add`.
+
 ## Claude Desktop, Antigravity, and Other MCP Clients
 
 For any MCP client that supports launching a stdio server, register `ssh-mcp-pro`
