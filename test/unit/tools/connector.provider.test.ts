@@ -1,4 +1,4 @@
-import { describe, expect, test } from "@jest/globals";
+import { describe, expect, test } from "vitest";
 import { createTestContainer } from "../helpers.js";
 import { ConnectorToolProvider } from "../../../src/tools/connector.provider.js";
 

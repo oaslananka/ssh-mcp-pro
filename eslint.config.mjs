@@ -34,7 +34,7 @@ export default [
     },
   },
   {
-    files: ["test/**/*.ts"],
+    files: ["test/**/*.ts", "vitest.config.ts"],
     languageOptions: {
       parser: tsParser,
       parserOptions: {

@@ -6,6 +6,7 @@ strictDepBuilds: true
 
 allowBuilds:
   cpu-features: false
+  esbuild: true
   libxmljs2: false
   protobufjs: false
   ssh2: false

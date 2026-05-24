@@ -8,7 +8,7 @@
  * pnpm run e2e:docker
  */
 
-import { afterAll, beforeAll, describe, expect, test } from "@jest/globals";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { createContainer, type AppContainer } from "../../src/container.js";
 import { detectOS } from "../../src/detect.js";
 import { createFsService, type FsService } from "../../src/fs-tools.js";

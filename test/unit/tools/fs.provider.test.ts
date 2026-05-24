@@ -1,22 +1,22 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { FsToolProvider } from "../../../src/tools/fs.provider.js";
 
 describe("FsToolProvider", () => {
   test("dispatches filesystem tools", async () => {
     const provider = new FsToolProvider({
       fsService: {
-        readFile: jest.fn(async () => "hello"),
-        writeFile: jest.fn(async () => true),
-        statFile: jest.fn(async () => ({
+        readFile: vi.fn(async () => "hello"),
+        writeFile: vi.fn(async () => true),
+        statFile: vi.fn(async () => ({
           type: "file",
           size: 5,
           mode: 0o644,
           mtime: new Date(0),
         })),
-        listDirectory: jest.fn(async () => ({ entries: [] })),
-        makeDirectories: jest.fn(async () => true),
-        removeRecursive: jest.fn(async () => true),
-        renameFile: jest.fn(async () => true),
+        listDirectory: vi.fn(async () => ({ entries: [] })),
+        makeDirectories: vi.fn(async () => true),
+        removeRecursive: vi.fn(async () => true),
+        renameFile: vi.fn(async () => true),
       } as any,
     });
 

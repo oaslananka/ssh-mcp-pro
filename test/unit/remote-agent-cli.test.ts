@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, jest, test } from "@jest/globals";
+import { afterEach, describe, expect, vi, test } from "vitest";
 import { runAgentCli } from "../../src/remote/agent-cli.js";
 import {
   generateEd25519PemKeyPair,
@@ -29,7 +29,7 @@ afterEach(() => {
 
 function captureStdout(): { read(): string; restore(): void } {
   let output = "";
-  const spy = jest.spyOn(process.stdout, "write").mockImplementation(((chunk: unknown) => {
+  const spy = vi.spyOn(process.stdout, "write").mockImplementation(((chunk: unknown) => {
     output += Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
     return true;
   }) as never);
@@ -97,7 +97,7 @@ describe("remote agent CLI", () => {
     const configPath = agentConfigPath();
     const controlPlaneKeys = generateEd25519PemKeyPair();
     const oneTimeToken = "enr_secret_token_that_must_not_be_persisted";
-    const fetchMock = jest.fn(async (_url: string | URL, _init?: RequestInit) => {
+    const fetchMock = vi.fn(async (_url: string | URL, _init?: RequestInit) => {
       return new Response(
         JSON.stringify({
           agent_id: "agt_enrolled",

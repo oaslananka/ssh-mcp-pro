@@ -1,4 +1,4 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { createPolicyError } from "../../src/errors.js";
 import { createFsService } from "../../src/fs-tools.js";
 import { PolicyEngine } from "../../src/policy.js";
@@ -25,7 +25,7 @@ function createLinuxOSInfo() {
 
 describe("createFsService", () => {
   test("uses SSH fallback for basic file operations", async () => {
-    const execCommand: any = jest.fn();
+    const execCommand: any = vi.fn();
     execCommand
       .mockResolvedValueOnce({
         code: 0,
@@ -87,20 +87,16 @@ describe("createFsService", () => {
 
   test("uses SFTP when available", async () => {
     const existingDirs = new Set<string>(["/existing"]);
-    const unlink = jest.fn((_path: string, callback: (err?: Error | null) => void) =>
-      callback(null),
-    );
-    const rmdir = jest.fn((_path: string, callback: (err?: Error | null) => void) =>
-      callback(null),
-    );
-    const rename = jest.fn((_from: string, _to: string, callback: (err?: Error | null) => void) =>
+    const unlink = vi.fn((_path: string, callback: (err?: Error | null) => void) => callback(null));
+    const rmdir = vi.fn((_path: string, callback: (err?: Error | null) => void) => callback(null));
+    const rename = vi.fn((_from: string, _to: string, callback: (err?: Error | null) => void) =>
       callback(null),
     );
     const service = createFsService({
       sessionManager: {
         getSession: () =>
           ({
-            ssh: { execCommand: jest.fn() },
+            ssh: { execCommand: vi.fn() },
             info: createSessionInfo(),
             sftp: {
               readFile: (_path: string, callback: (err: Error | null, data: Buffer) => void) =>
@@ -205,7 +201,7 @@ describe("createFsService", () => {
   });
 
   test("pathExists and type helpers handle failures", async () => {
-    const execCommand: any = jest.fn();
+    const execCommand: any = vi.fn();
     execCommand.mockResolvedValue({ code: 1, stdout: "", stderr: "nope" });
     const service = createFsService({
       sessionManager: {
@@ -223,7 +219,7 @@ describe("createFsService", () => {
   });
 
   test("enforces configured file-size limits before reading", async () => {
-    const readFile = jest.fn((_path: string, callback: (err: Error | null, data: Buffer) => void) =>
+    const readFile = vi.fn((_path: string, callback: (err: Error | null, data: Buffer) => void) =>
       callback(null, Buffer.from("too large")),
     );
     const service = createFsService({
@@ -231,7 +227,7 @@ describe("createFsService", () => {
         getSession: () =>
           ({
             info: createSessionInfo(),
-            ssh: { execCommand: jest.fn() },
+            ssh: { execCommand: vi.fn() },
             sftp: {
               readFile,
               stat: (
@@ -257,7 +253,7 @@ describe("createFsService", () => {
   });
 
   test("enforces write-size limits before buffering or writing", async () => {
-    const writeFile = jest.fn(
+    const writeFile = vi.fn(
       (_path: string, _data: Buffer, _opts: object, callback: (err?: Error | null) => void) =>
         callback(null),
     );
@@ -266,7 +262,7 @@ describe("createFsService", () => {
         getSession: () =>
           ({
             info: createSessionInfo(),
-            ssh: { execCommand: jest.fn() },
+            ssh: { execCommand: vi.fn() },
             sftp: { writeFile },
           }) as any,
         getOSInfo: async () => createLinuxOSInfo(),
@@ -283,11 +279,11 @@ describe("createFsService", () => {
   });
 
   test("enforces policy before stat and list access", async () => {
-    const stat = jest.fn(
+    const stat = vi.fn(
       (_path: string, callback: (err: Error | null, stats: { mode?: number }) => void) =>
         callback(null, { mode: 0o100644 }),
     );
-    const readdir = jest.fn(
+    const readdir = vi.fn(
       (
         _path: string,
         callback: (
@@ -297,7 +293,7 @@ describe("createFsService", () => {
       ) => callback(null, []),
     );
     const policy = {
-      assertAllowed: jest.fn((context: { action: string }) => {
+      assertAllowed: vi.fn((context: { action: string }) => {
         if (context.action === "fs.stat" || context.action === "fs.list") {
           throw createPolicyError("denied");
         }
@@ -309,7 +305,7 @@ describe("createFsService", () => {
         getSession: () =>
           ({
             info: createSessionInfo(),
-            ssh: { execCommand: jest.fn() },
+            ssh: { execCommand: vi.fn() },
             sftp: { stat, readdir },
           }) as any,
         getOSInfo: async () => createLinuxOSInfo(),
@@ -330,10 +326,10 @@ describe("createFsService", () => {
   });
 
   test("normalizes Windows-style remote paths before filesystem transport", async () => {
-    const readFile = jest.fn((_path: string, callback: (err: Error | null, data: Buffer) => void) =>
+    const readFile = vi.fn((_path: string, callback: (err: Error | null, data: Buffer) => void) =>
       callback(null, Buffer.from("secret")),
     );
-    const stat = jest.fn(
+    const stat = vi.fn(
       (_path: string, callback: (err: Error | null, stats: { mode?: number }) => void) =>
         callback(null, { mode: 0o100644 }),
     );
@@ -362,7 +358,7 @@ describe("createFsService", () => {
         getSession: () =>
           ({
             info: createSessionInfo(),
-            ssh: { execCommand: jest.fn() },
+            ssh: { execCommand: vi.fn() },
             sftp: { readFile, stat },
           }) as any,
         getOSInfo: async () => createLinuxOSInfo(),
@@ -380,11 +376,11 @@ describe("createFsService", () => {
   });
 
   test("does not require fs.stat policy for read size preflight", async () => {
-    const readFile = jest.fn((_path: string, callback: (err: Error | null, data: Buffer) => void) =>
+    const readFile = vi.fn((_path: string, callback: (err: Error | null, data: Buffer) => void) =>
       callback(null, Buffer.from("hello")),
     );
     const policy = {
-      assertAllowed: jest.fn((context: { action: string }) => {
+      assertAllowed: vi.fn((context: { action: string }) => {
         if (context.action === "fs.stat") {
           throw createPolicyError("stat denied");
         }
@@ -396,7 +392,7 @@ describe("createFsService", () => {
         getSession: () =>
           ({
             info: createSessionInfo(),
-            ssh: { execCommand: jest.fn() },
+            ssh: { execCommand: vi.fn() },
             sftp: {
               readFile,
               stat: (
@@ -439,7 +435,7 @@ describe("createFsService", () => {
       "Session missing not found or expired",
     );
 
-    const execCommand: any = jest.fn();
+    const execCommand: any = vi.fn();
     execCommand.mockResolvedValue({
       code: 0,
       stdout: "file\t10\t1700000000\t644",
@@ -461,14 +457,12 @@ describe("createFsService", () => {
   });
 
   test("cleans up temp files when sftp writes fail", async () => {
-    const unlink = jest.fn((_path: string, callback: (err?: Error | null) => void) =>
-      callback(null),
-    );
+    const unlink = vi.fn((_path: string, callback: (err?: Error | null) => void) => callback(null));
     const service = createFsService({
       sessionManager: {
         getSession: () =>
           ({
-            ssh: { execCommand: jest.fn() },
+            ssh: { execCommand: vi.fn() },
             info: createSessionInfo(),
             sftp: {
               writeFile: (
@@ -496,10 +490,8 @@ describe("createFsService", () => {
   });
 
   test("uses stats helper methods and unlinks single files over SFTP", async () => {
-    const unlink = jest.fn((_path: string, callback: (err?: Error | null) => void) =>
-      callback(null),
-    );
-    const stat: any = jest.fn();
+    const unlink = vi.fn((_path: string, callback: (err?: Error | null) => void) => callback(null));
+    const stat: any = vi.fn();
     stat.mockImplementationOnce(
       (
         _path: string,
@@ -549,7 +541,7 @@ describe("createFsService", () => {
       sessionManager: {
         getSession: () =>
           ({
-            ssh: { execCommand: jest.fn() },
+            ssh: { execCommand: vi.fn() },
             info: createSessionInfo(),
             sftp: {
               stat,
@@ -599,7 +591,7 @@ describe("createFsService", () => {
       sessionManager: {
         getSession: () =>
           ({
-            ssh: { execCommand: jest.fn() },
+            ssh: { execCommand: vi.fn() },
             info: createSessionInfo(),
             sftp: {
               readFile: (_path: string, callback: (err: Error | null, data: Buffer) => void) =>
@@ -635,13 +627,13 @@ describe("createFsService", () => {
 
   test("honors explain mode for write, mkdir, and remove without touching transports", async () => {
     const sftp = {
-      writeFile: jest.fn(),
-      mkdir: jest.fn(),
-      readdir: jest.fn(),
-      unlink: jest.fn(),
-      rmdir: jest.fn(),
+      writeFile: vi.fn(),
+      mkdir: vi.fn(),
+      readdir: vi.fn(),
+      unlink: vi.fn(),
+      rmdir: vi.fn(),
     };
-    const execCommand = jest.fn();
+    const execCommand = vi.fn();
     const service = createFsService({
       sessionManager: {
         getSession: () =>
@@ -668,7 +660,7 @@ describe("createFsService", () => {
   });
 
   test("lists SSH fallback entries without pagination when no page is requested", async () => {
-    const execCommand: any = jest.fn();
+    const execCommand: any = vi.fn();
     execCommand.mockResolvedValue({
       code: 0,
       stdout: "a.txt\tfile\t5\t1700000000\nlink\tsymlink\t0\t1700000001\n",
@@ -693,10 +685,10 @@ describe("createFsService", () => {
   });
 
   test("covers SFTP stat variants, pagination without next token, and cleanup failure", async () => {
-    const unlink = jest.fn((_path: string, callback: (err?: Error | null) => void) =>
+    const unlink = vi.fn((_path: string, callback: (err?: Error | null) => void) =>
       callback(new Error("cleanup failed")),
     );
-    const stat: any = jest.fn();
+    const stat: any = vi.fn();
     stat.mockImplementationOnce(
       (
         _path: string,
@@ -725,7 +717,7 @@ describe("createFsService", () => {
       sessionManager: {
         getSession: () =>
           ({
-            ssh: { execCommand: jest.fn() },
+            ssh: { execCommand: vi.fn() },
             info: createSessionInfo(),
             sftp: {
               stat,
@@ -806,7 +798,7 @@ describe("createFsService", () => {
   });
 
   test("covers fallback defaults and mkdir race tolerance", async () => {
-    const execCommand: any = jest.fn();
+    const execCommand: any = vi.fn();
     execCommand
       .mockResolvedValueOnce({ code: 0, stdout: "\n", stderr: "" })
       .mockResolvedValueOnce({ code: 0, stdout: "name-only\n", stderr: "" })
@@ -831,7 +823,7 @@ describe("createFsService", () => {
       code: "EFS",
     });
 
-    const mkdir = jest.fn((_path: string, callback: (err?: Error | null) => void) =>
+    const mkdir = vi.fn((_path: string, callback: (err?: Error | null) => void) =>
       callback(Object.assign(new Error("already exists"), { code: 4 })),
     );
     const mkdirRaceService = createFsService({
@@ -839,7 +831,7 @@ describe("createFsService", () => {
         getSession: () =>
           ({
             info: createSessionInfo(),
-            ssh: { execCommand: jest.fn() },
+            ssh: { execCommand: vi.fn() },
             sftp: {
               stat: (
                 _path: string,

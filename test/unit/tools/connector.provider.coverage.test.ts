@@ -1,8 +1,8 @@
-import { beforeEach, describe, expect, jest, test } from "@jest/globals";
+import { beforeEach, describe, expect, vi, test } from "vitest";
 import { createTestContainer } from "../helpers.js";
 
-const getConfiguredHosts = jest.fn<() => Promise<string[]>>();
-const resolveConnectorCredentials = jest.fn<() => Promise<any>>();
+const getConfiguredHosts = vi.fn<() => Promise<string[]>>();
+const resolveConnectorCredentials = vi.fn<() => Promise<any>>();
 
 async function loadProvider() {
   return import("../../../src/tools/connector.provider.js");
@@ -10,7 +10,7 @@ async function loadProvider() {
 
 function createProviderDeps(overrides: Record<string, unknown> = {}) {
   const container = createTestContainer();
-  const explain = jest.fn((context: any) => ({
+  const explain = vi.fn((context: any) => ({
     allowed: true,
     mode: "enforce",
     action: context.action,
@@ -18,18 +18,18 @@ function createProviderDeps(overrides: Record<string, unknown> = {}) {
   }));
   const deps = {
     sessionManager: {
-      openSession: jest.fn(async () => ({
+      openSession: vi.fn(async () => ({
         sessionId: "session-1",
         host: "prod.example",
         username: "deploy",
         sftpAvailable: true,
         expiresInMs: 1000,
       })),
-      closeSession: jest.fn(async () => true),
-      getOSInfo: jest.fn(async () => ({ platform: "linux" })),
-      getSession: jest.fn(() => ({
+      closeSession: vi.fn(async () => true),
+      getOSInfo: vi.fn(async () => ({ platform: "linux" })),
+      getSession: vi.fn(() => ({
         ssh: {
-          execCommand: jest.fn(async (command: string) => ({
+          execCommand: vi.fn(async (command: string) => ({
             code: command.includes("free") ? 1 : 0,
             stdout: command.includes("free") ? "x".repeat(4100) : `ok:${command}`,
             stderr: command.includes("free") ? "fallback" : "",
@@ -38,8 +38,8 @@ function createProviderDeps(overrides: Record<string, unknown> = {}) {
       })),
     },
     metrics: {
-      recordSessionCreated: jest.fn(),
-      recordSessionClosed: jest.fn(),
+      recordSessionCreated: vi.fn(),
+      recordSessionClosed: vi.fn(),
     },
     policy: { explain },
     getConfiguredHosts,
@@ -76,7 +76,7 @@ function createProviderDeps(overrides: Record<string, unknown> = {}) {
 
 describe("ConnectorToolProvider coverage", () => {
   beforeEach(() => {
-    jest.resetModules();
+    vi.resetModules();
     getConfiguredHosts.mockReset();
     resolveConnectorCredentials.mockReset();
   });
@@ -235,16 +235,16 @@ describe("ConnectorToolProvider coverage", () => {
     const { ConnectorToolProvider } = await loadProvider();
     const { container, deps } = createProviderDeps({
       sessionManager: {
-        openSession: jest.fn(async () => ({
+        openSession: vi.fn(async () => ({
           sessionId: "expired",
           host: "prod.example",
           username: "deploy",
           sftpAvailable: true,
           expiresInMs: 1000,
         })),
-        closeSession: jest.fn(async () => true),
-        getOSInfo: jest.fn(),
-        getSession: jest.fn(() => undefined),
+        closeSession: vi.fn(async () => true),
+        getOSInfo: vi.fn(),
+        getSession: vi.fn(() => undefined),
       },
     });
     resolveConnectorCredentials.mockResolvedValue({

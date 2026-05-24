@@ -1,11 +1,11 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { SystemToolProvider } from "../../../src/tools/system.provider.js";
 
 describe("SystemToolProvider", () => {
   test("detects OS and returns metrics in both formats", async () => {
     const provider = new SystemToolProvider({
       sessionManager: {
-        getOSInfo: jest.fn(async () => ({
+        getOSInfo: vi.fn(async () => ({
           platform: "linux",
           distro: "ubuntu",
           version: "22.04",
@@ -17,8 +17,8 @@ describe("SystemToolProvider", () => {
         })),
       } as any,
       metrics: {
-        getMetrics: jest.fn(() => ({ sessions: { active: 1 } })),
-        exportPrometheus: jest.fn(() => "ssh_mcp_sessions_active 1"),
+        getMetrics: vi.fn(() => ({ sessions: { active: 1 } })),
+        exportPrometheus: vi.fn(() => "ssh_mcp_sessions_active 1"),
       } as any,
     });
 

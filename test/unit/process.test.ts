@@ -1,14 +1,14 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { ErrorCode } from "../../src/types.js";
 import { createProcessService } from "../../src/process.js";
 import { createAllowPolicy, createSessionInfo, createTestConfig } from "./helpers.js";
 
 function createDeps() {
-  const execCommand = jest.fn() as any;
+  const execCommand = vi.fn() as any;
   const session = { info: createSessionInfo(), ssh: { execCommand } };
   const sessionManager = {
-    getSession: jest.fn(() => session) as any,
-    getOSInfo: jest.fn(async () => ({
+    getSession: vi.fn(() => session) as any,
+    getOSInfo: vi.fn(async () => ({
       platform: "linux" as const,
       distro: "ubuntu",
       version: "22.04",

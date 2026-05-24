@@ -35,15 +35,15 @@
     "dev:control-plane": "pnpm run build && node scripts/dev-control-plane.mjs",
     "dev:agent": "pnpm run build && node scripts/dev-agent.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=unit --runInBand",
-    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage --testPathPatterns=unit --runInBand",
-    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=integration --runInBand",
-    "test:e2e": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPatterns=e2e --runInBand",
-    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
-    "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --fix",
+    "test": "vitest run --reporter=default --reporter=junit",
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "vitest run test/integration",
+    "test:e2e": "vitest run test/e2e",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\" \"vitest.config.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.ts\" \"vitest.config.ts\" --fix",
     "lint:staged": "node scripts/run-staged-checks.mjs --lint-only",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.{mjs,cjs}\" \".github/workflows/*.{yml,yaml}\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.{mjs,cjs}\" \".github/workflows/*.{yml,yaml}\"",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.{mjs,cjs}\" \".github/workflows/*.{yml,yaml}\" \"vitest.config.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.{mjs,cjs}\" \".github/workflows/*.{yml,yaml}\" \"vitest.config.ts\"",
     "format:staged": "node scripts/run-staged-checks.mjs",
     "prepare": "node scripts/setup-git-hooks.mjs",
     "prepack": "pnpm run build && pnpm run sync-version -- --check && pnpm run validate:mcp-metadata && pnpm run validate:chatgpt-app && pnpm run validate:claude-connector",
@@ -123,86 +123,16 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@jest/globals": "^30.4.1",
     "@types/node": "^24.12.4",
     "@types/ssh2": "^1.15.5",
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.59.4",
+    "@vitest/coverage-v8": "^4.1.7",
     "eslint": "^9.39.4",
-    "jest": "^30.4.2",
     "prettier": "^3.8.3",
-    "ts-jest": "^29.4.11",
     "typedoc": "0.28.19",
-    "typescript": "^5.9.3"
-  },
-  "jest": {
-    "preset": "ts-jest/presets/default-esm",
-    "extensionsToTreatAsEsm": [
-      ".ts"
-    ],
-    "testEnvironment": "node",
-    "setupFiles": [
-      "<rootDir>/test/setup-logs.ts"
-    ],
-    "testMatch": [
-      "<rootDir>/test/**/*.test.ts"
-    ],
-    "moduleNameMapper": {
-      "^(\\.{1,2}/.*)\\.js$": "$1"
-    },
-    "transform": {
-      "^.+\\.tsx?$": [
-        "ts-jest",
-        {
-          "useESM": true,
-          "tsconfig": "tsconfig.test.json",
-          "diagnostics": {
-            "ignoreCodes": [
-              151002
-            ]
-          }
-        }
-      ]
-    },
-    "collectCoverageFrom": [
-      "src/**/*.ts",
-      "!src/**/*.d.ts",
-      "!src/index.ts",
-      "!src/server-http.ts",
-      "!src/render-http.ts",
-      "!src/remote/agent-executor.ts",
-      "!src/remote/agent-cli.ts",
-      "!src/remote/config.ts",
-      "!src/remote/control-plane.ts",
-      "!src/remote/mcp-tools.ts",
-      "!src/remote/store.ts",
-      "!src/remote/util.ts",
-      "!src/remote/websocket.ts"
-    ],
-    "coverageDirectory": "coverage",
-    "coverageReporters": [
-      "text",
-      "lcov",
-      "html",
-      "cobertura"
-    ],
-    "coverageThreshold": {
-      "global": {
-        "branches": 85,
-        "functions": 85,
-        "lines": 90,
-        "statements": 90
-      }
-    },
-    "reporters": [
-      "default",
-      [
-        "<rootDir>/scripts/junit-reporter.cjs",
-        {
-          "outputDirectory": "test-results",
-          "outputName": "junit.xml"
-        }
-      ]
-    ]
+    "typescript": "^5.9.3",
+    "vite": "^7.3.3",
+    "vitest": "^4.1.7"
   }
 }

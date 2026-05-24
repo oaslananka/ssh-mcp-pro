@@ -1,4 +1,4 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { detectOS } from "../../src/detect.js";
 
 type ExecResponse = {
@@ -9,7 +9,7 @@ type ExecResponse = {
 
 function createSSH(responses: Record<string, ExecResponse | Error>) {
   return {
-    execCommand: jest.fn(async (command: string) => {
+    execCommand: vi.fn(async (command: string) => {
       const response = responses[command];
       if (response instanceof Error) {
         throw response;

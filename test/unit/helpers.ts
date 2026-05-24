@@ -1,4 +1,4 @@
-import { jest } from "@jest/globals";
+import { vi } from "vitest";
 import { AuditLog } from "../../src/audit.js";
 import { ConfigManager } from "../../src/config.js";
 import type { AppContainer } from "../../src/container.js";
@@ -15,7 +15,7 @@ export const LEGACY_AGENT_COMMAND_PATTERN = /npx ssh-mcp-pro agent|sshautomator-
 
 export function createAllowPolicy() {
   return {
-    assertAllowed: jest.fn(
+    assertAllowed: vi.fn(
       (context: PolicyContext): PolicyDecision => ({
         allowed: true,
         mode: context.mode ?? "enforce",
@@ -38,23 +38,23 @@ export function createTestConfig() {
 
 export function createFileMetrics() {
   return {
-    recordFileRead: jest.fn(),
-    recordFileWrite: jest.fn(),
-    recordFileDelete: jest.fn(),
+    recordFileRead: vi.fn(),
+    recordFileWrite: vi.fn(),
+    recordFileDelete: vi.fn(),
   };
 }
 
 export function createTransferMetrics() {
   return {
-    recordTransfer: jest.fn(),
+    recordTransfer: vi.fn(),
   };
 }
 
 export function createTunnelMetrics() {
   return {
-    recordTunnelOpened: jest.fn(),
-    recordTunnelClosed: jest.fn(),
-    recordTunnelError: jest.fn(),
+    recordTunnelOpened: vi.fn(),
+    recordTunnelClosed: vi.fn(),
+    recordTunnelError: vi.fn(),
   };
 }
 

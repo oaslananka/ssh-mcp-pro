@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, jest, test } from "@jest/globals";
+import { afterAll, beforeAll, describe, expect, vi, test } from "vitest";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
   CallToolRequestSchema,
@@ -17,7 +17,7 @@ const integrationDescribe = RUN_INTEGRATION ? describe : describe.skip;
 
 const handlerMap = new WeakMap<object, Map<unknown, (request?: unknown) => Promise<unknown>>>();
 
-const setRequestHandlerSpy = jest
+const setRequestHandlerSpy = vi
   .spyOn(Server.prototype as any, "setRequestHandler")
   .mockImplementation(function (
     this: object,

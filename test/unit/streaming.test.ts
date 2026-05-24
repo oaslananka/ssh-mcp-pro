@@ -1,10 +1,10 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { createStreamingService, formatStreamOutput } from "../../src/streaming.js";
 import { createAllowPolicy, createSessionInfo, createTestConfig } from "./helpers.js";
 
 describe("createStreamingService", () => {
   test("streams stdout and stderr chunks", async () => {
-    const execCommand = jest.fn(
+    const execCommand = vi.fn(
       async (
         _command: string,
         options?: { onStdout?: (chunk: Buffer) => void; onStderr?: (chunk: Buffer) => void },
@@ -31,7 +31,7 @@ describe("createStreamingService", () => {
       config: createTestConfig(),
       policy: createAllowPolicy(),
     });
-    const onChunk = jest.fn();
+    const onChunk = vi.fn();
 
     const result = await service.execWithStreaming({
       sessionId: "session-1",
@@ -48,7 +48,7 @@ describe("createStreamingService", () => {
   });
 
   test("bounds retained chunks and buffered output", async () => {
-    const execCommand = jest.fn(
+    const execCommand = vi.fn(
       async (
         _command: string,
         options?: { onStdout?: (chunk: Buffer) => void; onStderr?: (chunk: Buffer) => void },

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, beforeAll, describe, expect, test } from "@jest/globals";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { createContainer, type AppContainer } from "../../src/container.js";
 import { createProcessService, type ProcessService } from "../../src/process.js";
 import { withRetry } from "../../src/retry.js";

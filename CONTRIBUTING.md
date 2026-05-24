@@ -36,7 +36,7 @@ Use the narrowest relevant command first, then run the broader gate before openi
 | `pnpm run integration:docker` | Runs the integration suite through the Docker SSH fixture helper. |
 | `pnpm run e2e:docker` | Runs the end-to-end suite through the Docker SSH fixture helper. |
 
-The current Jest runner emits a Node VM Modules experimental warning; that is tracked separately from normal test failures. Do not ignore any other warning or failure.
+Treat any warning or failure from the test runner as a failed check unless it is explicitly tracked in an open issue.
 
 ## Quality Gate
 

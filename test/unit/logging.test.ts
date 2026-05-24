@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, jest, test } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, vi, test } from "vitest";
 import {
   LogLevel,
   Logger,
@@ -9,15 +9,15 @@ import {
 } from "../../src/logging.js";
 
 describe("logging utilities", () => {
-  let stderrSpy: ReturnType<typeof jest.spyOn>;
+  let stderrSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    stderrSpy = jest.spyOn(process.stderr, "write").mockReturnValue(true);
+    stderrSpy = vi.spyOn(process.stderr, "write").mockReturnValue(true);
   });
 
   afterEach(() => {
     stderrSpy.mockRestore();
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   test("redactSensitiveData redacts nested sensitive fields", () => {
@@ -122,19 +122,19 @@ describe("logging utilities", () => {
   });
 
   test("Timer and createTimer measure elapsed time", () => {
-    jest.useFakeTimers();
-    jest.setSystemTime(new Date("2026-03-22T00:00:00Z"));
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-22T00:00:00Z"));
 
     const timer = new Timer();
-    jest.setSystemTime(new Date("2026-03-22T00:00:01Z"));
+    vi.setSystemTime(new Date("2026-03-22T00:00:01Z"));
     expect(timer.elapsed()).toBe(1000);
 
     timer.reset();
-    jest.setSystemTime(new Date("2026-03-22T00:00:01.500Z"));
+    vi.setSystemTime(new Date("2026-03-22T00:00:01.500Z"));
     expect(timer.elapsed()).toBe(500);
 
     const created = createTimer();
-    jest.setSystemTime(new Date("2026-03-22T00:00:02Z"));
+    vi.setSystemTime(new Date("2026-03-22T00:00:02Z"));
     expect(created.elapsed()).toBe(500);
   });
 });

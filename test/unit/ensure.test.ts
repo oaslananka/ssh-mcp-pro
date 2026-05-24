@@ -1,12 +1,12 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { ErrorCode } from "../../src/types.js";
 import { createEnsureService } from "../../src/ensure.js";
 
 function createDeps() {
   return {
     sessionManager: {
-      getSession: jest.fn(() => ({ ssh: {} }) as any) as any,
-      getOSInfo: jest.fn(async () => ({
+      getSession: vi.fn(() => ({ ssh: {} }) as any) as any,
+      getOSInfo: vi.fn(async () => ({
         platform: "linux" as const,
         distro: "ubuntu",
         version: "22.04",
@@ -18,14 +18,14 @@ function createDeps() {
       })) as any,
     },
     processService: {
-      execCommand: jest.fn() as any,
-      execSudo: jest.fn() as any,
-      commandExists: jest.fn() as any,
+      execCommand: vi.fn() as any,
+      execSudo: vi.fn() as any,
+      commandExists: vi.fn() as any,
     },
     fsService: {
-      readFile: jest.fn() as any,
-      writeFile: jest.fn() as any,
-      pathExists: jest.fn() as any,
+      readFile: vi.fn() as any,
+      writeFile: vi.fn() as any,
+      pathExists: vi.fn() as any,
     },
   };
 }
