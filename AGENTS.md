@@ -29,6 +29,58 @@ Guidance for AI agents using `ssh-mcp-pro` v2.
 5. Use task tools: `fs_*`, `proc_exec`, `ensure_*`, `file_*`, `tunnel_*`.
 6. `ssh_close_session` when work is complete.
 
+## Explain Mode
+
+Use explain mode when a request may mutate a remote host, change files, start or
+stop services, install packages, open tunnels, or require user approval before
+execution. Explain mode is a planning and policy-preview path; it is not a
+permission bypass and it does not execute the requested mutation.
+
+Use `policyMode: "explain"` when you need a non-mutating preview from normal SSH
+tools. For example, `ssh_open_session` with `policyMode: "explain"` returns a
+connection plan with `wouldConnect` instead of opening a live SSH connection.
+Write, transfer, process, ensure, and tunnel tools that honor the session policy
+mode return explain-only plans instead of performing the change.
+
+Use `policyMode: "enforce"` only after the plan has been reviewed, the target
+host and path are correct, strict host-key verification is active, and the
+effective policy allows the concrete operation. Enforce mode is the default mode
+for actual work.
+
+Connector clients can use `ssh_policy_explain` before opening sessions or
+running task tools. It evaluates an optional `hostAlias`, action class, command,
+and path against policy, returns `executed: false`, includes the policy
+decision, and marks non-inspection requests as requiring explicit user
+confirmation.
+
+Connector clients can use `ssh_mutation_plan` for remote changes that should be
+planned without execution. It accepts `hostAlias`, `goal`, and an optional
+category such as `package`, `service`, `file`, `command`, `tunnel`, or `other`.
+The result includes `executed: false`, a policy decision, prerequisites that
+must be true before execution, and operations that remain disallowed in remote
+connector profiles.
+
+Use the `plan-mutation` prompt when the user asks for a risky remote change and
+you need the agent to produce a concise, reviewable plan first. The prompt
+directs the agent to use explain mode or policy resources and to call out sudo
+needs, destructive operations, path policy, rollback, commands, and files that
+would change.
+
+Concrete explain-to-enforce sequence:
+
+1. `ssh_list_configured_hosts` to choose an allowed alias.
+2. `ssh_policy_explain` with `hostAlias`, `action: "mutation"`, and the
+   proposed command or path.
+3. `ssh_mutation_plan` with `hostAlias`, `goal`, and the closest category.
+4. `ssh_open_session` with `policyMode: "explain"` and strict host-key
+   verification to confirm the connection plan.
+5. Review the policy decision, target host, target path, rollback, and exact
+   tool payload with the user or supervising workflow.
+6. `ssh_open_session` again with `policyMode: "enforce"` only after approval.
+7. Run the narrow task tool, such as `ensure_package`, `ensure_service`,
+   `fs_write`, `patch_apply`, or `proc_exec`.
+8. Verify the result with read-only inspection and then `ssh_close_session`.
+
 ## Tool Guidance
 
 | Tool | Use |
