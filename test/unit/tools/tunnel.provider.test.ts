@@ -1,14 +1,14 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { TunnelToolProvider } from "../../../src/tools/tunnel.provider.js";
 
 describe("TunnelToolProvider", () => {
   test("dispatches tunnel tools", async () => {
-    const listTunnels = jest.fn(() => [{ id: "t1" }]);
+    const listTunnels = vi.fn(() => [{ id: "t1" }]);
     const provider = new TunnelToolProvider({
       tunnelService: {
-        createLocalForward: jest.fn(async () => ({ id: "t1" })),
-        createRemoteForward: jest.fn(async () => ({ id: "t2" })),
-        closeTunnel: jest.fn(async () => true),
+        createLocalForward: vi.fn(async () => ({ id: "t1" })),
+        createRemoteForward: vi.fn(async () => ({ id: "t2" })),
+        closeTunnel: vi.fn(async () => true),
         listTunnels,
       } as any,
     });

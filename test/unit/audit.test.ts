@@ -1,4 +1,4 @@
-import { describe, expect, test } from "@jest/globals";
+import { describe, expect, test } from "vitest";
 import { AuditLog } from "../../src/audit.js";
 import type { PolicyDecision } from "../../src/policy.js";
 

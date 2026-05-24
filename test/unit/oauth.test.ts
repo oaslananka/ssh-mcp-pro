@@ -1,5 +1,5 @@
 import { createSign, generateKeyPairSync, type JsonWebKey, type KeyLike } from "node:crypto";
-import { afterEach, describe, expect, test } from "@jest/globals";
+import { afterEach, describe, expect, test } from "vitest";
 import {
   isOAuthAuthorizationValid,
   normalizeOAuthError,

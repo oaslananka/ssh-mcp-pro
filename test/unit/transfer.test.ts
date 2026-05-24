@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, jest, test } from "@jest/globals";
+import { afterEach, describe, expect, vi, test } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -60,7 +60,7 @@ describe("createTransferService", () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "transfer-test-"));
     const localPath = path.join(tempDir, "upload.txt");
     fs.writeFileSync(localPath, "hello world");
-    const writeFile = jest.fn(
+    const writeFile = vi.fn(
       (
         _remotePath: string,
         _data: Buffer,
@@ -68,11 +68,11 @@ describe("createTransferService", () => {
         callback: (err?: Error | null) => void,
       ) => callback(null),
     );
-    const readFile = jest.fn(
+    const readFile = vi.fn(
       (_remotePath: string, callback: (err: Error | null, data: Buffer) => void) =>
         callback(null, Buffer.from("hello world")),
     );
-    const onProgress = jest.fn();
+    const onProgress = vi.fn();
 
     const service = createTransferService({
       sessionManager: {
@@ -107,7 +107,7 @@ describe("createTransferService", () => {
     const localPath = path.join(tempDir, "large.bin");
     fs.writeFileSync(localPath, "hello world");
     const config = { ...createTestConfig(), maxTransferBytes: 5 };
-    const writeFile = jest.fn(
+    const writeFile = vi.fn(
       (
         _remotePath: string,
         _data: Buffer,
@@ -115,7 +115,7 @@ describe("createTransferService", () => {
         callback: (err?: Error | null) => void,
       ) => callback(null),
     );
-    const readFile = jest.fn(
+    const readFile = vi.fn(
       (_remotePath: string, callback: (err: Error | null, data: Buffer) => void) =>
         callback(null, Buffer.from("hello world")),
     );
@@ -172,7 +172,7 @@ describe("createTransferService", () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "transfer-test-"));
     const localPath = path.join(tempDir, "upload.txt");
     fs.writeFileSync(localPath, "safe");
-    const writeFile = jest.fn(
+    const writeFile = vi.fn(
       (
         _remotePath: string,
         _data: Buffer,
@@ -180,16 +180,16 @@ describe("createTransferService", () => {
         callback: (err?: Error | null) => void,
       ) => callback(null),
     );
-    const readFile = jest.fn(
+    const readFile = vi.fn(
       (_remotePath: string, callback: (err: Error | null, data: Buffer) => void) =>
         callback(null, Buffer.from("safe")),
     );
     const fileHandle = {
-      stat: jest.fn(async () => ({ size: 4, isFile: () => true })),
-      readFile: jest.fn(async () => Buffer.from("expanded")),
-      close: jest.fn(async () => undefined),
+      stat: vi.fn(async () => ({ size: 4, isFile: () => true })),
+      readFile: vi.fn(async () => Buffer.from("expanded")),
+      close: vi.fn(async () => undefined),
     };
-    const openSpy = jest.spyOn(fs.promises, "open").mockResolvedValue(fileHandle as never);
+    const openSpy = vi.spyOn(fs.promises, "open").mockResolvedValue(fileHandle as never);
 
     try {
       const service = createTransferService({
@@ -221,7 +221,7 @@ describe("createTransferService", () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "transfer-test-"));
     const localPath = path.join(tempDir, "upload.txt");
     fs.writeFileSync(localPath, "safe");
-    const writeFile = jest.fn(
+    const writeFile = vi.fn(
       (
         _remotePath: string,
         _data: Buffer,
@@ -229,13 +229,13 @@ describe("createTransferService", () => {
         callback: (err?: Error | null) => void,
       ) => callback(null),
     );
-    const readFile = jest.fn();
+    const readFile = vi.fn();
     const fileHandle = {
-      stat: jest.fn(async () => ({ size: 4, isFile: () => false })),
-      readFile: jest.fn(async () => Buffer.from("safe")),
-      close: jest.fn(async () => undefined),
+      stat: vi.fn(async () => ({ size: 4, isFile: () => false })),
+      readFile: vi.fn(async () => Buffer.from("safe")),
+      close: vi.fn(async () => undefined),
     };
-    const openSpy = jest.spyOn(fs.promises, "open").mockResolvedValue(fileHandle as never);
+    const openSpy = vi.spyOn(fs.promises, "open").mockResolvedValue(fileHandle as never);
 
     try {
       const service = createTransferService({
@@ -268,7 +268,7 @@ describe("createTransferService", () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "transfer-test-"));
     const localPath = path.join(tempDir, "upload.txt");
     fs.writeFileSync(localPath, "safe");
-    const writeFile = jest.fn(
+    const writeFile = vi.fn(
       (
         _remotePath: string,
         _data: Buffer,
@@ -276,15 +276,15 @@ describe("createTransferService", () => {
         callback: (err?: Error | null) => void,
       ) => callback(null),
     );
-    const readFile = jest.fn();
+    const readFile = vi.fn();
     const fileHandle = {
-      stat: jest.fn(async () => ({ size: 4, isFile: () => true })),
-      readFile: jest.fn(async () => {
+      stat: vi.fn(async () => ({ size: 4, isFile: () => true })),
+      readFile: vi.fn(async () => {
         throw new Error("read failed");
       }),
-      close: jest.fn(async () => undefined),
+      close: vi.fn(async () => undefined),
     };
-    const openSpy = jest.spyOn(fs.promises, "open").mockResolvedValue(fileHandle as never);
+    const openSpy = vi.spyOn(fs.promises, "open").mockResolvedValue(fileHandle as never);
 
     try {
       const service = createTransferService({
@@ -319,7 +319,7 @@ describe("createTransferService", () => {
     const forbiddenPath = path.join(forbidden, "secret.txt");
     fs.writeFileSync(allowedPath, "allowed");
     fs.writeFileSync(forbiddenPath, "secret");
-    const writeFile = jest.fn(
+    const writeFile = vi.fn(
       (
         _remotePath: string,
         _data: Buffer,
@@ -327,7 +327,7 @@ describe("createTransferService", () => {
         callback: (err?: Error | null) => void,
       ) => callback(null),
     );
-    const readFile = jest.fn(
+    const readFile = vi.fn(
       (_remotePath: string, callback: (err: Error | null, data: Buffer) => void) =>
         callback(null, Buffer.from("allowed")),
     );
@@ -353,7 +353,7 @@ describe("createTransferService", () => {
 
     writeFile.mockClear();
     readFile.mockClear();
-    const localReadSpy = jest.spyOn(fs.promises, "readFile");
+    const localReadSpy = vi.spyOn(fs.promises, "readFile");
     try {
       await expect(
         service.uploadFileWithProgress(forbiddenPath, "/tmp/upload.txt", {
@@ -378,7 +378,7 @@ describe("createTransferService", () => {
     fs.writeFileSync(allowedPath, "allowed");
     fs.writeFileSync(prefixConfusionPath, "confused");
     fs.writeFileSync(forbiddenPath, "secret");
-    const writeFile = jest.fn(
+    const writeFile = vi.fn(
       (
         _remotePath: string,
         _data: Buffer,
@@ -386,7 +386,7 @@ describe("createTransferService", () => {
         callback: (err?: Error | null) => void,
       ) => callback(null),
     );
-    const readFile = jest.fn(
+    const readFile = vi.fn(
       (_remotePath: string, callback: (err: Error | null, data: Buffer) => void) =>
         callback(null, Buffer.from("allowed")),
     );
@@ -439,7 +439,7 @@ describe("createTransferService", () => {
   test("downloads files with progress", async () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "transfer-test-"));
     const localPath = path.join(tempDir, "download.txt");
-    const onProgress = jest.fn();
+    const onProgress = vi.fn();
 
     const service = createTransferService({
       sessionManager: {
@@ -479,11 +479,11 @@ describe("createTransferService", () => {
     const { allowed, forbidden } = makeDirs(tempDir);
     const allowedPath = path.join(allowed, "download.txt");
     const forbiddenPath = path.join(forbidden, "download.txt");
-    const stat = jest.fn(
+    const stat = vi.fn(
       (_remotePath: string, callback: (err: Error | null, stats: { size: number }) => void) =>
         callback(null, { size: 5 }),
     );
-    const readFile = jest.fn(
+    const readFile = vi.fn(
       (_remotePath: string, callback: (err: Error | null, data: Buffer) => void) =>
         callback(null, Buffer.from("hello")),
     );
@@ -509,7 +509,7 @@ describe("createTransferService", () => {
 
     stat.mockClear();
     readFile.mockClear();
-    const localWriteSpy = jest.spyOn(fs.promises, "writeFile");
+    const localWriteSpy = vi.spyOn(fs.promises, "writeFile");
     try {
       await expect(
         service.downloadFileWithProgress("/tmp/remote.txt", forbiddenPath, {
@@ -529,11 +529,11 @@ describe("createTransferService", () => {
     const { allowed, forbidden } = makeDirs(tempDir);
     const prefixConfusionDir = path.join(tempDir, "allowed2");
     fs.mkdirSync(prefixConfusionDir, { recursive: true });
-    const stat = jest.fn(
+    const stat = vi.fn(
       (_remotePath: string, callback: (err: Error | null, stats: { size: number }) => void) =>
         callback(null, { size: 5 }),
     );
-    const readFile = jest.fn(
+    const readFile = vi.fn(
       (_remotePath: string, callback: (err: Error | null, data: Buffer) => void) =>
         callback(null, Buffer.from("hello")),
     );
@@ -617,10 +617,10 @@ describe("createTransferService", () => {
   });
 
   test("returns dry-run transfer results in explain mode without local or SFTP IO", async () => {
-    const readFile = jest.fn();
-    const writeFile = jest.fn();
+    const readFile = vi.fn();
+    const writeFile = vi.fn();
     const policy = {
-      assertAllowed: jest.fn((context: { action: string }) => ({
+      assertAllowed: vi.fn((context: { action: string }) => ({
         allowed: true,
         mode:
           context.action === "transfer.upload" || context.action === "transfer.download"
@@ -694,10 +694,10 @@ describe("createTransferService", () => {
       policy: createAllowPolicy(),
       config: createTestConfig(),
     });
-    const readFileSpy = jest
+    const readFileSpy = vi
       .spyOn(fs.promises, "readFile")
       .mockImplementation(async () => Buffer.from("local"));
-    const rmSpy = jest.spyOn(fs.promises, "rm");
+    const rmSpy = vi.spyOn(fs.promises, "rm");
 
     try {
       await expect(

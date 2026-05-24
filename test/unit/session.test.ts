@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, jest, test } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, type Mock, vi, test } from "vitest";
 import { createHash, createHmac } from "node:crypto";
 import fs from "fs";
 import { NodeSSH } from "node-ssh";
@@ -36,9 +36,9 @@ describe("SessionManager", () => {
   beforeEach(() => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "session-test-"));
     execResponses = new Map();
-    sftpResult = { end: jest.fn() };
+    sftpResult = { end: vi.fn() };
 
-    jest.spyOn(NodeSSH.prototype, "connect").mockImplementation(async function (
+    vi.spyOn(NodeSSH.prototype, "connect").mockImplementation(async function (
       this: NodeSSH,
       config: unknown,
     ) {
@@ -46,7 +46,7 @@ describe("SessionManager", () => {
       return this;
     });
 
-    jest.spyOn(NodeSSH.prototype, "requestSFTP").mockImplementation(async () => {
+    vi.spyOn(NodeSSH.prototype, "requestSFTP").mockImplementation(async () => {
       if (sftpResult instanceof Error) {
         throw sftpResult;
       }
@@ -54,7 +54,7 @@ describe("SessionManager", () => {
       return sftpResult as never;
     });
 
-    jest.spyOn(NodeSSH.prototype, "execCommand").mockImplementation((async (_command: string) => {
+    vi.spyOn(NodeSSH.prototype, "execCommand").mockImplementation((async (_command: string) => {
       const response = execResponses.get(_command);
       if (response instanceof Error) {
         throw response;
@@ -68,7 +68,7 @@ describe("SessionManager", () => {
       };
     }) as any);
 
-    jest.spyOn(NodeSSH.prototype, "dispose").mockImplementation(() => undefined);
+    vi.spyOn(NodeSSH.prototype, "dispose").mockImplementation(() => undefined);
 
     manager = new SessionManager(2, 1000, 10000, {
       allowRootLogin: false,
@@ -84,7 +84,7 @@ describe("SessionManager", () => {
     delete process.env.SSH_DEFAULT_KEY_DIR;
 
     await manager.destroy();
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -129,12 +129,12 @@ describe("SessionManager", () => {
     if (!session) {
       throw new Error("session not found");
     }
-    const listener = jest.fn<(sessionId: string) => Promise<void>>(async () => {
+    const listener = vi.fn<(sessionId: string) => Promise<void>>(async () => {
       expect(manager.getSession(result.sessionId)).toBe(session);
       events.push("listener");
     });
     manager.onSessionClose(listener);
-    session.ssh.dispose = jest.fn(() => {
+    session.ssh.dispose = vi.fn(() => {
       events.push("dispose");
     }) as any;
 
@@ -145,7 +145,7 @@ describe("SessionManager", () => {
   });
 
   test("uses policyHost for allowlist checks while connecting to the resolved host", async () => {
-    const assertAllowed = jest.fn<(context: unknown) => { allowed: boolean }>(() => ({
+    const assertAllowed = vi.fn<(context: unknown) => { allowed: boolean }>(() => ({
       allowed: true,
     }));
     const policyManager = new SessionManager(2, 1000, 10000, undefined, {
@@ -587,11 +587,11 @@ describe("SessionManager", () => {
       auth: "password",
     });
 
-    const before = (NodeSSH.prototype.execCommand as jest.Mock).mock.calls.length;
+    const before = (NodeSSH.prototype.execCommand as Mock).mock.calls.length;
     const first = await manager.getOSInfo(result.sessionId);
-    const afterFirst = (NodeSSH.prototype.execCommand as jest.Mock).mock.calls.length;
+    const afterFirst = (NodeSSH.prototype.execCommand as Mock).mock.calls.length;
     const second = await manager.getOSInfo(result.sessionId);
-    const afterSecond = (NodeSSH.prototype.execCommand as jest.Mock).mock.calls.length;
+    const afterSecond = (NodeSSH.prototype.execCommand as Mock).mock.calls.length;
 
     expect(first.platform).toBe("linux");
     expect(second).toEqual(first);
@@ -684,7 +684,7 @@ describe("SessionManager", () => {
   });
 
   test("translates authentication and connection refused errors", async () => {
-    jest.spyOn(NodeSSH.prototype, "connect").mockImplementationOnce(async () => {
+    vi.spyOn(NodeSSH.prototype, "connect").mockImplementationOnce(async () => {
       throw new Error("authentication failed");
     });
     await expect(
@@ -696,7 +696,7 @@ describe("SessionManager", () => {
       }),
     ).rejects.toMatchObject({ code: "EAUTH" });
 
-    jest.spyOn(NodeSSH.prototype, "connect").mockImplementationOnce(async () => {
+    vi.spyOn(NodeSSH.prototype, "connect").mockImplementationOnce(async () => {
       throw new Error("ECONNREFUSED");
     });
     await expect(
@@ -710,7 +710,7 @@ describe("SessionManager", () => {
   });
 
   test("translates timeout, host key, host-denied, and generic connection failures", async () => {
-    jest.spyOn(NodeSSH.prototype, "connect").mockImplementationOnce(async () => {
+    vi.spyOn(NodeSSH.prototype, "connect").mockImplementationOnce(async () => {
       throw new Error("connection timeout");
     });
     await expect(
@@ -722,7 +722,7 @@ describe("SessionManager", () => {
       }),
     ).rejects.toMatchObject({ code: "ETIMEOUT" });
 
-    jest.spyOn(NodeSSH.prototype, "connect").mockImplementationOnce(async () => {
+    vi.spyOn(NodeSSH.prototype, "connect").mockImplementationOnce(async () => {
       throw new Error("host key mismatch");
     });
     await expect(
@@ -734,7 +734,7 @@ describe("SessionManager", () => {
       }),
     ).rejects.toMatchObject({ code: "EHOSTKEY" });
 
-    jest.spyOn(NodeSSH.prototype, "connect").mockImplementationOnce(async () => {
+    vi.spyOn(NodeSSH.prototype, "connect").mockImplementationOnce(async () => {
       throw new Error("host denied by policy");
     });
     await expect(
@@ -746,7 +746,7 @@ describe("SessionManager", () => {
       }),
     ).rejects.toMatchObject({ code: "EHOSTKEY" });
 
-    jest.spyOn(NodeSSH.prototype, "connect").mockImplementationOnce(async () => {
+    vi.spyOn(NodeSSH.prototype, "connect").mockImplementationOnce(async () => {
       throw "socket closed";
     });
     await expect(
@@ -854,7 +854,7 @@ describe("SessionManager", () => {
       throw new Error("session not found");
     }
 
-    current.ssh.dispose = jest.fn(() => {
+    current.ssh.dispose = vi.fn(() => {
       throw new Error("dispose failed");
     }) as any;
 
@@ -879,7 +879,7 @@ describe("SessionManager", () => {
       }),
     ).rejects.toMatchObject({ code: "EAUTH" });
 
-    jest.spyOn(NodeSSH.prototype, "connect").mockImplementationOnce(async () => {
+    vi.spyOn(NodeSSH.prototype, "connect").mockImplementationOnce(async () => {
       throw new Error("ETIMEDOUT");
     });
     await expect(

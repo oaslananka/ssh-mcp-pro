@@ -1,14 +1,14 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { EnsureToolProvider } from "../../../src/tools/ensure.provider.js";
 
 describe("EnsureToolProvider", () => {
   test("dispatches ensure and patch tools", async () => {
     const provider = new EnsureToolProvider({
       ensureService: {
-        ensurePackage: jest.fn(async () => ({ ok: true })),
-        ensureService: jest.fn(async () => ({ ok: true })),
-        ensureLinesInFile: jest.fn(async () => ({ ok: true, added: 1 })),
-        applyPatch: jest.fn(async () => ({ ok: true, changed: true })),
+        ensurePackage: vi.fn(async () => ({ ok: true })),
+        ensureService: vi.fn(async () => ({ ok: true })),
+        ensureLinesInFile: vi.fn(async () => ({ ok: true, added: 1 })),
+        applyPatch: vi.fn(async () => ({ ok: true, changed: true })),
       } as any,
     });
 

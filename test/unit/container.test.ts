@@ -1,4 +1,4 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { ConfigManager } from "../../src/config.js";
 import { createContainer } from "../../src/container.js";
 import { createTestContainer } from "./helpers.js";
@@ -73,10 +73,10 @@ describe("createContainer", () => {
 
   test("closes tunnels when production sessions close", async () => {
     const container = createContainer();
-    const closeSessionTunnels = jest
+    const closeSessionTunnels = vi
       .spyOn(container.tunnelService, "closeSessionTunnels")
       .mockResolvedValue(1);
-    const dispose = jest.fn();
+    const dispose = vi.fn();
     const now = Date.now();
 
     (

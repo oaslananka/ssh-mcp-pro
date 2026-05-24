@@ -1,3 +1,4 @@
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { loadRemoteConfig } from "../../src/remote/config.js";
 
 const SAVED_ENV = { ...process.env };

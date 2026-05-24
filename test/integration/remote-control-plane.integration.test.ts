@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { AgentExecutor, defaultHostMetadata } from "../../src/remote/agent-executor.js";
 import {
   generateEd25519PemKeyPair,

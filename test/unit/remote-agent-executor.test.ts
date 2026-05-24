@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, test } from "@jest/globals";
+import { describe, expect, test } from "vitest";
 import { AgentExecutor } from "../../src/remote/agent-executor.js";
 import { generateEd25519PemKeyPair, verifyEnvelope } from "../../src/remote/crypto.js";
 import { createAgentPolicy, mergeCustomPolicy } from "../../src/remote/policy.js";

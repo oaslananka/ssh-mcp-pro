@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { PolicyEngine, type PolicyConfig } from "../../src/policy.js";
 
 function policy(overrides: Partial<PolicyConfig> = {}) {
@@ -465,7 +465,7 @@ describe("PolicyEngine", () => {
   });
 
   test("explain mode returns policy verdicts without throwing", () => {
-    const observer = jest.fn();
+    const observer = vi.fn();
     const engine = new PolicyEngine(policy().getEffectivePolicy(), observer);
 
     const decision = engine.assertAllowed({

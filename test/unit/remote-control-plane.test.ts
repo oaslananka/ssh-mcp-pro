@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
 import {
   generateEd25519PemKeyPair,
@@ -172,9 +172,9 @@ describe("remote control plane remote-agent contracts", () => {
         deadline: new Date(Date.now() + 30_000).toISOString(),
       };
       const replayNonce = randomToken(16);
-      const connection = { sendJson: jest.fn(), close: jest.fn(), onClose: jest.fn() };
-      const resolve = jest.fn();
-      const reject = jest.fn();
+      const connection = { sendJson: vi.fn(), close: vi.fn(), onClose: vi.fn() };
+      const resolve = vi.fn();
+      const reject = vi.fn();
       const timeout = setTimeout(() => undefined, 30_000);
       const harness = controlPlane as unknown as {
         store: {
@@ -270,7 +270,7 @@ describe("remote control plane remote-agent contracts", () => {
 
       harness.agentConnections.set(agent.id, {
         agent,
-        connection: { sendJson: jest.fn(), close: jest.fn(), onClose: jest.fn() },
+        connection: { sendJson: vi.fn(), close: vi.fn(), onClose: vi.fn() },
         seenNonces,
       });
 

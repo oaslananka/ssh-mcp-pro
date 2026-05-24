@@ -1,17 +1,17 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { ProcessToolProvider } from "../../../src/tools/process.provider.js";
 
 describe("ProcessToolProvider", () => {
   test("dispatches command tools", async () => {
     const provider = new ProcessToolProvider({
       processService: {
-        execCommand: jest.fn(async () => ({
+        execCommand: vi.fn(async () => ({
           code: 0,
           stdout: "ok",
           stderr: "",
           durationMs: 5,
         })),
-        execSudo: jest.fn(async () => ({
+        execSudo: vi.fn(async () => ({
           code: 0,
           stdout: "sudo",
           stderr: "",
@@ -19,7 +19,7 @@ describe("ProcessToolProvider", () => {
         })),
       } as any,
       streamingService: {
-        execWithStreaming: jest.fn(async () => ({
+        execWithStreaming: vi.fn(async () => ({
           code: 0,
           chunks: [],
           stdout: "stream",
@@ -29,7 +29,7 @@ describe("ProcessToolProvider", () => {
         })),
       },
       metrics: {
-        recordCommand: jest.fn(),
+        recordCommand: vi.fn(),
       } as any,
     });
 
@@ -55,19 +55,19 @@ describe("ProcessToolProvider", () => {
   });
 
   test("passes optional process fields and records failed command outcomes", async () => {
-    const execCommand = jest.fn(async () => ({
+    const execCommand = vi.fn(async () => ({
       code: 2,
       stdout: "",
       stderr: "denied",
       durationMs: 11,
     }));
-    const execSudo = jest.fn(async () => ({
+    const execSudo = vi.fn(async () => ({
       code: 1,
       stdout: "",
       stderr: "sudo denied",
       durationMs: 12,
     }));
-    const execWithStreaming = jest.fn(async () => ({
+    const execWithStreaming = vi.fn(async () => ({
       code: 3,
       chunks: [{ stream: "stderr", data: "bad" }],
       stdout: "",
@@ -75,7 +75,7 @@ describe("ProcessToolProvider", () => {
       durationMs: 13,
       truncated: true,
     }));
-    const recordCommand = jest.fn();
+    const recordCommand = vi.fn();
     const provider = new ProcessToolProvider({
       processService: {
         execCommand,

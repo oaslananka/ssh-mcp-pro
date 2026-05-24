@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, jest, test } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, vi, test } from "vitest";
 import { RateLimiter } from "../../src/rate-limiter.js";
 
 describe("RateLimiter (sliding window)", () => {
@@ -66,7 +66,7 @@ describe("RateLimiter (sliding window)", () => {
 
   test("does not allow a burst after a fixed-window-style reset point", async () => {
     let now = 0;
-    const nowSpy = jest.spyOn(Date, "now").mockImplementation(() => now);
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
     const burstLimiter = new RateLimiter({
       maxRequests: 5,
       windowMs: 100,
@@ -132,7 +132,7 @@ describe("RateLimiter (sliding window)", () => {
 
   test("uses defaults, prunes expired keys, and tolerates repeated destroy", () => {
     let now = 10_000;
-    const nowSpy = jest.spyOn(Date, "now").mockImplementation(() => now);
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
     const defaultLimiter = new RateLimiter();
 
     try {

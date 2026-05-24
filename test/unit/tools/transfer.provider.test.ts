@@ -1,12 +1,12 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { TransferToolProvider } from "../../../src/tools/transfer.provider.js";
 
 describe("TransferToolProvider", () => {
   test("dispatches upload and download tools", async () => {
     const provider = new TransferToolProvider({
       transferService: {
-        uploadFileWithProgress: jest.fn(async () => ({ success: true })),
-        downloadFileWithProgress: jest.fn(async () => ({ success: true })),
+        uploadFileWithProgress: vi.fn(async () => ({ success: true })),
+        downloadFileWithProgress: vi.fn(async () => ({ success: true })),
       } as any,
     });
 

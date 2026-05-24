@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, jest, test } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, vi, test } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -7,37 +7,37 @@ describe("SSH config cache management", () => {
   let tempDir: string;
 
   beforeEach(() => {
-    jest.resetModules();
-    jest.useFakeTimers();
-    jest.setSystemTime(new Date("2026-03-22T00:00:00Z"));
+    vi.resetModules();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-22T00:00:00Z"));
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "ssh-config-test-"));
   });
 
   afterEach(() => {
-    jest.useRealTimers();
-    jest.restoreAllMocks();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
     fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
   test("re-parses config after TTL expires", async () => {
     const mod = await import("../../src/ssh-config.js");
-    const parseSpy = jest.spyOn(mod.SSHConfigParser.prototype, "parse").mockResolvedValue();
+    const parseSpy = vi.spyOn(mod.SSHConfigParser.prototype, "parse").mockResolvedValue();
 
     await mod.getSSHConfigParser();
     expect(parseSpy).toHaveBeenCalledTimes(1);
 
-    jest.setSystemTime(new Date("2026-03-22T00:04:59Z"));
+    vi.setSystemTime(new Date("2026-03-22T00:04:59Z"));
     await mod.getSSHConfigParser();
     expect(parseSpy).toHaveBeenCalledTimes(1);
 
-    jest.setSystemTime(new Date("2026-03-22T00:05:01Z"));
+    vi.setSystemTime(new Date("2026-03-22T00:05:01Z"));
     await mod.getSSHConfigParser();
     expect(parseSpy).toHaveBeenCalledTimes(2);
   });
 
   test("invalidateSSHConfigCache forces a fresh parse", async () => {
     const mod = await import("../../src/ssh-config.js");
-    const parseSpy = jest.spyOn(mod.SSHConfigParser.prototype, "parse").mockResolvedValue();
+    const parseSpy = vi.spyOn(mod.SSHConfigParser.prototype, "parse").mockResolvedValue();
 
     await mod.getSSHConfigParser();
     expect(parseSpy).toHaveBeenCalledTimes(1);

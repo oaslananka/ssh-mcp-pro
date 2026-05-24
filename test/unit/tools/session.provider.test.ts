@@ -1,17 +1,17 @@
-import { beforeEach, describe, expect, jest, test } from "@jest/globals";
+import { beforeEach, describe, expect, vi, test } from "vitest";
 
-const getConfiguredHosts = jest.fn() as any;
-const resolveSSHHost = jest.fn() as any;
+const getConfiguredHosts = vi.fn() as any;
+const resolveSSHHost = vi.fn() as any;
 
 describe("SessionToolProvider", () => {
   beforeEach(() => {
-    jest.resetModules();
+    vi.resetModules();
     getConfiguredHosts.mockReset();
     resolveSSHHost.mockReset();
   });
 
   async function loadProvider() {
-    jest.unstable_mockModule("../../../src/ssh-config.js", () => ({
+    vi.doMock("../../../src/ssh-config.js", () => ({
       getConfiguredHosts,
       resolveSSHHost,
     }));
@@ -21,14 +21,14 @@ describe("SessionToolProvider", () => {
 
   test("opens, closes, lists, and pings sessions", async () => {
     const { SessionToolProvider } = await loadProvider();
-    const openSession = jest.fn(async () => ({
+    const openSession = vi.fn(async () => ({
       sessionId: "session-1",
       host: "example.com",
       username: "demo",
       sftpAvailable: true,
       expiresInMs: 1000,
     }));
-    const closeSession = jest.fn(async () => true);
+    const closeSession = vi.fn(async () => true);
     const provider = new SessionToolProvider({
       sessionManager: {
         openSession,
@@ -46,7 +46,7 @@ describe("SessionToolProvider", () => {
         ],
         getSession: () => ({
           ssh: {
-            execCommand: jest.fn(async () => ({ code: 0 })),
+            execCommand: vi.fn(async () => ({ code: 0 })),
           },
           info: {
             host: "example.com",
@@ -55,8 +55,8 @@ describe("SessionToolProvider", () => {
         }),
       } as any,
       metrics: {
-        recordSessionCreated: jest.fn(),
-        recordSessionClosed: jest.fn(),
+        recordSessionCreated: vi.fn(),
+        recordSessionClosed: vi.fn(),
       } as any,
     });
 
@@ -87,8 +87,8 @@ describe("SessionToolProvider", () => {
         getSession: () => undefined,
       } as any,
       metrics: {
-        recordSessionCreated: jest.fn(),
-        recordSessionClosed: jest.fn(),
+        recordSessionCreated: vi.fn(),
+        recordSessionClosed: vi.fn(),
       } as any,
     });
 
@@ -111,17 +111,17 @@ describe("SessionToolProvider", () => {
 
   test("normalizes optional open-session fields and handles negative close/ping paths", async () => {
     const { SessionToolProvider } = await loadProvider();
-    const openSession = jest.fn(async () => ({
+    const openSession = vi.fn(async () => ({
       sessionId: "session-2",
       host: "target.example",
       username: "deploy",
       sftpAvailable: false,
       expiresInMs: 5000,
     }));
-    const closeSession = jest.fn(async () => false);
-    const recordSessionCreated = jest.fn();
-    const recordSessionClosed = jest.fn();
-    const execCommand = jest
+    const closeSession = vi.fn(async () => false);
+    const recordSessionCreated = vi.fn();
+    const recordSessionClosed = vi.fn();
+    const execCommand = vi
       .fn<() => Promise<{ code: number }>>()
       .mockResolvedValueOnce({ code: 1 })
       .mockRejectedValueOnce(new Error("network down"));

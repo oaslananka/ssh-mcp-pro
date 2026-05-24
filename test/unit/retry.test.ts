@@ -1,4 +1,4 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { retry, retryable, withRetry } from "../../src/retry.js";
 
 describe("withRetry", () => {
@@ -82,8 +82,8 @@ describe("withRetry", () => {
 
   test("records retry callbacks and caps jittered delays", async () => {
     const originalRandom = Math.random;
-    Math.random = jest.fn(() => 1) as unknown as typeof Math.random;
-    const onRetry = jest.fn();
+    Math.random = vi.fn(() => 1) as unknown as typeof Math.random;
+    const onRetry = vi.fn();
     let calls = 0;
 
     try {

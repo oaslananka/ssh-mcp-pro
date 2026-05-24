@@ -1,10 +1,10 @@
-import { describe, expect, jest, test } from "@jest/globals";
+import { describe, expect, vi, test } from "vitest";
 import { createTunnelService } from "../../src/tunnel.js";
 import { createAllowPolicy, createSessionInfo, createTunnelMetrics } from "./helpers.js";
 
 describe("createTunnelService", () => {
   test("creates, lists, and closes tunnels", async () => {
-    const dispose = jest.fn(async () => undefined);
+    const dispose = vi.fn(async () => undefined);
     const policy = createAllowPolicy();
     const service = createTunnelService({
       sessionManager: {
@@ -12,8 +12,8 @@ describe("createTunnelService", () => {
           ({
             info: createSessionInfo(),
             ssh: {
-              forwardIn: jest.fn(async (_host: string, port: number) => ({ port, dispose })),
-              forwardOut: jest.fn(),
+              forwardIn: vi.fn(async (_host: string, port: number) => ({ port, dispose })),
+              forwardOut: vi.fn(),
             },
           }) as any,
       },
@@ -59,8 +59,8 @@ describe("createTunnelService", () => {
     const metrics = createTunnelMetrics();
     const policy = createAllowPolicy();
     const ssh = {
-      forwardIn: jest.fn(),
-      forwardOut: jest.fn(),
+      forwardIn: vi.fn(),
+      forwardOut: vi.fn(),
     };
     const service = createTunnelService({
       sessionManager: {

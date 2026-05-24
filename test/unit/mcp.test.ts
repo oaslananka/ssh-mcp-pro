@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, jest, test } from "@jest/globals";
+import { afterAll, beforeEach, describe, expect, vi, test } from "vitest";
 import { readFileSync } from "fs";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import {
@@ -54,8 +54,8 @@ const registryMetadata = readJson<RegistryMetadata>("registry/ssh-mcp-pro/mcp.js
 
 const handlerMap = new WeakMap<object, Map<unknown, (request?: unknown) => Promise<unknown>>>();
 
-const connectSpy = jest.spyOn(Server.prototype as any, "connect").mockResolvedValue(undefined);
-const setRequestHandlerSpy = jest
+const connectSpy = vi.spyOn(Server.prototype as any, "connect").mockResolvedValue(undefined);
+const setRequestHandlerSpy = vi
   .spyOn(Server.prototype as any, "setRequestHandler")
   .mockImplementation(function (
     this: object,
@@ -82,8 +82,8 @@ async function destroyContainer(container: AppContainer): Promise<void> {
 }
 
 describe("SSHMCPServer", () => {
-  const infoSpy = jest.spyOn(logger, "info").mockImplementation(() => undefined);
-  const errorSpy = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+  const infoSpy = vi.spyOn(logger, "info").mockImplementation(() => undefined);
+  const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => undefined);
 
   beforeEach(() => {
     connectSpy.mockClear();
@@ -176,7 +176,7 @@ describe("SSHMCPServer", () => {
 
   test("registers handlers and delegates tool calls when rate limiting is disabled", async () => {
     const container = createTestContainer();
-    const rateCheckSpy = jest.spyOn(container.rateLimiter, "check");
+    const rateCheckSpy = vi.spyOn(container.rateLimiter, "check");
     const server = new SSHMCPServer(container);
     const handlers = getHandlers(server);
 
@@ -267,7 +267,7 @@ describe("SSHMCPServer", () => {
     const container = {
       ...base,
       config: {
-        get: jest.fn((key: string) =>
+        get: vi.fn((key: string) =>
           key === "connector"
             ? {
                 toolProfile: "remote-readonly",
@@ -277,7 +277,7 @@ describe("SSHMCPServer", () => {
               }
             : base.config.get(key as never),
         ),
-        getAll: jest.fn(() => ({
+        getAll: vi.fn(() => ({
           ...base.config.getAll(),
           connector: {
             toolProfile: "remote-readonly" as const,
@@ -329,17 +329,17 @@ describe("SSHMCPServer", () => {
     const container = {
       ...base,
       config: {
-        get: jest.fn((key: string) =>
+        get: vi.fn((key: string) =>
           key === "rateLimit" ? { enabled: true } : base.config.get(key as never),
         ),
-        getAll: jest.fn(() => ({
+        getAll: vi.fn(() => ({
           ...base.config.getAll(),
           rateLimit: { enabled: true, maxRequests: 100, windowMs: 60_000 },
         })),
       },
       rateLimiter: {
-        check: jest.fn(() => ({ allowed: false, resetIn: 1234 })),
-        destroy: jest.fn(),
+        check: vi.fn(() => ({ allowed: false, resetIn: 1234 })),
+        destroy: vi.fn(),
       },
     } as unknown as AppContainer;
 
@@ -371,17 +371,17 @@ describe("SSHMCPServer", () => {
     const container = {
       ...base,
       config: {
-        get: jest.fn((key: string) =>
+        get: vi.fn((key: string) =>
           key === "rateLimit" ? { enabled: true } : base.config.get(key as never),
         ),
-        getAll: jest.fn(() => ({
+        getAll: vi.fn(() => ({
           ...base.config.getAll(),
           rateLimit: { enabled: true, maxRequests: 100, windowMs: 60_000 },
         })),
       },
       rateLimiter: {
-        check: jest.fn(() => ({ allowed: true, resetIn: 0 })),
-        destroy: jest.fn(),
+        check: vi.fn(() => ({ allowed: true, resetIn: 0 })),
+        destroy: vi.fn(),
       },
     } as unknown as AppContainer;
 

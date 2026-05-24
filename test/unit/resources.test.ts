@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from "@jest/globals";
+import { afterAll, describe, expect, test } from "vitest";
 import type { AppContainer } from "../../src/container.js";
 import { createTestContainer } from "./helpers.js";
 import { listResources, readResource } from "../../src/resources.js";

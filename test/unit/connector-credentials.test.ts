@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, test } from "@jest/globals";
+import { afterEach, describe, expect, test } from "vitest";
 import { DEFAULT_CONFIG, type ServerConfig } from "../../src/config.js";
 import { resolveConnectorCredentials } from "../../src/connector-credentials.js";
 

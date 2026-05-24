@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, test } from "@jest/globals";
+import { describe, expect, test } from "vitest";
 import { createAgentPolicy } from "../../src/remote/policy.js";
 import { RemoteStore } from "../../src/remote/store.js";
 

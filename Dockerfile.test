@@ -23,6 +23,7 @@ COPY src/ ./src/
 COPY test/ ./test/
 COPY tsconfig.json ./
 COPY tsconfig.test.json ./
+COPY vitest.config.ts ./
 
 # Build TypeScript
 RUN pnpm run build && chown -R node:node /app
