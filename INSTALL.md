@@ -88,7 +88,8 @@ Create a bearer token file with restrictive permissions:
 
 ```bash
 install -m 700 -d /tmp/ssh-mcp-pro
-printf '%s' "<replace-with-random-token>" > /tmp/ssh-mcp-pro/bearer-token
+node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('base64url'))" \
+  > /tmp/ssh-mcp-pro/bearer-token
 chmod 600 /tmp/ssh-mcp-pro/bearer-token
 ```
 
@@ -106,7 +107,7 @@ ssh-mcp-pro \
 Register that HTTP endpoint with Codex:
 
 ```bash
-export SSH_MCP_HTTP_BEARER_TOKEN="<same-random-token>"
+export SSH_MCP_HTTP_BEARER_TOKEN="$(cat /tmp/ssh-mcp-pro/bearer-token)"
 codex mcp add ssh-mcp-http \
   --url http://127.0.0.1:3000/mcp \
   --bearer-token-env-var SSH_MCP_HTTP_BEARER_TOKEN
