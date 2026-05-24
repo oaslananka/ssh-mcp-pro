@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { parsePnpmPackOutput } from "./pack-json.mjs";
 
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 const requiredFiles = ["dist/index.js", "dist/index.d.ts", "LICENSE", "mcp.json", "server.json"];
@@ -33,9 +34,9 @@ if (pack.status !== 0) {
   process.exit(pack.status ?? 1);
 }
 
-const packed = JSON.parse(pack.stdout);
-const files = new Set((Array.isArray(packed) ? packed[0] : packed).files.map((file) => file.path));
-for (const file of ["dist/index.js", "dist/index.d.ts", "LICENSE", "mcp.json", "server.json"]) {
+const packed = parsePnpmPackOutput(pack.stdout);
+const files = new Set(packed.files.map((file) => file.path));
+for (const file of [...new Set(requiredFiles)]) {
   if (!files.has(file)) {
     throw new Error(`Packed artifact is missing ${file}.`);
   }

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 const mcp = JSON.parse(readFileSync("mcp.json", "utf8"));
@@ -41,6 +41,5 @@ assert(
   Array.isArray(server.packages) && server.packages.length > 0,
   "server.json must declare packages.",
 );
-assert(existsSync(packageJson.main), `${packageJson.main} must exist. Run pnpm run build first.`);
 
 console.log("validate-mcp-metadata: metadata files are consistent.");

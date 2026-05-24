@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { mkdtempSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { parsePnpmPackOutput } from "./pack-json.mjs";
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, {
@@ -25,10 +26,17 @@ try {
     ["pack", "--pack-destination", workspace, "--json"],
     process.cwd(),
   );
-  const packed = JSON.parse(packOutput);
-  const tarball = join(workspace, (Array.isArray(packed) ? packed[0] : packed).filename);
+  const packed = parsePnpmPackOutput(packOutput);
+  const tarball = isAbsolute(packed.filename) ? packed.filename : join(workspace, packed.filename);
 
-  run("pnpm", ["init"], workspace);
+  writeFileSync(
+    join(workspace, "package.json"),
+    `${JSON.stringify({ name: "ssh-mcp-pro-install-smoke", version: "0.0.0", private: true }, null, 2)}\n`,
+  );
+  const workspaceYaml = join(process.cwd(), "pnpm-workspace.yaml");
+  if (existsSync(workspaceYaml)) {
+    copyFileSync(workspaceYaml, join(workspace, "pnpm-workspace.yaml"));
+  }
   run("pnpm", ["add", tarball], workspace);
   run("node", ["node_modules/ssh-mcp-pro/dist/index.js", "--version"], workspace);
 
