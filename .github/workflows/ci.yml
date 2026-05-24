@@ -32,7 +32,11 @@ defaults:
 jobs:
   quality:
     name: Quality Gates
-    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    if: >-
+      ${{
+        github.event_name != 'pull_request' ||
+        github.event.pull_request.draft == false
+      }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -59,7 +63,11 @@ jobs:
 
   unit:
     name: Unit Tests (Node ${{ matrix.node_major }})
-    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    if: >-
+      ${{
+        github.event_name != 'pull_request' ||
+        github.event.pull_request.draft == false
+      }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
@@ -110,7 +118,11 @@ jobs:
 
   integration:
     name: SSH Integration
-    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    if: >-
+      ${{
+        github.event_name != 'pull_request' ||
+        github.event.pull_request.draft == false
+      }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
