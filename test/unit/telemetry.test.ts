@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, test } from "vitest";
+import { SpanStatusCode, trace, type Span, type SpanOptions } from "@opentelemetry/api";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   getTelemetryConfig,
   initTelemetry,
@@ -8,13 +9,47 @@ import {
   withSpan,
 } from "../../src/telemetry.js";
 
+function createMockSpan(): Span {
+  return {
+    addEvent: vi.fn(),
+    addLink: vi.fn(),
+    addLinks: vi.fn(),
+    end: vi.fn(),
+    isRecording: vi.fn(() => true),
+    recordException: vi.fn(),
+    setAttribute: vi.fn(),
+    setAttributes: vi.fn(),
+    setStatus: vi.fn(),
+    spanContext: vi.fn(() => ({
+      spanId: "1234567890abcdef",
+      traceFlags: 1,
+      traceId: "1234567890abcdef1234567890abcdef",
+    })),
+    updateName: vi.fn(),
+  } as unknown as Span;
+}
+
+function mockTracerWithSpan(span: Span) {
+  const startActiveSpan = vi.fn(
+    (_name: string, _options: SpanOptions, work: (activeSpan: Span) => unknown) => work(span),
+  );
+
+  vi.spyOn(trace, "getTracer").mockReturnValue({
+    startActiveSpan,
+  } as unknown as ReturnType<typeof trace.getTracer>);
+
+  return startActiveSpan;
+}
+
 describe("telemetry helpers", () => {
   afterEach(async () => {
+    vi.restoreAllMocks();
     delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
     delete process.env.OTEL_SERVICE_NAME;
     delete process.env.OTEL_SERVICE_VERSION;
     delete process.env.NODE_ENV;
     await shutdownTelemetry();
+    initTelemetry();
   });
 
   test("derives disabled config when OTLP endpoint is missing", () => {
@@ -81,6 +116,40 @@ describe("telemetry helpers", () => {
     });
 
     expect(result).toBe(42);
+  });
+
+  test("withSpan calls work with the active span and returns its value", async () => {
+    const span = createMockSpan();
+    const startActiveSpan = mockTracerWithSpan(span);
+    const work = vi.fn().mockResolvedValue("span result");
+    const options = { attributes: { "ssh.session_id": "session-1" } };
+
+    await expect(withSpan("ssh.test", work, options)).resolves.toBe("span result");
+
+    expect(trace.getTracer).toHaveBeenCalledWith("ssh-mcp-pro");
+    expect(startActiveSpan).toHaveBeenCalledWith("ssh.test", options, expect.any(Function));
+    expect(work).toHaveBeenCalledWith(span);
+    expect(span.setStatus).toHaveBeenCalledWith({ code: SpanStatusCode.OK });
+    expect(span.end).toHaveBeenCalledTimes(1);
+  });
+
+  test("withSpan sets error status and rethrows the original error", async () => {
+    const span = createMockSpan();
+    mockTracerWithSpan(span);
+    const error = new Error("span failed");
+
+    await expect(
+      withSpan("ssh.error", () => {
+        throw error;
+      }),
+    ).rejects.toBe(error);
+
+    expect(span.recordException).toHaveBeenCalledWith(error);
+    expect(span.setStatus).toHaveBeenCalledWith({
+      code: SpanStatusCode.ERROR,
+      message: "span failed",
+    });
+    expect(span.end).toHaveBeenCalledTimes(1);
   });
 
   test("withSpan records errors and rethrows them", async () => {
