@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -33,7 +33,10 @@ try {
     join(workspace, "package.json"),
     `${JSON.stringify({ name: "ssh-mcp-pro-install-smoke", version: "0.0.0", private: true }, null, 2)}\n`,
   );
-  copyFileSync(join(process.cwd(), "pnpm-workspace.yaml"), join(workspace, "pnpm-workspace.yaml"));
+  const workspaceYaml = join(process.cwd(), "pnpm-workspace.yaml");
+  if (existsSync(workspaceYaml)) {
+    copyFileSync(workspaceYaml, join(workspace, "pnpm-workspace.yaml"));
+  }
   run("pnpm", ["add", tarball], workspace);
   run("node", ["node_modules/ssh-mcp-pro/dist/index.js", "--version"], workspace);
 

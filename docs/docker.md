@@ -13,10 +13,10 @@ docker run --rm ssh-mcp-pro:local --version
 docker run --rm ssh-mcp-pro:local --help
 ```
 
-Run the HTTP transport on loopback:
+Run the HTTP transport on loopback on Linux hosts that support host networking:
 
 ```bash
-docker run --rm -p 127.0.0.1:3000:3000 ssh-mcp-pro:local http --host 0.0.0.0 --port 3000
+docker run --rm --network host ssh-mcp-pro:local http --host 127.0.0.1 --port 3000
 ```
 
-For non-loopback HTTP deployments, configure bearer or OAuth auth, allowed origins, `SSH_MCP_HTTP_PUBLIC_URL`, `SSH_MCP_ALLOWED_HOSTS`, strict host-key verification, and a remote-safe tool profile. The process refuses unsafe public bindings at startup.
+For bridge or port-mapped containers, binding inside the container to `0.0.0.0` is a non-loopback HTTP deployment. Configure bearer or OAuth auth, allowed origins, `SSH_MCP_HTTP_PUBLIC_URL`, `SSH_MCP_ALLOWED_HOSTS`, strict host-key verification, and a remote-safe tool profile. The process refuses unsafe public bindings at startup.

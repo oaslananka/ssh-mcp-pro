@@ -121,7 +121,7 @@ async function runSuite(suite) {
     ...process.env,
     RUN_SSH_E2E: suite === "e2e" ? "1" : process.env.RUN_SSH_E2E,
     RUN_SSH_INTEGRATION: suite === "integration" ? "1" : process.env.RUN_SSH_INTEGRATION,
-    TEST_SSH_HOST: "localhost",
+    TEST_SSH_HOST: SSH_HOST,
     TEST_SSH_PORT: String(SSH_PORT),
     TEST_SSH_USER: "testuser",
     TEST_SSH_PASS: "testpass",
