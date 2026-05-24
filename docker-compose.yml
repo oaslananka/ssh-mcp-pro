@@ -41,7 +41,7 @@ services:
       retries: 5
 
   ssh-server:
-    image: lscr.io/linuxserver/openssh-server:latest@sha256:792bb9969a6751f9be2dcecdebd166f75c51187628f1be48ac9c9b3776561c16
+    image: linuxserver/openssh-server@sha256:5b8550a3b703eb4e5efb14a1f491370b7f765febfac5b0b2ed0321cdc74b1476
     container_name: ssh-mcp-pro-test
     environment:
       - PUID=1000

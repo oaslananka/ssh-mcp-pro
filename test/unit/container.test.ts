@@ -1,6 +1,7 @@
-import { describe, expect, test } from "@jest/globals";
+import { describe, expect, jest, test } from "@jest/globals";
 import { ConfigManager } from "../../src/config.js";
-import { createContainer, createTestContainer } from "../../src/container.js";
+import { createContainer } from "../../src/container.js";
+import { createTestContainer } from "./helpers.js";
 import { MetricsCollector } from "../../src/metrics.js";
 
 describe("createContainer", () => {
@@ -22,6 +23,86 @@ describe("createContainer", () => {
 
     expect(container.config.get("maxSessions")).toBe(7);
 
+    container.rateLimiter.destroy();
+    await container.sessionManager.destroy();
+  });
+
+  test("records policy decisions in production audit and metrics services", async () => {
+    const container = createContainer();
+
+    container.policy.assertAllowed({
+      action: "ssh.open",
+      host: "example.com",
+      username: "deploy",
+    });
+    container.policy.assertAllowed({
+      action: "fs.read",
+      path: "/tmp/app.log",
+    });
+    container.policy.assertAllowed({
+      action: "proc.exec",
+      command: "pwd",
+    });
+
+    expect(container.metrics.getMetrics().policy.allowed).toBe(3);
+    expect(container.auditLog.list(3)).toMatchObject([
+      {
+        action: "ssh.open",
+        host: "example.com",
+        username: "deploy",
+        allowed: true,
+        mode: "enforce",
+      },
+      {
+        action: "fs.read",
+        target: "/tmp/app.log",
+        allowed: true,
+        mode: "enforce",
+      },
+      {
+        action: "proc.exec",
+        target: "pwd",
+        allowed: true,
+        mode: "enforce",
+      },
+    ]);
+
+    container.rateLimiter.destroy();
+    await container.sessionManager.destroy();
+  });
+
+  test("closes tunnels when production sessions close", async () => {
+    const container = createContainer();
+    const closeSessionTunnels = jest
+      .spyOn(container.tunnelService, "closeSessionTunnels")
+      .mockResolvedValue(1);
+    const dispose = jest.fn();
+    const now = Date.now();
+
+    (
+      container.sessionManager as unknown as {
+        sessions: Map<string, unknown>;
+      }
+    ).sessions.set("session-1", {
+      ssh: { dispose },
+      info: {
+        sessionId: "session-1",
+        host: "example.com",
+        username: "deploy",
+        port: 22,
+        createdAt: now,
+        expiresAt: now + 60_000,
+        lastUsed: now,
+        policyMode: "enforce",
+        hostKeyPolicy: "strict",
+      },
+    });
+
+    await expect(container.sessionManager.closeSession("session-1")).resolves.toBe(true);
+    expect(closeSessionTunnels).toHaveBeenCalledWith("session-1");
+    expect(dispose).toHaveBeenCalledTimes(1);
+
+    closeSessionTunnels.mockRestore();
     container.rateLimiter.destroy();
     await container.sessionManager.destroy();
   });

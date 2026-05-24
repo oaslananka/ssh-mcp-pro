@@ -1,5 +1,5 @@
 import { describe, expect, test } from "@jest/globals";
-import { createTestContainer } from "../../../src/container.js";
+import { createTestContainer } from "../helpers.js";
 import { ConnectorToolProvider } from "../../../src/tools/connector.provider.js";
 
 async function destroyContainer(container: ReturnType<typeof createTestContainer>): Promise<void> {
