@@ -3,9 +3,16 @@ import { RateLimiter } from "../../src/rate-limiter.js";
 
 describe("RateLimiter (sliding window)", () => {
   let rateLimiter: RateLimiter;
+  const createdLimiters = new Set<RateLimiter>();
+
+  function createRateLimiter(config?: ConstructorParameters<typeof RateLimiter>[0]) {
+    const limiter = new RateLimiter(config);
+    createdLimiters.add(limiter);
+    return limiter;
+  }
 
   beforeEach(() => {
-    rateLimiter = new RateLimiter({
+    rateLimiter = createRateLimiter({
       maxRequests: 3,
       windowMs: 1000,
       blockOnLimit: true,
@@ -13,7 +20,11 @@ describe("RateLimiter (sliding window)", () => {
   });
 
   afterEach(() => {
-    rateLimiter.destroy();
+    for (const limiter of createdLimiters) {
+      limiter.destroy();
+    }
+    createdLimiters.clear();
+    vi.restoreAllMocks();
   });
 
   test("allows requests below the limit", () => {
@@ -48,7 +59,7 @@ describe("RateLimiter (sliding window)", () => {
   });
 
   test("old requests fall out of the window", async () => {
-    const fastLimiter = new RateLimiter({
+    const fastLimiter = createRateLimiter({
       maxRequests: 2,
       windowMs: 50,
       blockOnLimit: true,
@@ -67,7 +78,7 @@ describe("RateLimiter (sliding window)", () => {
   test("does not allow a burst after a fixed-window-style reset point", async () => {
     let now = 0;
     const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
-    const burstLimiter = new RateLimiter({
+    const burstLimiter = createRateLimiter({
       maxRequests: 5,
       windowMs: 100,
       blockOnLimit: true,
@@ -96,7 +107,7 @@ describe("RateLimiter (sliding window)", () => {
   test("returns null for unknown or expired keys", async () => {
     expect(rateLimiter.getUsage("missing")).toBeNull();
 
-    const fastLimiter = new RateLimiter({
+    const fastLimiter = createRateLimiter({
       maxRequests: 1,
       windowMs: 20,
       blockOnLimit: true,
@@ -116,7 +127,7 @@ describe("RateLimiter (sliding window)", () => {
   });
 
   test("non-blocking mode still reports exceeded usage", () => {
-    const permissiveLimiter = new RateLimiter({
+    const permissiveLimiter = createRateLimiter({
       maxRequests: 1,
       windowMs: 1000,
       blockOnLimit: false,
@@ -133,7 +144,7 @@ describe("RateLimiter (sliding window)", () => {
   test("uses defaults, prunes expired keys, and tolerates repeated destroy", () => {
     let now = 10_000;
     const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
-    const defaultLimiter = new RateLimiter();
+    const defaultLimiter = createRateLimiter();
 
     try {
       expect(defaultLimiter.check("default").remaining).toBe(99);
@@ -157,7 +168,7 @@ describe("RateLimiter (sliding window)", () => {
   });
 
   test("falls back to current time when an exceeded log has no oldest entry", () => {
-    const sparseLimiter = new RateLimiter({
+    const sparseLimiter = createRateLimiter({
       maxRequests: 0,
       windowMs: 1000,
       blockOnLimit: true,
@@ -174,5 +185,37 @@ describe("RateLimiter (sliding window)", () => {
     );
     expect(result.resetIn).toBeLessThanOrEqual(1000);
     sparseLimiter.destroy();
+  });
+
+  test("destroy followed by check does not throw", () => {
+    const limiter = createRateLimiter({
+      maxRequests: 1,
+      windowMs: 1000,
+      blockOnLimit: true,
+    });
+
+    limiter.check("destroyed");
+    limiter.destroy();
+
+    let result: ReturnType<RateLimiter["check"]> | undefined;
+    expect(() => {
+      result = limiter.check("destroyed");
+    }).not.toThrow();
+    expect(result).toEqual({
+      allowed: false,
+      remaining: 0,
+      resetIn: 0,
+      blocked: true,
+    });
+  });
+
+  test("multiple destroy calls do not throw", () => {
+    const limiter = createRateLimiter();
+
+    expect(() => {
+      limiter.destroy();
+      limiter.destroy();
+      limiter.destroy();
+    }).not.toThrow();
   });
 });
