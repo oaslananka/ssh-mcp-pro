@@ -131,9 +131,8 @@ for connector-oriented clients. Valid values are:
 - `remote-readonly`
 - `remote-broker`
 
-Use `remote-safe` for HTTP deployments unless you have a controlled environment
-that requires the full SSH, process, filesystem, transfer, ensure, tunnel,
-connector, and system tool surface.
+Use `remote-safe` for non-loopback HTTP deployments. The `full` profile is
+limited to stdio or loopback-only development and test sessions.
 
 ### Remote Agent CLI
 
@@ -533,8 +532,8 @@ Usage:
   ssh-mcp-pro --help      Show this help
   ssh-mcp-pro --version   Show version
   ssh-mcp-pro --stdio     Force stdio mode (default)
-  ssh-mcp-pro --host 127.0.0.1 --port 3000
-  ssh-mcp-pro --bearer-token-file /path/token --enable-legacy-sse
+  ssh-mcp-pro --transport=http --host 127.0.0.1 --port 3000
+  ssh-mcp-pro --transport=http --bearer-token-file /path/token --enable-legacy-sse
   ssh-mcp-pro --transport=http --tool-profile remote-safe
   ssh-mcp-pro --transport=http --connector-credential-provider agent
 
