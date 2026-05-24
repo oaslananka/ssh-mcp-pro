@@ -68,9 +68,7 @@ function escapeRegex(value: string): string {
 }
 
 const safeString = fc.string({ maxLength: 48 }).filter((value) => !value.includes("\0"));
-const nonEmptyToken = fc
-  .string({ minLength: 1, maxLength: 24 })
-  .filter((value) => /^[a-z0-9][a-z0-9._-]*$/u.test(value));
+const nonEmptyToken = fc.stringMatching(/^[a-z0-9][a-z0-9._-]{0,23}$/u);
 const optionalSafeString = fc.option(safeString, { nil: undefined });
 const optionalPort = fc.option(fc.integer({ min: 0, max: 65_535 }), { nil: undefined });
 const optionalMode = fc.option(fc.constantFrom<PolicyMode>("enforce", "explain"), {

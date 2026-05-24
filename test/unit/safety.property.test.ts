@@ -4,9 +4,7 @@ import { addSafetyWarningToResult, checkCommandSafety } from "../../src/safety.j
 
 const ASSERT_OPTIONS = { numRuns: 100 };
 
-const simpleToken = fc
-  .string({ minLength: 1, maxLength: 16 })
-  .filter((value) => /^[a-z0-9._-]+$/u.test(value));
+const simpleToken = fc.stringMatching(/^[a-z0-9._-]{1,16}$/u);
 
 const jsonishValue = fc.oneof(
   fc.string({ maxLength: 32 }),

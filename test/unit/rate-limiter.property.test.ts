@@ -10,12 +10,13 @@ describe("RateLimiter property invariants", () => {
   });
 
   test("more than maxRequests in one window rejects at least one request", () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_000);
+
     fc.assert(
       fc.property(
         fc.integer({ min: 0, max: 20 }),
         fc.integer({ min: 1, max: 10 }),
         (maxRequests, extraRequests) => {
-          vi.spyOn(Date, "now").mockReturnValue(1_000);
           const limiter = new RateLimiter({
             maxRequests,
             windowMs: 60_000,
@@ -65,12 +66,13 @@ describe("RateLimiter property invariants", () => {
   });
 
   test("requests up to maxRequests remain allowed in a fresh window", () => {
+    vi.spyOn(Date, "now").mockReturnValue(2_000);
+
     fc.assert(
       fc.property(
         fc.integer({ min: 1, max: 20 }),
         fc.integer({ min: 0, max: 20 }),
         (maxRequests, requestedCount) => {
-          vi.spyOn(Date, "now").mockReturnValue(2_000);
           const limiter = new RateLimiter({
             maxRequests,
             windowMs: 60_000,
@@ -92,9 +94,10 @@ describe("RateLimiter property invariants", () => {
   });
 
   test("independent keys do not consume each other's remaining quota", () => {
+    vi.spyOn(Date, "now").mockReturnValue(3_000);
+
     fc.assert(
       fc.property(fc.integer({ min: 1, max: 20 }), (maxRequests) => {
-        vi.spyOn(Date, "now").mockReturnValue(3_000);
         const limiter = new RateLimiter({
           maxRequests,
           windowMs: 60_000,
