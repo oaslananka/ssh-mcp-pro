@@ -1,0 +1,172 @@
+# Contributing
+
+Thanks for improving `ssh-mcp-pro`. This project accepts focused pull requests that keep the MCP server buildable, tested, and safe for users who run SSH automation.
+
+## Development Prerequisites
+
+- Node.js 24.15.0. The supported engine range is `^22.22.2 || ^24.15.0`, but local development and CI currently use Node.js 24.15.0.
+- pnpm 11.0.9 through Corepack. The repository has `engine-strict=true`, so mismatched tool versions fail early.
+- Docker for integration and end-to-end tests that start SSH fixtures.
+- Git with repository hooks enabled by `pnpm run prepare`.
+
+## Setup
+
+```bash
+git clone https://github.com/oaslananka/ssh-mcp-pro.git
+cd ssh-mcp-pro
+corepack enable
+corepack prepare pnpm@11.0.9 --activate
+pnpm install --frozen-lockfile
+pnpm run build
+pnpm run prepare
+```
+
+`pnpm run prepare` configures `core.hooksPath=.githooks` and makes the local Git hooks executable.
+
+## Running Tests
+
+Use the narrowest relevant command first, then run the broader gate before opening a PR.
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm test` | Unit test suite. |
+| `pnpm run test:coverage` | Unit tests with coverage thresholds. |
+| `pnpm run test:integration` | Integration suite; requires Docker where SSH fixtures are used. |
+| `pnpm run test:e2e` | End-to-end suite; requires Docker where SSH fixtures are used. |
+| `pnpm run integration:docker` | Runs the integration suite through the Docker SSH fixture helper. |
+| `pnpm run e2e:docker` | Runs the end-to-end suite through the Docker SSH fixture helper. |
+
+The current Jest runner emits a Node VM Modules experimental warning; that is tracked separately from normal test failures. Do not ignore any other warning or failure.
+
+## Quality Gate
+
+Run this before opening a pull request:
+
+```bash
+pnpm run check
+```
+
+`pnpm run check` runs formatting checks, documentation language checks, ruleset validation, GitHub Actions runtime validation, ESLint, TypeScript type checking, `pnpm audit --audit-level moderate`, license checks, coverage, build, metadata validation, API docs, package-content checks, and the package install smoke test.
+
+For faster local iteration, these commands are also available:
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm run format:check` | Check Prettier formatting. |
+| `pnpm run format` | Apply Prettier formatting. |
+| `pnpm run format:staged` | Run the staged-file formatter used by the Git hook. |
+| `pnpm run lint` | Run ESLint. |
+| `pnpm run lint:fix` | Apply ESLint fixes where safe. |
+| `pnpm run lint:staged` | Run the staged-file lint-only helper. |
+| `pnpm run typecheck` | Run TypeScript with `--noEmit`. |
+| `pnpm run audit` | Run `pnpm audit --audit-level moderate`. |
+| `pnpm run licenses:check` | Validate dependency license policy. |
+| `pnpm run check:doc-language` | Validate documentation language conventions. |
+| `pnpm run check:rulesets` | Validate local GitHub ruleset files when present. |
+| `pnpm run verify:actions-runtime` | Verify GitHub Actions metadata does not use deprecated runtimes. |
+| `pnpm run check:quality` | Run the non-packaging quality checks. |
+| `pnpm run check:package` | Build and validate package metadata, docs, package contents, and install smoke. |
+| `pnpm run check:push` | Run the pre-push subset: format, lint, typecheck, and unit tests. |
+
+## Git Hooks
+
+The repository uses `.githooks` plus the local pre-commit configuration:
+
+- `pre-commit` runs staged formatting and local pre-commit checks.
+- `pre-push` runs `pnpm run check:push` and all-files pre-push checks.
+
+The hook entrypoints are `pnpm run hook:pre-commit` and `pnpm run hook:pre-push`; they are intended to be called by `.githooks`.
+
+If hooks are not installed, run:
+
+```bash
+pnpm run prepare
+```
+
+You can run the Python pre-commit hooks directly when needed:
+
+```bash
+uvx pre-commit run --all-files
+uvx pre-commit run --all-files --hook-stage manual
+```
+
+## Package and Metadata Commands
+
+Use these commands when a change touches package contents, metadata, generated docs, connectors, or release configuration:
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm run prepack` | Build and validate metadata before packaging. |
+| `pnpm run prepublishOnly` | Run the full check gate before an npm publish operation. Maintainers should rely on the release workflow for actual publication. |
+| `pnpm run validate:mcp-metadata` | Validate MCP registry metadata. |
+| `pnpm run validate:chatgpt-app` | Validate ChatGPT app readiness metadata. |
+| `pnpm run validate:claude-connector` | Validate Claude connector readiness metadata. |
+| `pnpm run sync-version -- --check` | Check version consistency across metadata files. |
+| `pnpm run docs:check` | Build TypeDoc with warnings treated as errors. |
+| `pnpm run pack:check` | Verify package dry-run contents. |
+| `pnpm run pack:install-smoke` | Verify the package installs and the CLI starts. |
+| `pnpm run release:dry-run` | Validate release-please configuration and package readiness without publishing. |
+| `pnpm run sbom` | Generate the CycloneDX SBOM artifact. |
+
+Do not publish packages manually from a feature branch. The release workflow and maintainers own publication.
+
+## Docker Fixture Commands
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm run docker:ssh-fixture:up` | Start the Docker SSH fixture. |
+| `pnpm run docker:ssh-fixture:down` | Stop the Docker SSH fixture. |
+| `pnpm run integration:docker` | Run integration tests through the fixture. |
+| `pnpm run e2e:docker` | Run E2E tests through the fixture. |
+
+## Development Helpers
+
+| Command | Purpose |
+| --- | --- |
+| `pnpm run dev` | Run TypeScript in watch mode. |
+| `pnpm run dev:control-plane` | Build and start the development control plane helper. |
+| `pnpm run dev:agent` | Build and start the development remote agent helper. |
+| `pnpm run start:http` | Start the built HTTP transport entrypoint. |
+| `pnpm run setup:chatgpt` | Run the ChatGPT setup helper. |
+| `pnpm run lint:commits` | Validate commit message style. |
+| `pnpm run lint:pr-title` | Validate PR title style. |
+| `pnpm run test:pr-title-lint` | Run PR-title lint tests. |
+| `pnpm run review:threads` | Check unresolved review-thread state. |
+| `pnpm run release:state` | Inspect release automation state. |
+| `pnpm run check:npm-name` | Check npm package-name availability. |
+
+## Commit Messages
+
+Use Conventional Commits:
+
+- `feat:` for user-facing features.
+- `fix:` for bug fixes.
+- `docs:` for documentation-only changes.
+- `test:` for tests.
+- `refactor:` for behavior-preserving code changes.
+- `build:` for build-system changes.
+- `ci:` for workflow changes.
+- `chore:` for repository maintenance.
+
+Use `!` or a `BREAKING CHANGE:` footer only when a commit intentionally introduces a breaking change.
+
+## Branch Naming
+
+Use short, focused branch names:
+
+- `feature/<short-slug>`
+- `fix/<short-slug>`
+- `docs/<short-slug>`
+- `chore/<short-slug>`
+
+Automation branches may use `codex/SSH-<id>-<short-slug>`.
+
+## Pull Request Checklist
+
+Before requesting review:
+
+- Keep the PR focused on one issue or one cohesive change.
+- Run `pnpm run check`.
+- Add or update tests for behavior changes.
+- Update documentation when commands, configuration, architecture, deployment, security, or user workflows change.
+- Leave changelog entries to release-please; do not edit `CHANGELOG.md` manually unless maintainers ask for it.
