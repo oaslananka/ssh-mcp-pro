@@ -3,6 +3,20 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const rulesetDir = ".github/rulesets";
+const mainProtectionFile = "main-protection.json";
+const requiredMainProtectionRules = [
+  "pull_request",
+  "required_status_checks",
+  "non_fast_forward",
+  "required_linear_history",
+];
+const requiredMainContexts = [
+  "Quality Gates",
+  "Unit Tests (Node 22)",
+  "Unit Tests (Node 24)",
+  "SSH Integration",
+  "Build, SBOM, and Pack",
+];
 
 if (!existsSync(rulesetDir)) {
   console.log("check-rulesets: no ruleset directory found; skipping.");
@@ -16,6 +30,106 @@ for (const file of files) {
   if (!ruleset.name || !Array.isArray(ruleset.rules)) {
     throw new Error(`${path} must include a name and rules array.`);
   }
+
+  if (file === mainProtectionFile) {
+    validateMainProtection(path, ruleset);
+  }
 }
 
 console.log(`check-rulesets: validated ${files.length} ruleset file(s).`);
+
+function validateMainProtection(path, ruleset) {
+  assertEqual(path, "name", ruleset.name, "main branch protection");
+  assertEqual(path, "target", ruleset.target, "branch");
+  assertEqual(path, "enforcement", ruleset.enforcement, "active");
+  assertArrayEqual(path, "bypass_actors", ruleset.bypass_actors, []);
+  assertArrayEqual(path, "conditions.ref_name.include", ruleset.conditions?.ref_name?.include, [
+    "~DEFAULT_BRANCH",
+  ]);
+  assertArrayEqual(path, "conditions.ref_name.exclude", ruleset.conditions?.ref_name?.exclude, []);
+
+  const ruleTypes = ruleset.rules.map((rule) => rule.type);
+  for (const type of requiredMainProtectionRules) {
+    if (!ruleTypes.includes(type)) {
+      throw new Error(`${path} is missing required ${type} rule.`);
+    }
+  }
+
+  const pullRequestRule = findRule(path, ruleset, "pull_request");
+  assertArrayEqual(
+    path,
+    "pull_request.parameters.allowed_merge_methods",
+    pullRequestRule.parameters?.allowed_merge_methods,
+    ["squash", "rebase"],
+  );
+  assertEqual(
+    path,
+    "pull_request.parameters.required_review_thread_resolution",
+    pullRequestRule.parameters?.required_review_thread_resolution,
+    true,
+  );
+
+  const statusRule = findRule(path, ruleset, "required_status_checks");
+  assertEqual(
+    path,
+    "required_status_checks.parameters.strict_required_status_checks_policy",
+    statusRule.parameters?.strict_required_status_checks_policy,
+    true,
+  );
+  assertEqual(
+    path,
+    "required_status_checks.parameters.do_not_enforce_on_create",
+    statusRule.parameters?.do_not_enforce_on_create,
+    false,
+  );
+
+  const contexts = statusRule.parameters?.required_status_checks?.map((check) => check.context);
+  assertArrayEqual(
+    path,
+    "required_status_checks.parameters.required_status_checks[].context",
+    contexts,
+    requiredMainContexts,
+  );
+  validateContextsMatchCiWorkflow(path, contexts);
+}
+
+function validateContextsMatchCiWorkflow(path, contexts) {
+  const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+
+  for (const context of contexts) {
+    if (context === "Unit Tests (Node 22)" || context === "Unit Tests (Node 24)") {
+      if (!workflow.includes("name: Unit Tests (Node ${{ matrix.node_major }})")) {
+        throw new Error(`${path} references ${context}, but ci.yml has no unit matrix job name.`);
+      }
+      continue;
+    }
+
+    if (!workflow.includes(`name: ${context}`)) {
+      throw new Error(`${path} references ${context}, but ci.yml has no matching job name.`);
+    }
+  }
+}
+
+function findRule(path, ruleset, type) {
+  const rule = ruleset.rules.find((candidate) => candidate.type === type);
+  if (!rule) {
+    throw new Error(`${path} is missing required ${type} rule.`);
+  }
+  return rule;
+}
+
+function assertEqual(path, field, actual, expected) {
+  if (actual !== expected) {
+    throw new Error(`${path} ${field} must be ${JSON.stringify(expected)}.`);
+  }
+}
+
+function assertArrayEqual(path, field, actual, expected) {
+  if (!Array.isArray(actual)) {
+    throw new Error(`${path} ${field} must be an array.`);
+  }
+
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(`${path} ${field} must be ${JSON.stringify(expected)}.`);
+  }
+}

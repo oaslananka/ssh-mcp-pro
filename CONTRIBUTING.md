@@ -90,6 +90,24 @@ uvx pre-commit run --all-files
 uvx pre-commit run --all-files --hook-stage manual
 ```
 
+## Branch Rulesets
+
+The main branch protection rules are version-controlled in
+`.github/rulesets/main-protection.json`. The file is a GitHub repository
+ruleset export that targets the default branch, requires pull requests, requires
+the CI status contexts listed in `.github/workflows/ci.yml`, blocks force pushes,
+and permits only squash or rebase merge history.
+
+Repository administrators can import or compare the file from GitHub repository
+settings under Rules, Rulesets, using GitHub's ruleset JSON import flow:
+https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/creating-rulesets-for-a-repository
+
+Run this after changing local ruleset files:
+
+```bash
+pnpm run check:rulesets
+```
+
 ## Package and Metadata Commands
 
 Use these commands when a change touches package contents, metadata, generated docs, connectors, or release configuration:
