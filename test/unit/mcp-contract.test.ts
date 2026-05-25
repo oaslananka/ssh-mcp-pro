@@ -43,6 +43,25 @@ function assertValidSchema(schema: unknown, label: string) {
   ).toBe(true);
 }
 
+function assertSpecificOutputSchema(schema: unknown, label: string) {
+  const candidates = [
+    schema,
+    ...(((schema as { anyOf?: unknown[] } | undefined)?.anyOf ?? []) as unknown[]),
+    ...(((schema as { oneOf?: unknown[] } | undefined)?.oneOf ?? []) as unknown[]),
+  ];
+  const hasTypedProperties = candidates.some((candidate) => {
+    const properties = (candidate as { properties?: unknown } | undefined)?.properties;
+    return (
+      properties !== undefined &&
+      typeof properties === "object" &&
+      !Array.isArray(properties) &&
+      Object.keys(properties).length > 0
+    );
+  });
+
+  expect(hasTypedProperties, `${label} must define typed response properties`).toBe(true);
+}
+
 function assertToolCallResult(result: ToolCallResult, toolName: string) {
   expect(result, `${toolName} must return a ToolCallResult`).toEqual(
     expect.objectContaining({
@@ -53,6 +72,9 @@ function assertToolCallResult(result: ToolCallResult, toolName: string) {
     result.content.length,
     `${toolName} must return at least one content item`,
   ).toBeGreaterThan(0);
+  expect(result.structuredContent, `${toolName} must include structuredContent`).toEqual(
+    expect.any(Object),
+  );
 }
 
 afterEach(async () => {
@@ -80,6 +102,7 @@ describe("MCP tool contracts", () => {
       expect(tool.annotations?.title?.trim()).not.toHaveLength(0);
       assertValidSchema(tool.inputSchema, `${tool.name}.inputSchema`);
       assertValidSchema(tool.outputSchema, `${tool.name}.outputSchema`);
+      assertSpecificOutputSchema(tool.outputSchema, `${tool.name}.outputSchema`);
     }
   });
 

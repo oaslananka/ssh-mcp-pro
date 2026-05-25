@@ -28,9 +28,13 @@ describe("SystemToolProvider", () => {
     await expect(provider.handleTool("get_metrics", {})).resolves.toEqual({
       sessions: { active: 1 },
     });
-    await expect(provider.handleTool("get_metrics", { format: "prometheus" })).resolves.toBe(
-      "ssh_mcp_sessions_active 1",
-    );
+    await expect(provider.handleTool("get_metrics", { format: "prometheus" })).resolves.toEqual({
+      content: [{ type: "text", text: "ssh_mcp_sessions_active 1" }],
+      structuredContent: {
+        format: "prometheus",
+        metrics: "ssh_mcp_sessions_active 1",
+      },
+    });
     await expect(provider.handleTool("get_metrics", undefined)).resolves.toEqual({
       sessions: { active: 1 },
     });

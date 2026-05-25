@@ -4,7 +4,15 @@ import type { MetricsCollector } from "../metrics.js";
 import type { SessionManager } from "../session.js";
 import { getConfiguredHosts, resolveSSHHost } from "../ssh-config.js";
 import { ConnectionParamsSchema, HostAliasSchema, SessionIdSchema } from "../types.js";
-import { annotate, objectOutputSchema } from "./metadata.js";
+import { annotate } from "./metadata.js";
+import {
+  CONFIGURED_HOSTS_OUTPUT_SCHEMA,
+  RESOLVED_HOST_OUTPUT_SCHEMA,
+  SESSION_CLOSE_OUTPUT_SCHEMA,
+  SESSION_LIST_OUTPUT_SCHEMA,
+  SESSION_OPEN_OUTPUT_SCHEMA,
+  SESSION_PING_OUTPUT_SCHEMA,
+} from "./output-schemas.js";
 import type { ToolProvider } from "./types.js";
 
 export interface SessionToolProviderDeps {
@@ -28,7 +36,7 @@ export class SessionToolProvider implements ToolProvider {
           destructive: false,
           idempotent: false,
         }),
-        outputSchema: objectOutputSchema("Session creation result or explain-mode connection plan"),
+        outputSchema: SESSION_OPEN_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -103,7 +111,7 @@ export class SessionToolProvider implements ToolProvider {
           destructive: false,
           idempotent: true,
         }),
-        outputSchema: objectOutputSchema("Boolean close result wrapped as structured content"),
+        outputSchema: SESSION_CLOSE_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -120,7 +128,7 @@ export class SessionToolProvider implements ToolProvider {
           readOnly: true,
           idempotent: true,
         }),
-        outputSchema: objectOutputSchema("Active SSH sessions"),
+        outputSchema: SESSION_LIST_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {},
@@ -135,7 +143,7 @@ export class SessionToolProvider implements ToolProvider {
           readOnly: true,
           idempotent: true,
         }),
-        outputSchema: objectOutputSchema("Session health check result"),
+        outputSchema: SESSION_PING_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -156,7 +164,7 @@ export class SessionToolProvider implements ToolProvider {
           idempotent: true,
           openWorld: false,
         }),
-        outputSchema: objectOutputSchema("Configured SSH host aliases"),
+        outputSchema: CONFIGURED_HOSTS_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {},
@@ -172,7 +180,7 @@ export class SessionToolProvider implements ToolProvider {
           idempotent: true,
           openWorld: false,
         }),
-        outputSchema: objectOutputSchema("Resolved SSH connection parameters"),
+        outputSchema: RESOLVED_HOST_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -219,14 +227,14 @@ export class SessionToolProvider implements ToolProvider {
     return result;
   }
 
-  private async closeSession(args: unknown): Promise<boolean> {
+  private async closeSession(args: unknown): Promise<unknown> {
     const { sessionId } = SessionIdSchema.parse(args);
     const result = await this.deps.sessionManager.closeSession(sessionId);
     if (result) {
       this.deps.metrics.recordSessionClosed();
     }
     logger.info("SSH session closed", { sessionId });
-    return result;
+    return { closed: result };
   }
 
   private async listSessions(): Promise<unknown> {

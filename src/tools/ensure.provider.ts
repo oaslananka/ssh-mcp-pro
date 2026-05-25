@@ -7,7 +7,13 @@ import {
   EnsureServiceSchema,
   PatchApplySchema,
 } from "../types.js";
-import { annotate, objectOutputSchema } from "./metadata.js";
+import { annotate } from "./metadata.js";
+import {
+  LINES_OUTPUT_SCHEMA,
+  PACKAGE_OUTPUT_SCHEMA,
+  PATCH_OUTPUT_SCHEMA,
+  SERVICE_OUTPUT_SCHEMA,
+} from "./output-schemas.js";
 import type { ToolProvider } from "./types.js";
 
 export interface EnsureToolProviderDeps {
@@ -30,7 +36,7 @@ export class EnsureToolProvider implements ToolProvider {
           destructive: true,
           idempotent: true,
         }),
-        outputSchema: objectOutputSchema("Package state result"),
+        outputSchema: PACKAGE_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -54,7 +60,7 @@ export class EnsureToolProvider implements ToolProvider {
           destructive: true,
           idempotent: true,
         }),
-        outputSchema: objectOutputSchema("Service state result"),
+        outputSchema: SERVICE_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -78,7 +84,7 @@ export class EnsureToolProvider implements ToolProvider {
           destructive: true,
           idempotent: true,
         }),
-        outputSchema: objectOutputSchema("Line management result"),
+        outputSchema: LINES_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -111,7 +117,7 @@ export class EnsureToolProvider implements ToolProvider {
           destructive: true,
           idempotent: false,
         }),
-        outputSchema: objectOutputSchema("Patch application result"),
+        outputSchema: PATCH_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {

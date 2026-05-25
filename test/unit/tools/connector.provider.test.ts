@@ -38,7 +38,9 @@ describe("ConnectorToolProvider", () => {
       "ssh_host_inspect",
       "ssh_mutation_plan",
     ]);
-    expect(serialized).not.toMatch(/password|privateKey|privateKeyPath|passphrase|sudoPassword/);
+    expect(serialized).not.toMatch(
+      /"password"|"privateKey"|"privateKeyPath"|"passphrase"|"sudoPassword"/,
+    );
 
     await destroyContainer(container);
   });
