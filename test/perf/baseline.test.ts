@@ -20,8 +20,8 @@ const THRESHOLD_MULTIPLIER = 1.2;
 const PROC_EXEC_SAMPLES = 100;
 const SESSION_OPEN_SAMPLES = 50;
 const STREAMING_BYTES = 10 * 1024 * 1024;
-const PROC_EXEC_P99_BASELINE_FLOOR_MS = 500;
-const SESSION_OPEN_P99_BASELINE_FLOOR_MS = 5_000;
+const PROC_EXEC_P99_BASELINE_FLOOR_MS = 300;
+const SESSION_OPEN_P99_BASELINE_FLOOR_MS = 1_500;
 const STREAMING_BASELINE_BYTES_PER_SECOND_CEILING = 2 * 1024 * 1024;
 
 interface LatencyStats {
@@ -213,9 +213,9 @@ function withLatencyP99Floor(stats: LatencyStats, p99FloorMs: number): LatencySt
 }
 
 function withThroughputCeiling(stats: StreamingStats): StreamingStats {
-  const bytesPerSecond = Math.min(
-    stats.bytesPerSecond,
-    STREAMING_BASELINE_BYTES_PER_SECOND_CEILING,
+  const bytesPerSecond = Math.max(
+    1,
+    Math.min(stats.bytesPerSecond, STREAMING_BASELINE_BYTES_PER_SECOND_CEILING),
   );
   return {
     ...stats,
@@ -238,22 +238,31 @@ function stabilizeBaseline(current: PerfBaseline): PerfBaseline {
   };
 }
 
-function assertLatencyWithinBaseline(name: string, current: LatencyStats, baseline: LatencyStats) {
-  const threshold = baseline.p99Ms * THRESHOLD_MULTIPLIER;
+function assertLatencyWithinBaseline(
+  name: string,
+  current: LatencyStats,
+  baseline: LatencyStats,
+  thresholdMultiplier: number,
+) {
+  const threshold = baseline.p99Ms * thresholdMultiplier;
   expect(
     current.p99Ms,
     `${name} p99 ${current.p99Ms}ms exceeded baseline ${baseline.p99Ms}ms by more than ${Math.round(
-      (THRESHOLD_MULTIPLIER - 1) * 100,
+      (thresholdMultiplier - 1) * 100,
     )}%`,
   ).toBeLessThanOrEqual(threshold);
 }
 
-function assertThroughputWithinBaseline(current: StreamingStats, baseline: StreamingStats) {
-  const threshold = baseline.bytesPerSecond / THRESHOLD_MULTIPLIER;
+function assertThroughputWithinBaseline(
+  current: StreamingStats,
+  baseline: StreamingStats,
+  thresholdMultiplier: number,
+) {
+  const threshold = baseline.bytesPerSecond / thresholdMultiplier;
   expect(
     current.bytesPerSecond,
     `streaming throughput ${current.bytesPerSecond} B/s fell below baseline ${baseline.bytesPerSecond} B/s by more than ${Math.round(
-      (THRESHOLD_MULTIPLIER - 1) * 100,
+      (thresholdMultiplier - 1) * 100,
     )}%`,
   ).toBeGreaterThanOrEqual(threshold);
 }
@@ -290,15 +299,18 @@ describe("SSH performance baseline", () => {
       "proc_exec",
       current.benchmarks.procExec,
       baseline.benchmarks.procExec,
+      baseline.thresholdMultiplier,
     );
     assertLatencyWithinBaseline(
       "ssh_open_session",
       current.benchmarks.sessionOpen,
       baseline.benchmarks.sessionOpen,
+      baseline.thresholdMultiplier,
     );
     assertThroughputWithinBaseline(
       current.benchmarks.streamingThroughput,
       baseline.benchmarks.streamingThroughput,
+      baseline.thresholdMultiplier,
     );
   });
 });
