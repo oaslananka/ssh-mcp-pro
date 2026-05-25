@@ -49,6 +49,46 @@ function errorResult(payload: Record<string, unknown>): ToolCallResult {
   };
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isToolCallResult(value: unknown): value is ToolCallResult {
+  return isRecord(value) && "content" in value && Array.isArray(value.content);
+}
+
+function normalizeToolCallResult(result: ToolCallResult): ToolCallResult {
+  if (!isRecord(result.structuredContent)) {
+    return errorResult({
+      code: "ESTRUCTUREDCONTENT",
+      message: "Tool handlers returning CallToolResult must include structuredContent.",
+    });
+  }
+
+  if (result.content.length === 0) {
+    return errorResult({
+      code: "ETOOLCONTENT",
+      message: "Tool handlers returning CallToolResult must include at least one content item.",
+    });
+  }
+
+  return result;
+}
+
+function normalizeDataResult(data: unknown): ToolCallResult {
+  if (!isRecord(data)) {
+    return errorResult({
+      code: "ESTRUCTUREDCONTENT",
+      message: "Tool handlers must return a structured JSON object or CallToolResult.",
+    });
+  }
+
+  return {
+    content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
+    structuredContent: data,
+  };
+}
+
 export class ToolRegistry {
   private readonly providers = new Map<string, ToolProvider>();
 
@@ -96,15 +136,10 @@ export class ToolRegistry {
 
       try {
         const data = await result;
-        const text = typeof data === "string" ? data : JSON.stringify(data, null, 2);
-        const structuredContent =
-          data && typeof data === "object" && !Array.isArray(data)
-            ? (data as Record<string, unknown>)
-            : { result: data };
-        return {
-          content: [{ type: "text", text }],
-          structuredContent,
-        };
+        if (isToolCallResult(data)) {
+          return normalizeToolCallResult(data);
+        }
+        return normalizeDataResult(data);
       } catch (error) {
         logger.error("Tool handler error", {
           toolName,

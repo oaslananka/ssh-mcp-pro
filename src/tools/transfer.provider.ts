@@ -2,7 +2,8 @@ import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { logger } from "../logging.js";
 import type { TransferService } from "../transfer.js";
 import { FileDownloadSchema, FileUploadSchema } from "../types.js";
-import { annotate, objectOutputSchema } from "./metadata.js";
+import { annotate } from "./metadata.js";
+import { TRANSFER_OUTPUT_SCHEMA } from "./output-schemas.js";
 import type { ToolProvider } from "./types.js";
 
 export interface TransferToolProviderDeps {
@@ -25,7 +26,7 @@ export class TransferToolProvider implements ToolProvider {
           destructive: true,
           idempotent: false,
         }),
-        outputSchema: objectOutputSchema("Upload result with integrity details"),
+        outputSchema: TRANSFER_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -44,7 +45,7 @@ export class TransferToolProvider implements ToolProvider {
           readOnly: true,
           idempotent: false,
         }),
-        outputSchema: objectOutputSchema("Download result with integrity details"),
+        outputSchema: TRANSFER_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {

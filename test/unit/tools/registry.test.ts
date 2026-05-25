@@ -1,9 +1,9 @@
 import { describe, expect, test } from "vitest";
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { TextContent, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { createTestContainer } from "../helpers.js";
 import { createToolRegistry } from "../../../src/tools/index.js";
 import { ToolRegistry } from "../../../src/tools/registry.js";
-import type { ToolProvider } from "../../../src/tools/types.js";
+import type { ToolCallResult, ToolProvider } from "../../../src/tools/types.js";
 
 function makeProvider(namespace: string, toolName: string): ToolProvider {
   return {
@@ -53,6 +53,76 @@ describe("ToolRegistry", () => {
     expect(direct.isError).toBeFalsy();
     expect(direct.structuredContent).toEqual({ tool: "ssh_open_session" });
     expect(aliasContent).toContain("ssh_open_session");
+  });
+
+  test("passes through explicit structured tool call results", async () => {
+    const content: TextContent[] = [{ type: "text", text: "closed" }];
+    const explicitResult: ToolCallResult = {
+      content,
+      structuredContent: { closed: true },
+    };
+    const registry = new ToolRegistry().register({
+      namespace: "explicit",
+      getTools: () => [
+        {
+          name: "explicit_tool",
+          description: "Returns an explicit MCP tool result",
+          inputSchema: { type: "object", properties: {} },
+          outputSchema: {
+            type: "object",
+            properties: { closed: { type: "boolean" } },
+            required: ["closed"],
+            additionalProperties: false,
+          },
+        },
+      ],
+      handleTool(name: string): Promise<unknown> | undefined {
+        if (name === "explicit_tool") {
+          return Promise.resolve(explicitResult);
+        }
+        return undefined;
+      },
+    });
+
+    await expect(registry.dispatch("explicit_tool", {})).resolves.toEqual(explicitResult);
+  });
+
+  test("rejects primitive handler results instead of using generic result fallback", async () => {
+    const registry = new ToolRegistry().register({
+      namespace: "primitive",
+      getTools: () => [
+        {
+          name: "primitive_tool",
+          description: "Returns a primitive result",
+          inputSchema: { type: "object", properties: {} },
+          outputSchema: {
+            type: "object",
+            properties: { ok: { type: "boolean" } },
+            required: ["ok"],
+            additionalProperties: false,
+          },
+        },
+      ],
+      handleTool(name: string): Promise<unknown> | undefined {
+        if (name === "primitive_tool") {
+          return Promise.resolve(true);
+        }
+        return undefined;
+      },
+    });
+
+    const result = await registry.dispatch("primitive_tool", {});
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        isError: true,
+        structuredContent: expect.objectContaining({
+          error: true,
+          code: "ESTRUCTUREDCONTENT",
+        }),
+      }),
+    );
+    expect(result.structuredContent).not.toHaveProperty("result");
   });
 
   test("returns structured errors and unknown-tool responses", async () => {

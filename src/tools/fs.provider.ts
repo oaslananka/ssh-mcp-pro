@@ -1,6 +1,7 @@
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import { logger } from "../logging.js";
 import type { FsService } from "../fs-tools.js";
+import type { DirEntry, DirListResult, FileStatInfo } from "../types.js";
 import {
   FSListSchema,
   FSPathSchema,
@@ -9,7 +10,14 @@ import {
   FSStatSchema,
   FSWriteSchema,
 } from "../types.js";
-import { annotate, objectOutputSchema } from "./metadata.js";
+import { annotate } from "./metadata.js";
+import {
+  DIRECTORY_LIST_OUTPUT_SCHEMA,
+  FILE_OPERATION_OUTPUT_SCHEMA,
+  FILE_READ_OUTPUT_SCHEMA,
+  FILE_STAT_OUTPUT_SCHEMA,
+} from "./output-schemas.js";
+import { toolResult } from "./results.js";
 import type { ToolProvider } from "./types.js";
 
 export interface FsToolProviderDeps {
@@ -31,7 +39,7 @@ export class FsToolProvider implements ToolProvider {
           readOnly: true,
           idempotent: true,
         }),
-        outputSchema: objectOutputSchema("Remote file content wrapped as structured content"),
+        outputSchema: FILE_READ_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -58,7 +66,7 @@ export class FsToolProvider implements ToolProvider {
           destructive: true,
           idempotent: false,
         }),
-        outputSchema: objectOutputSchema("File write result"),
+        outputSchema: FILE_OPERATION_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -78,7 +86,7 @@ export class FsToolProvider implements ToolProvider {
           readOnly: true,
           idempotent: true,
         }),
-        outputSchema: objectOutputSchema("Remote path stat result"),
+        outputSchema: FILE_STAT_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -96,7 +104,7 @@ export class FsToolProvider implements ToolProvider {
           readOnly: true,
           idempotent: true,
         }),
-        outputSchema: objectOutputSchema("Remote directory entries"),
+        outputSchema: DIRECTORY_LIST_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -120,7 +128,7 @@ export class FsToolProvider implements ToolProvider {
           destructive: false,
           idempotent: true,
         }),
-        outputSchema: objectOutputSchema("Directory creation result"),
+        outputSchema: FILE_OPERATION_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -139,7 +147,7 @@ export class FsToolProvider implements ToolProvider {
           destructive: true,
           idempotent: false,
         }),
-        outputSchema: objectOutputSchema("Recursive remove result"),
+        outputSchema: FILE_OPERATION_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -158,7 +166,7 @@ export class FsToolProvider implements ToolProvider {
           destructive: true,
           idempotent: false,
         }),
-        outputSchema: objectOutputSchema("Rename result"),
+        outputSchema: FILE_OPERATION_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -202,7 +210,7 @@ export class FsToolProvider implements ToolProvider {
       params.maxBytes,
     );
     logger.info("File read", { sessionId: params.sessionId, path: params.path });
-    return result;
+    return toolResult({ content: result }, result);
   }
 
   private async write(args: unknown): Promise<unknown> {
@@ -217,14 +225,14 @@ export class FsToolProvider implements ToolProvider {
       sessionId: params.sessionId,
       path: params.path,
     });
-    return result;
+    return { ok: result };
   }
 
   private async stat(args: unknown): Promise<unknown> {
     const params = FSStatSchema.parse(args);
     const result = await this.deps.fsService.statFile(params.sessionId, params.path);
     logger.info("Path stat", { sessionId: params.sessionId, path: params.path });
-    return result;
+    return normalizeFileStat(result);
   }
 
   private async list(args: unknown): Promise<unknown> {
@@ -239,7 +247,7 @@ export class FsToolProvider implements ToolProvider {
       sessionId: params.sessionId,
       path: params.path,
     });
-    return result;
+    return normalizeDirectoryList(result);
   }
 
   private async mkdirp(args: unknown): Promise<unknown> {
@@ -249,7 +257,7 @@ export class FsToolProvider implements ToolProvider {
       sessionId: params.sessionId,
       path: params.path,
     });
-    return result;
+    return { ok: result };
   }
 
   private async rmrf(args: unknown): Promise<unknown> {
@@ -259,7 +267,7 @@ export class FsToolProvider implements ToolProvider {
       sessionId: params.sessionId,
       path: params.path,
     });
-    return result;
+    return { ok: result };
   }
 
   private async rename(args: unknown): Promise<unknown> {
@@ -270,6 +278,27 @@ export class FsToolProvider implements ToolProvider {
       from: params.from,
       to: params.to,
     });
-    return result;
+    return { ok: result };
   }
+}
+
+function normalizeFileStat(stat: FileStatInfo) {
+  return {
+    ...stat,
+    mtime: stat.mtime.toISOString(),
+  };
+}
+
+function normalizeDirectoryEntry(entry: DirEntry) {
+  return {
+    ...entry,
+    ...(entry.mtime ? { mtime: entry.mtime.toISOString() } : {}),
+  };
+}
+
+function normalizeDirectoryList(result: DirListResult) {
+  return {
+    entries: result.entries.map((entry) => normalizeDirectoryEntry(entry)),
+    ...(result.nextToken ? { nextToken: result.nextToken } : {}),
+  };
 }

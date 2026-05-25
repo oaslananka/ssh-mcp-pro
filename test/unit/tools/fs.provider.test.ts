@@ -20,34 +20,39 @@ describe("FsToolProvider", () => {
       } as any,
     });
 
-    await expect(provider.handleTool("fs_read", { sessionId: "s", path: "/tmp/a" })).resolves.toBe(
-      "hello",
-    );
+    await expect(
+      provider.handleTool("fs_read", { sessionId: "s", path: "/tmp/a" }),
+    ).resolves.toEqual({
+      content: [{ type: "text", text: "hello" }],
+      structuredContent: { content: "hello" },
+    });
     await expect(
       provider.handleTool("fs_write", {
         sessionId: "s",
         path: "/tmp/a",
         data: "x",
       }),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ ok: true });
     await expect(
       provider.handleTool("fs_stat", { sessionId: "s", path: "/tmp/a" }),
-    ).resolves.toEqual(expect.objectContaining({ type: "file" }));
+    ).resolves.toEqual(
+      expect.objectContaining({ type: "file", mtime: "1970-01-01T00:00:00.000Z" }),
+    );
     await expect(provider.handleTool("fs_list", { sessionId: "s", path: "/tmp" })).resolves.toEqual(
       { entries: [] },
     );
     await expect(
       provider.handleTool("fs_mkdirp", { sessionId: "s", path: "/tmp/a" }),
-    ).resolves.toBe(true);
-    await expect(provider.handleTool("fs_rmrf", { sessionId: "s", path: "/tmp/a" })).resolves.toBe(
-      true,
-    );
+    ).resolves.toEqual({ ok: true });
+    await expect(
+      provider.handleTool("fs_rmrf", { sessionId: "s", path: "/tmp/a" }),
+    ).resolves.toEqual({ ok: true });
     await expect(
       provider.handleTool("fs_rename", {
         sessionId: "s",
         from: "/tmp/a",
         to: "/tmp/b",
       }),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ ok: true });
   });
 });

@@ -68,7 +68,7 @@ describe("SessionToolProvider", () => {
     ).resolves.toEqual(expect.objectContaining({ sessionId: "session-1" }));
     await expect(
       provider.handleTool("ssh_close_session", { sessionId: "session-1" }),
-    ).resolves.toBe(true);
+    ).resolves.toEqual({ closed: true });
     await expect(provider.handleTool("ssh_list_sessions", {})).resolves.toEqual(
       expect.objectContaining({ count: 1 }),
     );
@@ -188,7 +188,7 @@ describe("SessionToolProvider", () => {
 
     await expect(
       provider.handleTool("ssh_close_session", { sessionId: "session-2" }),
-    ).resolves.toBe(false);
+    ).resolves.toEqual({ closed: false });
     expect(recordSessionClosed).not.toHaveBeenCalled();
 
     await expect(provider.handleTool("ssh_ping", { sessionId: "session-2" })).resolves.toEqual(

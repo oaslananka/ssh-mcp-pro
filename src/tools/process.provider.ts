@@ -5,7 +5,8 @@ import type { ProcessService } from "../process.js";
 import { addSafetyWarningToResult } from "../safety.js";
 import type { StreamingService } from "../streaming.js";
 import { ExecSchema, ExecStreamSchema, SudoSchema } from "../types.js";
-import { annotate, objectOutputSchema } from "./metadata.js";
+import { annotate } from "./metadata.js";
+import { EXEC_OUTPUT_SCHEMA, STREAM_OUTPUT_SCHEMA } from "./output-schemas.js";
 import type { ToolProvider } from "./types.js";
 
 export interface ProcessToolProviderDeps {
@@ -31,7 +32,7 @@ export class ProcessToolProvider implements ToolProvider {
           destructive: false,
           idempotent: false,
         }),
-        outputSchema: objectOutputSchema("Remote command result"),
+        outputSchema: EXEC_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -57,7 +58,7 @@ export class ProcessToolProvider implements ToolProvider {
           destructive: true,
           idempotent: false,
         }),
-        outputSchema: objectOutputSchema("Remote sudo command result"),
+        outputSchema: EXEC_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -84,7 +85,7 @@ export class ProcessToolProvider implements ToolProvider {
           destructive: false,
           idempotent: false,
         }),
-        outputSchema: objectOutputSchema("Streaming command result with output chunks"),
+        outputSchema: STREAM_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {

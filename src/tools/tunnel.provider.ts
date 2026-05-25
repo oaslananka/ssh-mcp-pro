@@ -7,7 +7,12 @@ import {
   TunnelLocalForwardSchema,
   TunnelRemoteForwardSchema,
 } from "../types.js";
-import { annotate, objectOutputSchema } from "./metadata.js";
+import { annotate } from "./metadata.js";
+import {
+  TUNNEL_CLOSE_OUTPUT_SCHEMA,
+  TUNNEL_LIST_OUTPUT_SCHEMA,
+  TUNNEL_OUTPUT_SCHEMA,
+} from "./output-schemas.js";
 import type { ToolProvider } from "./types.js";
 
 export interface TunnelToolProviderDeps {
@@ -30,7 +35,7 @@ export class TunnelToolProvider implements ToolProvider {
           destructive: false,
           idempotent: false,
         }),
-        outputSchema: objectOutputSchema("Local tunnel information"),
+        outputSchema: TUNNEL_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -51,7 +56,7 @@ export class TunnelToolProvider implements ToolProvider {
           destructive: false,
           idempotent: false,
         }),
-        outputSchema: objectOutputSchema("Remote tunnel information"),
+        outputSchema: TUNNEL_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -72,7 +77,7 @@ export class TunnelToolProvider implements ToolProvider {
           destructive: false,
           idempotent: true,
         }),
-        outputSchema: objectOutputSchema("Tunnel close result"),
+        outputSchema: TUNNEL_CLOSE_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -89,7 +94,7 @@ export class TunnelToolProvider implements ToolProvider {
           readOnly: true,
           idempotent: true,
         }),
-        outputSchema: objectOutputSchema("Active tunnels"),
+        outputSchema: TUNNEL_LIST_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -155,11 +160,13 @@ export class TunnelToolProvider implements ToolProvider {
 
   private async close(args: unknown): Promise<unknown> {
     const params = TunnelCloseSchema.parse(args);
-    return this.deps.tunnelService.closeTunnel(params.tunnelId);
+    const closed = await this.deps.tunnelService.closeTunnel(params.tunnelId);
+    return { closed };
   }
 
   private async list(args: unknown): Promise<unknown> {
     const params = TunnelListSchema.parse(args ?? {});
-    return this.deps.tunnelService.listTunnels(params.sessionId);
+    const tunnels = this.deps.tunnelService.listTunnels(params.sessionId);
+    return { count: tunnels.length, tunnels };
   }
 }

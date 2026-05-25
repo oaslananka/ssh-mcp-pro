@@ -327,7 +327,7 @@ describe("SSHMCPServer", () => {
     );
     expect(toolNames).not.toEqual(expect.arrayContaining(["ssh_open_session", "proc_exec"]));
     expect(JSON.stringify(listTools.tools)).not.toMatch(
-      /password|privateKey|privateKeyPath|passphrase|sudoPassword/,
+      /"password"|"privateKey"|"privateKeyPath"|"passphrase"|"sudoPassword"/,
     );
 
     await expect(

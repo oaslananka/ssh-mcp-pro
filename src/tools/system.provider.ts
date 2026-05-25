@@ -3,7 +3,9 @@ import { logger } from "../logging.js";
 import type { MetricsCollector } from "../metrics.js";
 import type { SessionManager } from "../session.js";
 import { MetricsFormatSchema, SessionIdSchema } from "../types.js";
-import { annotate, objectOutputSchema } from "./metadata.js";
+import { annotate } from "./metadata.js";
+import { METRICS_OUTPUT_SCHEMA, OS_INFO_OUTPUT_SCHEMA } from "./output-schemas.js";
+import { toolResult } from "./results.js";
 import type { ToolProvider } from "./types.js";
 
 export interface SystemToolProviderDeps {
@@ -26,7 +28,7 @@ export class SystemToolProvider implements ToolProvider {
           readOnly: true,
           idempotent: true,
         }),
-        outputSchema: objectOutputSchema("Remote operating system information"),
+        outputSchema: OS_INFO_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -45,7 +47,7 @@ export class SystemToolProvider implements ToolProvider {
           idempotent: true,
           openWorld: false,
         }),
-        outputSchema: objectOutputSchema("Runtime metrics"),
+        outputSchema: METRICS_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -82,7 +84,8 @@ export class SystemToolProvider implements ToolProvider {
   private async getMetrics(args: unknown): Promise<unknown> {
     const { format } = MetricsFormatSchema.parse(args ?? {});
     if (format === "prometheus") {
-      return this.deps.metrics.exportPrometheus();
+      const metrics = this.deps.metrics.exportPrometheus();
+      return toolResult({ format: "prometheus", metrics }, metrics);
     }
     logger.debug("Metrics retrieved");
     return this.deps.metrics.getMetrics();

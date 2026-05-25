@@ -9,7 +9,14 @@ import type { MetricsCollector } from "../metrics.js";
 import type { PolicyAction, PolicyContext, PolicyEngine } from "../policy.js";
 import type { SessionManager } from "../session.js";
 import { getConfiguredHosts } from "../ssh-config.js";
-import { annotate, objectOutputSchema } from "./metadata.js";
+import { annotate } from "./metadata.js";
+import {
+  CONNECTOR_STATUS_OUTPUT_SCHEMA,
+  HOST_INSPECT_OUTPUT_SCHEMA,
+  MUTATION_PLAN_OUTPUT_SCHEMA,
+  POLICY_EXPLAIN_OUTPUT_SCHEMA,
+  SSH_HOSTS_LIST_OUTPUT_SCHEMA,
+} from "./output-schemas.js";
 import type { ToolProvider } from "./types.js";
 
 const PolicyExplainSchema = z.object({
@@ -67,7 +74,7 @@ export class ConnectorToolProvider implements ToolProvider {
           idempotent: true,
           openWorld: false,
         }),
-        outputSchema: objectOutputSchema("Remote connector readiness without secrets"),
+        outputSchema: CONNECTOR_STATUS_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {},
@@ -84,7 +91,7 @@ export class ConnectorToolProvider implements ToolProvider {
           idempotent: true,
           openWorld: false,
         }),
-        outputSchema: objectOutputSchema("Redacted SSH host aliases allowed by policy"),
+        outputSchema: SSH_HOSTS_LIST_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {},
@@ -101,7 +108,7 @@ export class ConnectorToolProvider implements ToolProvider {
           idempotent: true,
           openWorld: false,
         }),
-        outputSchema: objectOutputSchema("Explain-only policy decision"),
+        outputSchema: POLICY_EXPLAIN_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -133,7 +140,7 @@ export class ConnectorToolProvider implements ToolProvider {
           idempotent: false,
           openWorld: false,
         }),
-        outputSchema: objectOutputSchema("Read-only host inspection result"),
+        outputSchema: HOST_INSPECT_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {
@@ -160,7 +167,7 @@ export class ConnectorToolProvider implements ToolProvider {
           idempotent: true,
           openWorld: false,
         }),
-        outputSchema: objectOutputSchema("Non-executing remote mutation plan"),
+        outputSchema: MUTATION_PLAN_OUTPUT_SCHEMA,
         inputSchema: {
           type: "object" as const,
           properties: {

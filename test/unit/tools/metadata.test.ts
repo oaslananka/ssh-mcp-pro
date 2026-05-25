@@ -1,15 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { annotate, objectOutputSchema } from "../../../src/tools/metadata.js";
+import { annotate } from "../../../src/tools/metadata.js";
 
 describe("tool metadata helpers", () => {
-  test("builds object output schemas with descriptions", () => {
-    expect(objectOutputSchema("command result")).toEqual({
-      type: "object",
-      description: "command result",
-      additionalProperties: true,
-    });
-  });
-
   test("applies safe annotation defaults", () => {
     expect(annotate({ title: "Read file", readOnly: true })).toEqual({
       title: "Read file",
