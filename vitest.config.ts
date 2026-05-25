@@ -41,6 +41,16 @@ export default defineConfig({
           ...sequentialForkConfig,
         },
       },
+      {
+        test: {
+          name: "perf",
+          include: ["test/perf/**/*.test.ts"],
+          testTimeout: 180_000,
+          hookTimeout: 60_000,
+          ...nodeProjectConfig,
+          ...sequentialForkConfig,
+        },
+      },
     ],
     coverage: {
       provider: "v8",

@@ -9,6 +9,8 @@ interface TestProject {
     pool?: string;
     maxWorkers?: number;
     fileParallelism?: boolean;
+    testTimeout?: number;
+    hookTimeout?: number;
   };
 }
 
@@ -41,6 +43,7 @@ describe("Vitest suite pool configuration", () => {
       "unit",
       "integration",
       "e2e",
+      "perf",
     ]);
   });
 
@@ -68,14 +71,28 @@ describe("Vitest suite pool configuration", () => {
     });
   });
 
+  test("runs perf suites separately with extended timeouts", () => {
+    expect(project("perf")).toMatchObject({
+      include: ["test/perf/**/*.test.ts"],
+      pool: "forks",
+      maxWorkers: 1,
+      fileParallelism: false,
+    });
+    expect(project("perf")?.testTimeout).toBe(180_000);
+    expect(project("perf")?.hookTimeout).toBe(60_000);
+  });
+
   test("routes package scripts to suite-specific projects", () => {
     const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
       scripts?: Record<string, string>;
     };
 
     expect(pkg.scripts?.test).toContain("--project unit");
-    expect(pkg.scripts?.["test:coverage"]).toBe("vitest run --coverage");
+    expect(pkg.scripts?.["test:coverage"]).toBe(
+      "vitest run --coverage --project unit --project integration --project e2e",
+    );
     expect(pkg.scripts?.["test:integration"]).toContain("--project integration");
     expect(pkg.scripts?.["test:e2e"]).toContain("--project e2e");
+    expect(pkg.scripts?.["test:perf"]).toContain("--project perf");
   });
 });

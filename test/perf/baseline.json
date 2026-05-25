@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "thresholdMultiplier": 1.2,
+  "generatedAt": "2026-05-25T13:22:01.932Z",
+  "benchmarks": {
+    "procExec": {
+      "samples": 100,
+      "p50Ms": 93.91,
+      "p95Ms": 130.37,
+      "p99Ms": 300
+    },
+    "sessionOpen": {
+      "samples": 50,
+      "p50Ms": 300.1,
+      "p95Ms": 361.8,
+      "p99Ms": 1500
+    },
+    "streamingThroughput": {
+      "bytes": 10485760,
+      "durationMs": 5000,
+      "bytesPerSecond": 2097152
+    }
+  }
+}

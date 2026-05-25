@@ -13,6 +13,8 @@ on:
   merge_group:
     types:
       - checks_requested
+  schedule:
+    - cron: "0 3 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -48,7 +50,7 @@ jobs:
           fail-on-severity: moderate
           allow-licenses: >-
             MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD,
-            CC0-1.0, Unlicense
+            CC0-1.0, Unlicense, Zlib
 
   quality:
     name: Quality Gates
@@ -237,6 +239,53 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: junit-e2e
+          path: test-results/**/*.xml
+          if-no-files-found: warn
+
+  perf:
+    name: Performance Baseline
+    if: ${{ github.event_name == 'schedule' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24.15.0
+          package-manager-cache: false
+
+      - name: Enable pnpm
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare pnpm@11.0.9 --activate
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Start SSH fixture
+        run: pnpm run docker:ssh-fixture:up
+
+      - name: Run performance baseline
+        run: pnpm run test:perf
+        env:
+          TEST_SSH_HOST: localhost
+          TEST_SSH_PORT: "2222"
+          TEST_SSH_USER: testuser
+          TEST_SSH_PASS: testpass
+
+      - name: Stop SSH fixture
+        if: ${{ !cancelled() }}
+        run: pnpm run docker:ssh-fixture:down
+
+      - name: Upload perf JUnit results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: junit-perf
           path: test-results/**/*.xml
           if-no-files-found: warn
 
