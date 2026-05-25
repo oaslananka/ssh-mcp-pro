@@ -43,7 +43,7 @@ Tool calls pass through a global sliding-window rate limit first. Calls whose ar
 
 Streamable HTTP responses also include `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers derived from the current global limiter usage so HTTP clients can observe budget state before a hard rate-limit error.
 
-`ToolRegistry` owns provider registration and dispatch. It supports compatibility aliases such as `ssh.openSession` -> `ssh_open_session`, filters tool exposure through the configured tool profile, and converts thrown project errors into structured MCP error results. Successful tool handlers must return either a JSON object or an explicit MCP `CallToolResult` with non-null `structuredContent`; every listed tool has a concrete `outputSchema` that describes the structured response shape exposed to clients.
+`ToolRegistry` owns provider registration and dispatch. It supports compatibility aliases such as `ssh.openSession` -> `ssh_open_session`, filters tool exposure through the configured tool profile, and converts thrown project errors into typed `ToolErrorResponse` MCP error results with `structuredContent.error`, `code`, and `message`. Successful tool handlers must return either a JSON object or an explicit MCP `CallToolResult` with non-null `structuredContent`; every listed tool has a concrete `outputSchema` that describes the successful structured response shape exposed to clients.
 
 ## Policy Engine
 

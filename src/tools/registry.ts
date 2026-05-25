@@ -5,7 +5,7 @@ import {
   type ToolProfile,
 } from "../connector-profile.js";
 import { logger } from "../logging.js";
-import type { ToolCallResult, ToolProvider } from "./types.js";
+import type { ToolCallResult, ToolErrorResponse, ToolProvider } from "./types.js";
 
 const TOOL_ALIASES: Record<string, string> = {
   "ssh.openSession": "ssh_open_session",
@@ -35,8 +35,35 @@ const TOOL_ALIASES: Record<string, string> = {
   "ssh.mutationPlan": "ssh_mutation_plan",
 };
 
-function errorResult(payload: Record<string, unknown>): ToolCallResult {
-  const structuredContent = { error: true, ...payload };
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function toToolErrorResponse(
+  payload: Record<string, unknown>,
+  fallbackCode = "ETOOL",
+): ToolErrorResponse {
+  const response: ToolErrorResponse = {
+    error: true,
+    code: optionalString(payload.code) ?? fallbackCode,
+    message: optionalString(payload.message) ?? "Tool call failed.",
+  };
+  const hint = optionalString(payload.hint);
+  if (hint !== undefined) {
+    response.hint = hint;
+  }
+  if (typeof payload.recoverable === "boolean") {
+    response.recoverable = payload.recoverable;
+  }
+  const suggestedAction = optionalString(payload.suggestedAction);
+  if (suggestedAction !== undefined) {
+    response.suggestedAction = suggestedAction;
+  }
+  return response;
+}
+
+function errorResult(payload: Record<string, unknown>, fallbackCode?: string): ToolCallResult {
+  const structuredContent = toToolErrorResponse(payload, fallbackCode);
   return {
     content: [
       {
@@ -161,6 +188,9 @@ export class ToolRegistry {
       }
     }
 
-    return errorResult({ message: `Unknown tool: ${toolName}` });
+    return errorResult(
+      { code: "ETOOLNOTFOUND", message: `Unknown tool: ${toolName}` },
+      "ETOOLNOTFOUND",
+    );
   }
 }
