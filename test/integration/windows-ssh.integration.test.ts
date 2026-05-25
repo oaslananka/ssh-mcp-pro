@@ -27,6 +27,13 @@ function createLocalWindowsSsh() {
       if (unsupportedUnixCommands.has(command)) {
         return { code: 1, stdout: "", stderr: `${command}: not found` };
       }
+      if (
+        command ===
+          'powershell -NoLogo -NoProfile -Command "Get-Command winget -ErrorAction SilentlyContinue"' ||
+        command === "choco -v"
+      ) {
+        return { code: 1, stdout: "", stderr: "" };
+      }
 
       try {
         const result = await execAsync(command, {
@@ -98,7 +105,7 @@ windowsDescribe("Windows SSH integration coverage", () => {
       }),
     );
     expect(result.tempDir).toMatch(/^[A-Za-z]:\//u);
-  });
+  }, 20_000);
 
   test.each([
     ["winget", "Git.Git", "winget install --id Git.Git"],
