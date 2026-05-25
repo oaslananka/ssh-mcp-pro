@@ -38,6 +38,7 @@
     "test": "vitest run --project unit --reporter=default --reporter=junit",
     "test:coverage": "vitest run --coverage --project unit --project integration --project e2e",
     "test:integration": "vitest run --project integration",
+    "test:integration:windows": "vitest run --project integration test/integration/windows-ssh.integration.test.ts",
     "test:e2e": "vitest run --project e2e",
     "test:perf": "vitest run --project perf",
     "test:perf:baseline": "WRITE_BASELINE=true pnpm run test:perf",

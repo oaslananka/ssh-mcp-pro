@@ -102,7 +102,8 @@ export async function readResource(
         linux: "full",
         macos: "session/process/fs/transfer; package/service helpers limited to tested managers",
         "BusyBox/dropbear": "experimental: session/process/basic fs without SFTP",
-        windows: "experimental: session/process/fs/transfer; sudo and ensure tools unsupported",
+        windows:
+          "experimental: session/process/fs/transfer; ensure_package supports winget/choco; sudo/service helpers unsupported",
       });
     default:
       throw new Error(`Unknown resource: ${uri}`);
