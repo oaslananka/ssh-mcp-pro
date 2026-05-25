@@ -24,6 +24,8 @@ if (!existsSync(rulesetDir)) {
 }
 
 const files = readdirSync(rulesetDir).filter((file) => file.endsWith(".json"));
+const ciJobNames = extractCiJobNames(readFileSync(".github/workflows/ci.yml", "utf8"));
+
 for (const file of files) {
   const path = join(rulesetDir, file);
   const ruleset = JSON.parse(readFileSync(path, "utf8"));
@@ -32,13 +34,13 @@ for (const file of files) {
   }
 
   if (file === mainProtectionFile) {
-    validateMainProtection(path, ruleset);
+    validateMainProtection(path, ruleset, ciJobNames);
   }
 }
 
 console.log(`check-rulesets: validated ${files.length} ruleset file(s).`);
 
-function validateMainProtection(path, ruleset) {
+function validateMainProtection(path, ruleset, ciJobNames) {
   assertEqual(path, "name", ruleset.name, "main branch protection");
   assertEqual(path, "target", ruleset.target, "branch");
   assertEqual(path, "enforcement", ruleset.enforcement, "active");
@@ -68,6 +70,12 @@ function validateMainProtection(path, ruleset) {
     pullRequestRule.parameters?.required_review_thread_resolution,
     true,
   );
+  assertEqual(
+    path,
+    "pull_request.parameters.required_approving_review_count",
+    pullRequestRule.parameters?.required_approving_review_count,
+    1,
+  );
 
   const statusRule = findRule(path, ruleset, "required_status_checks");
   assertEqual(
@@ -90,24 +98,38 @@ function validateMainProtection(path, ruleset) {
     contexts,
     requiredMainContexts,
   );
-  validateContextsMatchCiWorkflow(path, contexts);
+  validateContextsMatchCiWorkflow(path, contexts, ciJobNames);
 }
 
-function validateContextsMatchCiWorkflow(path, contexts) {
-  const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
-
+function validateContextsMatchCiWorkflow(path, contexts, ciJobNames) {
   for (const context of contexts) {
-    if (context === "Unit Tests (Node 22)" || context === "Unit Tests (Node 24)") {
-      if (!workflow.includes("name: Unit Tests (Node ${{ matrix.node_major }})")) {
-        throw new Error(`${path} references ${context}, but ci.yml has no unit matrix job name.`);
-      }
-      continue;
-    }
-
-    if (!workflow.includes(`name: ${context}`)) {
+    if (!ciJobNames.some((jobName) => ciJobNameMatchesContext(jobName, context))) {
       throw new Error(`${path} references ${context}, but ci.yml has no matching job name.`);
     }
   }
+}
+
+function extractCiJobNames(workflow) {
+  return [...workflow.matchAll(/^ {4}name:\s+(.+)$/gm)].map((match) => unquoteYamlScalar(match[1]));
+}
+
+function unquoteYamlScalar(value) {
+  return value.trim().replace(/^["'](.*)["']$/, "$1");
+}
+
+function ciJobNameMatchesContext(jobName, context) {
+  if (jobName === context) {
+    return true;
+  }
+
+  const token = "${{ matrix.node_major }}";
+  if (!jobName.includes(token)) {
+    return false;
+  }
+
+  const [prefix, suffix] = jobName.split(token);
+  const matrixValue = context.slice(prefix.length, context.length - suffix.length);
+  return context.startsWith(prefix) && context.endsWith(suffix) && matrixValue.length > 0;
 }
 
 function findRule(path, ruleset, type) {
