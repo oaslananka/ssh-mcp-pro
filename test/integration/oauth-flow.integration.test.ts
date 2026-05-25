@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import net from "node:net";
+import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -14,22 +14,6 @@ interface Harness {
   controlPlane: RemoteControlPlane;
   dir: string;
   server: Server;
-}
-
-async function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      server.close(() => {
-        if (address && typeof address === "object") {
-          resolve(address.port);
-          return;
-        }
-        reject(new Error("Unable to allocate port"));
-      });
-    });
-  });
 }
 
 function config(baseUrl: string, dir: string, overrides: Partial<RemoteConfig> = {}): RemoteConfig {
@@ -55,13 +39,35 @@ function config(baseUrl: string, dir: string, overrides: Partial<RemoteConfig> =
   };
 }
 
-async function startHarness(overrides: Partial<RemoteConfig> = {}): Promise<Harness> {
-  const port = await freePort();
-  const baseUrl = `http://127.0.0.1:${port}`;
-  const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-oauth-flow-"));
-  const controlPlane = new RemoteControlPlane(config(baseUrl, dir, overrides));
-  await controlPlane.initialize();
-  const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+async function listenOnLoopback(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const onError = (error: Error) => {
+      server.off("listening", onListening);
+      reject(error);
+    };
+    const onListening = () => {
+      server.off("error", onError);
+      resolve();
+    };
+
+    server.once("error", onError);
+    server.listen(0, "127.0.0.1", onListening);
+  });
+}
+
+async function closeServer(server: Server): Promise<void> {
+  if (!server.listening) {
+    return;
+  }
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+}
+
+function attachControlPlane(
+  server: Server,
+  controlPlane: RemoteControlPlane,
+  baseUrl: string,
+): void {
+  server.on("request", (req: IncomingMessage, res: ServerResponse) => {
     void controlPlane
       .handleHttp(req, res, new URL(req.url ?? "/", baseUrl).pathname)
       .then((handled) => {
@@ -88,8 +94,31 @@ async function startHarness(overrides: Partial<RemoteConfig> = {}): Promise<Harn
         res.end(JSON.stringify({ error: message, code }));
       });
   });
-  await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
-  return { baseUrl, controlPlane, dir, server };
+}
+
+async function startHarness(overrides: Partial<RemoteConfig> = {}): Promise<Harness> {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-oauth-flow-"));
+  const server = createServer();
+  let controlPlane: RemoteControlPlane | undefined;
+
+  try {
+    await listenOnLoopback(server);
+    const address = server.address();
+    if (!address || typeof address !== "object") {
+      throw new Error("Unable to resolve listening address");
+    }
+
+    const baseUrl = `http://127.0.0.1:${(address as AddressInfo).port}`;
+    controlPlane = new RemoteControlPlane(config(baseUrl, dir, overrides));
+    await controlPlane.initialize();
+    attachControlPlane(server, controlPlane, baseUrl);
+    return { baseUrl, controlPlane, dir, server };
+  } catch (error) {
+    await closeServer(server);
+    controlPlane?.close();
+    rmSync(dir, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 async function closeHarness(harness: Harness): Promise<void> {
