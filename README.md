@@ -151,14 +151,14 @@ The parser also accepts non-`SSH_MCP_*` compatibility aliases `PORT`, `KNOWN_HOS
 
 ## Tool Profiles
 
-`full` exposes every registered tool, resource, and prompt. Every other profile currently exposes the remote connector subset only.
+`full` exposes every registered tool, resource, and prompt. Every other profile uses an explicit per-profile allowset. `chatgpt` and `claude` currently expose the same baseline connector tools as `remote-safe`, with empty client-specific extension sets reserved for future additions.
 
 | Profile | Exposed tools | Exposed resources | Exposed prompts |
 | --- | --- | --- | --- |
 | `full` | All SSH, process, filesystem, transfer, ensure, tunnel, connector, and system tools. | All runtime resources. | All prompts. |
 | `remote-safe` | `connector_status`, `ssh_hosts_list`, `ssh_policy_explain`, `ssh_host_inspect`, `ssh_mutation_plan`. | `ssh-mcp-pro://capabilities/support-matrix`. | `inspect-host-capabilities`, `plan-mutation`. |
-| `chatgpt` | Same remote connector subset as `remote-safe`. | Same remote connector subset as `remote-safe`. | Same remote connector subset as `remote-safe`. |
-| `claude` | Same remote connector subset as `remote-safe`. | Same remote connector subset as `remote-safe`. | Same remote connector subset as `remote-safe`. |
+| `chatgpt` | Baseline remote connector tools plus an empty ChatGPT extension set. | Same remote connector subset as `remote-safe`. | Same remote connector subset as `remote-safe`. |
+| `claude` | Baseline remote connector tools plus an empty Claude extension set. | Same remote connector subset as `remote-safe`. | Same remote connector subset as `remote-safe`. |
 | `remote-readonly` | Same remote connector subset as `remote-safe`. | Same remote connector subset as `remote-safe`. | Same remote connector subset as `remote-safe`. |
 | `remote-broker` | Same remote connector subset as `remote-safe`. | Same remote connector subset as `remote-safe`. | Same remote connector subset as `remote-safe`. |
 

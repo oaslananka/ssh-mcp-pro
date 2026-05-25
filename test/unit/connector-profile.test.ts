@@ -1,5 +1,8 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
 import {
+  CHATGPT_EXTRA_TOOLS,
+  CLAUDE_EXTRA_TOOLS,
+  PROFILE_TOOL_SETS,
   filterPromptsForProfile,
   filterResourcesForProfile,
   filterToolsForProfile,
@@ -13,7 +16,20 @@ import type { MCPPromptDefinition } from "../../src/prompts.js";
 import type { MCPResource } from "../../src/resources.js";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 
+const remoteConnectorToolNames = [
+  "connector_status",
+  "ssh_hosts_list",
+  "ssh_policy_explain",
+  "ssh_host_inspect",
+  "ssh_mutation_plan",
+];
+
 describe("connector profile helpers", () => {
+  afterEach(() => {
+    CHATGPT_EXTRA_TOOLS.clear();
+    CLAUDE_EXTRA_TOOLS.clear();
+  });
+
   test("parses configured profiles with safe fallback behavior", () => {
     expect(parseToolProfile(undefined, "chatgpt")).toBe("chatgpt");
     expect(parseToolProfile("", "remote-safe")).toBe("remote-safe");
@@ -43,6 +59,45 @@ describe("connector profile helpers", () => {
     expect(isToolAllowedForProfile("ssh_open_session", "full")).toBe(true);
     expect(isToolAllowedForProfile("ssh_open_session", "chatgpt")).toBe(false);
     expect(isToolAllowedForProfile("ssh_policy_explain", "chatgpt")).toBe(true);
+  });
+
+  test("defines per-profile tool sets and empty client extension points", () => {
+    expect(CHATGPT_EXTRA_TOOLS.size).toBe(0);
+    expect(CLAUDE_EXTRA_TOOLS.size).toBe(0);
+    expect(PROFILE_TOOL_SETS["remote-safe"]).not.toBe(PROFILE_TOOL_SETS.chatgpt);
+    expect(PROFILE_TOOL_SETS["remote-safe"]).not.toBe(PROFILE_TOOL_SETS.claude);
+
+    for (const profile of [
+      "remote-safe",
+      "chatgpt",
+      "claude",
+      "remote-readonly",
+      "remote-broker",
+    ] as const) {
+      expect(Array.from(PROFILE_TOOL_SETS[profile])).toEqual(remoteConnectorToolNames);
+    }
+  });
+
+  test("applies profile-specific client extension sets when filtering tools", () => {
+    CHATGPT_EXTRA_TOOLS.add("chatgpt_extra_tool");
+    CLAUDE_EXTRA_TOOLS.add("claude_extra_tool");
+    const tools = [
+      { name: "connector_status" },
+      { name: "chatgpt_extra_tool" },
+      { name: "claude_extra_tool" },
+      { name: "ssh_open_session" },
+    ] as Tool[];
+
+    expect(filterToolsForProfile(tools, "chatgpt").map((tool) => tool.name)).toEqual([
+      "connector_status",
+      "chatgpt_extra_tool",
+    ]);
+    expect(filterToolsForProfile(tools, "claude").map((tool) => tool.name)).toEqual([
+      "connector_status",
+      "claude_extra_tool",
+    ]);
+    expect(isToolAllowedForProfile("chatgpt_extra_tool", "chatgpt")).toBe(true);
+    expect(isToolAllowedForProfile("chatgpt_extra_tool", "claude")).toBe(false);
   });
 
   test("filters resources for remote connector profiles", () => {
