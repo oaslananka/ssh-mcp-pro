@@ -13,17 +13,47 @@ export const TOOL_PROFILES = [
 
 export type ToolProfile = (typeof TOOL_PROFILES)[number];
 
-const REMOTE_CONNECTOR_TOOLS = new Set([
+const REMOTE_CONNECTOR_TOOL_NAMES = [
   "connector_status",
   "ssh_hosts_list",
   "ssh_policy_explain",
   "ssh_host_inspect",
   "ssh_mutation_plan",
-]);
+] as const;
+
+function createRemoteConnectorToolSet(): Set<string> {
+  return new Set<string>(REMOTE_CONNECTOR_TOOL_NAMES);
+}
+
+export const CHATGPT_EXTRA_TOOLS = new Set<string>();
+export const CLAUDE_EXTRA_TOOLS = new Set<string>();
+
+export const PROFILE_TOOL_SETS: Record<ToolProfile, Set<string>> = {
+  full: new Set<string>(),
+  "remote-safe": createRemoteConnectorToolSet(),
+  chatgpt: createRemoteConnectorToolSet(),
+  claude: createRemoteConnectorToolSet(),
+  "remote-readonly": createRemoteConnectorToolSet(),
+  "remote-broker": createRemoteConnectorToolSet(),
+};
 
 const REMOTE_CONNECTOR_RESOURCES = new Set(["ssh-mcp-pro://capabilities/support-matrix"]);
 
 const REMOTE_CONNECTOR_PROMPTS = new Set(["inspect-host-capabilities", "plan-mutation"]);
+
+function getProfileToolSet(profile: ToolProfile): ReadonlySet<string> {
+  const profileTools = PROFILE_TOOL_SETS[profile];
+
+  if (profile === "chatgpt" && CHATGPT_EXTRA_TOOLS.size > 0) {
+    return new Set<string>([...profileTools, ...CHATGPT_EXTRA_TOOLS]);
+  }
+
+  if (profile === "claude" && CLAUDE_EXTRA_TOOLS.size > 0) {
+    return new Set<string>([...profileTools, ...CLAUDE_EXTRA_TOOLS]);
+  }
+
+  return profileTools;
+}
 
 export function parseToolProfile(value: string | undefined, fallback: ToolProfile): ToolProfile {
   if (value === undefined || value === "") {
@@ -40,14 +70,15 @@ export function isRemoteSafeToolProfile(profile: ToolProfile): boolean {
 }
 
 export function isToolAllowedForProfile(toolName: string, profile: ToolProfile): boolean {
-  return profile === "full" || REMOTE_CONNECTOR_TOOLS.has(toolName);
+  return profile === "full" || getProfileToolSet(profile).has(toolName);
 }
 
 export function filterToolsForProfile(tools: Tool[], profile: ToolProfile): Tool[] {
   if (profile === "full") {
     return tools;
   }
-  return tools.filter((tool) => REMOTE_CONNECTOR_TOOLS.has(tool.name));
+  const profileTools = getProfileToolSet(profile);
+  return tools.filter((tool) => profileTools.has(tool.name));
 }
 
 export function filterResourcesForProfile(resources: MCPResource[], profile: ToolProfile) {
