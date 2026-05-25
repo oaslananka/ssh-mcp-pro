@@ -562,7 +562,7 @@ describe("createEnsureService", () => {
       packageManager: "winget",
       packageName: "Git.Git",
       checkCommand:
-        "$package = winget list --id 'Git.Git' --exact --disable-interactivity; if ($LASTEXITCODE -eq 0 -and ($package -match 'Git\\.Git')) { exit 0 } exit 1",
+        "$idPattern = '(^|\\s)Git\\.Git(\\s|$)'; $package = winget list --id 'Git.Git' --exact --disable-interactivity; if ($LASTEXITCODE -eq 0 -and ($package -match $idPattern)) { exit 0 } exit 1",
       installCommand:
         "winget install --id Git.Git --exact --silent --accept-source-agreements --accept-package-agreements --disable-interactivity",
       removeCommand:

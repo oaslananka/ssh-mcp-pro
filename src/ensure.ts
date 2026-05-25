@@ -45,6 +45,21 @@ export interface EnsureServiceDeps {
   fsService: Pick<FsService, "readFile" | "writeFile" | "pathExists">;
 }
 
+const SUPPORTED_PACKAGE_MANAGERS: readonly Exclude<PackageManager, "unknown">[] = [
+  "apt",
+  "dnf",
+  "yum",
+  "pacman",
+  "apk",
+  "zypper",
+  "brew",
+  "winget",
+  "choco",
+];
+const SUPPORTED_PACKAGE_MANAGERS_HINT = `Supported package managers: ${SUPPORTED_PACKAGE_MANAGERS.join(
+  ", ",
+)}`;
+
 function sanitizePackageName(name: string): string {
   const validPackageName = /^[a-zA-Z0-9][a-zA-Z0-9._+-]*$/;
 
@@ -176,11 +191,11 @@ function getPackageCheckCommand(pm: PackageManager, packageName: string): string
     case "brew":
       return `brew list --versions ${packageName}`;
     case "winget":
-      return `$package = winget list --id ${powerShellQuote(
+      return `$idPattern = ${powerShellQuote(
+        `(^|\\s)${escapeRegExp(packageName)}(\\s|$)`,
+      )}; $package = winget list --id ${powerShellQuote(
         packageName,
-      )} --exact --disable-interactivity; if ($LASTEXITCODE -eq 0 -and ($package -match ${powerShellQuote(
-        escapeRegExp(packageName),
-      )})) { exit 0 } exit 1`;
+      )} --exact --disable-interactivity; if ($LASTEXITCODE -eq 0 -and ($package -match $idPattern)) { exit 0 } exit 1`;
     case "choco":
       return `$package = choco list --exact ${powerShellQuote(
         packageName,
@@ -243,7 +258,7 @@ export function createEnsureService({
       if (pm === "unknown") {
         throw createPackageManagerError(
           "No supported package manager found",
-          "Supported package managers: apt, dnf, yum, pacman, apk, zypper, brew, winget, choco",
+          SUPPORTED_PACKAGE_MANAGERS_HINT,
         );
       }
 
