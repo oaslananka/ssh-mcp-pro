@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "vitest";
 import { ConfigManager, DEFAULT_CONFIG } from "../../src/config.js";
 import { TOOL_PROFILES, type ToolProfile } from "../../src/connector-profile.js";
 import { createToolRegistry } from "../../src/tools/index.js";
-import type { ToolCallResult } from "../../src/tools/types.js";
+import type { ToolCallResult, ToolErrorResponse } from "../../src/tools/types.js";
 import { createTestContainer } from "./helpers.js";
 
 const EXPECTED_TOOL_COUNTS: Record<ToolProfile, number> = {
@@ -77,6 +77,19 @@ function assertToolCallResult(result: ToolCallResult, toolName: string) {
   );
 }
 
+function assertToolErrorResponse(
+  value: unknown,
+  toolName: string,
+): asserts value is ToolErrorResponse {
+  expect(value, `${toolName} error structuredContent must be ToolErrorResponse-shaped`).toEqual(
+    expect.objectContaining({
+      error: true,
+      code: expect.any(String),
+      message: expect.any(String),
+    }),
+  );
+}
+
 afterEach(async () => {
   for (const container of containers) {
     container.rateLimiter.destroy();
@@ -121,6 +134,26 @@ describe("MCP tool contracts", () => {
             `${tool.name}.structuredContent must satisfy outputSchema:\n${formatAjvErrors()}`,
           ).toBe(true);
         }
+      }
+    },
+  );
+
+  test.each(TOOL_PROFILES)(
+    "profile %s tools with missing required parameters return typed structured errors",
+    async (profile) => {
+      const registry = createRegistryForProfile(profile);
+
+      for (const tool of registry.getAllTools()) {
+        const required = (tool.inputSchema as { required?: unknown } | undefined)?.required;
+        if (!Array.isArray(required) || required.length === 0) {
+          continue;
+        }
+
+        const result = await registry.dispatch(tool.name, {});
+
+        expect(result.isError, `${tool.name} must reject missing required parameters`).toBe(true);
+        assertToolCallResult(result, tool.name);
+        assertToolErrorResponse(result.structuredContent, tool.name);
       }
     },
   );

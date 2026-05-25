@@ -7,3 +7,12 @@ export interface ToolProvider {
 }
 
 export type ToolCallResult = CallToolResult;
+
+export interface ToolErrorResponse extends Record<string, unknown> {
+  error: true;
+  code: string;
+  message: string;
+  hint?: string;
+  recoverable?: boolean;
+  suggestedAction?: string;
+}

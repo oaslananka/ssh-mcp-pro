@@ -3,7 +3,7 @@ import type { TextContent, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { createTestContainer } from "../helpers.js";
 import { createToolRegistry } from "../../../src/tools/index.js";
 import { ToolRegistry } from "../../../src/tools/registry.js";
-import type { ToolCallResult, ToolProvider } from "../../../src/tools/types.js";
+import type { ToolCallResult, ToolErrorResponse, ToolProvider } from "../../../src/tools/types.js";
 
 function makeProvider(namespace: string, toolName: string): ToolProvider {
   return {
@@ -24,6 +24,16 @@ function makeProvider(namespace: string, toolName: string): ToolProvider {
       return undefined;
     },
   };
+}
+
+function assertToolErrorResponse(value: unknown): asserts value is ToolErrorResponse {
+  expect(value).toEqual(
+    expect.objectContaining({
+      error: true,
+      code: expect.any(String),
+      message: expect.any(String),
+    }),
+  );
 }
 
 describe("ToolRegistry", () => {
@@ -113,6 +123,7 @@ describe("ToolRegistry", () => {
 
     const result = await registry.dispatch("primitive_tool", {});
 
+    assertToolErrorResponse(result.structuredContent);
     expect(result).toEqual(
       expect.objectContaining({
         isError: true,
@@ -125,7 +136,7 @@ describe("ToolRegistry", () => {
     expect(result.structuredContent).not.toHaveProperty("result");
   });
 
-  test("returns structured errors and unknown-tool responses", async () => {
+  test("returns ToolErrorResponse-shaped structured errors and unknown-tool responses", async () => {
     const registry = new ToolRegistry().register({
       namespace: "broken",
       getTools: () => [],
@@ -137,19 +148,21 @@ describe("ToolRegistry", () => {
       },
     });
 
-    await expect(registry.dispatch("broken_tool", {})).resolves.toEqual(
-      expect.objectContaining({
-        isError: true,
-        structuredContent: expect.objectContaining({ error: true, message: "boom" }),
-      }),
+    const broken = await registry.dispatch("broken_tool", {});
+    const missing = await registry.dispatch("missing_tool", {});
+
+    expect(broken.isError).toBe(true);
+    assertToolErrorResponse(broken.structuredContent);
+    expect(broken.structuredContent).toEqual(
+      expect.objectContaining({ code: "ETOOL", message: "boom" }),
     );
-    await expect(registry.dispatch("missing_tool", {})).resolves.toEqual(
+
+    expect(missing.isError).toBe(true);
+    assertToolErrorResponse(missing.structuredContent);
+    expect(missing.structuredContent).toEqual(
       expect.objectContaining({
-        isError: true,
-        structuredContent: expect.objectContaining({
-          error: true,
-          message: "Unknown tool: missing_tool",
-        }),
+        code: "ETOOLNOTFOUND",
+        message: "Unknown tool: missing_tool",
       }),
     );
   });
