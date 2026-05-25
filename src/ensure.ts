@@ -45,6 +45,21 @@ export interface EnsureServiceDeps {
   fsService: Pick<FsService, "readFile" | "writeFile" | "pathExists">;
 }
 
+const SUPPORTED_PACKAGE_MANAGERS: readonly Exclude<PackageManager, "unknown">[] = [
+  "apt",
+  "dnf",
+  "yum",
+  "pacman",
+  "apk",
+  "zypper",
+  "brew",
+  "winget",
+  "choco",
+];
+const SUPPORTED_PACKAGE_MANAGERS_HINT = `Supported package managers: ${SUPPORTED_PACKAGE_MANAGERS.join(
+  ", ",
+)}`;
+
 function sanitizePackageName(name: string): string {
   const validPackageName = /^[a-zA-Z0-9][a-zA-Z0-9._+-]*$/;
 
@@ -83,6 +98,14 @@ function shellQuote(value: string): string {
   return `'${String(value).replace(/'/g, `'"'"'`)}'`;
 }
 
+function powerShellQuote(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+}
+
 function describeError(error: unknown): string {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -118,6 +141,10 @@ function getRemoveCommand(pm: PackageManager, packageName: string): string {
       return `zypper remove -y ${packageName}`;
     case "brew":
       return `brew uninstall ${packageName}`;
+    case "winget":
+      return `winget uninstall --id ${packageName} --exact --silent --accept-source-agreements --disable-interactivity`;
+    case "choco":
+      return `choco uninstall ${packageName} -y --no-progress`;
     default:
       throw createPackageManagerError(`Unsupported package manager: ${pm}`);
   }
@@ -139,9 +166,49 @@ function getInstallCommand(pm: PackageManager, packageName: string): string {
       return `zypper install -y ${packageName}`;
     case "brew":
       return `brew install ${packageName}`;
+    case "winget":
+      return `winget install --id ${packageName} --exact --silent --accept-source-agreements --accept-package-agreements --disable-interactivity`;
+    case "choco":
+      return `choco install ${packageName} -y --no-progress`;
     default:
       throw createPackageManagerError(`Unsupported package manager: ${pm}`);
   }
+}
+
+function getPackageCheckCommand(pm: PackageManager, packageName: string): string | undefined {
+  switch (pm) {
+    case "apt":
+      return `dpkg -l ${packageName} | grep -q '^ii'`;
+    case "dnf":
+    case "yum":
+      return `${pm} list installed ${packageName}`;
+    case "pacman":
+      return `pacman -Q ${packageName}`;
+    case "apk":
+      return `apk info -e ${packageName}`;
+    case "zypper":
+      return `zypper se -i ${packageName}`;
+    case "brew":
+      return `brew list --versions ${packageName}`;
+    case "winget":
+      return `$idPattern = ${powerShellQuote(
+        `(^|\\s)${escapeRegExp(packageName)}(\\s|$)`,
+      )}; $package = winget list --id ${powerShellQuote(
+        packageName,
+      )} --exact --disable-interactivity; if ($LASTEXITCODE -eq 0 -and ($package -match $idPattern)) { exit 0 } exit 1`;
+    case "choco":
+      return `$package = choco list --exact ${powerShellQuote(
+        packageName,
+      )} --limit-output; if ($LASTEXITCODE -eq 0 -and ($package -like ${powerShellQuote(
+        `${packageName}|*`,
+      )})) { exit 0 } exit 1`;
+    default:
+      return undefined;
+  }
+}
+
+function usesDirectPackageCommand(pm: PackageManager): boolean {
+  return pm === "brew" || pm === "winget" || pm === "choco";
 }
 
 export function createEnsureService({
@@ -154,30 +221,9 @@ export function createEnsureService({
     packageName: string,
     pm: PackageManager,
   ): Promise<boolean> {
-    let checkCommand: string;
-
-    switch (pm) {
-      case "apt":
-        checkCommand = `dpkg -l ${packageName} | grep -q '^ii'`;
-        break;
-      case "dnf":
-      case "yum":
-        checkCommand = `${pm} list installed ${packageName}`;
-        break;
-      case "pacman":
-        checkCommand = `pacman -Q ${packageName}`;
-        break;
-      case "apk":
-        checkCommand = `apk info -e ${packageName}`;
-        break;
-      case "zypper":
-        checkCommand = `zypper se -i ${packageName}`;
-        break;
-      case "brew":
-        checkCommand = `brew list --versions ${packageName}`;
-        break;
-      default:
-        return false;
+    const checkCommand = getPackageCheckCommand(pm, packageName);
+    if (!checkCommand) {
+      return false;
     }
 
     try {
@@ -212,13 +258,7 @@ export function createEnsureService({
       if (pm === "unknown") {
         throw createPackageManagerError(
           "No supported package manager found",
-          "Supported package managers: apt, dnf, yum, pacman, apk, zypper, brew",
-        );
-      }
-      if (osInfo.platform === "windows") {
-        throw createPackageManagerError(
-          "Package management on Windows hosts is not supported by this tool yet",
-          "Use winget/choco manually or install via other Windows package workflows",
+          SUPPORTED_PACKAGE_MANAGERS_HINT,
         );
       }
 
@@ -247,21 +287,20 @@ export function createEnsureService({
           command: removeCommand,
         });
 
-        const result =
-          pm === "brew"
-            ? await processService.execCommand(sessionId, removeCommand)
-            : await processService.execSudo(
-                sessionId,
-                removeCommand,
-                undefined,
-                undefined,
-                undefined,
-                {
-                  policyAction: "ensure.package",
-                  rawSudo: false,
-                  destructive: true,
-                },
-              );
+        const result = usesDirectPackageCommand(pm)
+          ? await processService.execCommand(sessionId, removeCommand)
+          : await processService.execSudo(
+              sessionId,
+              removeCommand,
+              undefined,
+              undefined,
+              undefined,
+              {
+                policyAction: "ensure.package",
+                rawSudo: false,
+                destructive: true,
+              },
+            );
 
         const packageResult: PackageResult = {
           ok: result.code === 0,
@@ -308,20 +347,19 @@ export function createEnsureService({
         command: installCommand,
       });
 
-      const result =
-        pm === "brew"
-          ? await processService.execCommand(sessionId, installCommand)
-          : await processService.execSudo(
-              sessionId,
-              installCommand,
-              undefined,
-              undefined,
-              undefined,
-              {
-                policyAction: "ensure.package",
-                rawSudo: false,
-              },
-            );
+      const result = usesDirectPackageCommand(pm)
+        ? await processService.execCommand(sessionId, installCommand)
+        : await processService.execSudo(
+            sessionId,
+            installCommand,
+            undefined,
+            undefined,
+            undefined,
+            {
+              policyAction: "ensure.package",
+              rawSudo: false,
+            },
+          );
 
       const packageResult: PackageResult = {
         ok: result.code === 0,

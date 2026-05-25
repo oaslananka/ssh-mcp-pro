@@ -557,22 +557,95 @@ describe("createEnsureService", () => {
     });
   });
 
-  test("rejects Windows package management and failed privileged file moves", async () => {
-    const deps = createDeps();
-    deps.sessionManager.getOSInfo.mockResolvedValueOnce({
-      platform: "windows",
-      distro: "windows",
-      version: "11",
-      arch: "x64",
-      shell: "powershell",
+  test.each([
+    {
       packageManager: "winget",
-      init: "windows-service",
-    });
-    const service = createEnsureService(deps as any);
+      packageName: "Git.Git",
+      checkCommand:
+        "$idPattern = '(^|\\s)Git\\.Git(\\s|$)'; $package = winget list --id 'Git.Git' --exact --disable-interactivity; if ($LASTEXITCODE -eq 0 -and ($package -match $idPattern)) { exit 0 } exit 1",
+      installCommand:
+        "winget install --id Git.Git --exact --silent --accept-source-agreements --accept-package-agreements --disable-interactivity",
+      removeCommand:
+        "winget uninstall --id Git.Git --exact --silent --accept-source-agreements --disable-interactivity",
+    },
+    {
+      packageManager: "choco",
+      packageName: "git",
+      checkCommand:
+        "$package = choco list --exact 'git' --limit-output; if ($LASTEXITCODE -eq 0 -and ($package -like 'git|*')) { exit 0 } exit 1",
+      installCommand: "choco install git -y --no-progress",
+      removeCommand: "choco uninstall git -y --no-progress",
+    },
+  ])(
+    "dispatches Windows $packageManager package management without sudo",
+    async ({ packageManager, packageName, checkCommand, installCommand, removeCommand }) => {
+      const installDeps = createDeps();
+      installDeps.sessionManager.getOSInfo.mockResolvedValue({
+        platform: "windows",
+        distro: "windows",
+        version: "11",
+        arch: "x64",
+        shell: "powershell",
+        packageManager,
+        init: "windows-service",
+        defaultShell: "powershell",
+      });
+      installDeps.processService.execCommand
+        .mockResolvedValueOnce({ code: 1, stdout: "", stderr: "", durationMs: 1 })
+        .mockResolvedValueOnce({ code: 0, stdout: "installed", stderr: "", durationMs: 1 });
+      const installService = createEnsureService(installDeps as any);
 
-    await expect(service.ensurePackage("session-1", "git")).rejects.toMatchObject({
-      code: ErrorCode.EPMGR,
-    });
+      await expect(
+        installService.ensurePackage("session-1", packageName, "present"),
+      ).resolves.toEqual(expect.objectContaining({ ok: true, pm: packageManager }));
+      expect(installDeps.processService.execCommand).toHaveBeenNthCalledWith(
+        1,
+        "session-1",
+        checkCommand,
+      );
+      expect(installDeps.processService.execCommand).toHaveBeenNthCalledWith(
+        2,
+        "session-1",
+        installCommand,
+      );
+      expect(installDeps.processService.execSudo).not.toHaveBeenCalled();
+
+      const removeDeps = createDeps();
+      removeDeps.sessionManager.getOSInfo.mockResolvedValue({
+        platform: "windows",
+        distro: "windows",
+        version: "11",
+        arch: "x64",
+        shell: "powershell",
+        packageManager,
+        init: "windows-service",
+        defaultShell: "powershell",
+      });
+      removeDeps.processService.execCommand
+        .mockResolvedValueOnce({ code: 0, stdout: "installed", stderr: "", durationMs: 1 })
+        .mockResolvedValueOnce({ code: 0, stdout: "removed", stderr: "", durationMs: 1 });
+      const removeService = createEnsureService(removeDeps as any);
+
+      await expect(
+        removeService.ensurePackage("session-1", packageName, "absent"),
+      ).resolves.toEqual(expect.objectContaining({ ok: true, pm: packageManager }));
+      expect(removeDeps.processService.execCommand).toHaveBeenNthCalledWith(
+        1,
+        "session-1",
+        checkCommand,
+      );
+      expect(removeDeps.processService.execCommand).toHaveBeenNthCalledWith(
+        2,
+        "session-1",
+        removeCommand,
+      );
+      expect(removeDeps.processService.execSudo).not.toHaveBeenCalled();
+    },
+  );
+
+  test("handles failed privileged file moves", async () => {
+    const deps = createDeps();
+    const service = createEnsureService(deps as any);
 
     deps.sessionManager.getOSInfo.mockResolvedValueOnce({
       platform: "linux",
