@@ -86,8 +86,9 @@ function writeAgentConfig(
   );
 }
 
-async function waitFor(predicate: () => boolean): Promise<void> {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+async function waitFor(predicate: () => boolean, timeoutMs = 5_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
     if (predicate()) {
       return;
     }
@@ -271,10 +272,20 @@ describe("remote agent CLI", () => {
 
     const output = stdout.read();
     expect(output).toContain("Agent is not enrolled.");
-    expect(output).toContain("Create a systemd service with ExecStart:");
     expect(output).toContain("ssh-mcp-pro-agent run");
-    expect(output).toContain("Agent=not-enrolled");
-    expect(output).toContain("Disable and remove the systemd service");
+
+    if (process.platform === "win32") {
+      expect(output).toContain("Windows service installation requires");
+      expect(output).toContain("PowerShell");
+      expect(output).toContain("Remove the Windows service or scheduled task");
+    } else if (process.platform === "darwin") {
+      expect(output).toContain("launchd");
+      expect(output).toContain("Unload and remove the launchd plist");
+    } else {
+      expect(output).toContain("Create a systemd service with ExecStart:");
+      expect(output).toContain("Agent=not-enrolled");
+      expect(output).toContain("Disable and remove the systemd service");
+    }
   });
 
   test("fails clearly when the runtime WebSocket implementation is unavailable", async () => {
@@ -327,6 +338,7 @@ describe("remote agent CLI", () => {
     let socket: FakeWebSocket | undefined;
     try {
       runPromise = runAgentCli(["run"]);
+      await waitFor(() => FakeWebSocket.instances.length > 0);
       socket = FakeWebSocket.instances[0];
       expect(socket).toBeDefined();
       expect(socket?.url).toBe("wss://sshautomator.example/api/agents/connect");
@@ -363,7 +375,7 @@ describe("remote agent CLI", () => {
         controlPlaneKeys.privateKeyPem,
       );
       socket?.onmessage?.({ data: JSON.stringify(action) });
-      await waitFor(() => (socket?.sent.length ?? 0) >= 2);
+      await waitFor(() => (socket?.sent.length ?? 0) >= 2, 20_000);
 
       const result = JSON.parse(socket?.sent[1] ?? "{}") as Record<string, unknown>;
       expect(result).toMatchObject({
@@ -384,7 +396,7 @@ describe("remote agent CLI", () => {
       stdout.restore();
     }
     expect(stdout.read()).toContain("Agent connected: agt_online");
-  });
+  }, 30_000);
 
   test("run ignores invalid control-plane messages and applies signed policy updates", async () => {
     const configPath = agentConfigPath();
@@ -427,7 +439,9 @@ describe("remote agent CLI", () => {
     let socket: FakeWebSocket | undefined;
     try {
       runPromise = runAgentCli(["run"]);
+      await waitFor(() => FakeWebSocket.instances.length > 0);
       socket = FakeWebSocket.instances[0];
+      expect(socket).toBeDefined();
       socket?.onopen?.();
       await waitFor(() => (socket?.sent.length ?? 0) >= 1);
 

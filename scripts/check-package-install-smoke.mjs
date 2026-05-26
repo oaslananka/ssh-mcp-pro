@@ -5,15 +5,35 @@ import { isAbsolute, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { parsePnpmPackOutput } from "./pack-json.mjs";
 
+/** Quote a single shell argument if it contains spaces. */
+function shellQuote(arg) {
+  return arg.includes(" ") ? `"${arg}"` : arg;
+}
+
 function run(command, args, cwd) {
-  const result = spawnSync(command, args, {
-    cwd,
-    encoding: "utf8",
-    stdio: "pipe",
-  });
+  // On Windows, tools like pnpm are .cmd wrappers that need shell resolution.
+  // To avoid Node v24 DEP0190, pass the full command string rather than an
+  // args array when shell is enabled.
+  const isWin = process.platform === "win32";
+  const result = isWin
+    ? spawnSync([command, ...args.map(shellQuote)].join(" "), {
+        cwd,
+        encoding: "utf8",
+        stdio: "pipe",
+        shell: true,
+      })
+    : spawnSync(command, args, {
+        cwd,
+        encoding: "utf8",
+        stdio: "pipe",
+      });
+  if (result.error) {
+    console.error(`spawn error: ${result.error.message}`);
+    process.exit(1);
+  }
   if (result.status !== 0) {
-    process.stdout.write(result.stdout);
-    process.stderr.write(result.stderr);
+    if (result.stdout) process.stdout.write(result.stdout);
+    if (result.stderr) process.stderr.write(result.stderr);
     process.exit(result.status ?? 1);
   }
   return result.stdout;

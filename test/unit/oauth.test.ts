@@ -230,7 +230,7 @@ describe("OAuth verification", () => {
             aud: "https://mcp.example/mcp",
             exp: now + 300,
             iat: now,
-            scope: "ssh-mcp-pro.read",
+            scope: "sshautomator.read",
           },
           privateKey,
         )}`,
