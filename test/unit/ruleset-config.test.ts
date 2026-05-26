@@ -71,6 +71,12 @@ function ruleOfType(ruleset: BranchRuleset, type: string) {
   return rule;
 }
 
+function extractWorkflowJobNames(workflows: string) {
+  return [...workflows.matchAll(/^ {4}name:\s+(.+)$/gm)].map((match) =>
+    match[1].trim().replace(/^["'](.*)["']$/, "$1"),
+  );
+}
+
 describe("GitHub branch protection ruleset configuration", () => {
   test("commits an active ruleset targeting the default branch", () => {
     expect(fs.existsSync(path.join(repoRoot, rulesetPath))).toBe(true);
@@ -121,6 +127,7 @@ describe("GitHub branch protection ruleset configuration", () => {
       readText(".github/workflows/codeql.yml"),
       readText(".github/workflows/mcp-registry.yml"),
     ].join("\n");
+    const workflowJobNames = extractWorkflowJobNames(workflows);
     const statusRule = ruleOfType(readRuleset(), "required_status_checks");
     const contexts =
       statusRule.parameters?.required_status_checks?.map((check) => check.context) ?? [];
@@ -131,15 +138,19 @@ describe("GitHub branch protection ruleset configuration", () => {
     });
     expect(contexts).toEqual([...requiredProtectionContexts]);
 
-    expect(workflows).toContain("name: Quality Gates");
-    expect(workflows).toContain("name: Unit Tests (Node ${{ matrix.node_major }})");
-    expect(workflows).toContain("name: SSH Integration");
-    expect(workflows).toContain("name: Windows Integration");
-    expect(workflows).toContain("name: SSH E2E");
-    expect(workflows).toContain("name: Build, SBOM, and Pack");
-    expect(workflows).toContain("name: Build and smoke image");
-    expect(workflows).toContain("name: Analyze TypeScript");
-    expect(workflows).toContain("name: Validate MCP Registry metadata");
+    expect(workflowJobNames).toEqual(
+      expect.arrayContaining([
+        "Quality Gates",
+        "Unit Tests (Node ${{ matrix.node_major }})",
+        "SSH Integration",
+        "Windows Integration",
+        "SSH E2E",
+        "Build, SBOM, and Pack",
+        "Build and smoke image",
+        "Analyze TypeScript",
+        "Validate MCP Registry metadata",
+      ]),
+    );
   });
 
   test("documents the version-controlled ruleset import path", () => {
