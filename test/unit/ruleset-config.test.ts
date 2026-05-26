@@ -4,6 +4,18 @@ import { describe, expect, test } from "vitest";
 
 const repoRoot = path.resolve(import.meta.dirname, "../..");
 const rulesetPath = ".github/rulesets/main-protection.json";
+const requiredProtectionContexts = [
+  "Quality Gates",
+  "Unit Tests (Node 22)",
+  "Unit Tests (Node 24)",
+  "SSH Integration",
+  "Windows Integration",
+  "SSH E2E",
+  "Build, SBOM, and Pack",
+  "Build and smoke image",
+  "Analyze TypeScript",
+  "Validate MCP Registry metadata",
+] as const;
 
 interface RequiredStatusCheck {
   readonly context: string;
@@ -59,6 +71,12 @@ function ruleOfType(ruleset: BranchRuleset, type: string) {
   return rule;
 }
 
+function extractWorkflowJobNames(workflows: string) {
+  return [...workflows.matchAll(/^ {4}name:\s+(.+)$/gm)].map((match) =>
+    match[1].trim().replace(/^["'](.*)["']$/, "$1"),
+  );
+}
+
 describe("GitHub branch protection ruleset configuration", () => {
   test("commits an active ruleset targeting the default branch", () => {
     expect(fs.existsSync(path.join(repoRoot, rulesetPath))).toBe(true);
@@ -78,7 +96,7 @@ describe("GitHub branch protection ruleset configuration", () => {
     });
   });
 
-  test("requires pull requests, linear history, and blocks force pushes", () => {
+  test("requires pull requests, linear history, and blocks destructive changes", () => {
     const ruleset = readRuleset();
     const ruleTypes = ruleset.rules.map((rule) => rule.type);
 
@@ -88,6 +106,7 @@ describe("GitHub branch protection ruleset configuration", () => {
         "required_status_checks",
         "non_fast_forward",
         "required_linear_history",
+        "deletion",
       ]),
     );
 
@@ -101,8 +120,14 @@ describe("GitHub branch protection ruleset configuration", () => {
     });
   });
 
-  test("requires CI status contexts that map to ci.yml job names", () => {
-    const workflow = readText(".github/workflows/ci.yml");
+  test("requires protected status contexts that map to workflow job names", () => {
+    const workflows = [
+      readText(".github/workflows/ci.yml"),
+      readText(".github/workflows/docker.yml"),
+      readText(".github/workflows/codeql.yml"),
+      readText(".github/workflows/mcp-registry.yml"),
+    ].join("\n");
+    const workflowJobNames = extractWorkflowJobNames(workflows);
     const statusRule = ruleOfType(readRuleset(), "required_status_checks");
     const contexts =
       statusRule.parameters?.required_status_checks?.map((check) => check.context) ?? [];
@@ -111,18 +136,21 @@ describe("GitHub branch protection ruleset configuration", () => {
       do_not_enforce_on_create: false,
       strict_required_status_checks_policy: true,
     });
-    expect(contexts).toEqual([
-      "Quality Gates",
-      "Unit Tests (Node 22)",
-      "Unit Tests (Node 24)",
-      "SSH Integration",
-      "Build, SBOM, and Pack",
-    ]);
+    expect(contexts).toEqual([...requiredProtectionContexts]);
 
-    expect(workflow).toContain("name: Quality Gates");
-    expect(workflow).toContain("name: Unit Tests (Node ${{ matrix.node_major }})");
-    expect(workflow).toContain("name: SSH Integration");
-    expect(workflow).toContain("name: Build, SBOM, and Pack");
+    expect(workflowJobNames).toEqual(
+      expect.arrayContaining([
+        "Quality Gates",
+        "Unit Tests (Node ${{ matrix.node_major }})",
+        "SSH Integration",
+        "Windows Integration",
+        "SSH E2E",
+        "Build, SBOM, and Pack",
+        "Build and smoke image",
+        "Analyze TypeScript",
+        "Validate MCP Registry metadata",
+      ]),
+    );
   });
 
   test("documents the version-controlled ruleset import path", () => {
@@ -131,5 +159,6 @@ describe("GitHub branch protection ruleset configuration", () => {
     expect(contributing).toContain(rulesetPath);
     expect(contributing).toContain("https://docs.github.com");
     expect(contributing).toContain("Rulesets");
+    expect(contributing).toContain("Administrators are enforced");
   });
 });

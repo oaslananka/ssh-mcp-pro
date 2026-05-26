@@ -8,6 +8,7 @@ const requiredMainProtectionRules = [
   "pull_request",
   "required_status_checks",
   "non_fast_forward",
+  "deletion",
   "required_linear_history",
 ];
 const requiredMainContexts = [
@@ -15,7 +16,18 @@ const requiredMainContexts = [
   "Unit Tests (Node 22)",
   "Unit Tests (Node 24)",
   "SSH Integration",
+  "Windows Integration",
+  "SSH E2E",
   "Build, SBOM, and Pack",
+  "Build and smoke image",
+  "Analyze TypeScript",
+  "Validate MCP Registry metadata",
+];
+const protectedWorkflowFiles = [
+  ".github/workflows/ci.yml",
+  ".github/workflows/docker.yml",
+  ".github/workflows/codeql.yml",
+  ".github/workflows/mcp-registry.yml",
 ];
 
 if (!existsSync(rulesetDir)) {
@@ -24,7 +36,7 @@ if (!existsSync(rulesetDir)) {
 }
 
 const files = readdirSync(rulesetDir).filter((file) => file.endsWith(".json"));
-const ciJobNames = extractCiJobNames(readFileSync(".github/workflows/ci.yml", "utf8"));
+const workflowJobNames = extractWorkflowJobNames(protectedWorkflowFiles);
 
 for (const file of files) {
   const path = join(rulesetDir, file);
@@ -34,13 +46,13 @@ for (const file of files) {
   }
 
   if (file === mainProtectionFile) {
-    validateMainProtection(path, ruleset, ciJobNames);
+    validateMainProtection(path, ruleset, workflowJobNames);
   }
 }
 
 console.log(`check-rulesets: validated ${files.length} ruleset file(s).`);
 
-function validateMainProtection(path, ruleset, ciJobNames) {
+function validateMainProtection(path, ruleset, workflowJobNames) {
   assertEqual(path, "name", ruleset.name, "main branch protection");
   assertEqual(path, "target", ruleset.target, "branch");
   assertEqual(path, "enforcement", ruleset.enforcement, "active");
@@ -98,18 +110,22 @@ function validateMainProtection(path, ruleset, ciJobNames) {
     contexts,
     requiredMainContexts,
   );
-  validateContextsMatchCiWorkflow(path, contexts, ciJobNames);
+  validateContextsMatchWorkflowJobs(path, contexts, workflowJobNames);
 }
 
-function validateContextsMatchCiWorkflow(path, contexts, ciJobNames) {
+function validateContextsMatchWorkflowJobs(path, contexts, workflowJobNames) {
   for (const context of contexts) {
-    if (!ciJobNames.some((jobName) => ciJobNameMatchesContext(jobName, context))) {
-      throw new Error(`${path} references ${context}, but ci.yml has no matching job name.`);
+    if (!workflowJobNames.some((jobName) => workflowJobNameMatchesContext(jobName, context))) {
+      throw new Error(`${path} references ${context}, but no protected workflow job matches.`);
     }
   }
 }
 
-function extractCiJobNames(workflow) {
+function extractWorkflowJobNames(files) {
+  return files.flatMap((file) => extractJobNames(readFileSync(file, "utf8")));
+}
+
+function extractJobNames(workflow) {
   return [...workflow.matchAll(/^ {4}name:\s+(.+)$/gm)].map((match) => unquoteYamlScalar(match[1]));
 }
 
@@ -117,7 +133,7 @@ function unquoteYamlScalar(value) {
   return value.trim().replace(/^["'](.*)["']$/, "$1");
 }
 
-function ciJobNameMatchesContext(jobName, context) {
+function workflowJobNameMatchesContext(jobName, context) {
   if (jobName === context) {
     return true;
   }
