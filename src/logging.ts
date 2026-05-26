@@ -22,8 +22,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function isEmptySensitiveValue(value: unknown): boolean {
-  return value === null || value === undefined || value === "";
+function shouldPreserveSensitiveValue(value: unknown): boolean {
+  return value === null || value === undefined || value === "" || typeof value === "boolean";
 }
 
 /**
@@ -46,7 +46,7 @@ export function redactSensitiveData(obj: unknown): unknown {
     const redacted: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
       if (SENSITIVE_PATTERNS.some((pattern) => pattern.test(key))) {
-        redacted[key] = isEmptySensitiveValue(value) ? value : REDACTED;
+        redacted[key] = shouldPreserveSensitiveValue(value) ? value : REDACTED;
       } else {
         redacted[key] = redactSensitiveData(value);
       }

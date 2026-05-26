@@ -64,15 +64,17 @@ describe("logging utilities", () => {
     });
   });
 
-  test("redactSensitiveData redacts non-empty sensitive primitives", () => {
+  test("redactSensitiveData redacts sensitive numbers and preserves booleans", () => {
     expect(
       redactSensitiveData({
         token: 0,
         authEnabled: false,
+        bearer: true,
       }),
     ).toEqual({
       token: "****",
-      authEnabled: "****",
+      authEnabled: false,
+      bearer: true,
     });
   });
 
