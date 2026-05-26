@@ -4,11 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { describe, expect, vi, test } from "vitest";
-import {
-  controlPlanePublicKeyId,
-  createRemoteControlPlane,
-  RemoteControlPlane,
-} from "../../src/remote/control-plane.js";
+import { RemoteControlPlane } from "../../src/remote/control-plane.js";
 import {
   generateEd25519PemKeyPair,
   issueAccessToken,

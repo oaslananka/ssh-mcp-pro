@@ -64,6 +64,18 @@ describe("logging utilities", () => {
     });
   });
 
+  test("redactSensitiveData redacts non-empty sensitive primitives", () => {
+    expect(
+      redactSensitiveData({
+        token: 0,
+        authEnabled: false,
+      }),
+    ).toEqual({
+      token: "****",
+      authEnabled: "****",
+    });
+  });
+
   test("redactErrorMessage removes sensitive patterns and keeps benign text", () => {
     const message =
       "Authentication failed password=secret key=my-key bearer abc123 pem=inline path=/tmp/value";

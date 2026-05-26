@@ -42,3 +42,18 @@ The in-memory audit buffer keeps 500 events by default. This bounded size avoids
 ## Token Comparison
 
 Bearer token comparison uses SHA-256 digests and `timingSafeEqual` through `constantTimeTokenEquals()`. Remote enrollment token validation also compares fixed-length hashes with `timingSafeEqual`. This avoids leaking token equality information through variable-time string comparison.
+
+## CodeQL Agent Bootstrap Findings
+
+CodeQL alerts #2, #4, #5, and #6 are documented false positives for the remote agent bootstrap flow. They are tracked by CodeQL as `js/http-to-file-access` / `js/file-access-to-http` because the agent writes enrollment data to its local config file and later uses that config to connect to the control plane.
+
+The flow is intentional:
+
+- `ssh-mcp-pro-agent enroll` requires an explicit `--server` URL and one-time enrollment token from the operator.
+- Enrollment writes only to `SSHAUTOMATOR_AGENT_CONFIG` or `~/.sshautomator/agent.json` with file mode `0600`.
+- Server response fields are validated with `requireString()` and `parseAgentPolicy()` before persistence.
+- The agent private key is generated locally and is not received from the network.
+- `ssh-mcp-pro-agent run` connects only to the enrolled `websocketUrl` from that config and sends signed agent envelopes to the configured control plane.
+- The private key remains local; outbound payloads contain signed metadata, policy-limited capabilities, and policy-controlled action results.
+
+These findings are dismissed individually with a false-positive rationale. No broad CodeQL suppression is used.
