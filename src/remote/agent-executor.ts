@@ -46,7 +46,7 @@ function platformShell(command: string): { command: string; args: string[] } {
 function powerShell(command: string, args: string[] = []): { command: string; args: string[] } {
   return {
     command: "powershell.exe",
-    args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command, ...args],
+    args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", `& { ${command} }`, ...args],
   };
 }
 
@@ -324,7 +324,7 @@ export class AgentExecutor {
   private getSystemStatus(timeoutSeconds: number): Promise<ExecResult> {
     const command =
       process.platform === "win32"
-        ? "Get-ComputerInfo | Select-Object CsName,OsName,OsVersion,CsTotalPhysicalMemory | ConvertTo-Json -Compress"
+        ? "[pscustomobject]@{ComputerName=$env:COMPUTERNAME;OSVersion=[System.Environment]::OSVersion.VersionString;Architecture=[System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()} | ConvertTo-Json -Compress"
         : "uname -a && uptime && df -h /";
     const shell = platformShell(command);
     return runCommand(shell.command, shell.args, {
@@ -347,7 +347,9 @@ export class AgentExecutor {
     }
     if (process.platform === "win32") {
       if (isFileTarget) {
-        const shell = powerShell("Get-Content -Path $args[0] -Tail 100", [target]);
+        const shell = powerShell("param([string]$Path) Get-Content -LiteralPath $Path -Tail 100", [
+          target,
+        ]);
         return runCommand(shell.command, shell.args, {
           timeoutSeconds,
           maxOutputBytes: this.policy.maxOutputBytes,
@@ -355,7 +357,7 @@ export class AgentExecutor {
       }
       assertSafeIdentifier(target, "Log target");
       const shell = powerShell(
-        "Get-EventLog -LogName $args[0] -Newest 100 | ConvertTo-Json -Compress",
+        "param([string]$LogName) Get-EventLog -LogName $LogName -Newest 100 | ConvertTo-Json -Compress",
         [target],
       );
       return runCommand(shell.command, shell.args, {
@@ -385,7 +387,7 @@ export class AgentExecutor {
     assertSafeIdentifier(service, "Service name");
     const shell =
       process.platform === "win32"
-        ? powerShell("Restart-Service -Name $args[0]", [service])
+        ? powerShell("param([string]$Name) Restart-Service -Name $Name", [service])
         : { command: "systemctl", args: ["restart", service] };
     return runCommand(shell.command, shell.args, {
       timeoutSeconds,

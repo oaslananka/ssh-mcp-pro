@@ -7,6 +7,8 @@ import { generateEd25519PemKeyPair, verifyEnvelope } from "../../src/remote/cryp
 import { createAgentPolicy, mergeCustomPolicy } from "../../src/remote/policy.js";
 import type { ActionRequestEnvelope, RemoteToolName } from "../../src/remote/types.js";
 
+const shellTestTimeout = process.platform === "win32" ? 15_000 : 5_000;
+
 function action(
   tool: RemoteToolName,
   capability: ActionRequestEnvelope["capability"],
@@ -44,65 +46,77 @@ describe("remote agent executor", () => {
     );
   });
 
-  test("full-admin policy allows bounded shell execution", async () => {
-    const keyPair = generateEd25519PemKeyPair();
-    const executor = new AgentExecutor(createAgentPolicy("full-admin"), keyPair.privateKeyPem);
+  test(
+    "full-admin policy allows bounded shell execution",
+    async () => {
+      const keyPair = generateEd25519PemKeyPair();
+      const executor = new AgentExecutor(createAgentPolicy("full-admin"), keyPair.privateKeyPem);
 
-    const result = await executor.execute(
-      action("run_shell", "shell.exec", {
-        command: "node -e \"process.stdout.write('ok')\"",
-        timeout_seconds: 10,
-      }),
-    );
+      const result = await executor.execute(
+        action("run_shell", "shell.exec", {
+          command: "node -e \"process.stdout.write('ok')\"",
+          timeout_seconds: 10,
+        }),
+      );
 
-    expect(result.status).toBe("ok");
-    expect(result.exit_code).toBe(0);
-    expect(result.stdout).toBe("ok");
-  });
+      expect(result.status).toBe("ok");
+      expect(result.exit_code).toBe(0);
+      expect(result.stdout).toBe("ok");
+    },
+    shellTestTimeout,
+  );
 
-  test("policy updates take effect before executing commands in a requested cwd", async () => {
-    const tempDir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-"));
-    const keyPair = generateEd25519PemKeyPair();
-    const executor = new AgentExecutor(createAgentPolicy("read-only"), keyPair.privateKeyPem);
-    executor.updatePolicy(createAgentPolicy("full-admin"));
+  test(
+    "policy updates take effect before executing commands in a requested cwd",
+    async () => {
+      const tempDir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-"));
+      const keyPair = generateEd25519PemKeyPair();
+      const executor = new AgentExecutor(createAgentPolicy("read-only"), keyPair.privateKeyPem);
+      executor.updatePolicy(createAgentPolicy("full-admin"));
 
-    const result = await executor.execute(
-      action("run_shell", "shell.exec", {
-        command: 'node -e "process.stdout.write(process.cwd())"',
-        cwd: tempDir,
-        timeout_seconds: 10,
-      }),
-    );
+      const result = await executor.execute(
+        action("run_shell", "shell.exec", {
+          command: 'node -e "process.stdout.write(process.cwd())"',
+          cwd: tempDir,
+          timeout_seconds: 10,
+        }),
+      );
 
-    expect(result.status).toBe("ok");
-    expect(result.stdout).toBe(tempDir);
-  });
+      expect(result.status).toBe("ok");
+      expect(result.stdout).toBe(tempDir);
+    },
+    shellTestTimeout,
+  );
 
-  test("reports basic system status and tails allowed log files", async () => {
-    const tempDir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-"));
-    const target = path.join(tempDir, "service.log");
-    writeFileSync(target, ["one", "two", "three"].join("\n"));
-    const keyPair = generateEd25519PemKeyPair();
-    const policy = mergeCustomPolicy({
-      profile: "read-only",
-      capabilities: createAgentPolicy("read-only").capabilities,
-      allowPaths: [tempDir.replace(/\\/gu, "/")],
-      denyPaths: ["/"],
-    });
-    const executor = new AgentExecutor(policy, keyPair.privateKeyPem);
+  test(
+    "reports basic system status and tails allowed log files",
+    async () => {
+      const tempDir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-"));
+      const target = path.join(tempDir, "service.log");
+      writeFileSync(target, ["one", "two", "three"].join("\n"));
+      const keyPair = generateEd25519PemKeyPair();
+      const policy = mergeCustomPolicy({
+        profile: "read-only",
+        capabilities: createAgentPolicy("read-only").capabilities,
+        allowPaths: [tempDir.replace(/\\/gu, "/")],
+        denyPaths: ["/"],
+      });
+      const executor = new AgentExecutor(policy, keyPair.privateKeyPem);
 
-    const status = await executor.execute(
-      action("get_system_status", "system.read", { timeout_seconds: 10 }),
-    );
-    const logs = await executor.execute(
-      action("tail_logs", "logs.read", { unit_or_file: target, timeout_seconds: 10 }),
-    );
+      const status = await executor.execute(
+        action("get_system_status", "system.read", { timeout_seconds: 10 }),
+      );
+      const logs = await executor.execute(
+        action("tail_logs", "logs.read", { unit_or_file: target, timeout_seconds: 10 }),
+      );
 
-    expect(status.status).toBe("ok");
-    expect(status.stdout).toContain(os.type() === "Windows_NT" ? "" : "Linux");
-    expect(logs.status).toBe("ok");
-    expect(logs.stdout).toContain("three");
-  });
+      expect(status.status).toBe("ok");
+      expect(status.stdout).toContain(os.type() === "Windows_NT" ? "" : "Linux");
+      expect(logs.status).toBe("ok");
+      expect(logs.stdout).toContain("three");
+    },
+    shellTestTimeout,
+  );
 
   test("file writes are path scoped and use local policy", async () => {
     const tempDir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-"));
@@ -123,49 +137,57 @@ describe("remote agent executor", () => {
     expect(readFileSync(target, "utf8")).toBe("agent-local");
   });
 
-  test("truncates large command output with metadata", async () => {
-    const keyPair = generateEd25519PemKeyPair();
-    const policy = mergeCustomPolicy({
-      profile: "full-admin",
-      capabilities: createAgentPolicy("full-admin").capabilities,
-      maxOutputBytes: 64,
-    });
-    const executor = new AgentExecutor(policy, keyPair.privateKeyPem);
+  test(
+    "truncates large command output with metadata",
+    async () => {
+      const keyPair = generateEd25519PemKeyPair();
+      const policy = mergeCustomPolicy({
+        profile: "full-admin",
+        capabilities: createAgentPolicy("full-admin").capabilities,
+        maxOutputBytes: 64,
+      });
+      const executor = new AgentExecutor(policy, keyPair.privateKeyPem);
 
-    const result = await executor.execute(
-      action("run_shell", "shell.exec", {
-        command: "node -e \"process.stdout.write('x'.repeat(200))\"",
-        timeout_seconds: 10,
-      }),
-    );
+      const result = await executor.execute(
+        action("run_shell", "shell.exec", {
+          command: "node -e \"process.stdout.write('x'.repeat(200))\"",
+          timeout_seconds: 10,
+        }),
+      );
 
-    expect(result.status).toBe("ok");
-    expect(result.truncated).toBe(true);
-    expect(Buffer.byteLength(result.stdout ?? "", "utf8")).toBeLessThanOrEqual(64);
-    expect((result.stdout ?? "").startsWith("x".repeat(20))).toBe(true);
-    expect(result.stdout).toContain("truncated");
-  });
+      expect(result.status).toBe("ok");
+      expect(result.truncated).toBe(true);
+      expect(Buffer.byteLength(result.stdout ?? "", "utf8")).toBeLessThanOrEqual(64);
+      expect((result.stdout ?? "").startsWith("x".repeat(20))).toBe(true);
+      expect(result.stdout).toContain("truncated");
+    },
+    shellTestTimeout,
+  );
 
-  test("marks output truncated when the local policy allows zero output bytes", async () => {
-    const keyPair = generateEd25519PemKeyPair();
-    const policy = mergeCustomPolicy({
-      profile: "full-admin",
-      capabilities: createAgentPolicy("full-admin").capabilities,
-      maxOutputBytes: 0,
-    });
-    const executor = new AgentExecutor(policy, keyPair.privateKeyPem);
+  test(
+    "marks output truncated when the local policy allows zero output bytes",
+    async () => {
+      const keyPair = generateEd25519PemKeyPair();
+      const policy = mergeCustomPolicy({
+        profile: "full-admin",
+        capabilities: createAgentPolicy("full-admin").capabilities,
+        maxOutputBytes: 0,
+      });
+      const executor = new AgentExecutor(policy, keyPair.privateKeyPem);
 
-    const result = await executor.execute(
-      action("run_shell", "shell.exec", {
-        command: "node -e \"process.stdout.write('hidden')\"",
-        timeout_seconds: 10,
-      }),
-    );
+      const result = await executor.execute(
+        action("run_shell", "shell.exec", {
+          command: "node -e \"process.stdout.write('hidden')\"",
+          timeout_seconds: 10,
+        }),
+      );
 
-    expect(result.status).toBe("ok");
-    expect(result.truncated).toBe(true);
-    expect(result.stdout).toBe("");
-  });
+      expect(result.status).toBe("ok");
+      expect(result.truncated).toBe(true);
+      expect(result.stdout).toBe("");
+    },
+    shellTestTimeout,
+  );
 
   test("returns exit code 124 when bounded command execution times out", async () => {
     const keyPair = generateEd25519PemKeyPair();
@@ -288,51 +310,63 @@ describe("remote agent executor", () => {
     });
   });
 
-  test("dispatches docker and privileged shell tools through bounded command execution", async () => {
-    const keyPair = generateEd25519PemKeyPair();
-    const executor = new AgentExecutor(createAgentPolicy("full-admin"), keyPair.privateKeyPem);
+  test(
+    "dispatches docker and privileged shell tools through bounded command execution",
+    async () => {
+      const keyPair = generateEd25519PemKeyPair();
+      const executor = new AgentExecutor(createAgentPolicy("full-admin"), keyPair.privateKeyPem);
 
-    await expect(
-      executor.execute(action("docker_ps", "docker.manage", { timeout_seconds: 1 })),
-    ).resolves.toMatchObject({
-      status: "ok",
-      truncated: false,
-    });
-    await expect(
-      executor.execute(
-        action("docker_logs", "docker.manage", {
-          container: "missing-container",
-          lines: 999,
-          timeout_seconds: 1,
-        }),
-      ),
-    ).resolves.toMatchObject({
-      status: "ok",
-      truncated: false,
-    });
-    await expect(
-      executor.execute(
-        action("docker_restart", "docker.manage", {
-          container: "missing-container",
-          timeout_seconds: 1,
-        }),
-      ),
-    ).resolves.toMatchObject({
-      status: "ok",
-      truncated: false,
-    });
-    await expect(
-      executor.execute(
+      await expect(
+        executor.execute(action("docker_ps", "docker.manage", { timeout_seconds: 1 })),
+      ).resolves.toMatchObject({
+        status: "ok",
+        truncated: false,
+      });
+      await expect(
+        executor.execute(
+          action("docker_logs", "docker.manage", {
+            container: "missing-container",
+            lines: 999,
+            timeout_seconds: 1,
+          }),
+        ),
+      ).resolves.toMatchObject({
+        status: "ok",
+        truncated: false,
+      });
+      await expect(
+        executor.execute(
+          action("docker_restart", "docker.manage", {
+            container: "missing-container",
+            timeout_seconds: 1,
+          }),
+        ),
+      ).resolves.toMatchObject({
+        status: "ok",
+        truncated: false,
+      });
+      const privilegedShellResult = executor.execute(
         action("run_shell_as_root", "sudo.exec", {
           command: "true",
           timeout_seconds: 1,
         }),
-      ),
-    ).resolves.toMatchObject({
-      status: "ok",
-      truncated: false,
-    });
-  });
+      );
+
+      if (process.platform === "win32") {
+        await expect(privilegedShellResult).resolves.toMatchObject({
+          status: "error",
+          error_code: "UNSUPPORTED_PLATFORM_OR_PRIVILEGE",
+          truncated: false,
+        });
+      } else {
+        await expect(privilegedShellResult).resolves.toMatchObject({
+          status: "ok",
+          truncated: false,
+        });
+      }
+    },
+    shellTestTimeout,
+  );
 
   test("rejects unsafe service, container, and log identifiers before spawning commands", async () => {
     const keyPair = generateEd25519PemKeyPair();

@@ -68,6 +68,10 @@ For faster local iteration, these commands are also available:
 | `pnpm run check:package` | Build and validate package metadata, docs, package contents, and install smoke. |
 | `pnpm run check:push` | Run the pre-push subset: format, lint, typecheck, and unit tests. |
 
+`pnpm test` and `pnpm run check:push` are expected to pass on Windows 11 as well
+as Linux. Remote-agent tests assert platform-specific service guidance and
+privileged-command behavior instead of assuming systemd or sudo are present.
+
 ## Git Hooks
 
 The repository uses `.githooks` plus the local pre-commit configuration:
