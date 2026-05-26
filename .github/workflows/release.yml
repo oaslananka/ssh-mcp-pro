@@ -79,6 +79,23 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Generate dependency freshness report
+        id: freshness
+        continue-on-error: true
+        run: pnpm run check:freshness
+
+      - name: Upload dependency freshness report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: dependency-freshness-${{ needs.release.outputs.version }}
+          path: artifacts/dependency-freshness.*
+          if-no-files-found: warn
+
+      - name: Fail on dependency freshness policy breach
+        if: ${{ steps.freshness.outcome == 'failure' }}
+        run: exit 1
+
       - name: Verify release quality
         run: pnpm run check
 

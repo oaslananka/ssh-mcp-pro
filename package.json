@@ -65,6 +65,7 @@
     "validate:chatgpt-app": "node scripts/validate-chatgpt-app.mjs",
     "validate:claude-connector": "node scripts/validate-claude-connector.mjs",
     "check:doc-language": "node scripts/check-doc-language.mjs",
+    "check:freshness": "node scripts/check-dependency-freshness.mjs --json artifacts/dependency-freshness.json --markdown artifacts/dependency-freshness.md",
     "check:rulesets": "node scripts/check-rulesets.mjs",
     "lint:commits": "node scripts/lint-commits.mjs",
     "lint:pr-title": "node scripts/lint-pr-title.mjs",

@@ -61,12 +61,21 @@ For faster local iteration, these commands are also available:
 | `pnpm run typecheck` | Run TypeScript with `--noEmit`. |
 | `pnpm run audit` | Run `pnpm audit --audit-level moderate`. |
 | `pnpm run licenses:check` | Validate dependency license policy. |
+| `pnpm run check:freshness` | Generate the runtime, package-manager, and direct-dependency freshness report. |
 | `pnpm run check:doc-language` | Validate documentation language conventions. |
 | `pnpm run check:rulesets` | Validate local GitHub ruleset files when present. |
 | `pnpm run verify:actions-runtime` | Verify GitHub Actions metadata does not use deprecated runtimes. |
 | `pnpm run check:quality` | Run the non-packaging quality checks. |
 | `pnpm run check:package` | Build and validate package metadata, docs, package contents, and install smoke. |
 | `pnpm run check:push` | Run the pre-push subset: format, lint, typecheck, and unit tests. |
+
+## Dependency Freshness Policy
+
+Runtime and dependency freshness is advisory unless a pinned version is unsupported, EOL, deprecated, missing from the lockfile, or vulnerable according to `pnpm audit --audit-level moderate`. The project intentionally does not fail CI only because a newer upstream version exists.
+
+`pnpm run check:freshness` writes `artifacts/dependency-freshness.json` and `artifacts/dependency-freshness.md`. The report compares the Node.js engine floors, local Node version files, pinned pnpm version, and direct dependencies against official Node release metadata, the Node.js release schedule, and npm registry package metadata.
+
+Scheduled CI and release builds upload the freshness report as a workflow artifact. Release builds also include the report in the release verification artifact set, alongside the SBOM and package checksums.
 
 ## Git Hooks
 
