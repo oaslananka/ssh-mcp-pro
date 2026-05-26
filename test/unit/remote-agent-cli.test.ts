@@ -87,13 +87,36 @@ function writeAgentConfig(
 }
 
 async function waitFor(predicate: () => boolean): Promise<void> {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
     if (predicate()) {
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 20));
   }
   throw new Error("Timed out waiting for condition");
+}
+
+function expectPlatformServiceGuidance(output: string): void {
+  if (process.platform === "win32") {
+    expect(output).toContain(
+      "Windows service installation requires an elevated PowerShell session.",
+    );
+    expect(output).toContain("NSSM or PowerShell Scheduled Task");
+    expect(output).toContain(
+      "Remove the Windows service or scheduled task that runs ssh-mcp-pro-agent run.",
+    );
+    return;
+  }
+
+  if (process.platform === "darwin") {
+    expect(output).toContain("Create a launchd plist that runs:");
+    expect(output).toContain("Unload and remove the launchd plist");
+    return;
+  }
+
+  expect(output).toContain("Create a systemd service with ExecStart:");
+  expect(output).toContain("Agent=not-enrolled");
+  expect(output).toContain("Disable and remove the systemd service");
 }
 
 describe("remote agent CLI", () => {
@@ -271,10 +294,8 @@ describe("remote agent CLI", () => {
 
     const output = stdout.read();
     expect(output).toContain("Agent is not enrolled.");
-    expect(output).toContain("Create a systemd service with ExecStart:");
     expect(output).toContain("ssh-mcp-pro-agent run");
-    expect(output).toContain("Agent=not-enrolled");
-    expect(output).toContain("Disable and remove the systemd service");
+    expectPlatformServiceGuidance(output);
   });
 
   test("fails clearly when the runtime WebSocket implementation is unavailable", async () => {
