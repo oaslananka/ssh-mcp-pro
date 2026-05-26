@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import { parsePnpmPackOutput } from "./pack-json.mjs";
+import { capture, failFromResult } from "./lib/command.mjs";
 
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 const requiredFiles = ["dist/index.js", "dist/index.d.ts", "LICENSE", "mcp.json", "server.json"];
@@ -25,13 +25,9 @@ if (missing.length > 0) {
   throw new Error("Package files list references missing files.");
 }
 
-const pack = spawnSync("pnpm", ["pack", "--dry-run", "--json"], {
-  encoding: "utf8",
-  stdio: "pipe",
-});
+const pack = capture("pnpm", ["pack", "--dry-run", "--json"]);
 if (pack.status !== 0) {
-  process.stderr.write(pack.stderr);
-  process.exit(pack.status ?? 1);
+  failFromResult(pack, "pnpm pack");
 }
 
 const packed = parsePnpmPackOutput(pack.stdout);

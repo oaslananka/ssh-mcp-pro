@@ -1,22 +1,7 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
+import { capture, failFromResult, run } from "./lib/command.mjs";
 
 const lintOnly = process.argv.includes("--lint-only");
-
-function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
-    encoding: "utf8",
-    stdio: "inherit",
-    ...options,
-  });
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
-  }
-}
-
-function capture(command, args) {
-  return spawnSync(command, args, { encoding: "utf8", stdio: "pipe" });
-}
 
 const gitCheck = capture("git", ["rev-parse", "--is-inside-work-tree"]);
 if (gitCheck.status !== 0) {
@@ -26,8 +11,7 @@ if (gitCheck.status !== 0) {
 
 const diff = capture("git", ["diff", "--cached", "--name-only", "--diff-filter=ACMR"]);
 if (diff.status !== 0) {
-  process.stderr.write(diff.stderr);
-  process.exit(diff.status ?? 1);
+  failFromResult(diff, "git diff");
 }
 
 const files = diff.stdout
