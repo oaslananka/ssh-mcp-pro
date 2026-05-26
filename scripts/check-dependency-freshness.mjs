@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 const NODE_INDEX_URL = "https://nodejs.org/dist/index.json";
 const NODE_SCHEDULE_URL = "https://raw.githubusercontent.com/nodejs/Release/main/schedule.json";
 const NPM_REGISTRY_URL = "https://registry.npmjs.org";
+const NPM_PACKAGE_NAME_PATTERN = /^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/iu;
 const USER_AGENT = "ssh-mcp-pro-dependency-freshness";
 
 export function compareVersions(left, right) {
@@ -321,7 +322,7 @@ function stripLockVersion(version) {
 }
 
 function escapeMarkdown(value) {
-  return String(value).replace(/\|/gu, "\\|");
+  return String(value).replace(/\\/gu, "\\\\").replace(/\|/gu, "\\|");
 }
 
 function appendReleaseNotes(note, releaseNotesUrl, status) {
@@ -350,7 +351,20 @@ function normalizeGitHubRepository(repositoryUrl) {
 }
 
 async function fetchPackument(packageName) {
-  return fetchJson(`${NPM_REGISTRY_URL}/${encodeURIComponent(packageName)}`);
+  return fetchJson(registryPackageUrl(packageName));
+}
+
+function registryPackageUrl(packageName) {
+  assertNpmPackageName(packageName);
+  const url = new URL(NPM_REGISTRY_URL);
+  url.pathname = encodeURIComponent(packageName);
+  return url;
+}
+
+function assertNpmPackageName(packageName) {
+  if (!NPM_PACKAGE_NAME_PATTERN.test(packageName)) {
+    throw new Error(`Unsupported npm package name: ${packageName}`);
+  }
 }
 
 async function fetchJson(url) {
