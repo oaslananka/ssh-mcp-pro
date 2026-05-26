@@ -95,8 +95,11 @@ uvx pre-commit run --all-files --hook-stage manual
 The main branch protection rules are version-controlled in
 `.github/rulesets/main-protection.json`. The file is a GitHub repository
 ruleset export that targets the default branch, requires pull requests, requires
-the CI status contexts listed in `.github/workflows/ci.yml`, blocks force pushes,
-and permits only squash or rebase merge history.
+the protected status contexts listed across the GitHub workflow files, blocks
+force pushes and branch deletion, and permits only squash or rebase merge
+history. Administrators are enforced: no repository administrator bypass actors
+are configured for the version-controlled ruleset, and the live branch
+protection configuration must keep `enforce_admins` enabled.
 
 Repository administrators can import or compare the file from GitHub repository
 settings under Rules, Rulesets, using GitHub's ruleset JSON import flow:

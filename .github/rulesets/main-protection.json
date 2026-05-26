@@ -39,7 +39,22 @@
             "context": "SSH Integration"
           },
           {
+            "context": "Windows Integration"
+          },
+          {
+            "context": "SSH E2E"
+          },
+          {
             "context": "Build, SBOM, and Pack"
+          },
+          {
+            "context": "Build and smoke image"
+          },
+          {
+            "context": "Analyze TypeScript"
+          },
+          {
+            "context": "Validate MCP Registry metadata"
           }
         ],
         "strict_required_status_checks_policy": true
@@ -47,6 +62,9 @@
     },
     {
       "type": "non_fast_forward"
+    },
+    {
+      "type": "deletion"
     },
     {
       "type": "required_linear_history"
