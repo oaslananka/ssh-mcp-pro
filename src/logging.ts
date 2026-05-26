@@ -19,7 +19,7 @@ const SENSITIVE_PATTERNS = [
 const REDACTED = "****";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === "object" && !!value;
 }
 
 function shouldPreserveSensitiveValue(value: unknown): boolean {
