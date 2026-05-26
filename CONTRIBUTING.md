@@ -145,16 +145,18 @@ Automatic npm publishing is opt-in:
   - Workflow filename: `release.yml`
   - Environment name: `npm-production`
   - Allowed action: `npm publish`
+- Confirm the intended trusted-publishing payload before enabling automatic publishing:
+  `npm trust github ssh-mcp-pro --file release.yml --repo oaslananka/ssh-mcp-pro --env npm-production --allow-publish --dry-run --json`.
 - Keep the release job on GitHub-hosted runners with `id-token: write`; npm trusted publishing uses OIDC and does not require a long-lived npm automation token.
 - Confirm `package.json` `repository.url` still matches `https://github.com/oaslananka/ssh-mcp-pro`.
 
 If `AUTO_RELEASE_PUBLISH` is not set to `true`, the workflow records that npm publishing was skipped after attaching release assets to the GitHub release. To publish manually from a verified release artifact, download the tarball into `artifacts/`, verify the checksum attached to the GitHub release, then run:
 
 ```bash
-pnpm publish ./artifacts/<tarball> --access public --provenance
+npm publish ./artifacts/<tarball> --access public --provenance
 ```
 
-Use manual publishing only for a release artifact that was produced by the release workflow. Do not run `pnpm publish` from feature branches or dirty worktrees.
+Use manual publishing only for a release artifact that was produced by the release workflow. Do not run `npm publish` from feature branches or dirty worktrees.
 
 ## Docker Fixture Commands
 

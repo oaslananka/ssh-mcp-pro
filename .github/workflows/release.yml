@@ -122,7 +122,7 @@ jobs:
         run: |
           set -euo pipefail
           unset NODE_AUTH_TOKEN NPM_CONFIG_USERCONFIG
-          pnpm publish "./artifacts/${PACKAGE_FILE}" --access public --provenance --no-git-checks
+          npm publish "./artifacts/${PACKAGE_FILE}" --access public --provenance
 
       - name: Verify npm package
         if: ${{ vars.AUTO_RELEASE_PUBLISH == 'true' }}

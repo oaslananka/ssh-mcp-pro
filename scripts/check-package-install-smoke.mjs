@@ -2,19 +2,13 @@
 import { copyFileSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
-import { spawnSync } from "node:child_process";
+import { failWithCommandResult, runCommand } from "./lib/command.mjs";
 import { parsePnpmPackOutput } from "./pack-json.mjs";
 
 function run(command, args, cwd) {
-  const result = spawnSync(command, args, {
-    cwd,
-    encoding: "utf8",
-    stdio: "pipe",
-  });
+  const result = runCommand(command, args, { cwd });
   if (result.status !== 0) {
-    process.stdout.write(result.stdout);
-    process.stderr.write(result.stderr);
-    process.exit(result.status ?? 1);
+    failWithCommandResult(`${command} ${args.join(" ")}`, result);
   }
   return result.stdout;
 }
