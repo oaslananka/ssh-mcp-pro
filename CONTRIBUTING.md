@@ -68,6 +68,29 @@ For faster local iteration, these commands are also available:
 | `pnpm run check:package` | Build and validate package metadata, docs, package contents, and install smoke. |
 | `pnpm run check:push` | Run the pre-push subset: format, lint, typecheck, and unit tests. |
 
+## Dependency Automation
+
+GitHub Dependabot owns vulnerability alerts and security-update pull requests.
+Keep the repository dependency graph, Dependabot alerts, and Dependabot security
+updates enabled in GitHub repository security settings. Dependabot security PRs
+should use the existing security, dependency, and priority labels and must pass
+the Dependency Review job before merge.
+
+Renovate owns scheduled non-security dependency updates through
+[`renovate.json`](renovate.json). Do not add Dependabot version-update groups in
+`.github/dependabot.yml` unless maintainers intentionally move non-security
+update ownership away from Renovate. If both systems propose the same package,
+prefer the Dependabot PR only when it is linked to an active vulnerability alert;
+otherwise close the duplicate and keep the Renovate PR.
+
+Use these checks when dependency automation policy changes:
+
+```bash
+gh api repos/oaslananka/ssh-mcp-pro --jq '.security_and_analysis'
+gh api repos/oaslananka/ssh-mcp-pro/dependabot/alerts --jq 'length'
+pnpm audit --audit-level moderate
+```
+
 ## Git Hooks
 
 The repository uses `.githooks` plus the local pre-commit configuration:
