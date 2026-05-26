@@ -3,15 +3,6 @@ name: MCP Registry Metadata
 on:
   workflow_dispatch:
   pull_request:
-    paths:
-      - .github/workflows/mcp-registry.yml
-      - mcp.json
-      - package.json
-      - pnpm-lock.yaml
-      - registry/ssh-mcp-pro/mcp.json
-      - scripts/check-mcp-registry-record.mjs
-      - scripts/validate-mcp-metadata.mjs
-      - server.json
   push:
     branches:
       - main
