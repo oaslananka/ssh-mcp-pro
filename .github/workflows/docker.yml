@@ -17,6 +17,7 @@ permissions:
 
 env:
   IMAGE_NAME: ghcr.io/oaslananka/ssh-mcp-pro
+  PLATFORMS: linux/amd64,linux/arm64
 
 concurrency:
   group: docker-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -38,7 +39,12 @@ jobs:
           persist-credentials: false
 
       - name: Build local image
-        run: docker build -t ssh-mcp-pro:local .
+        run: |
+          docker build \
+            --build-arg VCS_REF="${GITHUB_SHA}" \
+            --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            -t ssh-mcp-pro:local \
+            .
 
       - name: Smoke CLI
         run: |
@@ -50,6 +56,15 @@ jobs:
           set -euo pipefail
           test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.title" }}')" = "ssh-mcp-pro"
           test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.source" }}')" = "https://github.com/oaslananka/ssh-mcp-pro"
+          test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.documentation" }}')" = "https://github.com/oaslananka/ssh-mcp-pro/blob/main/docs/docker.md"
+          test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.licenses" }}')" = "MIT"
+          test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "${GITHUB_SHA}"
+
+      - name: Create Buildx check builder
+        run: docker buildx create --name ssh-mcp-pro-check --driver docker-container --bootstrap --use
+
+      - name: Check multi-platform Dockerfile support
+        run: docker buildx build --check --platform "${PLATFORMS}" .
 
   publish-ghcr:
     name: Publish GHCR image
@@ -83,7 +98,11 @@ jobs:
           GHCR_ACTOR: ${{ github.actor }}
         run: echo "$GH_TOKEN" | docker login ghcr.io -u "$GHCR_ACTOR" --password-stdin
 
-      - name: Build and push image
+      - name: Create Buildx builder
+        run: docker buildx create --name ssh-mcp-pro-release --driver docker-container --bootstrap --use
+
+      - name: Build and push multi-platform image
+        id: publish
         run: |
           set -euo pipefail
           VERSION_TAG="${GITHUB_REF_NAME}"
@@ -99,11 +118,81 @@ jobs:
               exit 1
               ;;
           esac
-          docker build \
+          mkdir -p artifacts
+          docker buildx build \
+            --platform "${PLATFORMS}" \
             --build-arg VCS_REF="$(git rev-list -n 1 "$VERSION_TAG")" \
             --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --label "org.opencontainers.image.version=${VERSION}" \
+            --label "org.opencontainers.image.ref.name=${VERSION_TAG}" \
             -t "${IMAGE_NAME}:${VERSION}" \
             -t "${IMAGE_NAME}:${VERSION_TAG}" \
+            --metadata-file artifacts/ghcr-image-metadata.json \
+            --provenance=true \
+            --sbom=true \
+            --push \
             .
-          docker push "${IMAGE_NAME}:${VERSION}"
-          docker push "${IMAGE_NAME}:${VERSION_TAG}"
+          DIGEST="$(jq -r '."containerimage.digest"' artifacts/ghcr-image-metadata.json)"
+          if [[ ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "expected manifest digest in artifacts/ghcr-image-metadata.json, got: ${DIGEST}"
+            exit 1
+          fi
+          jq \
+            --arg image "${IMAGE_NAME}" \
+            --arg version "${VERSION}" \
+            --arg release_tag "${VERSION_TAG}" \
+            --arg platforms "${PLATFORMS}" \
+            --arg digest "${DIGEST}" \
+            '{image:$image, version:$version, releaseTag:$release_tag, platforms:($platforms | split(",")), digest:$digest, buildMetadata:.}' \
+            artifacts/ghcr-image-metadata.json > artifacts/ghcr-release-image.json
+          {
+            echo "version=${VERSION}"
+            echo "release_tag=${VERSION_TAG}"
+            echo "digest=${DIGEST}"
+            echo "image=${IMAGE_NAME}@${DIGEST}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify published registry metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          DIGEST="${{ steps.publish.outputs.digest }}"
+          docker buildx imagetools inspect "${IMAGE_NAME}@${DIGEST}" --raw > artifacts/ghcr-manifest.json
+          for PLATFORM in ${PLATFORMS//,/ }; do
+            OS="${PLATFORM%%/*}"
+            ARCH="${PLATFORM##*/}"
+            jq -e --arg os "$OS" --arg arch "$ARCH" \
+              '.manifests[] | select(.platform.os == $os and .platform.architecture == $arch)' \
+              artifacts/ghcr-manifest.json >/dev/null
+          done
+          for REF in "${IMAGE_NAME}:${{ steps.publish.outputs.version }}" "${IMAGE_NAME}:${{ steps.publish.outputs.release_tag }}"; do
+            RESOLVED_DIGEST="$(docker buildx imagetools inspect "$REF" | awk '/^Digest:/ {print $2; exit}')"
+            if [[ "$RESOLVED_DIGEST" != "$DIGEST" ]]; then
+              echo "$REF resolved to $RESOLVED_DIGEST, expected $DIGEST."
+              exit 1
+            fi
+          done
+          gh api "/users/${GITHUB_REPOSITORY_OWNER}/packages/container/ssh-mcp-pro/versions" \
+            --jq '[.[] | {id, name, updated_at, tags: .metadata.container.tags}]' \
+            > artifacts/ghcr-package-versions.json
+          jq -e --arg version "${{ steps.publish.outputs.version }}" --arg release_tag "${{ steps.publish.outputs.release_tag }}" \
+            'map(select((.tags // []) | index($version) and index($release_tag))) | length > 0' \
+            artifacts/ghcr-package-versions.json >/dev/null
+
+      - name: Publish image digest summary
+        run: |
+          {
+            echo "## GHCR image"
+            echo
+            echo "- Image: \`${{ steps.publish.outputs.image }}\`"
+            echo "- Tags: \`${{ steps.publish.outputs.version }}\`, \`${{ steps.publish.outputs.release_tag }}\`"
+            echo "- Platforms: \`${PLATFORMS}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload registry verification artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ghcr-release-verification
+          path: artifacts/ghcr-*.json
+          if-no-files-found: error
