@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
 import net from "node:net";
+import { capture as captureCommand, executable } from "./lib/command.mjs";
 
 const CONTAINER_NAME = "ssh-mcp-pro-test";
 const SSH_HOST = "127.0.0.1";
@@ -10,7 +10,7 @@ const UP_ATTEMPTS = Number.parseInt(process.env.SSH_FIXTURE_UP_ATTEMPTS ?? "3", 
 const UP_RETRY_DELAY_MS = Number.parseInt(process.env.SSH_FIXTURE_UP_RETRY_DELAY_MS ?? "5000", 10);
 
 function run(command, args, options = {}) {
-  const result = spawnSync(command, args, {
+  const result = captureCommand(executable(command), args, {
     encoding: "utf8",
     stdio: options.stdio ?? "inherit",
     env: options.env ?? process.env,
@@ -25,10 +25,7 @@ function run(command, args, options = {}) {
 }
 
 function capture(command, args) {
-  const result = spawnSync(command, args, {
-    encoding: "utf8",
-    stdio: "pipe",
-  });
+  const result = captureCommand(command, args);
 
   if (result.error || result.status !== 0) {
     return "";

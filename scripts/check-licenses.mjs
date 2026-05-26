@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawnSync } from "node:child_process";
+import { capture, failFromResult } from "./lib/command.mjs";
 
 const allowedLicenses = new Set([
   "0BSD",
@@ -15,14 +15,10 @@ const allowedLicenses = new Set([
   "Unlicense",
 ]);
 
-const result = spawnSync("pnpm", ["licenses", "list", "--json"], {
-  encoding: "utf8",
-  stdio: "pipe",
-});
+const result = capture("pnpm", ["licenses", "list", "--json"]);
 
 if (result.status !== 0) {
-  process.stderr.write(result.stderr);
-  process.exit(result.status ?? 1);
+  failFromResult(result, "pnpm licenses list");
 }
 
 const report = JSON.parse(result.stdout);

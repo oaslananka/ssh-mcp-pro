@@ -62,6 +62,7 @@ For faster local iteration, these commands are also available:
 | `pnpm run audit` | Run `pnpm audit --audit-level moderate`. |
 | `pnpm run licenses:check` | Validate dependency license policy. |
 | `pnpm run check:doc-language` | Validate documentation language conventions. |
+| `pnpm run check:package-scripts` | Validate package script entrypoints resolve to existing helpers. |
 | `pnpm run check:rulesets` | Validate local GitHub ruleset files when present. |
 | `pnpm run verify:actions-runtime` | Verify GitHub Actions metadata does not use deprecated runtimes. |
 | `pnpm run check:quality` | Run the non-packaging quality checks. |
@@ -170,10 +171,7 @@ Use manual publishing only for a release artifact that was produced by the relea
 | Command | Purpose |
 | --- | --- |
 | `pnpm run dev` | Run TypeScript in watch mode. |
-| `pnpm run dev:control-plane` | Build and start the development control plane helper. |
-| `pnpm run dev:agent` | Build and start the development remote agent helper. |
 | `pnpm run start:http` | Start the built HTTP transport entrypoint. |
-| `pnpm run setup:chatgpt` | Run the ChatGPT setup helper. |
 | `pnpm run lint:commits` | Validate commit message style. |
 | `pnpm run lint:pr-title` | Validate PR title style. |
 | `pnpm run test:pr-title-lint` | Run PR-title lint tests. |
