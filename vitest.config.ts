@@ -57,6 +57,7 @@ export default defineConfig({
       include: ["src/**/*.ts"],
       exclude: ["src/**/*.d.ts", "src/index.ts", "src/server-http.ts", "src/render-http.ts"],
       reporter: ["text", "lcov", "html", "cobertura"],
+      processingConcurrency: 1,
       thresholds: {
         branches: 85,
         functions: 85,
