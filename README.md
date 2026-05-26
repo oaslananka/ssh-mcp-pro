@@ -34,6 +34,17 @@ For pnpm-only environments, use:
 pnpm dlx ssh-mcp-pro
 ```
 
+Container images are published to GitHub Container Registry for release tags:
+
+```bash
+docker run --rm ghcr.io/oaslananka/ssh-mcp-pro:1.0.0 --version
+```
+
+Images are published for `linux/amd64` and `linux/arm64` with exact semver and
+Git tag aliases. Production deployments should prefer the digest-pinned
+reference recorded by the release workflow. See [Docker Usage](docs/docker.md)
+for the tag policy, digest-pinned examples, and registry verification steps.
+
 ## Quickstart
 
 Generic stdio MCP config:
