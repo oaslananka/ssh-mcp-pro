@@ -83,6 +83,26 @@ jobs:
       - name: Quality gate parity
         run: pnpm run check:quality
 
+  reuse:
+    name: REUSE Compliance
+    if: >-
+      ${{
+        github.event_name != 'pull_request' ||
+        github.event.pull_request.draft == false
+      }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          persist-credentials: false
+
+      - name: Install REUSE tool
+        run: python3 -m pip install --user --disable-pip-version-check reuse==6.2.0
+
+      - name: REUSE lint
+        run: python3 -m reuse lint
+
   unit:
     name: Unit Tests (Node ${{ matrix.node_major }})
     if: >-
@@ -342,6 +362,7 @@ jobs:
     timeout-minutes: 20
     needs:
       - quality
+      - reuse
       - unit
       - integration
       - integration-windows

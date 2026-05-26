@@ -21,6 +21,7 @@
     "server.json",
     "README.md",
     "LICENSE",
+    "LICENSES/MIT.txt",
     "SECURITY.md",
     "REGISTRY_SUBMISSION.md",
     "registry"
@@ -66,6 +67,7 @@
     "validate:claude-connector": "node scripts/validate-claude-connector.mjs",
     "check:doc-language": "node scripts/check-doc-language.mjs",
     "check:rulesets": "node scripts/check-rulesets.mjs",
+    "reuse:lint": "reuse lint",
     "lint:commits": "node scripts/lint-commits.mjs",
     "lint:pr-title": "node scripts/lint-pr-title.mjs",
     "test:pr-title-lint": "node scripts/test-pr-title-lint.mjs",

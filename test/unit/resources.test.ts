@@ -14,7 +14,7 @@ const CANONICAL_RESOURCE_URIS = [
 ] as const;
 
 const RENAME_ERA_RESOURCE_URIS = CANONICAL_RESOURCE_URIS.map((uri) =>
-  uri.replace("ssh-mcp-pro://", "mcp-ssh-tool://"),
+  uri.replace("ssh-mcp-pro://", "ssh-mcp-pro://"),
 );
 
 async function destroyContainer(container: AppContainer): Promise<void> {
