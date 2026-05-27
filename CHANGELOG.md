@@ -10,3 +10,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Publish generated TypeDoc API reference through GitHub Pages.
+
+[Unreleased]: https://github.com/oaslananka/ssh-mcp-pro/compare/v1.0.0...HEAD
