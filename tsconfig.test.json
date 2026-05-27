@@ -7,6 +7,6 @@
     "noUncheckedIndexedAccess": false,
     "exactOptionalPropertyTypes": false
   },
-  "include": ["src/**/*", "test/**/*", "vitest.config.ts"],
+  "include": ["src/**/*", "test/**/*", "vitest.config.ts", "vitest.mutation.config.ts"],
   "exclude": ["node_modules", "dist"]
 }

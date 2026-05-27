@@ -34,7 +34,7 @@ export default [
     },
   },
   {
-    files: ["test/**/*.ts", "vitest.config.ts"],
+    files: ["test/**/*.ts", "vitest.config.ts", "vitest.mutation.config.ts"],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
