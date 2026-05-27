@@ -1,6 +1,7 @@
 [![npm version](https://img.shields.io/npm/v/ssh-mcp-pro.svg)](https://www.npmjs.com/package/ssh-mcp-pro)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml/badge.svg)](https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/oaslananka/ssh-mcp-pro/badge)](https://securityscorecards.dev/viewer/?uri=github.com/oaslananka/ssh-mcp-pro)
 
 # ssh-mcp-pro
 

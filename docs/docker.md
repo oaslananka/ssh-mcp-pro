@@ -13,6 +13,13 @@ docker run --rm ssh-mcp-pro:local --version
 docker run --rm ssh-mcp-pro:local --help
 ```
 
+Verify license evidence in release artifacts:
+
+```bash
+pnpm run pack:check
+docker run --rm --entrypoint sh ssh-mcp-pro:local -c 'test -f LICENSE && test -f LICENSES/MIT.txt'
+```
+
 Run the HTTP transport on loopback on Linux hosts that support host networking:
 
 ```bash
