@@ -1,6 +1,7 @@
 [![npm version](https://img.shields.io/npm/v/ssh-mcp-pro.svg)](https://www.npmjs.com/package/ssh-mcp-pro)
 [![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml/badge.svg)](https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml)
+[![API Docs](https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/docs.yml/badge.svg)](https://oaslananka.github.io/ssh-mcp-pro/)
 
 # ssh-mcp-pro
 
@@ -169,6 +170,8 @@ ssh-mcp-pro starts with strict SSH host-key verification, denies root login, den
 ## More Documentation
 
 - [INSTALL.md](INSTALL.md) covers full client setup and troubleshooting.
+- [API reference](https://oaslananka.github.io/ssh-mcp-pro/) is generated from the published TypeScript entry points.
+- [CHANGELOG.md](CHANGELOG.md) records release history in Keep a Changelog format.
 - [AGENTS.md](AGENTS.md) describes agent-facing operational guidance.
 - [examples/README.md](examples/README.md) contains workflow examples.
 - [ARCHITECTURE.md](ARCHITECTURE.md) explains the major subsystems and ADRs.
