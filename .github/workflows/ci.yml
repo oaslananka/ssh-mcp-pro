@@ -52,6 +52,27 @@ jobs:
             MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD,
             CC0-1.0, Unlicense, Zlib
 
+  reuse:
+    name: REUSE Compliance
+    if: >-
+      ${{
+        github.event_name != 'pull_request' ||
+        github.event.pull_request.draft == false
+      }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+        with:
+          persist-credentials: false
+
+      - name: Install REUSE tool
+        run: >-
+          python3 -m pip install --user --disable-pip-version-check reuse==6.2.0
+
+      - name: REUSE lint
+        run: python3 -m reuse lint
+
   quality:
     name: Quality Gates
     if: >-

@@ -21,6 +21,7 @@
     "server.json",
     "README.md",
     "LICENSE",
+    "LICENSES/MIT.txt",
     "SECURITY.md",
     "REGISTRY_SUBMISSION.md",
     "registry"
@@ -75,6 +76,7 @@
     "check:npm-name": "node scripts/check-npm-name.mjs ssh-mcp-pro",
     "audit": "pnpm audit --audit-level moderate",
     "licenses:check": "node scripts/check-licenses.mjs",
+    "reuse:lint": "reuse lint",
     "pack:check": "node scripts/check-package-contents.mjs",
     "pack:install-smoke": "node scripts/check-package-install-smoke.mjs",
     "check:quality": "pnpm run format:check && pnpm run check:doc-language && pnpm run check:rulesets && pnpm run verify:actions-runtime && pnpm run lint && pnpm run typecheck && pnpm run audit && pnpm run licenses:check",

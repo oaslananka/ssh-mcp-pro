@@ -34,6 +34,7 @@ RUN corepack enable && \
 
 COPY --from=build /app/dist ./dist
 COPY README.md LICENSE SECURITY.md SECURITY_DECISIONS.md ARCHITECTURE.md REGISTRY_SUBMISSION.md ./
+COPY LICENSES ./LICENSES
 COPY docs ./docs
 COPY mcp.json server.json ./
 COPY registry ./registry
