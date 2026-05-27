@@ -19,7 +19,7 @@ export function getRequiredLabels(taxonomy) {
 }
 
 export function validateLabels(actualLabels, taxonomy) {
-  const actualByName = new Map(actualLabels.map((label) => [label.name, label]));
+  const actualByName = new Map((actualLabels ?? []).map((label) => [label.name, label]));
   const failures = [];
 
   for (const expected of getRequiredLabels(taxonomy)) {
@@ -45,8 +45,8 @@ export function validateIssueTaxonomy(issues, taxonomy) {
   const groups = getLabelGroups(taxonomy);
   const failures = [];
 
-  for (const issue of issues) {
-    const issueLabels = new Set(issue.labels.map((label) => label.name));
+  for (const issue of issues ?? []) {
+    const issueLabels = new Set((issue.labels ?? []).map((label) => label.name));
     for (const [groupName, labelNames] of Object.entries(groups)) {
       const matches = labelNames.filter((labelName) => issueLabels.has(labelName));
       if (matches.length !== 1) {
@@ -61,7 +61,7 @@ export function validateIssueTaxonomy(issues, taxonomy) {
 }
 
 export function validateProjectFields(fieldsPayload, taxonomy) {
-  const fields = Array.isArray(fieldsPayload) ? fieldsPayload : fieldsPayload.fields;
+  const fields = Array.isArray(fieldsPayload) ? fieldsPayload : fieldsPayload?.fields;
   const actualNames = new Set((fields ?? []).map((field) => field.name));
 
   return taxonomy.project.requiredFields
@@ -70,7 +70,7 @@ export function validateProjectFields(fieldsPayload, taxonomy) {
 }
 
 export function extractProjectItemIssueNumbers(projectPayload) {
-  const items = Array.isArray(projectPayload) ? projectPayload : projectPayload.items;
+  const items = Array.isArray(projectPayload) ? projectPayload : projectPayload?.items;
   const numbers = new Set();
 
   for (const item of items ?? []) {
@@ -82,7 +82,7 @@ export function extractProjectItemIssueNumbers(projectPayload) {
 
 export function validateProjectItems(projectPayload, issues) {
   const projectIssueNumbers = extractProjectItemIssueNumbers(projectPayload);
-  const openIssueNumbers = issues.map((issue) => issue.number);
+  const openIssueNumbers = (issues ?? []).map((issue) => issue.number);
 
   if (openIssueNumbers.length > 0 && projectIssueNumbers.size === 0) {
     return ["Project item list did not expose issue numbers for synchronization validation."];
@@ -98,6 +98,10 @@ export function formatFailures(failures) {
 }
 
 export function formatGhFailure(args, result) {
+  if (result.error) {
+    return `Failed to execute gh: ${result.error.message}`;
+  }
+
   const stderr = normalizeText(result.stderr);
   const stdout = normalizeText(result.stdout);
   const output = [stderr, stdout].filter(Boolean).join("\n");
@@ -195,7 +199,7 @@ function getProjectIssueNumber(value, key) {
   if (typeof value === "string") {
     return parseIssueNumber(value);
   }
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
 
