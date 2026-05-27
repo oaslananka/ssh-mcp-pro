@@ -5,6 +5,7 @@ import {
   CallToolRequestSchema,
   GetPromptRequestSchema,
   InitializeRequestSchema,
+  LATEST_PROTOCOL_VERSION,
   ListResourcesRequestSchema,
   ListPromptsRequestSchema,
   ReadResourceRequestSchema,
@@ -173,7 +174,7 @@ describe("SSHMCPServer", () => {
       await expect(
         handlers.get(InitializeRequestSchema)?.({
           params: {
-            protocolVersion: "2025-06-18",
+            protocolVersion: LATEST_PROTOCOL_VERSION,
             capabilities: {},
             clientInfo: {
               name: "metadata-contract-test",
@@ -183,6 +184,7 @@ describe("SSHMCPServer", () => {
         }),
       ).resolves.toEqual(
         expect.objectContaining({
+          protocolVersion: LATEST_PROTOCOL_VERSION,
           serverInfo: {
             name: packageMetadata.mcpName,
             version: packageMetadata.version,

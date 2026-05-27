@@ -60,7 +60,7 @@ Default policy denies root login, raw sudo, destructive commands, and destructiv
 The remote control plane provides Streamable HTTP MCP access and a no-custody outbound agent model.
 
 - `server-http.ts` hosts the HTTP MCP endpoint and enforces bearer or OAuth authorization.
-- `remote/control-plane.ts` implements control-plane HTTP routes, OAuth 2.0 PKCE, GitHub identity exchange, protected resource metadata, agent enrollment, and WebSocket agent communication.
+- `remote/control-plane.ts` implements control-plane HTTP routes, OAuth 2.0 PKCE, GitHub identity exchange, protected resource metadata, agent enrollment, WebSocket agent communication, and MCP protocol negotiation using the installed SDK's supported protocol versions.
 - `remote/websocket.ts` handles the persistent outbound agent channel.
 - `RemoteStore` persists users, OAuth clients, authorization codes, remote agents, enrollment tokens, and audit events in SQLite.
 - `remote/mcp-tools.ts` exposes administrative remote-agent tools behind control-plane scopes.

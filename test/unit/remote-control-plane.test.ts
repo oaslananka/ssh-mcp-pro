@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
+import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import { describe, expect, vi, test } from "vitest";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
 import {
@@ -606,16 +607,62 @@ describe("remote control plane remote-agent contracts", () => {
 
       const authedInitialize = captureResponse();
       await harness.handleMcp(
-        request("POST", "/mcp", JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize" }), {
-          ...authHeaders,
-          "content-type": "application/json",
-        }),
+        request(
+          "POST",
+          "/mcp",
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "initialize",
+            params: {
+              protocolVersion: LATEST_PROTOCOL_VERSION,
+              capabilities: {},
+              clientInfo: { name: "unit-test", version: "0.0.0" },
+            },
+          }),
+          {
+            ...authHeaders,
+            "content-type": "application/json",
+          },
+        ),
         authedInitialize as ServerResponse,
       );
       expect(responseBody(authedInitialize)).toEqual(
         expect.objectContaining({
           result: expect.objectContaining({
+            protocolVersion: LATEST_PROTOCOL_VERSION,
+            capabilities: { tools: {} },
             serverInfo: expect.objectContaining({ name: "sshautomator-remote-agent" }),
+          }),
+        }),
+      );
+
+      const legacyInitialize = captureResponse();
+      await harness.handleMcp(
+        request(
+          "POST",
+          "/mcp",
+          JSON.stringify({
+            jsonrpc: "2.0",
+            id: 11,
+            method: "initialize",
+            params: {
+              protocolVersion: "2025-06-18",
+              capabilities: {},
+              clientInfo: { name: "legacy-unit-test", version: "0.0.0" },
+            },
+          }),
+          {
+            ...authHeaders,
+            "content-type": "application/json",
+          },
+        ),
+        legacyInitialize as ServerResponse,
+      );
+      expect(responseBody(legacyInitialize)).toEqual(
+        expect.objectContaining({
+          result: expect.objectContaining({
+            protocolVersion: "2025-06-18",
           }),
         }),
       );

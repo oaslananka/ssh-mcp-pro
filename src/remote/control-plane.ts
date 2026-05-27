@@ -3,6 +3,10 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 import { URL } from "node:url";
 import {
+  LATEST_PROTOCOL_VERSION,
+  SUPPORTED_PROTOCOL_VERSIONS,
+} from "@modelcontextprotocol/sdk/types.js";
+import {
   ensurePemKeyPair,
   hashSecret,
   id,
@@ -83,6 +87,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function asString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function negotiateMcpProtocolVersion(params: unknown): string {
+  const requestedVersion = isRecord(params) ? asString(params.protocolVersion) : undefined;
+  return requestedVersion && SUPPORTED_PROTOCOL_VERSIONS.includes(requestedVersion)
+    ? requestedVersion
+    : LATEST_PROTOCOL_VERSION;
 }
 
 function quotePosixArg(value: string): string {
@@ -715,7 +726,7 @@ export class RemoteControlPlane {
         jsonrpc: "2.0",
         id: rpcId,
         result: {
-          protocolVersion: "2025-06-18",
+          protocolVersion: negotiateMcpProtocolVersion(body.params),
           capabilities: { tools: {} },
           serverInfo: { name: "sshautomator-remote-agent", version: SERVER_VERSION },
         },
