@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "repository": "oaslananka/ssh-mcp-pro",
+  "issueTracker": "https://github.com/oaslananka/ssh-mcp-pro/issues",
+  "supportPolicy": "../../SUPPORT.md",
+  "discussions": {
+    "enabled": false,
+    "reason": "GitHub Issues is the single source of truth for support, triage, audit findings, and release work."
+  },
+  "project": {
+    "owner": "oaslananka",
+    "number": 5,
+    "name": "ssh-mcp-pro Governance",
+    "requiredFields": ["Product", "Area", "Priority", "Phase", "Status", "Risk"]
+  },
+  "labelGroups": {
+    "priority": [
+      {
+        "name": "priority:P0",
+        "color": "b60205",
+        "description": "Critical foundation or release-blocking work"
+      },
+      {
+        "name": "priority:P1",
+        "color": "d93f0b",
+        "description": "High-priority work"
+      },
+      {
+        "name": "priority:P2",
+        "color": "fbca04",
+        "description": "Medium-priority scheduled work"
+      },
+      {
+        "name": "priority:P3",
+        "color": "c5def5",
+        "description": "Lower-priority backlog work"
+      }
+    ],
+    "area": [
+      {
+        "name": "area:release",
+        "color": "1d76db",
+        "description": "Release engineering, packaging, and publication"
+      },
+      {
+        "name": "area:ci",
+        "color": "1d76db",
+        "description": "CI/CD workflows and required checks"
+      },
+      {
+        "name": "area:security",
+        "color": "1d76db",
+        "description": "Security posture, vulnerability handling, and supply-chain controls"
+      },
+      {
+        "name": "area:docs",
+        "color": "1d76db",
+        "description": "README, generated docs, changelog, and user documentation"
+      },
+      {
+        "name": "area:compatibility",
+        "color": "1d76db",
+        "description": "Runtime, dependency, platform, and ecosystem compatibility"
+      },
+      {
+        "name": "area:testing",
+        "color": "1d76db",
+        "description": "Unit, integration, E2E, mutation, performance, and regression testing"
+      },
+      {
+        "name": "area:packaging",
+        "color": "1d76db",
+        "description": "npm, Docker, registry, installer, and artifact packaging"
+      },
+      {
+        "name": "area:dx",
+        "color": "1d76db",
+        "description": "Developer experience, scripts, hooks, and local workflow"
+      },
+      {
+        "name": "area:infra",
+        "color": "1d76db",
+        "description": "Infrastructure, environments, deployment, and hosting configuration"
+      },
+      {
+        "name": "area:governance",
+        "color": "1d76db",
+        "description": "Governance, labels, triage, projects, policies, and compliance"
+      }
+    ],
+    "type": [
+      {
+        "name": "type:bug",
+        "color": "d73a4a",
+        "description": "Defect or broken behavior"
+      },
+      {
+        "name": "type:enhancement",
+        "color": "a2eeef",
+        "description": "New or improved capability"
+      },
+      {
+        "name": "type:task",
+        "color": "cfd3d7",
+        "description": "Operational or maintenance task"
+      },
+      {
+        "name": "type:docs",
+        "color": "0075ca",
+        "description": "Documentation-only change"
+      },
+      {
+        "name": "type:security",
+        "color": "b60205",
+        "description": "Security hardening or vulnerability response"
+      }
+    ],
+    "risk": [
+      {
+        "name": "risk:high",
+        "color": "b60205",
+        "description": "High blast-radius or release/security risk"
+      },
+      {
+        "name": "risk:medium",
+        "color": "fbca04",
+        "description": "Moderate implementation or operational risk"
+      },
+      {
+        "name": "risk:low",
+        "color": "0e8a16",
+        "description": "Low-risk maintenance or polish"
+      }
+    ]
+  }
+}

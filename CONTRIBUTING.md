@@ -64,6 +64,7 @@ For faster local iteration, these commands are also available:
 | `pnpm run check:doc-language` | Validate documentation language conventions. |
 | `pnpm run check:rulesets` | Validate local GitHub ruleset files when present. |
 | `pnpm run verify:actions-runtime` | Verify GitHub Actions metadata does not use deprecated runtimes. |
+| `pnpm run check:governance` | Validate canonical issue labels, open issue taxonomy, and Governance project coverage. |
 | `pnpm run check:quality` | Run the non-packaging quality checks. |
 | `pnpm run check:package` | Build and validate package metadata, docs, package contents, and install smoke. |
 | `pnpm run check:push` | Run the pre-push subset: format, lint, typecheck, and unit tests. |
@@ -109,6 +110,35 @@ Run this after changing local ruleset files:
 
 ```bash
 pnpm run check:rulesets
+```
+
+## Issue Triage and Support
+
+GitHub Issues is the support path and single source of truth for public work.
+Use `SUPPORT.md` for response targets, stale handling, duplicate handling, and
+the security advisory boundary.
+
+Every open issue should have exactly one canonical label from each group:
+`priority:*`, `area:*`, `type:*`, and `risk:*`. The machine-readable taxonomy
+lives in `docs/governance/issue-taxonomy.json`.
+
+Maintainer-owned and audit-created issues should also be represented on the
+`ssh-mcp-pro Governance` GitHub Project v2, project number `5` under
+`oaslananka`, with the Product, Area, Priority, Phase, Status, and Risk fields
+available.
+
+Run this after changing issue templates, labels, support policy, or governance
+project fields:
+
+```bash
+pnpm run check:governance
+```
+
+The GitHub CLI token must include project access for the project validation
+steps:
+
+```bash
+gh auth refresh -s read:project
 ```
 
 ## Package and Metadata Commands
