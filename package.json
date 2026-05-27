@@ -22,6 +22,7 @@
     "README.md",
     "LICENSE",
     "SECURITY.md",
+    "SUPPORT.md",
     "REGISTRY_SUBMISSION.md",
     "registry"
   ],
@@ -70,6 +71,7 @@
     "lint:pr-title": "node scripts/lint-pr-title.mjs",
     "test:pr-title-lint": "node scripts/test-pr-title-lint.mjs",
     "verify:actions-runtime": "node scripts/verify-actions-runtime.mjs",
+    "check:governance": "node scripts/check-governance.mjs",
     "review:threads": "node scripts/check-review-threads.mjs",
     "release:state": "node scripts/release-state.mjs",
     "check:npm-name": "node scripts/check-npm-name.mjs ssh-mcp-pro",

@@ -3,6 +3,10 @@ description: Report a reproducible defect in ssh-mcp-pro.
 title: "bug: "
 labels:
   - bug
+  - priority:P2
+  - area:compatibility
+  - type:bug
+  - risk:medium
 body:
   - type: markdown
     attributes:

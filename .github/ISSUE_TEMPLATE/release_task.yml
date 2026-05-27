@@ -3,6 +3,10 @@ description: Track release, registry, or supply-chain work.
 title: "release: "
 labels:
   - release
+  - priority:P1
+  - area:release
+  - type:task
+  - risk:medium
 body:
   - type: dropdown
     id: release-area

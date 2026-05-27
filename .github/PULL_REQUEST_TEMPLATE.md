@@ -21,4 +21,4 @@
 
 ## Related Issue
 
-<!-- Link the Linear or GitHub issue, for example SSH-004. -->
+<!-- Link the GitHub issue, for example Fixes #123 or Refs #123. -->

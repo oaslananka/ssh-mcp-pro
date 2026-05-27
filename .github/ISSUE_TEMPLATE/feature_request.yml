@@ -3,6 +3,10 @@ description: Propose a scoped improvement.
 title: "feat: "
 labels:
   - enhancement
+  - priority:P3
+  - area:dx
+  - type:enhancement
+  - risk:medium
 body:
   - type: textarea
     id: problem
