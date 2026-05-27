@@ -8,6 +8,32 @@ const repoRoot = path.resolve(import.meta.dirname, "../..");
 
 const read = (relativePath: string) => readFileSync(path.join(repoRoot, relativePath), "utf8");
 
+const extractLocalAllowedLicenses = () => {
+  const script = read("scripts/check-licenses.mjs");
+  const match = /allowedLicenses\s*=\s*new Set\(\[([\s\S]*?)\]\);/u.exec(script);
+
+  if (!match?.[1]) {
+    throw new Error("Unable to parse local allowed dependency licenses.");
+  }
+
+  return [...match[1].matchAll(/"([^"]+)"/gu)].map(([, license]) => license).sort();
+};
+
+const extractDependencyReviewLicenses = () => {
+  const ci = read(".github/workflows/ci.yml");
+  const match = /allow-licenses:\s*>-\n((?: {12}.+\n?)+)/u.exec(ci);
+
+  if (!match?.[1]) {
+    throw new Error("Unable to parse Dependency Review allowed licenses.");
+  }
+
+  return match[1]
+    .split(",")
+    .map((license) => license.trim())
+    .filter(Boolean)
+    .sort();
+};
+
 describe("mutation testing gate", () => {
   test("declares pinned Stryker tooling and runnable scripts", () => {
     const pkg = JSON.parse(read("package.json")) as {
@@ -101,6 +127,10 @@ describe("mutation testing gate", () => {
     expect(ci).toContain("github.event_name == 'workflow_dispatch'");
     expect(ci).toContain("continue-on-error: true");
     expect(ci).toContain("pnpm run test:mutation:ci");
+  });
+
+  test("keeps Dependency Review license policy aligned with the local license gate", () => {
+    expect(extractDependencyReviewLicenses()).toEqual(extractLocalAllowedLicenses());
   });
 
   test("documents promotion criteria and local validation", () => {
