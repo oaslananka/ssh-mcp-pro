@@ -112,7 +112,7 @@
     "access": "public"
   },
   "engines": {
-    "node": "^22.22.2 || ^24.15.0",
+    "node": ">=22.22.1",
     "pnpm": "^11.0.9"
   },
   "dependencies": {
