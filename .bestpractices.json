@@ -3,6 +3,7 @@
   "project": "ssh-mcp-pro",
   "repository": "https://github.com/oaslananka/ssh-mcp-pro",
   "assessment_date": "2026-07-03",
+  "last_reviewed": "2026-07-03",
   "target_tier": "passing",
   "status": "not_submitted",
   "evidence_doc": "docs/openssf-evidence.md",
@@ -30,7 +31,7 @@
       "ci_on_commits_and_prs": "met",
       "test_coverage_policy": "met",
       "static_analysis": "met",
-      "static_analysis_findings_resolved": "unmet"
+      "static_analysis_findings_resolved": "met"
     },
     "security": {
       "documented_security_defaults": "met",
@@ -44,8 +45,11 @@
     }
   },
   "known_blockers": [
-    "7 open CodeQL alerts (1 high severity) without a fully current documented disposition",
-    "No release has been published yet, so release-notes-per-release is unverified in practice"
+    "No release has been published yet, so release-notes-per-release is unverified in practice",
+    "Trivy container-image scanning (added 2026-07-03) found 50+ open CVE alerts against the built Docker image, mostly in the Alpine base image and npm/corepack's own bundled dependencies rather than this project's own code -- not yet triaged"
+  ],
+  "resolved_blockers": [
+    "7 open CodeQL alerts (1 high severity) -- resolved 2026-07-03: 1 fixed in code, 7 dismissed with rationale re-verified against current code (see SECURITY_DECISIONS.md)"
   ],
   "explicitly_not_claimed": ["silver", "gold"]
 }

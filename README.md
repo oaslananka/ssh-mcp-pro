@@ -215,7 +215,7 @@ ssh-mcp-pro starts with strict SSH host-key verification, denies root login, den
   task (tutorial, how-to, reference, explanation).
 - [docs/troubleshooting.md](docs/troubleshooting.md) covers common failure modes.
 
-## Project Health &amp; Governance
+## Project Health & Governance
 
 - [GOVERNANCE.md](GOVERNANCE.md) describes how decisions are made today.
 - [MAINTAINERS.md](MAINTAINERS.md) lists current maintainers.

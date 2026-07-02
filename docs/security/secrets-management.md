@@ -17,10 +17,11 @@ by this audit — this document only records what already exists.
   `test/unit/connector-credentials.test.ts`).
 - **Audit logging redacts sensitive fields** per `SECURITY_DECISIONS.md`, within a
   bounded 500-event buffer.
-- **Known open gap:** CodeQL alert #1 (High) flags clear-text logging of sensitive
-  environment data in `scripts/start-chatgpt-http.mjs` — this is exactly a secrets
-  handling defect, tracked as a recommended issue in
-  [docs/repo-maturity-report.md](../repo-maturity-report.md), not fixed by this audit.
+- **Resolved (was: known open gap):** CodeQL alert #1 (High) flagged clear-text logging
+  of sensitive environment data in `scripts/start-chatgpt-http.mjs` — a genuine secrets
+  handling defect. Fixed 2026-07-03 by deriving the logged values from already-validated
+  enum checks instead of interpolating environment-sourced strings directly; see
+  [docs/repo-maturity-report.md](../repo-maturity-report.md) for the audit trail.
 
 ## CI/CD
 

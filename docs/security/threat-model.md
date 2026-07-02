@@ -44,13 +44,18 @@ tunnels against remote hosts, mediated by a policy layer.
    documents audit redaction patterns and a bounded (500-event) audit buffer, and
    constant-time (`timingSafeEqual`) comparison for bearer tokens.
 
-## Known open gap
+## Resolved gap (was: known open gap)
 
-Seven CodeQL alerts are currently open (see
-[docs/repo-maturity-report.md](../repo-maturity-report.md)), including one High severity
-finding (`js/clear-text-logging` in `scripts/start-chatgpt-http.mjs`) that is exactly the
-kind of secret-leakage-through-logs risk this threat model calls out. It is tracked as a
-recommended issue, not fixed by this document.
+CodeQL previously had 7 open alerts, including one High severity finding
+(`js/clear-text-logging` in `scripts/start-chatgpt-http.mjs`) that was exactly the kind
+of secret-leakage-through-logs risk this threat model calls out. All 8 were resolved
+2026-07-03 (1 fixed in code, 7 dismissed with re-verified rationale) — see
+[docs/repo-maturity-report.md](../repo-maturity-report.md) for the audit trail. Separately,
+adding Trivy container-image scanning the same day surfaced 50+ new findings against the
+built Docker image (mostly the base image's bundled tooling, not this project's own
+code) — see "Package publishing maturity" in that same report. That backlog is
+untriaged as of this update and is the current live example of "detection isn't the
+same as resolution."
 
 ## Out of scope (matches SECURITY.md)
 

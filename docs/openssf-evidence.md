@@ -48,7 +48,7 @@ vocabulary.
 | Project has a general policy for test coverage | Met | `vitest.config.ts` enforces 85–90% thresholds |
 | Project uses continuous integration | Met | `ci.yml` on push/PR/schedule |
 | Project has at least one static analysis tool applied | Met | CodeQL, ESLint, mutation testing (Stryker) |
-| All medium/high-severity static analysis findings are addressed | Unmet | 7 open CodeQL alerts, 1 High — see repo-maturity-report.md |
+| All medium/high-severity static analysis findings are addressed | Met (2026-07-03) | All 8 CodeQL alerts closed: 1 fixed in code, 7 dismissed with rationale re-verified against current code — see `SECURITY_DECISIONS.md`. (Separately, Trivy container-image scanning added the same day found 50+ new findings against the built Docker image, mostly in the base image's bundled tooling rather than this project's source — tracked as an open item in `docs/repo-maturity-report.md`, not part of this specific criterion, which concerns source static analysis) |
 
 ## Security
 
@@ -68,8 +68,8 @@ vocabulary.
 
 ## Bottom line
 
-Passing-tier is realistically achievable without new engineering work — the gaps above
-are mostly "resolve 7 CodeQL alerts" and "cut a first release," both already tracked in
-[ROADMAP.md](../ROADMAP.md). Nothing in this evidence log claims Silver or Gold; see
-[docs/openssf-gap-analysis.md](openssf-gap-analysis.md) for why those are out of reach
-right now.
+As of 2026-07-03, the CodeQL blocker has been resolved. The remaining blocker is
+"cut a first release," already tracked in [ROADMAP.md](../ROADMAP.md), plus triaging
+the new Trivy container-image findings noted above. Nothing in this evidence log claims
+Silver or Gold; see [docs/openssf-gap-analysis.md](openssf-gap-analysis.md) for why
+those are out of reach right now.

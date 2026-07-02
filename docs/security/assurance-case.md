@@ -34,15 +34,21 @@ findings) have not yet been exercised.
 
 1. **No release has ever shipped.** Every mechanism in (4) is implemented but
    unexercised end-to-end.
-2. **No pull request has ever received independent human review.** All three PRs to
-   date are bot-authored. The claim above does not extend to "this project has been
-   independently verified by a second person" — it hasn't.
+2. **No pull request has ever received independent human review.** PRs merged to date
+   are either bot-authored (Dependabot) or authored and self-merged by the sole
+   maintainer. The claim above does not extend to "this project has been independently
+   verified by a second person" — it hasn't.
 3. **Branch protection is not actually applied on GitHub**, despite a ruleset
    definition existing in-repo. Anyone with push access (currently just the sole
    maintainer) can push directly to `main` today.
-4. **Seven CodeQL alerts are open**, including one High severity. Static analysis
-   running is evidence of *detection* capability, not evidence that everything it has
-   detected has been resolved.
+4. ~~Seven CodeQL alerts are open, including one High severity.~~ **Resolved
+   2026-07-03** — 1 fixed in code, 7 dismissed with rationale re-verified against
+   current code (see `SECURITY_DECISIONS.md`). Separately, Trivy container-image
+   scanning (added the same day) found 50+ new open findings against the built Docker
+   image — mostly the Alpine base image's bundled tooling, not this project's own code
+   — still untriaged as of this update. Static analysis/scanning running is evidence of
+   *detection* capability, not evidence that everything it detects has been resolved;
+   the Trivy backlog is the current live example of that gap.
 
 ## Bottom line
 

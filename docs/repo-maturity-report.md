@@ -14,6 +14,32 @@ Legend for prioritization tables (refactor/action items): `Required now` ·
 `Recommended` · `Optional` · `Future` · `Not applicable` · `Needs human confirmation`.
 Each table states which legend it uses.
 
+> **Update (2026-07-03, same day, post-merge):** The two PRs this report originally
+> described as pending (`repo-maturity/professional-oss-hardening`,
+> `security-fixes/codeql-and-supply-chain`) have both merged to `main`, along with two
+> Dependabot Actions-version-bump PRs. What changed on the ground, in brief — full detail
+> is in the sections below, not just here:
+>
+> - CodeQL: all 8 alerts closed (1 fixed in code, 7 dismissed with verified rationale —
+>   see "Security/supply-chain maturity"). 0 open CodeQL alerts as of this update.
+> - Private vulnerability reporting: confirmed **enabled** via
+>   `GET /repos/.../private-vulnerability-reporting` (was "needs human confirmation").
+> - Dependabot vulnerability alerts and automated security fixes: both **enabled** (were
+>   disabled).
+> - **New finding, not present at initial audit time:** the Trivy container scan added in
+>   the security-fixes PR surfaced **50+ open alerts** against the built Docker image —
+>   see "Package publishing maturity" and "Security/supply-chain maturity" below. This is
+>   a real gap the original audit had no visibility into (Trivy didn't exist in the
+>   pipeline yet), not a regression introduced by merging.
+> - Branch protection, the release-please PR (#1), and npm trusted-publisher registration
+>   remain untouched, exactly as originally recommended — still manual/maintainer
+>   decisions.
+>
+> The narrative below is left largely as originally written (including the "before this
+> PR" framing) so the audit trail stays intact; treat table rows tagged **[updated]**
+> as current, and the executive summary's "seven CodeQL alerts... open" and "three PRs to
+> date" as the state *at the time of the original audit*, not now.
+
 ## Executive summary
 
 ssh-mcp-pro is a five-day-old (created 2026-06-28), single-maintainer TypeScript project
@@ -169,7 +195,7 @@ published or the badge is removed.**
 | Check | Status | Evidence |
 | --- | --- | --- |
 | Branch-Protection | Missing | `GET .../branches/main/protection` → 404 "Branch not protected". A ruleset JSON exists at `.github/rulesets/main-protection.json` describing 10 required status checks + 1 approval + linear history, but it is **not applied** on GitHub — Needs human confirmation whether it was ever imported via Settings → Rules, or is a design document awaiting import |
-| Code-Review | Missing | 1 collaborator, 3 PRs total, all bot-authored (Dependabot ×2, release-please ×1). No human-reviewed PR exists yet |
+| Code-Review | Missing **[updated]** | 1 collaborator. 6 PRs total as of this update: 2 Dependabot (merged), 1 release-please (open), and 3 authored and merged by the sole maintainer/owner (`author_association: OWNER`) via this audit's own branches — including this report itself. None were reviewed by an independent second party; self-merging your own PR is not what this check measures. Still `Missing` in substance, just with more data points |
 | Maintained | Needs human confirmation | Active commit history over the observed window, but 5-day repo age is too short for Scorecard's 90-day activity window to mean anything |
 | Security-Policy | Passed | `SECURITY.md` present, linked from `.github/ISSUE_TEMPLATE/config.yml` |
 | License | Passed | MIT + REUSE-compliant |
@@ -248,7 +274,7 @@ takes on itself.
 | Multi-arch build | Passed | `linux/amd64,linux/arm64` via Buildx + QEMU, `--check` step validates cross-platform buildability even on PRs that don't publish |
 | Provenance/SBOM on the image itself | Passed | `docker buildx build --provenance=true --sbom=true` on the published image (distinct from the npm-package SBOM) |
 | Digest verification post-publish | Passed | Asserts the pushed manifest's digest matches expectations for both platforms, and cross-checks the GHCR package API for the expected tags before declaring success |
-| Image vulnerability scanning (Trivy/Grype) | Missing | No scanner found in `docker.yml` or elsewhere. Recommended — see "Safe refactor opportunities" |
+| Image vulnerability scanning (Trivy/Grype) | Partial **[updated]** | Trivy was added to `docker.yml` (advisory, `exit-code: "0"`) after this report was first written. It now runs and reports — and it found real findings: **50+ open CVE alerts** against the built image (`security/code-scanning`, tool `Trivy`), spanning Low through High severity. The large majority are in the Alpine base image's `libssl3`/`libcrypto3` packages and in `npm`'s/`corepack`'s own bundled dependencies (`undici`, `tar`, `sigstore`, `ip-address`, `brace-expansion`, and `pnpm` itself) — not in this project's application code or `dependencies`/`devDependencies`. These are pre-existing characteristics of the `node:24-alpine` base image and its bundled tooling that nobody had visibility into before Trivy was added; they are not a regression from anything in this audit. Status moves from `Missing` to `Partial`: the scanner now exists and is providing real signal, but the findings themselves are unaddressed. See the new recommended issue below |
 | Hadolint (Dockerfile linting) | Missing | Not present. Recommended, low-risk to add |
 
 ### PyPI, Go modules, Rust crates, VS Code Marketplace, Homebrew
@@ -316,11 +342,12 @@ ecosystem's checklist.
 | Item | Status | Evidence |
 | --- | --- | --- |
 | SECURITY.md | Passed | Private reporting, 7-day SLA, explicit scope |
-| Private vulnerability reporting | Needs human confirmation | `SECURITY.md` references GitHub security advisories; confirm the "Private vulnerability reporting" repo setting is actually toggled on (this is a Settings checkbox, not inferable from file contents alone) |
-| CodeQL | Partial | Workflow present and running weekly + on PR; **7 open alerts** (1 High: `js/clear-text-logging` in `scripts/start-chatgpt-http.mjs`; 6 Medium: `js/indirect-command-line-injection` ×2 in `scripts/lib/command.mjs`, `js/file-access-to-http` ×3 and `js/http-to-file-access` ×1 in `src/remote/agent-cli.ts` / `scripts/check-dependency-freshness.mjs`). `SECURITY_DECISIONS.md` documents rationale for some prior CodeQL findings (#2, #4–#6) as accepted false positives, but alert numbers #1–#8 as currently reported don't have a 1:1 documented disposition — Needs human confirmation whether the existing rationale still covers all 7 open alerts or whether the High-severity clear-text-logging alert needs a code fix |
+| Private vulnerability reporting | Passed **[updated]** | Confirmed via `GET /repos/oaslananka/ssh-mcp-pro/private-vulnerability-reporting` → `{"enabled": true}`. No longer needs human confirmation |
+| CodeQL | Passed **[updated]** | Workflow present and running weekly + on PR. All 8 originally-open alerts are now closed: #1 (High, `js/clear-text-logging` in `scripts/start-chatgpt-http.mjs`) was fixed in code (the log line no longer interpolates environment-sourced strings directly); #2–#8 were dismissed as false positives via the code-scanning API, each with a rationale re-verified against the current code (not just re-asserting stale documentation) — see `SECURITY_DECISIONS.md` for the write-up. 0 open CodeQL alerts as of this update |
 | Gitleaks / secret scanning | Passed | GitHub native secret scanning **and** push protection are both enabled at the repo level (confirmed via API); this PR adds `gitleaks.yml` as a defense-in-depth layer for full-history scanning, since native secret scanning primarily covers newly pushed content |
 | Dependency review | Passed | `ci.yml` job, `fail-on-severity: moderate` |
-| Dependabot | Partial | `dependabot.yml` covers `github-actions` only; npm dependencies are intentionally left to Renovate (`renovate.json`) to avoid two bots opening competing PRs for the same ecosystem — this is a deliberate design choice, not a gap, but note that repo Settings shows **Dependabot security updates: disabled** (a separate toggle from Renovate) — Needs human confirmation whether that's intentional given Renovate's `packageRules` don't guarantee same-day response to a new advisory the way Dependabot security updates do |
+| Trivy (container image scanning) | Partial **[new, added after initial audit]** | Added to `docker.yml`, advisory-only. Surfaced 50+ open alerts against the built image, almost entirely in the Alpine base image and npm/corepack's own bundled dependencies rather than this project's code — see "Package publishing maturity" above. New visibility, not yet acted on |
+| Dependabot | Passed **[updated]** | `dependabot.yml` covers `github-actions` only; npm dependencies are intentionally left to Renovate (`renovate.json`) to avoid two bots opening competing PRs for the same ecosystem — a deliberate design choice, not a gap. **Dependabot vulnerability alerts and automated security fixes are now both enabled** (were disabled at initial audit time) |
 | OSV Scanner | Missing | Not present; `pnpm audit --audit-level moderate` (the `audit` script) covers similar ground for npm advisories |
 | SBOM | Passed | Generated + attested per release |
 | SLSA / provenance | Passed | `actions/attest-build-provenance` (build provenance, not full SLSA level claim) |
@@ -467,8 +494,8 @@ None of these can be done via a file change; they need repository Settings acces
 | Branch protection / ruleset on `main` | Not applied (404 from the protection API) | Import `.github/rulesets/main-protection.json` under Settings → Rules, or configure classic branch protection to match it |
 | Required status checks | Described in the unapplied ruleset only | Apply alongside branch protection |
 | Required PR review count | Described in the unapplied ruleset only (1 approval) | Apply alongside branch protection |
-| Private vulnerability reporting | Unknown from file inspection alone | Confirm enabled under Settings → Security & analysis to match `SECURITY.md`'s claims |
-| Dependabot alerts / dependency graph | Dependency graph and secret scanning confirmed enabled; **Dependabot security updates confirmed disabled** via API | Decide whether to enable security updates given Renovate already covers routine npm updates |
+| Private vulnerability reporting | **Done [updated]** — confirmed `enabled: true` via API | No action needed |
+| Dependabot alerts / dependency graph | **Done [updated]** — vulnerability alerts and automated security fixes both enabled via API | No action needed |
 | npm trusted publishing registration | Workflow-side OIDC publish flow is implemented (no stored token, `--provenance`) | On npmjs.com, register this repo/workflow as a trusted publisher for the `ssh-mcp-pro` package (a one-time npmjs.com-side setup outside this repo) — **Needs human confirmation** whether this registration already exists, since it can't be checked from the repo |
 | PyPI trusted publishing | Not applicable | No PyPI package exists |
 | Docker registry (GHCR) settings | Package visibility/linkage not inspected by this audit | Confirm the GHCR package is linked to this repo and set to public visibility once the first image is published |
@@ -481,32 +508,40 @@ The following are proposed as GitHub issues (not opened automatically by this au
 per scope — the PR description lists them so the maintainer can file them, or ask for
 them to be filed as a follow-up):
 
-1. **[security] Fix CodeQL alert #1 (High): clear-text logging of sensitive environment
-   data in `scripts/start-chatgpt-http.mjs`.**
-2. **[security] Review CodeQL alerts #2–#8 (Medium) and record disposition** in
-   `SECURITY_DECISIONS.md` (fix, suppress-with-rationale, or confirm existing rationale
-   still applies).
+1. ~~**[security] Fix CodeQL alert #1 (High): clear-text logging of sensitive
+   environment data in `scripts/start-chatgpt-http.mjs`.**~~ **Done** — fixed in code.
+2. ~~**[security] Review CodeQL alerts #2–#8 (Medium) and record disposition.**~~
+   **Done** — all dismissed with rationale re-verified against current code;
+   documented in `SECURITY_DECISIONS.md`.
 3. **[governance] Decide and apply branch protection for `main`**, either by importing
    `.github/rulesets/main-protection.json` as a GitHub Ruleset or configuring classic
-   branch protection to match it.
+   branch protection to match it. **Still open** — deliberately left for the maintainer.
 4. **[release] Ship the first release** (merge or re-trigger release-please PR #1) to
    exercise the release pipeline (SBOM, checksums, attestation, optional npm publish)
-   end-to-end for the first time.
-5. **[security] Confirm "Private vulnerability reporting" is enabled** in repo Security
-   settings to match what `SECURITY.md` promises.
+   end-to-end for the first time. **Still open** — deliberately left for the maintainer;
+   triggers a real, hard-to-reverse publish action.
+5. ~~**[security] Confirm "Private vulnerability reporting" is enabled.**~~ **Done** —
+   confirmed already enabled via API.
 6. **[ci] Re-evaluate OpenSSF Scorecard `publish_results: false`** — either fix the
    blocking `env:`/`defaults:` patterns across workflows, or replace the Scorecard badge
-   with language clarifying no public score is currently published.
+   with language clarifying no public score is currently published. **Still open** —
+   investigated, deliberately not applied (see "High-risk refactor opportunities"); a
+   relocation across all 7 workflows risks breaking the Windows Integration job's shell
+   default in a way that can't be verified without a live Windows Actions run.
 7. **[governance] Decide on a second maintainer / reviewer** before targeting OpenSSF
-   Silver or a "mature OSS" claim that depends on independent code review.
-8. **[supply-chain] Add container image vulnerability scanning** (Trivy or Grype) to
-   `docker.yml` before the first GHCR image is published from a release tag.
-9. **[packaging] Add `publint` (and optionally `arethetypeswrong`) as an advisory npm
-   packaging check**, run in CI but non-blocking initially, ahead of the first npm
-   publish.
+   Silver or a "mature OSS" claim that depends on independent code review. **Still
+   open** — not something this audit can create by itself.
+8. ~~**[supply-chain] Add container image vulnerability scanning** (Trivy or Grype).~~
+   **Done** — added to `docker.yml`. **New follow-up issue this created:** 50+ open
+   Trivy alerts now exist against the built image (Alpine base-image OpenSSL packages,
+   npm/corepack's own bundled dependencies). **[supply-chain] Triage the Trivy backlog** —
+   decide whether to rebuild on a newer/slimmer base image, prune corepack's cache from
+   the final image layer, or accept the current baseline and document why.
+9. ~~**[packaging] Add `publint`** as an advisory npm packaging check.~~ **Done** —
+   added, passes cleanly against the built package.
 10. **[registry] Confirm npm trusted-publisher registration exists on npmjs.com** for
-    this repository/workflow, since the workflow-side OIDC flow is already implemented
-    but the npmjs.com-side registration can't be verified from the repo.
+    this repository/workflow. **Still open** — this is an npmjs.com-side action outside
+    the repo; can't be verified or performed via the GitHub API.
 
 ## Next actions
 

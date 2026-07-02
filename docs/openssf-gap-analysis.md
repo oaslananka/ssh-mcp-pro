@@ -6,15 +6,22 @@ overclaim.
 
 ## Passing — achievable now
 
-See [docs/openssf-evidence.md](openssf-evidence.md) for the full criterion table. The
-two concrete blockers are:
+See [docs/openssf-evidence.md](openssf-evidence.md) for the full criterion table.
 
-1. Seven open CodeQL alerts (one High) with no fully-current documented disposition.
-2. No release has been cut yet, so "release notes exist for each release" is unverified
-   in practice even though the mechanism (release-please + CHANGELOG) is implemented.
+~~Seven open CodeQL alerts (one High) with no fully-current documented disposition.~~
+**Resolved 2026-07-03** — see `SECURITY_DECISIONS.md`.
 
-Both are tracked in [ROADMAP.md](../ROADMAP.md) and as recommended issues in
-[docs/repo-maturity-report.md](repo-maturity-report.md).
+The remaining concrete blocker: no release has been cut yet, so "release notes exist
+for each release" is unverified in practice even though the mechanism (release-please +
+CHANGELOG) is implemented. Tracked in [ROADMAP.md](../ROADMAP.md) and as a recommended
+issue in [docs/repo-maturity-report.md](repo-maturity-report.md).
+
+A new, unrelated item surfaced the same day: Trivy container-image scanning (added
+after this document was first written) found 50+ open findings against the built
+Docker image — see "Package publishing maturity" in
+[docs/repo-maturity-report.md](repo-maturity-report.md). This doesn't block Passing
+(that criterion concerns source static analysis, not container base-image CVEs) but is
+worth tracking as its own item.
 
 ## Silver — not yet achievable
 

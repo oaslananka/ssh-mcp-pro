@@ -53,7 +53,7 @@ individual is officially representing the project in public spaces.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported via a private message to [@oaslananka](https://github.com/oaslananka)
-on GitHub, or through a [private security advisory](../../security/advisories/new)
+on GitHub, or through a [private security advisory](https://github.com/oaslananka/ssh-mcp-pro/security/advisories/new)
 if the report also involves a security concern. All complaints will be
 reviewed and investigated promptly and fairly.
 

@@ -14,39 +14,54 @@ development-process docs, security docs, and the `gitleaks.yml` workflow.
 
 ## Phase 1 — Maintainer decisions, no code change
 
-These are each a single Settings toggle or a merge, not a refactor:
+Status as of 2026-07-03:
 
 1. Apply branch protection on `main` (import the existing ruleset or configure
-   equivalently).
-2. Confirm private vulnerability reporting is enabled.
-3. Decide on the Dependabot security-updates toggle.
-4. Merge or re-trigger release-please PR #1 to ship the first release.
+   equivalently). **Still open.**
+2. ~~Confirm private vulnerability reporting is enabled.~~ **Done** — confirmed
+   already enabled via API.
+3. ~~Decide on the Dependabot security-updates toggle.~~ **Done** — enabled, along
+   with Dependabot vulnerability alerts.
+4. Merge or re-trigger release-please PR #1 to ship the first release. **Still open**
+   — deliberately left for the maintainer; triggers a real publish action.
 5. Register the repo/workflow as an npm trusted publisher on npmjs.com (the workflow
-   side is already implemented; this is the registry-side counterpart).
+   side is already implemented; this is the registry-side counterpart). **Still open**
+   — an npmjs.com-side action outside the repo.
 
-**Why this order:** branch protection and the first release are the two changes that
-would flip the most `Missing`/`Partial` rows in the maturity report to `Passed` — they
-have outsized leverage relative to effort.
+**Why this order:** branch protection and the first release are the two remaining
+changes that would flip the most `Missing`/`Partial` rows in the maturity report to
+`Passed` — they have outsized leverage relative to effort.
 
 ## Phase 2 — Low-risk CI additions
 
-Each is additive, doesn't touch existing workflow behavior, and doesn't require a new
-runtime dependency in the shipped package:
+Status as of 2026-07-03:
 
-1. Container image vulnerability scanning (Trivy or Grype) in `docker.yml`.
-2. Hadolint for Dockerfile linting.
-3. `publint` as an advisory (non-blocking) npm packaging check, run once before the
-   first publish and then in CI going forward.
+1. ~~Container image vulnerability scanning (Trivy or Grype) in `docker.yml`.~~
+   **Done** — Trivy added, advisory-only. It found real findings: see the new Phase 3
+   item below.
+2. Hadolint for Dockerfile linting. **Still open.**
+3. ~~`publint` as an advisory (non-blocking) npm packaging check.~~ **Done** — added,
+   passes cleanly against the built package.
 
 ## Phase 3 — Security follow-through
 
-Requires actual code changes, so scoped separately from this doc-only audit:
+Status as of 2026-07-03:
 
-1. Fix CodeQL alert #1 (High: clear-text logging in `scripts/start-chatgpt-http.mjs`).
-2. Review and record disposition for the remaining 6 CodeQL alerts in
-   `SECURITY_DECISIONS.md`.
+1. ~~Fix CodeQL alert #1 (High: clear-text logging in `scripts/start-chatgpt-http.mjs`).~~
+   **Done.**
+2. ~~Review and record disposition for the remaining 7 CodeQL alerts.~~ **Done** — all
+   dismissed via the code-scanning API with rationale re-verified against current code;
+   written up in `SECURITY_DECISIONS.md`.
 3. Re-evaluate Scorecard `publish_results: false` — either fix the blocking
-   `env:`/`defaults:` patterns across workflows, or adjust the README badge.
+   `env:`/`defaults:` patterns across workflows, or adjust the README badge. **Still
+   open** — investigated; relocating those blocks across all 7 workflows risks
+   silently breaking the Windows Integration job's shell default, which can't be
+   verified without a live Windows Actions run.
+4. **New: triage the Trivy container-image backlog.** Adding Trivy in item 1 above
+   surfaced 50+ open findings against the built image — mostly the Alpine base image's
+   OpenSSL packages and npm/corepack's own bundled dependencies, not this project's own
+   code. Options: rebuild on a newer/slimmer base image, prune build tooling from the
+   final layer, or accept and document the current baseline explicitly.
 
 ## Phase 4 — Community growth (not schedulable)
 

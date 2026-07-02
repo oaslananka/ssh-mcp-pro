@@ -42,12 +42,13 @@ Every buffer- or transfer-related setting has an explicit byte ceiling:
 (`SSH_MCP_MAX_STREAM_CHUNKS`, `SSH_MCP_MAX_SESSIONS`, `SSH_MCP_HTTP_MAX_SESSIONS`). These
 exist to bound both memory use and the blast radius of any single tool call.
 
-## Known gap
+## Resolved gap (was: known gap)
 
-Two of the open CodeQL alerts (`js/file-access-to-http` / `js/http-to-file-access` in
-`src/remote/agent-cli.ts` and `scripts/check-dependency-freshness.mjs`) are exactly
+Several CodeQL alerts (`js/file-access-to-http` / `js/http-to-file-access` in
+`src/remote/agent-cli.ts` and `scripts/check-dependency-freshness.mjs`) were exactly
 input-validation-shaped findings — untrusted file data influencing a network request, or
-untrusted network data influencing a file write. `SECURITY_DECISIONS.md` records
-rationale for some of these as accepted false positives; whether that rationale is fully
-current for all open alerts needs human confirmation (see
-[docs/repo-maturity-report.md](../repo-maturity-report.md)).
+untrusted network data influencing a file write. As of 2026-07-03 all were dismissed
+after independently re-verifying the rationale in `SECURITY_DECISIONS.md` against the
+current code (not just re-asserting stale documentation) — see
+[docs/repo-maturity-report.md](../repo-maturity-report.md) for the audit trail. 0 open
+CodeQL alerts remain.
