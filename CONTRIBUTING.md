@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for improving `ssh-mcp-pro`. This project accepts focused pull requests that keep the MCP server buildable, tested, and safe for users who run SSH automation.
+Thanks for improving `ssh-mcp-pro`. This project accepts focused pull requests that keep the MCP server buildable, tested, and safe for users who run SSH automation. Participation in this project is governed by the [Code of Conduct](CODE_OF_CONDUCT.md); see [GOVERNANCE.md](GOVERNANCE.md) for how decisions get made and by whom.
 
 ## Development Prerequisites
 

@@ -1,0 +1,51 @@
+{
+  "$comment": "Internal tracking file for an OpenSSF Best Practices badge self-assessment. This is NOT an official OpenSSF schema or artifact -- the real badge is issued via a web form at https://www.bestpractices.dev/. This file exists so the self-assessment in docs/openssf-evidence.md is machine-readable and easy to keep in sync when the actual form is filled out.",
+  "project": "ssh-mcp-pro",
+  "repository": "https://github.com/oaslananka/ssh-mcp-pro",
+  "assessment_date": "2026-07-03",
+  "target_tier": "passing",
+  "status": "not_submitted",
+  "evidence_doc": "docs/openssf-evidence.md",
+  "gap_analysis_doc": "docs/openssf-gap-analysis.md",
+  "criteria": {
+    "basics": {
+      "public_vcs_repository": "met",
+      "floss_license": "met",
+      "license_location": "met",
+      "documentation_basics": "met",
+      "documentation_interface": "met"
+    },
+    "change_control": {
+      "public_vcs_history": "met",
+      "unique_version_numbering": "met",
+      "release_notes": "partially_met"
+    },
+    "reporting": {
+      "bug_reporting_process": "met",
+      "vulnerability_reporting_process": "met",
+      "vulnerability_report_acknowledgment": "unmet_no_data"
+    },
+    "quality": {
+      "automated_test_suite": "met",
+      "ci_on_commits_and_prs": "met",
+      "test_coverage_policy": "met",
+      "static_analysis": "met",
+      "static_analysis_findings_resolved": "unmet"
+    },
+    "security": {
+      "documented_security_defaults": "met",
+      "crypto_uses_reviewed_protocols": "met",
+      "no_secrets_in_repo": "met",
+      "secure_delivery": "met"
+    },
+    "analysis": {
+      "static_analysis_applied": "met",
+      "dynamic_analysis_applied": "partially_met"
+    }
+  },
+  "known_blockers": [
+    "7 open CodeQL alerts (1 high severity) without a fully current documented disposition",
+    "No release has been published yet, so release-notes-per-release is unverified in practice"
+  ],
+  "explicitly_not_claimed": ["silver", "gold"]
+}

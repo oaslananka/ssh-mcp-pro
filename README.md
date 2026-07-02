@@ -209,11 +209,26 @@ ssh-mcp-pro starts with strict SSH host-key verification, denies root login, den
 - [examples/README.md](examples/README.md) contains workflow examples.
 - [ARCHITECTURE.md](ARCHITECTURE.md) explains the major subsystems and ADRs.
 - [REGISTRY_SUBMISSION.md](REGISTRY_SUBMISSION.md) tracks MCP Registry submission readiness.
+- [docs/tutorials/getting-started.md](docs/tutorials/getting-started.md),
+  [docs/how-to/](docs/how-to/README.md), [docs/reference/](docs/reference/README.md),
+  and [docs/explanation/](docs/explanation/architecture.md) organize the docs above by
+  task (tutorial, how-to, reference, explanation).
+
+## Project Health &amp; Governance
+
+- [GOVERNANCE.md](GOVERNANCE.md) describes how decisions are made today.
+- [MAINTAINERS.md](MAINTAINERS.md) lists current maintainers.
+- [ROADMAP.md](ROADMAP.md) tracks known process gaps and what's planned to close them.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) sets community expectations.
+- [docs/repo-maturity-report.md](docs/repo-maturity-report.md) is an evidence-based
+  audit of this repository's open-source and OpenSSF maturity, including what's not
+  yet in place.
 
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, quality gates, commit rules,
-and pull request expectations.
+and pull request expectations. Participation is governed by the
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
