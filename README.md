@@ -213,6 +213,7 @@ ssh-mcp-pro starts with strict SSH host-key verification, denies root login, den
   [docs/how-to/](docs/how-to/README.md), [docs/reference/](docs/reference/README.md),
   and [docs/explanation/](docs/explanation/architecture.md) organize the docs above by
   task (tutorial, how-to, reference, explanation).
+- [docs/troubleshooting.md](docs/troubleshooting.md) covers common failure modes.
 
 ## Project Health &amp; Governance
 

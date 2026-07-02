@@ -9,5 +9,6 @@ Organized per the [Diátaxis](https://diataxis.fr/how-to-guides/) model.
 - [How to harden a public/remote MCP deployment](../remote-mcp-hardening.md)
 - [How to set the SSH host-key and policy defaults](configure-ssh-policy.md)
 
-If you're looking for exhaustive option listings instead of a task, see
-[Reference](../reference/README.md).
+If something's actually broken rather than a task you're trying to accomplish, see
+[Troubleshooting](../troubleshooting.md) instead. If you're looking for exhaustive
+option listings instead of a task, see [Reference](../reference/README.md).

@@ -7,7 +7,12 @@ alerts, collaborators, releases, open PRs, workflow runs), and workflow source r
 Classifications use only observed evidence; no criterion is marked `Passed` without a
 file, workflow run, or API response backing it.
 
-Legend: `Passed` · `Partial` · `Missing` · `Not applicable` · `Needs human confirmation`
+Legend for evidence tables (current-state assessment): `Passed` · `Partial` · `Missing` ·
+`Not applicable` · `Needs human confirmation`.
+
+Legend for prioritization tables (refactor/action items): `Required now` ·
+`Recommended` · `Optional` · `Future` · `Not applicable` · `Needs human confirmation`.
+Each table states which legend it uses.
 
 ## Executive summary
 
@@ -65,6 +70,50 @@ and a repeatable release history — none of which can exist five days after rep
 creation with one collaborator. See "Gold / foundation-grade gap analysis" in
 [docs/openssf-gap-analysis.md](openssf-gap-analysis.md) for what would need to be true
 before that label is reconsidered.
+
+## Repository inventory
+
+| Attribute | Value | Evidence |
+| --- | --- | --- |
+| Visibility | Public | `GET /repos/oaslananka/ssh-mcp-pro` |
+| Default branch | `main` | Same |
+| License | MIT | `LICENSE`, repo metadata `license.spdx_id: MIT` |
+| Maintenance signal | Active — created 2026-06-28, commits and one open release PR as of this audit | Commit history, `list_workflow_runs` |
+| Archived/deprecated signal | None found | `archived: false`, `disabled: false` |
+| Primary purpose | MCP server exposing policy-guarded SSH automation tools to LLM clients | `README.md` intro, `package.json` `description` |
+| Stated maturity in README | Not explicitly labeled experimental/beta/stable | README documents strict security defaults and a full config surface, which reads as production-intent, but no version-stability statement (e.g. "pre-1.0, breaking changes expected") is made anywhere — **Needs human confirmation**: is `1.x` intended as stable, or still stabilizing? |
+
+## Language and package ecosystem inventory
+
+| Attribute | Value |
+| --- | --- |
+| Primary language | TypeScript (100% of `src/`) |
+| Runtime | Node.js, `engines.node: ">=22.22.2"` (also supports `24.15.0`, `26.3.0` per CI matrix) |
+| Package manager | pnpm `^11.5.1`, pinned exactly via `packageManager` field and `corepack`; `pnpm-lock.yaml` present and respected everywhere (no lockfile changes made by this audit) |
+| Build system | `tsc` (`tsconfig.json`), no bundler — ships plain compiled JS + `.d.ts` |
+| Test framework | Vitest (unit/integration/e2e/perf projects), Stryker (mutation testing), `fast-check` (property-based testing) |
+| Lint/format | ESLint (`eslint.config.mjs`), Prettier, `.editorconfig` |
+| Docs generator | TypeDoc, deployed to GitHub Pages |
+| CLI/API/SDK/MCP surface | MCP server (stdio + Streamable HTTP transports) with two published binaries (`ssh-mcp-pro`, `ssh-mcp-pro-agent`); no separate SDK package |
+| Container | Docker, multi-stage, multi-arch (`linux/amd64`, `linux/arm64`), published to GHCR |
+| Monorepo/multi-package | No — confirmed single package. `pnpm-workspace.yaml` declares `packages: [.]` only; its other fields (`engineStrict`, `strictDepBuilds`, `allowBuilds`, dependency `overrides`) are pnpm supply-chain hardening settings, not a multi-package structure |
+| Other language ecosystems (Python, Go, Rust) | **Not applicable** — no `pyproject.toml`, `go.mod`, or `Cargo.toml` found in the repository |
+
+## Publishing and release inventory
+
+| Platform | Present? | Package/artifact name | Version source | Publish trigger |
+| --- | --- | --- | --- | --- |
+| npm | Yes | `ssh-mcp-pro` | `package.json` `version`, synced via `scripts/sync-version.mjs` | `release.yml` → `release-assets` job, conditional on repo variable `AUTO_RELEASE_PUBLISH` |
+| Docker / GHCR | Yes | `ghcr.io/oaslananka/ssh-mcp-pro` | Derived from the pushed release tag (`v*.*.*` or `ssh-mcp-pro-v*`) | `docker.yml` → `publish-ghcr`, on tag push / published release / manual dispatch |
+| GitHub Releases | Configured, unused | — | release-please | 0 releases published to date |
+| PyPI | **Not applicable** | — | — | No Python packaging files present |
+| VS Code Marketplace | **Not applicable** | — | — | Not an editor extension |
+| Homebrew | **Not applicable** (no formula found) | — | — | Could be added later as a distribution channel; not currently planned anywhere in the repo |
+| MCP Registry | Yes | `io.github.oaslananka/ssh-mcp-pro` | `server.json`/`mcp.json`, validated by `mcp-registry.yml` | Manual/PR-validated, tracked in `REGISTRY_SUBMISSION.md` |
+| Documentation site | Yes | TypeDoc → GitHub Pages | Generated from `src/` entry points | `docs.yml`, on push to `main` |
+
+See "Package publishing maturity" below for the per-platform detail (metadata quality,
+trusted publishing, checksums, provenance) this table only inventories.
 
 ## GitHub Community Standards status
 
@@ -170,6 +219,45 @@ open PR #1 (`chore(main): release ssh-mcp-pro 1.2.0`) is the first opportunity t
 exercise it end-to-end — merging it is a repository decision, not something this audit
 takes on itself.
 
+## Package publishing maturity
+
+### npm
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| Package metadata (`name`, `description`, `keywords`, `author`, `license`) | Passed | `package.json` |
+| `repository`/`bugs`/`homepage` fields | Passed | All three present and point to the correct repo |
+| `files` allowlist | Passed | Explicit allowlist (`dist`, `docs` minus `docs/api`, `examples`, key root docs) rather than publishing everything |
+| `exports` / `main` / `types` / `bin` | Passed | `exports: "./dist/index.js"`, `types: "dist/index.d.ts"`, two `bin` entries (`ssh-mcp-pro`, `ssh-mcp-pro-agent`) |
+| `engines` | Passed | Enforced (`engine-strict=true` per `.npmrc`/CONTRIBUTING) |
+| Trusted publishing / OIDC (vs. long-lived token) | Passed | `release-assets` job has `id-token: write`; the publish step explicitly runs `unset NODE_AUTH_TOKEN NPM_CONFIG_USERCONFIG` before `npm publish --provenance` — this is deliberate use of npm's OIDC trusted-publisher flow, not a stored `NPM_TOKEN`. No npm token secret was found anywhere in the workflow set |
+| Publish gating | Passed | Only runs when release-please reports `release_created == 'true'` **and** repo variable `AUTO_RELEASE_PUBLISH == 'true'` — a release PR merge does not by itself publish |
+| Post-publish verification | Passed | Polls `pnpm view ssh-mcp-pro@<version>` up to 18 times with backoff to confirm the publish actually landed |
+| `publint` / `arethetypeswrong` | Missing | Not run. Recommended, not applied — see "Safe refactor opportunities" |
+| Package version | 1.1.5 (unpublished) | `package.json`; nothing published to the npm registry yet since no release has shipped — **Needs human confirmation** by checking `npm view ssh-mcp-pro` directly if this audit's snapshot is stale |
+
+### Docker / GHCR
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| `Dockerfile` | Passed | Multi-stage build, non-root `USER node`, `HEALTHCHECK` defined |
+| `.dockerignore` | Passed | Present |
+| Base image pinning | Passed | `node:24-alpine` pinned by digest (`@sha256:...`), not just a tag |
+| OCI labels | Passed | `title`, `description`, `url`, `documentation`, `source`, `revision`, `licenses`, `created` — all set and verified by a CI smoke-test step that asserts exact label values |
+| Tag policy | Passed | Publishes both the bare version (`1.1.5`) and the release tag; no mutable `latest` tag is pushed |
+| Multi-arch build | Passed | `linux/amd64,linux/arm64` via Buildx + QEMU, `--check` step validates cross-platform buildability even on PRs that don't publish |
+| Provenance/SBOM on the image itself | Passed | `docker buildx build --provenance=true --sbom=true` on the published image (distinct from the npm-package SBOM) |
+| Digest verification post-publish | Passed | Asserts the pushed manifest's digest matches expectations for both platforms, and cross-checks the GHCR package API for the expected tags before declaring success |
+| Image vulnerability scanning (Trivy/Grype) | Missing | No scanner found in `docker.yml` or elsewhere. Recommended — see "Safe refactor opportunities" |
+| Hadolint (Dockerfile linting) | Missing | Not present. Recommended, low-risk to add |
+
+### PyPI, Go modules, Rust crates, VS Code Marketplace, Homebrew
+
+**Not applicable.** No `pyproject.toml`, `go.mod`, `Cargo.toml`, VS Code extension manifest,
+or Homebrew formula exists in this repository, and nothing in the docs suggests one is
+planned. If that changes, re-run this section of the audit against the relevant
+ecosystem's checklist.
+
 ## Quality maturity
 
 | Item | Status | Evidence |
@@ -236,6 +324,86 @@ takes on itself.
 | SLSA / provenance | Passed | `actions/attest-build-provenance` (build provenance, not full SLSA level claim) |
 | Minimal Actions permissions | Passed | Verified directly in `release.yml`, `scorecard.yml`, `ci.yml` |
 
+## Developer experience maturity
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| One-command setup | Passed | `Taskfile.yml` (`task install`) + documented `pnpm install --frozen-lockfile` in `CONTRIBUTING.md` |
+| One-command verify | Passed | `task verify` chains lint/format/typecheck/test/build; `pnpm run check` is the fuller CI-equivalent gate |
+| Git hooks | Passed | `pnpm run prepare` wires `.githooks` automatically on install |
+| `.env.example` | Passed (pre-existing) | Present at repo root, documents `SSH_MCP_*` variables |
+| `.editorconfig` | Passed (pre-existing) | Present |
+| Troubleshooting docs | Passed (added) | `docs/troubleshooting.md` |
+| Local setup doc | Passed (added) | `docs/development/local-setup.md` (previously only in `CONTRIBUTING.md`; this cross-links rather than forks it) |
+| `.devcontainer` | Missing | Not present — **Optional**, not required for a Node/pnpm project with a straightforward toolchain |
+| Debug/logging documentation | Partial | `SSH_MCP_DEBUG` is documented in the README config table; no dedicated "how to debug a failing session" guide existed before this PR — added as part of `docs/troubleshooting.md` |
+
+## API/CLI stability
+
+| Item | Status | Evidence |
+| --- | --- | --- |
+| Public API surface definition | Partial | The MCP tool/resource/prompt registry is the primary "public API"; it's implicitly defined by `src/tools/*` and exposed via `mcp-contract` tests, but there's no single stability statement (e.g. "tool schemas are covered by SemVer, additions are minor, removals are major") |
+| CLI flag stability | Partial | Flags are enumerated in `src/cli.ts` (now documented in `docs/reference/cli.md`, added by this PR); unknown flags are silently ignored by design, which is forgiving but also means a typo'd flag never errors — worth being aware of, not necessarily a defect |
+| Breaking change policy | Partial | Conventional Commits `!`/`BREAKING CHANGE:` conventions exist and drive release-please's major-version bump, but there's no prose policy stating what counts as a breaking change for *this* project's specific surfaces (tool schema, CLI flags, env vars, HTTP endpoints) |
+| Deprecation policy | Missing (added by this PR) | `docs/development/deprecation-policy.md` — states the current honest position (no formal deprecation window has ever been exercised yet, project is pre-1.x-maturity despite `1.x` versioning) rather than inventing a policy with no track record |
+| Migration guide | Passed (pre-existing) | `MIGRATION.md` |
+| MCP tool schema stability | Needs human confirmation | `test/unit/mcp-contract.test.ts` validates schema shape continuously, which is good signal, but whether schema changes are treated as SemVer-significant is a maintainer policy question, not something inferable from tests alone |
+| Config schema versioning | Missing | Environment variables and the optional `SSH_MCP_POLICY_FILE` JSON have no explicit schema version field; a policy file written for one version isn't guaranteed forward-compatible by anything other than convention |
+
+## README and badge review
+
+Current badges (top of `README.md`): npm version, license, CI, API Docs, OpenSSF
+Scorecard. This is already a restrained, non-cluttered set — the audit's main note is
+about accuracy, not quantity:
+
+| Badge | Status | Note |
+| --- | --- | --- |
+| npm version | Passed | Accurate once a release is published; currently reflects `package.json`'s unpublished `1.1.5` |
+| License | Passed | Accurate |
+| CI | Passed | Accurate, links to `ci.yml` |
+| API Docs | Passed | Accurate, links to the deployed TypeDoc site |
+| OpenSSF Scorecard | Needs human confirmation | Currently misleading in one specific way: `publish_results: false` means there is no published score behind this badge yet (see "Scorecard readiness" above). Recommend either fixing `publish_results` or adding a one-line caveat until it's live — not changed by this PR since it's a judgment call about how to represent an intentionally-disabled feature |
+| OpenSSF Best Practices | Missing | No badge yet — correctly absent, since no badge has been issued (see `docs/openssf-evidence.md`); adding one now would be a false claim |
+| Adoption signals (npm downloads, Docker pulls, GitHub release downloads) | Not applicable | No release has shipped; these would all read as zero/nonexistent right now. Revisit after the first release |
+| Donation button (Buy Me a Coffee) | Passed | Present, and correctly placed in the body rather than above the fold/title — matches the guidance of using it sparingly |
+
+No badges were added or removed by this PR — the existing set was already reasonable
+and none of the audit's findings justify a change without human judgment (see the
+OpenSSF Scorecard row above).
+
+## Safe refactor opportunities
+
+Legend: prioritization (`Required now` / `Recommended` / `Optional` / `Future` / `Not
+applicable` / `Needs human confirmation`). "Safe" here means: no behavior change, no
+public API impact, no build/publish system impact — confirmed by classification, not
+just intent.
+
+| Opportunity | Classification | Type | Notes |
+| --- | --- | --- | --- |
+| Community/governance docs (this PR) | Done | Documentation-only | Already applied |
+| Diátaxis doc structure (this PR) | Done | Documentation-only | Already applied |
+| `gitleaks.yml` (this PR) | Done | CI/workflow-only | Already applied, one bug fixed post-merge-attempt (missing `GITHUB_TOKEN`) |
+| Add `publint` as an advisory (non-blocking) npm packaging check | Recommended | CI/workflow-only + new devDependency | Not applied by this audit — adding a devDependency and a new script is a build-tooling change, and the instructions for this audit call for leaving those as recommendations rather than auto-applying them |
+| Add `arethetypeswrong` check | Optional | CI/workflow-only + new devDependency | Same reasoning as `publint`; lower priority since the package ships a single ESM entry point, not a dual CJS/ESM surface where ATW findings are most valuable |
+| Add Trivy or Grype image scanning to `docker.yml` | Recommended | CI/workflow-only | No behavior change to the shipped image; only adds a scan step. Not applied here to keep this PR's diff limited to what was explicitly asked for; filed as a recommended issue |
+| Add Hadolint for Dockerfile linting | Optional | CI/workflow-only | Same reasoning |
+| Formalize a breaking-change/API-stability statement | Recommended | Documentation-only | Partially done via `docs/development/api-stability.md` (added by this PR); the remaining piece is a maintainer decision about what counts as "the public API" for versioning purposes |
+| `docs/development/deprecation-policy.md` | Done | Documentation-only | Already applied |
+
+## High-risk refactor opportunities
+
+These are **not applied** by this audit under any circumstance — they require either a
+maintainer decision, affect a live build/publish/security surface, or both:
+
+| Opportunity | Classification | Type | Why it's high-risk |
+| --- | --- | --- | --- |
+| Fix the 7 open CodeQL alerts (1 High) | Required now (but not by this audit) | Public-API-adjacent / behavioral | Touches scripts that handle credentials and network I/O (`scripts/start-chatgpt-http.mjs`, `src/remote/agent-cli.ts`, `scripts/lib/command.mjs`); a careless fix could change error handling behavior. Needs a maintainer or a dedicated security-focused PR, not a drive-by doc-audit fix |
+| Apply branch protection to `main` | Required now | GitHub Settings / admin action | Immediately changes how the sole maintainer can push; must be a deliberate choice, not an automated one |
+| Re-enable Scorecard `publish_results` | Recommended | CI/workflow, cross-cutting | Requires removing global `env:`/`defaults:` blocks from multiple workflows simultaneously — a coordinated change with real potential for behavioral drift across CI, release, and Docker workflows |
+| Migrate Conventional Commit tooling to strict enforcement (reject non-conforming commits at push time, not just lint) | Optional | CI/workflow-only, but changes contributor experience | Currently advisory-shaped (`lint:commits`); making it a hard gate is a policy call affecting all future contributors |
+| Add a config-schema version field to `SSH_MCP_POLICY_FILE` | Future | Public-API-impacting | Would require a code change to `src/config.ts`'s policy loader and a decision about backward compatibility for existing deployments' policy files |
+| Add npm ecosystem to `dependabot.yml` | Not applicable (intentional) | Dependency-management | Already assessed and rejected — see "Dependabot" row in Security/supply-chain maturity |
+
 ## Missing files (before this PR)
 
 - `CODE_OF_CONDUCT.md`
@@ -245,11 +413,16 @@ takes on itself.
 - `.bestpractices.json`
 - `docs/openssf-evidence.md`, `docs/openssf-gap-analysis.md`, `docs/openssf-proposal-links.md`
 - Diátaxis folders: `docs/tutorials/`, `docs/how-to/`, `docs/reference/`, `docs/explanation/`
-- `docs/development/*` (coding standards, testing policy, release process, dependency management, commit conventions)
-- `docs/security/*` (threat model, release integrity, input validation, assurance case)
+- `docs/development/*` (coding standards, testing policy, release process, dependency
+  management, commit conventions, local setup, API stability, deprecation policy)
+- `docs/security/*` (threat model, release integrity, input validation, assurance case,
+  secrets management)
+- `docs/professionalization-plan.md`, `docs/troubleshooting.md`,
+  `docs/reference/configuration.md`, `docs/reference/compatibility.md`
 
-All of the above are added by this PR. `NOTICE` and `CITATION.cff` were considered and
-intentionally **not** added — see "Not applied intentionally" in the PR description.
+All of the above are added by this PR. `NOTICE`, `THIRD_PARTY_NOTICES.md`, and
+`CITATION.cff` were considered and intentionally **not** added — see "Not applied
+intentionally" in the PR description.
 
 ## Missing workflows (before this PR)
 
@@ -281,6 +454,23 @@ change, and are intentionally left as recommendations/issues rather than direct 
 6. **Modifying the OpenSSF Scorecard badge or removing it** pending the
    `publish_results` decision above — left as-is, flagged for maintainer awareness.
 
+## Manual GitHub settings required
+
+None of these can be done via a file change; they need repository Settings access:
+
+| Setting | Current state | Needed action |
+| --- | --- | --- |
+| Branch protection / ruleset on `main` | Not applied (404 from the protection API) | Import `.github/rulesets/main-protection.json` under Settings → Rules, or configure classic branch protection to match it |
+| Required status checks | Described in the unapplied ruleset only | Apply alongside branch protection |
+| Required PR review count | Described in the unapplied ruleset only (1 approval) | Apply alongside branch protection |
+| Private vulnerability reporting | Unknown from file inspection alone | Confirm enabled under Settings → Security & analysis to match `SECURITY.md`'s claims |
+| Dependabot alerts / dependency graph | Dependency graph and secret scanning confirmed enabled; **Dependabot security updates confirmed disabled** via API | Decide whether to enable security updates given Renovate already covers routine npm updates |
+| npm trusted publishing registration | Workflow-side OIDC publish flow is implemented (no stored token, `--provenance`) | On npmjs.com, register this repo/workflow as a trusted publisher for the `ssh-mcp-pro` package (a one-time npmjs.com-side setup outside this repo) — **Needs human confirmation** whether this registration already exists, since it can't be checked from the repo |
+| PyPI trusted publishing | Not applicable | No PyPI package exists |
+| Docker registry (GHCR) settings | Package visibility/linkage not inspected by this audit | Confirm the GHCR package is linked to this repo and set to public visibility once the first image is published |
+| OpenSSF BadgeApp final approval | Not submitted | Submit via bestpractices.dev once the two blockers in `docs/openssf-evidence.md` close |
+| CODEOWNERS enforcement | File exists but isn't enforced without branch protection | Enable "Require review from Code Owners" alongside branch protection |
+
 ## Recommended issues
 
 The following are proposed as GitHub issues (not opened automatically by this audit,
@@ -305,6 +495,14 @@ them to be filed as a follow-up):
    with language clarifying no public score is currently published.
 7. **[governance] Decide on a second maintainer / reviewer** before targeting OpenSSF
    Silver or a "mature OSS" claim that depends on independent code review.
+8. **[supply-chain] Add container image vulnerability scanning** (Trivy or Grype) to
+   `docker.yml` before the first GHCR image is published from a release tag.
+9. **[packaging] Add `publint` (and optionally `arethetypeswrong`) as an advisory npm
+   packaging check**, run in CI but non-blocking initially, ahead of the first npm
+   publish.
+10. **[registry] Confirm npm trusted-publisher registration exists on npmjs.com** for
+    this repository/workflow, since the workflow-side OIDC flow is already implemented
+    but the npmjs.com-side registration can't be verified from the repo.
 
 ## Next actions
 

@@ -11,6 +11,10 @@ organized for lookup rather than reading start-to-finish. This index follows the
   connector profile (`full`, `remote-safe`, `chatgpt`, `claude`, `remote-readonly`,
   `remote-broker`) exposes.
 - [CLI reference](cli.md) — `ssh-mcp-pro` and `ssh-mcp-pro-agent` command-line flags.
+- [Configuration reference](configuration.md) — the `SSH_MCP_*` table grouped by
+  concern, pointing back to the canonical table in the README.
+- [Compatibility reference](compatibility.md) — supported Node.js/pnpm/OS/container
+  platforms and MCP transport/client compatibility.
 - [MCP metadata](../../mcp.json) and [server metadata](../../server.json) — machine-readable
   capability and registry declarations.
 - [Security defaults](../../SECURITY_DECISIONS.md) — the exact default-deny behaviors and
