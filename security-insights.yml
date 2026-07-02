@@ -1,0 +1,127 @@
+header:
+  schema-version: 2.2.0
+  last-updated: "2026-07-03"
+  last-reviewed: "2026-07-03"
+  url: https://raw.githubusercontent.com/oaslananka/ssh-mcp-pro/main/security-insights.yml
+  comment: |
+    Single-repository security-insights.yml (contains both project and repository
+    sections). Generated as part of an OpenSSF-style maturity audit -- see
+    docs/repo-maturity-report.md for the evidence behind every field below. Fields
+    with no verifiable evidence are omitted rather than filled with placeholders.
+
+project:
+  name: ssh-mcp-pro
+  homepage: https://github.com/oaslananka/ssh-mcp-pro
+  administrators:
+    - name: Osman Aslan
+      affiliation: Independent
+      email: oaslananka@gmail.com
+      social: https://github.com/oaslananka
+      primary: true
+  documentation:
+    quickstart-guide: https://github.com/oaslananka/ssh-mcp-pro#quickstart
+    detailed-guide: https://github.com/oaslananka/ssh-mcp-pro/blob/main/INSTALL.md
+    code-of-conduct: https://github.com/oaslananka/ssh-mcp-pro/blob/main/CODE_OF_CONDUCT.md
+    release-process: https://github.com/oaslananka/ssh-mcp-pro/blob/main/docs/development/release-process.md
+    support-policy: https://github.com/oaslananka/ssh-mcp-pro/blob/main/SUPPORT.md
+  repositories:
+    - name: ssh-mcp-pro
+      url: https://github.com/oaslananka/ssh-mcp-pro
+      comment: |
+        Single-repository project; no separate sibling repositories exist.
+  vulnerability-reporting:
+    reports-accepted: true
+    bug-bounty-available: false
+    contact:
+      name: Repository maintainer, via GitHub private security advisories
+      primary: true
+    policy: https://github.com/oaslananka/ssh-mcp-pro/blob/main/SECURITY.md
+    comment: |
+      No bug bounty program exists. Reports are accepted via GitHub private
+      security advisories; see SECURITY.md for the documented 7-day response
+      target. That target is unverified in practice -- no vulnerability report
+      has been received yet (see docs/openssf-evidence.md).
+
+repository:
+  url: https://github.com/oaslananka/ssh-mcp-pro
+  status: active
+  accepts-change-request: true
+  accepts-automated-change-request: true
+  core-team:
+    - name: Osman Aslan
+      affiliation: Independent
+      email: oaslananka@gmail.com
+      social: https://github.com/oaslananka
+      primary: true
+  documentation:
+    contributing-guide: https://github.com/oaslananka/ssh-mcp-pro/blob/main/CONTRIBUTING.md
+    security-policy: https://github.com/oaslananka/ssh-mcp-pro/blob/main/SECURITY.md
+    governance: https://github.com/oaslananka/ssh-mcp-pro/blob/main/GOVERNANCE.md
+    dependency-management-policy: https://github.com/oaslananka/ssh-mcp-pro/blob/main/docs/development/dependency-management.md
+  license:
+    url: https://github.com/oaslananka/ssh-mcp-pro/blob/main/LICENSE
+    expression: MIT
+  release:
+    changelog: https://github.com/oaslananka/ssh-mcp-pro/blob/main/CHANGELOG.md
+    automated-pipeline: true
+    distribution-points:
+      - uri: pkg:npm/ssh-mcp-pro
+        comment: |
+          Package metadata and publish workflow are complete and use npm OIDC
+          trusted publishing (no stored token); no version has been published yet.
+      - uri: pkg:oci/ssh-mcp-pro?repository_url=ghcr.io%2Foaslananka
+        comment: |
+          Multi-arch (linux/amd64, linux/arm64) image with OCI labels, build
+          provenance, and SBOM attached at publish time; not yet published.
+    comment: |
+      Release pipeline (release-please, SBOM, checksums, build-provenance
+      attestation) is fully implemented but has never been exercised end-to-end --
+      zero releases have shipped as of this file's last-updated date.
+  security:
+    assessments:
+      self:
+        evidence: https://github.com/oaslananka/ssh-mcp-pro/blob/main/docs/security/assurance-case.md
+        date: "2026-07-03"
+        comment: |
+          Self-assessment completed as part of an OpenSSF-style maturity audit; see
+          docs/repo-maturity-report.md and docs/security/assurance-case.md for the
+          full evidence and its explicitly stated limits (no independent review has
+          ever occurred; 7 open CodeQL alerts as of this date).
+    tools:
+      - name: CodeQL
+        type: SAST
+        integration:
+          ci: true
+          release: false
+          adhoc: false
+        comment: Runs weekly and on every pull request via .github/workflows/codeql.yml.
+      - name: Gitleaks
+        type: secret-scanning
+        integration:
+          ci: true
+          release: false
+          adhoc: false
+        comment: |
+          Full-history scan via .github/workflows/gitleaks.yml, in addition to
+          GitHub's own native secret scanning and push protection (both enabled).
+      - name: Dependabot
+        type: SCA
+        integration:
+          ci: true
+          release: false
+          adhoc: false
+        comment: Covers the github-actions ecosystem only; see dependency-management-policy.
+      - name: Renovate
+        type: SCA
+        integration:
+          ci: true
+          release: false
+          adhoc: false
+        comment: Covers the npm ecosystem; intentionally not duplicated by Dependabot.
+      - name: dependency-review-action
+        type: SCA
+        integration:
+          ci: true
+          release: false
+          adhoc: false
+        comment: Blocks pull requests introducing a moderate-or-worse vulnerable dependency.

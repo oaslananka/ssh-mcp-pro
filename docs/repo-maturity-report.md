@@ -283,7 +283,8 @@ ecosystem's checklist.
 | ROADMAP.md | Passed (added) | Grounded in real open items (branch protection, first release, CodeQL alerts, contributor growth) rather than invented features |
 | CODEOWNERS | Passed (pre-existing) | `.github/CODEOWNERS` |
 | Support policy | Passed (pre-existing) | `SUPPORT.md` |
-| Deprecation policy | Missing | Not documented; `MIGRATION.md` covers version-to-version compatibility but not a formal deprecation window policy |
+| Deprecation policy | Passed (added) | `docs/development/deprecation-policy.md` — states intent honestly as forward-looking, since no deprecation has ever happened yet |
+| Security Insights (OpenSSF spec) | Passed (added) | `security-insights.yml`, schema-version 2.2.0, verified against the upstream `ossf/security-insights-spec` examples before writing; fields without verifiable evidence (bug bounty, third-party assessment, attestation predicate URIs) are omitted rather than filled with placeholders |
 | Backward compatibility policy | Partial | Implied by `engines` in `package.json` and `MIGRATION.md`, not formalized as policy |
 
 ## Community maturity (CHAOSS-style)
@@ -291,10 +292,11 @@ ecosystem's checklist.
 | Metric | Status | Notes |
 | --- | --- | --- |
 | Bus factor | 1 | Single collaborator with admin rights; this is the single most important maturity constraint in this report |
-| Time to first response | Not applicable (insufficient history) | 3 issues open, no response-time data surfaced by the API used |
+| Time to first response | Not applicable (insufficient history) | `open_issues_count: 3` reflects 3 open pull requests (all bot-authored); `list_issues` confirms **0 actual open issues** — no human-filed issue has ever received (or needed) a first response |
 | PR review process | Partial | A ruleset *describing* 1 required approval exists but is unapplied; zero PRs have ever received a human review |
 | Contributor activity | Not applicable (insufficient history) | 0 non-maintainer, non-bot contributors to date |
 | Release frequency | Not applicable (insufficient history) | 0 releases published |
+| `good first issue` / `help wanted` label usage | Not applicable (insufficient history) | Both labels exist in the repo's default label set, but there are 0 open issues to apply them to — usage can't be assessed until issues exist |
 | Documentation discoverability | Passed | README links out to all major docs; this PR adds Diátaxis structure |
 | Change request acceptance process | Passed | `CONTRIBUTING.md` + PR template + required `pnpm run check` |
 
@@ -419,6 +421,8 @@ maintainer decision, affect a live build/publish/security surface, or both:
   secrets management)
 - `docs/professionalization-plan.md`, `docs/troubleshooting.md`,
   `docs/reference/configuration.md`, `docs/reference/compatibility.md`
+- `security-insights.yml` (OpenSSF Security Insights spec, schema-version 2.2.0 —
+  verified against `ossf/security-insights-spec`'s own examples before writing)
 
 All of the above are added by this PR. `NOTICE`, `THIRD_PARTY_NOTICES.md`, and
 `CITATION.cff` were considered and intentionally **not** added — see "Not applied
