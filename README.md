@@ -1,10 +1,12 @@
-[![npm version](https://img.shields.io/npm/v/ssh-mcp-pro.svg)](https://www.npmjs.com/package/ssh-mcp-pro)
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![CI](https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml/badge.svg)](https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml)
-[![API Docs](https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/docs.yml/badge.svg)](https://oaslananka.github.io/ssh-mcp-pro/)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/oaslananka/ssh-mcp-pro/badge)](https://securityscorecards.dev/viewer/?uri=github.com/oaslananka/ssh-mcp-pro)
+<h1 align="center">ssh-mcp-pro</h1>
 
-# ssh-mcp-pro
+<p align="center">
+  <a href="https://www.npmjs.com/package/ssh-mcp-pro"><img alt="npm version" src="https://img.shields.io/npm/v/ssh-mcp-pro.svg" /></a>
+  <a href="https://www.npmjs.com/package/ssh-mcp-pro"><img alt="npm downloads" src="https://img.shields.io/npm/dt/ssh-mcp-pro.svg" /></a>
+  <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
+  <a href="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="https://oaslananka.github.io/ssh-mcp-pro/"><img alt="API Docs" src="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/docs.yml/badge.svg" /></a>
+</p>
 
 <p align="center">
   <a href="https://www.buymeacoffee.com/oaslananka">

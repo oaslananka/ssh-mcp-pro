@@ -232,18 +232,20 @@ duplicating it:
 | --- | --- | --- |
 | Semantic Versioning | Passed | `package.json` version `1.1.5`, `release-please-config.json` uses `node` release type |
 | CHANGELOG.md, Keep a Changelog format | Passed | Header explicitly declares Keep a Changelog v1.1.0 + SemVer |
-| GitHub Releases | Missing | `list_releases` → `[]`. No release has ever been published |
-| Release notes | Needs human confirmation | release-please generates them on first release; unverified until one ships |
+| GitHub Releases | Missing | `list_releases` → `[]`. No **GitHub Release** has ever been published — this is still accurate and unrelated to npm (see correction below) |
+| Release notes | Needs human confirmation | release-please generates them on first GitHub Release; unverified via that mechanism specifically until one ships |
 | Release workflow | Passed | `release.yml` — release-please PR flow, gated on `github.repository` |
 | Checksums | Passed | `sha256sum` generated for the packed tarball and SBOM in `release-assets` job |
 | Artifact provenance / attestation | Passed | `actions/attest-build-provenance` run twice (package + SBOM) |
 | SBOM | Passed | `pnpm run sbom` (CycloneDX) generated and attested per release |
-| npm publish | Needs human confirmation | Gated behind repo variable `AUTO_RELEASE_PUBLISH`; current value not inspected (requires repo Settings access) — confirm intentional |
+| npm publish | Passed **[corrected 2026-07-03]** | Originally marked "needs human confirmation" on the assumption nothing had been published. Verified directly against `registry.npmjs.org/ssh-mcp-pro`: versions `1.0.0`–`1.1.5` are live, with 613 npm downloads in the preceding month. The package **is** published — just not via the `release.yml` → `AUTO_RELEASE_PUBLISH` path this audit was watching, which means that specific automated path is still unexercised even though the package itself is real |
 
-The release pipeline is genuinely strong for a project that hasn't shipped yet. The
-open PR #1 (`chore(main): release ssh-mcp-pro 1.2.0`) is the first opportunity to
-exercise it end-to-end — merging it is a repository decision, not something this audit
-takes on itself.
+The release pipeline is genuinely strong. Correction: this report previously said "for
+a project that hasn't shipped yet" — that referred to GitHub Releases specifically and
+was worded ambiguously; the npm package itself has shipped multiple versions already.
+The open PR #1 (`chore(main): release ssh-mcp-pro 1.2.0`) is still the first opportunity
+to exercise the *automated* `release.yml` → npm-publish path end-to-end — merging it is
+a repository decision, not something this audit takes on itself.
 
 ## Package publishing maturity
 
@@ -381,24 +383,33 @@ ecosystem's checklist.
 
 ## README and badge review
 
-Current badges (top of `README.md`): npm version, license, CI, API Docs, OpenSSF
-Scorecard. This is already a restrained, non-cluttered set — the audit's main note is
-about accuracy, not quantity:
+> **Correction [updated 2026-07-03, later same day]:** the original audit assumed
+> `package.json`'s `1.1.5` was unpublished, based on `list_releases` returning `[]`
+> (zero GitHub Releases). That was true for GitHub Releases but wrong about npm: a
+> direct query against `registry.npmjs.org/ssh-mcp-pro` shows versions `1.0.0` through
+> `1.1.5` actually published, with 613 downloads in the preceding month. **The npm
+> package has been live for some time, published outside the GitHub Release /
+> release-please flow this audit was tracking.** This is a correction to "Release
+> maturity" and "Package publishing maturity" above, not a new event — flagging it here
+> because it directly affects badge accuracy, and because every other statement in this
+> report about "0 releases" refers specifically to GitHub Releases, which is still
+> accurate; npm publishing is a separate, already-exercised channel.
+
+Badges were also physically reworked (centered, `<h1 align="center">` title) at the
+maintainer's request, and two badge changes were made based on live verification, not
+guesswork:
 
 | Badge | Status | Note |
 | --- | --- | --- |
-| npm version | Passed | Accurate once a release is published; currently reflects `package.json`'s unpublished `1.1.5` |
+| npm version | Passed | Accurate — confirmed published |
+| npm downloads (total) | Passed (added) | New: `img.shields.io/npm/dt/ssh-mcp-pro.svg`. Legitimate now that the package is confirmed live |
 | License | Passed | Accurate |
 | CI | Passed | Accurate, links to `ci.yml` |
 | API Docs | Passed | Accurate, links to the deployed TypeDoc site |
-| OpenSSF Scorecard | Needs human confirmation | Currently misleading in one specific way: `publish_results: false` means there is no published score behind this badge yet (see "Scorecard readiness" above). Recommend either fixing `publish_results` or adding a one-line caveat until it's live — not changed by this PR since it's a judgment call about how to represent an intentionally-disabled feature |
+| OpenSSF Scorecard | Removed | **Verified broken, not just "no data":** `GET api.securityscorecards.dev/projects/github.com/oaslananka/ssh-mcp-pro` returns HTTP 404, and the badge itself rendered as `invalid repo path` on GitHub — a visibly broken red badge, worse than "no score yet." Removed rather than left displaying an error. Re-add once `publish_results` is fixed (see "Scorecard readiness") and a real score exists |
 | OpenSSF Best Practices | Missing | No badge yet — correctly absent, since no badge has been issued (see `docs/openssf-evidence.md`); adding one now would be a false claim |
-| Adoption signals (npm downloads, Docker pulls, GitHub release downloads) | Not applicable | No release has shipped; these would all read as zero/nonexistent right now. Revisit after the first release |
-| Donation button (Buy Me a Coffee) | Passed | Present, and correctly placed in the body rather than above the fold/title — matches the guidance of using it sparingly |
-
-No badges were added or removed by this PR — the existing set was already reasonable
-and none of the audit's findings justify a change without human judgment (see the
-OpenSSF Scorecard row above).
+| Docker pulls / GitHub release downloads | Not applicable | No GHCR image or GitHub Release has shipped yet. npm downloads (above) is the one adoption signal that's actually real right now |
+| Donation button (Buy Me a Coffee) | Passed | Present, kept below the title/badges rather than above the fold — matches the guidance of using it sparingly |
 
 ## Safe refactor opportunities
 
