@@ -145,8 +145,12 @@ try {
   fail("ssh-mcp-pro binary not found on PATH; run: npm install -g ssh-mcp-pro");
 }
 
+// Log only fixed literals derived from already-validated enum checks above, never
+// the raw environment-derived strings themselves (avoids js/clear-text-logging).
+const profileLabel = toolProfile === "chatgpt" ? "chatgpt" : "unknown";
+const authLabel = authMode === "bearer" || authMode === "oauth" ? authMode : "unknown";
 console.log(
-  `start:chatgpt: starting (public URL configured) with profile=${toolProfile}, auth=${authMode}, allowedHosts=${allowedHosts.length}`,
+  `start:chatgpt: starting (public URL configured) with profile=${profileLabel}, auth=${authLabel}, allowedHosts=${allowedHosts.length > 0 ? "configured" : "none"}`,
 );
 
 const child = spawn(serverBin, ["--transport=http"], {

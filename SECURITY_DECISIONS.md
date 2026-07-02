@@ -57,3 +57,12 @@ The flow is intentional:
 - The private key remains local; outbound payloads contain signed metadata, policy-limited capabilities, and policy-controlled action results.
 
 These findings are dismissed individually with a false-positive rationale. No broad CodeQL suppression is used.
+
+## Other CodeQL False-Positive Dispositions
+
+- **`js/file-access-to-http` in `scripts/check-dependency-freshness.mjs` (`fetchJson`)**: annotated in-code with `codeql[js/file-access-to-http]`. Every URL reaching `fetch()` is either a hardcoded constant or built by `registryPackageUrl()`, which validates the package name against `assertNpmPackageName()` before use; names originate from this repository's own `package.json`, not external input.
+- **`js/indirect-command-line-injection` in `scripts/lib/command.mjs` (`capture`, `run`)**: annotated in-code with `codeql[js/indirect-command-line-injection]` at both `spawnSync` call sites. This is a build/CI-only helper imported by internal maintenance scripts; it is not reachable from the shipped MCP server's runtime attack surface, and the Windows `cmd.exe` shim path quotes every argument via `quoteWindowsCommandArg()` before constructing the command line.
+
+## Clear-Text Logging Fix (CodeQL Alert #1)
+
+`scripts/start-chatgpt-http.mjs` previously logged `toolProfile`, `authMode`, and `allowedHosts.length` directly, all derived from `process.env`. CodeQL's `js/clear-text-logging` flagged this because the values were tainted by the environment, even though none of what was printed was itself secret (profile name, auth mode, and a count, not the URL or token values, which the code already deliberately avoids logging). Fixed by deriving the logged values from already-validated enum comparisons (`toolProfile === "chatgpt"`, `authMode === "bearer" || authMode === "oauth"`) instead of interpolating the environment-sourced strings directly, which both satisfies the analysis and keeps the log output equally informative.

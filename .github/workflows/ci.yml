@@ -477,6 +477,10 @@ jobs:
       - name: Package parity
         run: pnpm run check:package
 
+      - name: Lint package publish metadata (advisory)
+        continue-on-error: true
+        run: pnpm run pack:lint
+
       - name: Generate CycloneDX SBOM and package hash
         run: |
           set -euo pipefail
