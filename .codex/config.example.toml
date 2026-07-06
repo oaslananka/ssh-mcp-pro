@@ -1,0 +1,9 @@
+# Example Codex MCP configuration for ssh-mcp-pro.
+
+[[mcp_servers]]
+name = "ssh-mcp-pro"
+command = "npx"
+args = ["ssh-mcp-pro"]
+
+[mcp_servers.env]
+SSH_MCP_TRANSPORT = "stdio"

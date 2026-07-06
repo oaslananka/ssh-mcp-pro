@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "ssh-mcp-pro": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["ssh-mcp-pro"],
+      "env": {
+        "SSH_MCP_TRANSPORT": "stdio"
+      }
+    }
+  }
+}

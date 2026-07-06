@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "ssh-mcp-pro",
+  "version": "1.1.5",
+  "description": "SSH MCP Pro plugin for controlled SSH operations, remote host workflows, command execution guardrails, and infrastructure automation.",
+  "author": {
+    "name": "oaslananka",
+    "url": "https://github.com/oaslananka"
+  },
+  "skills": [
+    "./skills/ssh-operations",
+    "./skills/remote-host-workflow",
+    "./skills/security-guardrails"
+  ]
+}

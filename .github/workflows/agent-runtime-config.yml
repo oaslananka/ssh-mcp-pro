@@ -1,0 +1,68 @@
+name: Agent Runtime Config
+
+on:
+  pull_request:
+    paths:
+      - ".claude-plugin/plugin.json"
+      - ".mcp.json"
+      - ".vscode/mcp.example.json"
+      - ".codex/config.example.toml"
+      - "opencode.example.jsonc"
+      - "skills/**/SKILL.md"
+      - ".opencode/skills/**/SKILL.md"
+      - "docs/agent-runtime-config.md"
+      - ".github/workflows/agent-runtime-config.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".claude-plugin/plugin.json"
+      - ".mcp.json"
+      - ".vscode/mcp.example.json"
+      - ".codex/config.example.toml"
+      - "opencode.example.jsonc"
+      - "skills/**/SKILL.md"
+      - ".opencode/skills/**/SKILL.md"
+      - "docs/agent-runtime-config.md"
+      - ".github/workflows/agent-runtime-config.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-runtime-config-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Validate JSON files
+        run: |
+          python3 -m json.tool .claude-plugin/plugin.json >/dev/null
+          python3 -m json.tool .mcp.json >/dev/null
+          python3 -m json.tool .vscode/mcp.example.json >/dev/null
+          python3 -m json.tool opencode.example.jsonc >/dev/null
+      - name: Validate skill references
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          plugin = json.loads(Path('.claude-plugin/plugin.json').read_text())
+          assert plugin.get('$schema') == 'https://anthropic.com/claude-code/plugin.schema.json'
+          skills = plugin.get('skills')
+          assert isinstance(skills, list) and skills
+          for entry in skills:
+              assert entry.startswith('./skills/')
+              name = Path(entry).name
+              skill = Path(entry[2:]) / 'SKILL.md'
+              mirror = Path('.opencode/skills') / name / 'SKILL.md'
+              assert skill.is_file(), skill
+              assert mirror.is_file(), mirror
+              assert f'name: {name}' in skill.read_text(), skill
+              assert f'name: {name}' in mirror.read_text(), mirror
+          assert '[[mcp_servers]]' in Path('.codex/config.example.toml').read_text()
+          print('agent runtime config ok')
+          PY
