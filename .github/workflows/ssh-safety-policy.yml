@@ -1,0 +1,44 @@
+name: SSH Safety Policy
+
+on:
+  pull_request:
+    paths:
+      - README.md
+      - skills/**/SKILL.md
+      - .claude-plugin/plugin.json
+      - .github/workflows/ssh-safety-policy.yml
+  push:
+    branches: [main]
+    paths:
+      - README.md
+      - skills/**/SKILL.md
+      - .claude-plugin/plugin.json
+      - .github/workflows/ssh-safety-policy.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ssh-safety-policy-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Validate SSH safety docs
+        run: |
+          set -euo pipefail
+          test -f skills/security-guardrails/SKILL.md
+          grep -Riq "explicit approval" README.md skills/security-guardrails/SKILL.md skills/ssh-operations/SKILL.md
+          grep -Riq "rollback" skills/security-guardrails/SKILL.md skills/remote-host-workflow/SKILL.md
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          plugin=json.loads(Path('.claude-plugin/plugin.json').read_text())
+          assert './skills/security-guardrails' in plugin['skills']
+          print('ssh safety policy ok')
+          PY
