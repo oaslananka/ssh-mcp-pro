@@ -1,0 +1,105 @@
+name: Publish MCP Registry
+
+on:
+  pull_request:
+    paths:
+      - server.json
+      - package.json
+      - .github/workflows/publish-mcp-registry.yml
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Validate metadata without publishing.
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-mcp-registry-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  MCP_PUBLISHER_VERSION: v1.7.9
+
+jobs:
+  validate:
+    if: >-
+      ${{
+        github.event_name == 'pull_request' ||
+        (github.event_name == 'workflow_dispatch' && inputs.dry_run == true)
+      }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Validate MCP registry metadata
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('fs');
+          const server = JSON.parse(fs.readFileSync('server.json', 'utf8'));
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          if (!server.name || !server.name.startsWith('io.github.oaslananka/')) throw new Error('server.json must use io.github.oaslananka namespace');
+          if (!server.version || server.version !== pkg.version) throw new Error(`server.json version ${server.version} must match package.json ${pkg.version}`);
+          if (!Array.isArray(server.packages) || server.packages.length === 0) throw new Error('server.json must define packages');
+          const npmPackage = server.packages.find((entry) => entry.registryType === 'npm');
+          if (!npmPackage) throw new Error('server.json must include an npm package entry');
+          if (npmPackage.identifier !== pkg.name) throw new Error(`npm package identifier ${npmPackage.identifier} must match ${pkg.name}`);
+          console.log(`MCP metadata ready for ${server.name}@${server.version}`);
+          NODE
+
+  publish:
+    if: >-
+      ${{
+        github.repository_owner == 'oaslananka' &&
+        (github.event_name == 'release' ||
+         (github.event_name == 'workflow_dispatch' && inputs.dry_run != true))
+      }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: mcp-registry
+    permissions:
+      contents: read
+      id-token: write # required for mcp-publisher GitHub OIDC login
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Verify npm package exists
+        run: |
+          set -euo pipefail
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          for attempt in {1..18}; do
+            if published="$(npm view "${package_name}@${package_version}" version --silent 2>/tmp/npm-view.err)" && [ "$published" = "$package_version" ]; then
+              echo "Verified ${package_name}@${package_version} on npm."
+              exit 0
+            fi
+            echo "npm package ${package_name}@${package_version} is not visible yet (attempt ${attempt}/18)."
+            if [ -s /tmp/npm-view.err ]; then cat /tmp/npm-view.err; fi
+            sleep 10
+          done
+          echo "npm package ${package_name}@${package_version} was not verifiable." >&2
+          exit 1
+      - name: Install mcp-publisher
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" -o mcp-publisher.tar.gz
+          tar -xzf mcp-publisher.tar.gz mcp-publisher
+          chmod +x mcp-publisher
+          sudo mv mcp-publisher /usr/local/bin/mcp-publisher
+      - name: Publish to MCP Registry
+        run: |
+          set -euo pipefail
+          mcp-publisher login github-oidc
+          mcp-publisher publish
