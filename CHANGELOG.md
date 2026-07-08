@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.1.5...ssh-mcp-pro-v1.2.0) (2026-07-08)
+
+
+### Features
+
+* add device onboarding scripts and guide ([58f0104](https://github.com/oaslananka/ssh-mcp-pro/commit/58f0104122d7ee17e72dd3eb35064e6e55cd35db))
+* add process and system management tools ([a85f3e6](https://github.com/oaslananka/ssh-mcp-pro/commit/a85f3e60b9fe02c089c9e5a276af01dfa99d3d87))
+* SSH MCP server with remote control plane and ChatGPT connector ([d8058cd](https://github.com/oaslananka/ssh-mcp-pro/commit/d8058cd605c1dc9978c4217cb34ad255376856de))
+
+
+### Bug Fixes
+
+* **security:** resolve CodeQL alert [#1](https://github.com/oaslananka/ssh-mcp-pro/issues/1), add image scanning and publint ([#5](https://github.com/oaslananka/ssh-mcp-pro/issues/5)) ([1043dc8](https://github.com/oaslananka/ssh-mcp-pro/commit/1043dc80a5de75c97c8ed0705dde6ed5b68fa290))
+
 ## [1.1.4](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.1.3...ssh-mcp-pro-v1.1.4) (2026-06-16)
 
 
