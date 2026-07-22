@@ -27,6 +27,15 @@ choice, not an oversight (see the corresponding row in
   "Dependabot security updates" (automatic fix PRs) is enabled is a repository Settings
   toggle — see the manual actions list in the maturity report.
 
+### Published artifact verification
+
+`pnpm run audit:packed` installs the generated npm tarball in a clean consumer project
+and audits the resolved production graph without inheriting workspace overrides. Any
+remaining finding must match the machine-readable, time-bounded policy in
+[dependency-audit-exceptions.json](../security/dependency-audit-exceptions.json) and the
+public rationale in [Dependency Audit Exceptions](../security/dependency-audit-exceptions.md).
+Unexpected, expired, or stale exceptions fail the package gate.
+
 ## License compliance
 
 [scripts/check-licenses.mjs](../../scripts/check-licenses.mjs) enforces an allowlist

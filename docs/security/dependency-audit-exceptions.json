@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "exceptions": [
+    {
+      "id": "GHSA-frvp-7c67-39w9",
+      "package": "@hono/node-server",
+      "scope": "packed-npm-consumer",
+      "severity": "moderate",
+      "owner": "@oaslananka",
+      "introducedOn": "2026-07-23",
+      "expiresOn": "2026-08-23",
+      "reason": "The latest @modelcontextprotocol/sdk release still constrains @hono/node-server to the vulnerable 1.x major. Workspace and container installs force the patched 2.x major, but npm does not apply dependency-package overrides when consumers install the published tarball.",
+      "reachability": "ssh-mcp-pro does not import @hono/node-server or Hono serve-static. Its HTTP entrypoints use the project's own Node HTTP implementation, so the affected Windows static-file path is not reachable in the supported application flow.",
+      "removalCondition": "Remove this exception as soon as @modelcontextprotocol/sdk accepts @hono/node-server >=2.0.5, or immediately if ssh-mcp-pro begins using the Hono Node adapter or serve-static."
+    }
+  ]
+}
