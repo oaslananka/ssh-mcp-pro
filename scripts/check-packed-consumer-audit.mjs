@@ -132,7 +132,7 @@ try {
     );
   }
 
-  const accepted = [];
+  let acceptedCount = 0;
   for (const advisory of advisories) {
     const exception = configured.get(`${advisory.package}:${advisory.id}`);
     if (exception.severity !== advisory.severity) {
@@ -140,7 +140,7 @@ try {
         `Packed audit exception ${advisory.id} severity changed from ${exception.severity} to ${advisory.severity}`,
       );
     }
-    accepted.push(advisory);
+    acceptedCount += 1;
   }
 
   const stale = [...configured.entries()].filter(
@@ -152,17 +152,17 @@ try {
     );
   }
 
-  if (audit.status === 0 && accepted.length > 0) {
+  if (audit.status === 0 && acceptedCount > 0) {
     throw new Error("npm audit passed but packed audit exceptions are still configured");
   }
-  if (audit.status !== 0 && accepted.length === 0) {
+  if (audit.status !== 0 && acceptedCount === 0) {
     printResultOutput(audit);
     throw new Error("npm audit failed without a recognized advisory");
   }
 
   const suffix = nextExpiry ? `; next expiry ${nextExpiry.toISOString().slice(0, 10)}` : "";
   console.log(
-    `check-packed-consumer-audit: accepted ${accepted.length} time-bounded advisory exception(s)${suffix}.`,
+    `check-packed-consumer-audit: accepted ${acceptedCount} time-bounded advisory exception(s)${suffix}.`,
   );
 } finally {
   rmSync(workspace, { recursive: true, force: true });
