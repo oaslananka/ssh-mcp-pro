@@ -5,6 +5,7 @@ import { describe, expect, test } from "vitest";
 import { AgentExecutor } from "../../src/remote/agent-executor.js";
 import { generateEd25519PemKeyPair, verifyEnvelope } from "../../src/remote/crypto.js";
 import { createAgentPolicy, mergeCustomPolicy } from "../../src/remote/policy.js";
+import { REMOTE_TOOLS, TOOL_CAPABILITY_MAP } from "../../src/remote/types.js";
 import type { ActionRequestEnvelope, RemoteToolName } from "../../src/remote/types.js";
 
 function action(
@@ -43,6 +44,56 @@ describe("remote agent executor", () => {
       true,
     );
   });
+
+  const harmlessArgsByTool: Partial<Record<RemoteToolName, Record<string, unknown>>> = {
+    get_system_status: { timeout_seconds: 1 },
+    tail_logs: { unit_or_file: "", timeout_seconds: 1 },
+    restart_service: { service: "invalid;service", timeout_seconds: 1 },
+    docker_ps: { timeout_seconds: 1 },
+    docker_logs: { container: "invalid;container", timeout_seconds: 1 },
+    docker_restart: { container: "invalid;container", timeout_seconds: 1 },
+    file_read: { path: "/etc/passwd" },
+    file_write: { path: "/etc/ssh-mcp-pro-never-write", content: "unexpected" },
+    run_shell: {
+      command: "node -e \"process.stdout.write('unexpected')\"",
+      timeout_seconds: 1,
+    },
+    run_shell_as_root: { command: "true", timeout_seconds: 1 },
+  };
+  const enabledAlternateCapabilities = [
+    "hosts.read",
+    "system.read",
+    "logs.read",
+    "audit.read",
+  ] as const;
+  const mismatchedToolCapabilities = REMOTE_TOOLS.map((tool) => {
+    const capability = enabledAlternateCapabilities.find(
+      (candidate) => candidate !== TOOL_CAPABILITY_MAP[tool],
+    );
+    if (!capability) {
+      throw new Error(`No alternate capability configured for ${tool}`);
+    }
+    return [tool, capability, harmlessArgsByTool[tool] ?? {}] as const;
+  });
+
+  test.each(mismatchedToolCapabilities)(
+    "rejects a mismatched declared capability for %s before dispatch",
+    async (tool, capability, args) => {
+      const keyPair = generateEd25519PemKeyPair();
+      const executor = new AgentExecutor(createAgentPolicy("full-admin"), keyPair.privateKeyPem);
+
+      const result = await executor.execute(action(tool, capability, args));
+
+      expect(result).toMatchObject({
+        status: "error",
+        error_code: "CAPABILITY_DENIED",
+        message: `Tool ${tool} requires ${TOOL_CAPABILITY_MAP[tool]}, received ${capability}`,
+      });
+      expect(
+        verifyEnvelope(result as unknown as Record<string, unknown>, keyPair.publicKeyPem),
+      ).toBe(true);
+    },
+  );
 
   test("full-admin policy allows bounded shell execution", async () => {
     const keyPair = generateEd25519PemKeyPair();

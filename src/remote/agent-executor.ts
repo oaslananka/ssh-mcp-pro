@@ -3,6 +3,7 @@ import { constants, createReadStream } from "node:fs";
 import { access, writeFile } from "node:fs/promises";
 import os from "node:os";
 import { isContainerAllowed, isPathAllowed, isServiceAllowed } from "./policy.js";
+import { TOOL_CAPABILITY_MAP } from "./types.js";
 import type {
   ActionRequestEnvelope,
   ActionResultEnvelope,
@@ -268,8 +269,22 @@ export class AgentExecutor {
   }
 
   private async executeAllowed(action: ActionRequestEnvelope): Promise<ExecResult> {
-    if (!this.policy.capabilities[action.capability]) {
-      throw Object.assign(new Error(`Capability ${action.capability} is not enabled`), {
+    const requiredCapability = TOOL_CAPABILITY_MAP[action.tool];
+    if (!requiredCapability) {
+      throw Object.assign(new Error(`Unsupported action ${action.tool}`), {
+        code: "UNSUPPORTED_PLATFORM" as const,
+      });
+    }
+    if (action.capability !== requiredCapability) {
+      throw Object.assign(
+        new Error(
+          `Tool ${action.tool} requires ${requiredCapability}, received ${action.capability}`,
+        ),
+        { code: "CAPABILITY_DENIED" as const },
+      );
+    }
+    if (!this.policy.capabilities[requiredCapability]) {
+      throw Object.assign(new Error(`Capability ${requiredCapability} is not enabled`), {
         code: "CAPABILITY_DENIED" as const,
       });
     }
