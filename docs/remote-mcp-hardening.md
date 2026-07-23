@@ -9,6 +9,16 @@ Use this checklist before exposing `ssh-mcp-pro` through a public Streamable HTT
 - The HTTP session registry cleans expired sessions before opening a new session. If capacity is still full, it evicts the oldest idle session with reason `capacity-evict-oldest` instead of returning a persistent 503 that can surface as an upstream 502.
 - Watch logs for `HTTP MCP session removed`, `idle-timeout`, and `capacity-evict-oldest` to confirm cleanup is happening.
 
+## Remote agent WebSocket lifecycle
+
+- Keep `AGENT_WS_HELLO_TIMEOUT_MS` short enough that unauthenticated sockets cannot remain open indefinitely. The default is `10000` milliseconds.
+- `AGENT_WS_MAX_CONNECTIONS` bounds all accepted agent WebSockets, including connections still waiting for `agent.hello`. The default is `128`.
+- `AGENT_WS_MAX_CONNECTIONS_PER_AGENT` bounds active and replacement candidates for one enrolled agent. The default is `2`, which permits one live connection and one authenticated replacement attempt.
+- `AGENT_WS_HEARTBEAT_INTERVAL_MS` defaults to `30000`. The server sends protocol pings and treats pong or text traffic as activity.
+- `AGENT_WS_IDLE_TIMEOUT_MS` defaults to `90000` and is normalized to at least two heartbeat intervals. Idle connections close cleanly and are forcibly terminated if the close handshake does not complete.
+- The `/readyz` response reports `agent_connections_open` and `agent_connections_unauthenticated`. Audit events record global/per-agent capacity rejection, hello timeout, idle timeout, replacement, and safe numeric close codes.
+- Keep WebSocket compression disabled at the public boundary. Agent messages are text-only and capped at 1 MiB.
+
 ## OAuth and token verification
 
 - Prefer OAuth mode for public endpoints.

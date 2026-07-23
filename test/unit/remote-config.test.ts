@@ -12,6 +12,11 @@ function resetRemoteEnv(): void {
   delete process.env.AUTH_ALLOWED_GITHUB_LOGINS;
   delete process.env.AUTH_ALLOWED_GITHUB_IDS;
   delete process.env.ACCESS_TOKEN_TTL_SECONDS;
+  delete process.env.AGENT_WS_HELLO_TIMEOUT_MS;
+  delete process.env.AGENT_WS_HEARTBEAT_INTERVAL_MS;
+  delete process.env.AGENT_WS_IDLE_TIMEOUT_MS;
+  delete process.env.AGENT_WS_MAX_CONNECTIONS;
+  delete process.env.AGENT_WS_MAX_CONNECTIONS_PER_AGENT;
 }
 
 describe("loadRemoteConfig", () => {
@@ -68,6 +73,62 @@ describe("loadRemoteConfig", () => {
       expect.objectContaining({
         mcpResourceUrl: "https://mcp.example/resource",
         accessTokenTtlSeconds: 1200,
+      }),
+    );
+  });
+  test("uses bounded WebSocket lifecycle defaults", () => {
+    expect(loadRemoteConfig()).toEqual(
+      expect.objectContaining({
+        agentHelloTimeoutMs: 10_000,
+        agentHeartbeatIntervalMs: 30_000,
+        agentIdleTimeoutMs: 90_000,
+        maxAgentConnections: 128,
+        maxAgentConnectionsPerAgent: 2,
+      }),
+    );
+  });
+
+  test("parses bounded WebSocket lifecycle overrides and rejects unsafe values", () => {
+    process.env.AGENT_WS_HELLO_TIMEOUT_MS = "5000";
+    process.env.AGENT_WS_HEARTBEAT_INTERVAL_MS = "15000";
+    process.env.AGENT_WS_IDLE_TIMEOUT_MS = "45000";
+    process.env.AGENT_WS_MAX_CONNECTIONS = "64";
+    process.env.AGENT_WS_MAX_CONNECTIONS_PER_AGENT = "3";
+
+    expect(loadRemoteConfig()).toEqual(
+      expect.objectContaining({
+        agentHelloTimeoutMs: 5000,
+        agentHeartbeatIntervalMs: 15000,
+        agentIdleTimeoutMs: 45000,
+        maxAgentConnections: 64,
+        maxAgentConnectionsPerAgent: 3,
+      }),
+    );
+
+    process.env.AGENT_WS_HELLO_TIMEOUT_MS = "0";
+    process.env.AGENT_WS_HEARTBEAT_INTERVAL_MS = "999999999";
+    process.env.AGENT_WS_IDLE_TIMEOUT_MS = "-1";
+    process.env.AGENT_WS_MAX_CONNECTIONS = "0";
+    process.env.AGENT_WS_MAX_CONNECTIONS_PER_AGENT = "100";
+
+    expect(loadRemoteConfig()).toEqual(
+      expect.objectContaining({
+        agentHelloTimeoutMs: 10_000,
+        agentHeartbeatIntervalMs: 30_000,
+        agentIdleTimeoutMs: 90_000,
+        maxAgentConnections: 128,
+        maxAgentConnectionsPerAgent: 2,
+      }),
+    );
+  });
+  test("keeps idle timeout at least two heartbeat intervals", () => {
+    process.env.AGENT_WS_HEARTBEAT_INTERVAL_MS = "300000";
+    process.env.AGENT_WS_IDLE_TIMEOUT_MS = "2000";
+
+    expect(loadRemoteConfig()).toEqual(
+      expect.objectContaining({
+        agentHeartbeatIntervalMs: 300_000,
+        agentIdleTimeoutMs: 600_000,
       }),
     );
   });

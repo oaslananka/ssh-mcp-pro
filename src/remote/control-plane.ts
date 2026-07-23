@@ -96,6 +96,7 @@ export class RemoteControlPlane {
 
   close(): void {
     clearInterval(this.cleanupInterval);
+    this.agentHandler.close();
     for (const pending of this.pendingActions.values()) {
       clearTimeout(pending.timeout);
       pending.reject(new Error("Control plane shutting down"));
@@ -150,6 +151,8 @@ export class RemoteControlPlane {
         service: "ssh-mcp-pro",
         control_plane: true,
         agents_online: this.agentHandler.connectedAgentCount,
+        agent_connections_open: this.agentHandler.openConnectionCount,
+        agent_connections_unauthenticated: this.agentHandler.unauthenticatedConnectionCount,
       });
       return true;
     }

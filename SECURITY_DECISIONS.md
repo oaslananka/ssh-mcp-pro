@@ -31,6 +31,14 @@ Operators who need privileged work should prefer `ensure_package`, `ensure_servi
 
 Destructive command execution and destructive filesystem operations are denied by default. Policy allowlists, path prefixes, and explicit destructive toggles are required before tools such as `fs_rmrf` can remove remote paths.
 
+## Remote Agent WebSocket Boundary
+
+The internet-facing agent boundary uses the maintained `ws` implementation in no-server mode rather than a project-specific frame parser. Protocol masking, fragmentation, opcode handling, UTF-8 validation, close-code validation, and control-frame validation are delegated to that implementation. Per-message compression is disabled, binary application messages are rejected, and text payloads are limited to 1 MiB.
+
+Accepted sockets must complete `agent.hello` within 10 seconds by default. The control plane bounds accepted connections globally at 128 and per enrolled agent at 2, allowing one live agent plus one replacement candidate without permitting unbounded handshakes. Protocol pings default to 30-second intervals; the idle timeout defaults to 90 seconds and is never configured below two heartbeat intervals. Connections that do not complete a close handshake are terminated after a short grace period.
+
+Capacity rejection, hello timeout, idle timeout, connection replacement, and disconnect events are observable through the audit store and `/readyz` connection counts. Audit metadata records fixed reason categories, configured bounds, authentication state, and numeric close codes only. Peer-provided close reasons, WebSocket payloads, signatures, and enrollment material are not retained in audit metadata.
+
 ## Remote Agent Policy Update Freshness
 
 Signed `policy.update` envelopes are accepted only when their nonce has not been used in the current agent process, their `issued_at` value is no more than five minutes old and no more than 30 seconds in the future, the envelope and embedded policy versions match, and the version is strictly greater than the currently persisted policy version. Accepted nonces use the shared five-minute TTL window and 4096-entry cap.
