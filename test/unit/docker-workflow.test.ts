@@ -34,6 +34,17 @@ describe("Docker release workflow", () => {
     );
   });
 
+  test("blocks fixable high and critical image vulnerabilities while retaining SARIF evidence", () => {
+    const workflow = readText(dockerWorkflowPath);
+
+    expect(workflow).toContain("Scan image for fixable release-blocking vulnerabilities");
+    expect(workflow).toContain("severity: CRITICAL,HIGH");
+    expect(workflow).toContain("ignore-unfixed: true");
+    expect(workflow).toContain('exit-code: "1"');
+    expect(workflow).toContain("Upload vulnerability scan results");
+    expect(workflow).toContain('exit-code: "0"');
+  });
+
   test("documents GHCR tag policy and digest-pinned usage", () => {
     const readme = readText("README.md");
     const dockerDocs = readText("docs/docker.md");

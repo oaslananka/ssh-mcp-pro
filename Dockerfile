@@ -4,7 +4,7 @@ FROM node:24-alpine@sha256:2bdb65ed1dab192432bc31c95f94155ca5ad7fc1392fb7eb7526a
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN corepack enable && corepack prepare pnpm@11.5.1 --activate && pnpm install --frozen-lockfile --ignore-scripts
+RUN corepack enable && corepack prepare pnpm@11.9.0 --activate && pnpm install --frozen-lockfile --ignore-scripts
 
 COPY tsconfig.json typedoc.json ./
 COPY src ./src
@@ -28,9 +28,13 @@ ENV NODE_ENV=production
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN corepack enable && \
-    corepack prepare pnpm@11.5.1 --activate && \
+    corepack prepare pnpm@11.9.0 --activate && \
     pnpm install --prod --frozen-lockfile --ignore-scripts && \
-    pnpm store prune
+    pnpm store prune && \
+    rm -rf /root/.cache /root/.local/share/pnpm && \
+    rm -rf /usr/local/lib/node_modules/npm && \
+    rm -rf /usr/local/lib/node_modules/corepack && \
+    rm -f /usr/local/bin/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/pnpm /usr/local/bin/pnpx
 
 COPY --from=build /app/dist ./dist
 COPY README.md LICENSE SECURITY.md SECURITY_DECISIONS.md ARCHITECTURE.md REGISTRY_SUBMISSION.md ./

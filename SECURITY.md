@@ -23,6 +23,10 @@ Maintainers aim to acknowledge a valid report within 7 days. The acknowledgment 
 
 Security fixes are coordinated privately until a patch is available. Public disclosure should happen after the patched release is published, release notes are available, and affected users have a practical upgrade path.
 
+## Automated Security Scanning
+
+The repository's scanner coverage, blocking thresholds, and exception requirements are documented in [docs/security/scanning-policy.md](docs/security/scanning-policy.md). Scanner output is reviewed in context; verified security findings are fixed or handled through an explicit, expiring exception.
+
 ## Scope
 
 In scope:

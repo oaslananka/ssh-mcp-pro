@@ -5,7 +5,7 @@ Thanks for improving `ssh-mcp-pro`. This project accepts focused pull requests t
 ## Development Prerequisites
 
 - Node.js 24.15.0. The supported engine range is `^22.22.2 || ^24.15.0`, but local development and CI currently use Node.js 24.15.0.
-- pnpm 11.0.9 through Corepack. The repository has `engine-strict=true`, so mismatched tool versions fail early.
+- pnpm 11.9.0 through Corepack. The repository has `engine-strict=true`, so mismatched tool versions fail early.
 - Docker for integration and end-to-end tests that start SSH fixtures.
 - Git with repository hooks enabled by `pnpm run prepare`.
 
@@ -15,7 +15,7 @@ Thanks for improving `ssh-mcp-pro`. This project accepts focused pull requests t
 git clone https://github.com/oaslananka/ssh-mcp-pro.git
 cd ssh-mcp-pro
 corepack enable
-corepack prepare pnpm@11.0.9 --activate
+corepack prepare pnpm@11.9.0 --activate
 pnpm install --frozen-lockfile
 pnpm run build
 pnpm run prepare

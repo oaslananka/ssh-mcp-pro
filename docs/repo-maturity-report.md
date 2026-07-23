@@ -115,7 +115,7 @@ before that label is reconsidered.
 | --- | --- |
 | Primary language | TypeScript (100% of `src/`) |
 | Runtime | Node.js, `engines.node: ">=22.22.2"` (also supports `24.15.0`, `26.3.0` per CI matrix) |
-| Package manager | pnpm `^11.5.1`, pinned exactly via `packageManager` field and `corepack`; `pnpm-lock.yaml` present and respected everywhere (no lockfile changes made by this audit) |
+| Package manager | pnpm `11.9.0`, pinned exactly via `packageManager` field and `corepack`; `pnpm-lock.yaml` present and respected everywhere (no lockfile changes made by this audit) |
 | Build system | `tsc` (`tsconfig.json`), no bundler — ships plain compiled JS + `.d.ts` |
 | Test framework | Vitest (unit/integration/e2e/perf projects), Stryker (mutation testing), `fast-check` (property-based testing) |
 | Lint/format | ESLint (`eslint.config.mjs`), Prettier, `.editorconfig` |

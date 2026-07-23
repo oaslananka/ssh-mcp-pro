@@ -13,7 +13,7 @@ LTS line). This is expected, not an oversight.
 
 ## Package manager
 
-pnpm `^11.5.1`, enforced via `packageManager` in `package.json` and `engine-strict=true`.
+pnpm `11.9.0`, enforced via `packageManager` in `package.json` and `engine-strict=true`.
 npm/yarn are not supported installation paths for *developing* this repo (consumers
 installing the published package via npm/npx are unaffected — see
 [README.md#installation](../../README.md#installation)).

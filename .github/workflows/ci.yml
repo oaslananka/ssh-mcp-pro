@@ -97,7 +97,7 @@ jobs:
         run: |
           set -euo pipefail
           corepack enable
-          corepack prepare pnpm@11.5.1 --activate
+          corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -138,7 +138,7 @@ jobs:
         run: |
           set -euo pipefail
           corepack enable
-          corepack prepare pnpm@11.5.1 --activate
+          corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -185,7 +185,7 @@ jobs:
         run: |
           set -euo pipefail
           corepack enable
-          corepack prepare pnpm@11.5.1 --activate
+          corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -237,7 +237,7 @@ jobs:
         run: |
           set -euo pipefail
           corepack enable
-          corepack prepare pnpm@11.5.1 --activate
+          corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -278,7 +278,7 @@ jobs:
         run: |
           set -euo pipefail
           corepack enable
-          corepack prepare pnpm@11.5.1 --activate
+          corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -326,7 +326,7 @@ jobs:
         run: |
           set -euo pipefail
           corepack enable
-          corepack prepare pnpm@11.5.1 --activate
+          corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -373,7 +373,7 @@ jobs:
         run: |
           set -euo pipefail
           corepack enable
-          corepack prepare pnpm@11.5.1 --activate
+          corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -419,7 +419,7 @@ jobs:
         run: |
           set -euo pipefail
           corepack enable
-          corepack prepare pnpm@11.5.1 --activate
+          corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -469,7 +469,7 @@ jobs:
         run: |
           set -euo pipefail
           corepack enable
-          corepack prepare pnpm@11.5.1 --activate
+          corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
         run: pnpm install --frozen-lockfile
