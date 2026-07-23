@@ -31,6 +31,7 @@ export default [
       "no-console": ["warn", { allow: ["warn", "error"] }],
       eqeqeq: ["error", "always"],
       "no-throw-literal": "error",
+      "default-param-last": "error",
     },
   },
   {
