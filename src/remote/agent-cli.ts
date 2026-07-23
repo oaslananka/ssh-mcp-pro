@@ -10,6 +10,11 @@ import {
   verifyEnvelope,
   type PemKeyPair,
 } from "./crypto.js";
+import {
+  rememberAcceptedPolicyUpdate,
+  validatePolicyUpdate,
+  type PolicyUpdateRejectionReason,
+} from "./policy-update-guard.js";
 import { parseControlPlaneEnvelope, parseAgentPolicy } from "./schemas.js";
 import type { AgentHelloEnvelope, AgentHostMetadata, AgentPolicy } from "./types.js";
 
@@ -38,6 +43,18 @@ type RuntimeWebSocketConstructor = new (url: string) => RuntimeWebSocket;
 
 function output(line: string): void {
   process.stdout.write(`${line}\n`);
+}
+
+const POLICY_UPDATE_REJECTION_EVENTS: Record<PolicyUpdateRejectionReason, string> = {
+  replay: "policy_update_replay",
+  stale: "policy_update_stale",
+  future: "policy_update_future",
+  version_mismatch: "policy_version_mismatch",
+  not_newer: "policy_version_not_newer",
+};
+
+function recordPolicyUpdateRejection(reason: PolicyUpdateRejectionReason): void {
+  process.stderr.write(`Agent policy update rejected: ${POLICY_UPDATE_REJECTION_EVENTS[reason]}\n`);
 }
 
 function configPath(): string {
@@ -162,6 +179,7 @@ async function runAgent(): Promise<void> {
   const WebSocketCtor = runtimeWebSocket();
   const executor = new AgentExecutor(config.policy, config.privateKeyPem);
   const seenActions = new Map<string, number>();
+  const seenPolicyUpdateNonces = new Map<string, number>();
 
   function rememberAction(actionId: string, deadline: string): boolean {
     const now = Date.now();
@@ -235,9 +253,21 @@ async function runAgent(): Promise<void> {
         }
         if (envelope.type === "policy.update") {
           const update = envelope;
+          const validation = validatePolicyUpdate(
+            update,
+            config.policy.version,
+            seenPolicyUpdateNonces,
+          );
+          if (!validation.accepted) {
+            recordPolicyUpdateRejection(validation.reason);
+            return;
+          }
+
+          const nextConfig: AgentConfigFile = { ...config, policy: update.policy };
+          saveConfig(nextConfig);
+          rememberAcceptedPolicyUpdate(seenPolicyUpdateNonces, update.nonce);
           config.policy = update.policy;
           executor.updatePolicy(update.policy);
-          saveConfig(config);
           return;
         }
         const action = envelope;

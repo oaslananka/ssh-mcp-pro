@@ -31,6 +31,12 @@ Operators who need privileged work should prefer `ensure_package`, `ensure_servi
 
 Destructive command execution and destructive filesystem operations are denied by default. Policy allowlists, path prefixes, and explicit destructive toggles are required before tools such as `fs_rmrf` can remove remote paths.
 
+## Remote Agent Policy Update Freshness
+
+Signed `policy.update` envelopes are accepted only when their nonce has not been used in the current agent process, their `issued_at` value is no more than five minutes old and no more than 30 seconds in the future, the envelope and embedded policy versions match, and the version is strictly greater than the currently persisted policy version. Accepted nonces use the shared five-minute TTL window and 4096-entry cap.
+
+The agent validates the complete update before writing config or changing the in-memory executor policy. Replays, stale/future timestamps, version mismatches, and downgrade/equal-version attempts are recorded only as fixed reason codes; policy fields, paths, capabilities, and version values are not included in the rejection log. If a process restarts after persisting an accepted update, the persisted monotonic version still rejects reuse even though the in-memory nonce window is new.
+
 ## Remote Agent Local Path Boundaries
 
 Remote-agent `file_read`, `file_write`, and file-based `tail_logs` operations authorize both the requested path and the canonical filesystem target. Symlinks are permitted only when their resolved target remains inside an allowed path and outside every denied path; a lexically allowed link to a denied target fails closed.

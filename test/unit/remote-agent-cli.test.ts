@@ -43,6 +43,18 @@ function captureStdout(): { read(): string; restore(): void } {
   };
 }
 
+function captureStderr(): { read(): string; restore(): void } {
+  let output = "";
+  const spy = vi.spyOn(process.stderr, "write").mockImplementation(((chunk: unknown) => {
+    output += Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk);
+    return true;
+  }) as never);
+  return {
+    read: () => output,
+    restore: () => spy.mockRestore(),
+  };
+}
+
 function agentConfigPath(): string {
   const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-cli-"));
   const configPath = path.join(dir, "agent.json");
@@ -431,6 +443,7 @@ describe("remote agent CLI", () => {
     }
     (globalThis as { WebSocket?: unknown }).WebSocket = FakeWebSocket;
     const stdout = captureStdout();
+    const stderr = captureStderr();
     let runPromise: Promise<void> | undefined;
     let socket: FakeWebSocket | undefined;
     try {
@@ -458,24 +471,84 @@ describe("remote agent CLI", () => {
       };
       socket?.onmessage?.({ data: JSON.stringify(unsignedAction) });
 
-      const update: PolicyUpdateEnvelope = {
-        type: "policy.update",
-        agent_id: "agt_policy_update",
-        policy: updatedPolicy,
-        policy_version: updatedPolicy.version,
-        issued_at: nowIso(),
-        nonce: "nonce-policy-update",
-        signature: "",
+      function signedPolicyUpdate(
+        policy: AgentPolicy,
+        overrides: Partial<PolicyUpdateEnvelope> = {},
+      ): PolicyUpdateEnvelope {
+        const envelope: PolicyUpdateEnvelope = {
+          type: "policy.update",
+          agent_id: "agt_policy_update",
+          policy,
+          policy_version: policy.version,
+          issued_at: nowIso(),
+          nonce: `nonce-policy-${policy.version}-0000000000`,
+          signature: "",
+          ...overrides,
+        };
+        envelope.signature = signEnvelope(
+          envelope as unknown as Record<string, unknown>,
+          controlPlaneKeys.privateKeyPem,
+        );
+        return envelope;
+      }
+
+      const sensitivePolicyPath = "/private/policy/material-must-not-be-logged";
+      const rejectedPolicy: AgentPolicy = {
+        ...updatedPolicy,
+        allowPaths: [sensitivePolicyPath],
       };
-      update.signature = signEnvelope(
-        update as unknown as Record<string, unknown>,
-        controlPlaneKeys.privateKeyPem,
+      const staleUpdate = signedPolicyUpdate(rejectedPolicy, {
+        issued_at: new Date(Date.now() - 10 * 60_000).toISOString(),
+        nonce: "nonce-policy-stale-000000",
+      });
+      socket?.onmessage?.({ data: JSON.stringify(staleUpdate) });
+      await waitFor(() => stderr.read().includes("policy_update_stale"));
+      expect(
+        (JSON.parse(readFileSync(configPath, "utf8")) as { policy: AgentPolicy }).policy,
+      ).toEqual(initialPolicy);
+
+      const futureUpdate = signedPolicyUpdate(rejectedPolicy, {
+        issued_at: new Date(Date.now() + 2 * 60_000).toISOString(),
+        nonce: "nonce-policy-future-00000",
+      });
+      socket?.onmessage?.({ data: JSON.stringify(futureUpdate) });
+      await waitFor(() => stderr.read().includes("policy_update_future"));
+
+      const mismatchUpdate = signedPolicyUpdate(
+        { ...rejectedPolicy, version: 3 },
+        { policy_version: 2, nonce: "nonce-policy-mismatch-000" },
       );
+      socket?.onmessage?.({ data: JSON.stringify(mismatchUpdate) });
+      await waitFor(() => stderr.read().includes("policy_version_mismatch"));
+
+      const update = signedPolicyUpdate(updatedPolicy, { nonce: "nonce-policy-update" });
       socket?.onmessage?.({ data: JSON.stringify(update) });
       await waitFor(() => {
         const persisted = JSON.parse(readFileSync(configPath, "utf8")) as { policy: AgentPolicy };
         return persisted.policy.profile === "full-admin";
       });
+
+      socket?.onmessage?.({ data: JSON.stringify(update) });
+      await waitFor(() => stderr.read().includes("policy_update_replay"));
+
+      const equalUpdate = signedPolicyUpdate(
+        { ...createAgentPolicy("operations"), version: 2 },
+        { nonce: "nonce-policy-equal-000000" },
+      );
+      socket?.onmessage?.({ data: JSON.stringify(equalUpdate) });
+      await waitFor(() => stderr.read().includes("policy_version_not_newer"));
+
+      const olderUpdate = signedPolicyUpdate(
+        { ...createAgentPolicy("read-only"), version: 1 },
+        { nonce: "nonce-policy-older-000000" },
+      );
+      socket?.onmessage?.({ data: JSON.stringify(olderUpdate) });
+      await waitFor(() => stderr.read().split("policy_version_not_newer").length >= 3);
+      const afterDeniedUpdates = JSON.parse(readFileSync(configPath, "utf8")) as {
+        policy: AgentPolicy;
+      };
+      expect(afterDeniedUpdates.policy).toEqual(updatedPolicy);
+      expect(stderr.read()).not.toContain(sensitivePolicyPath);
 
       const wrongAgentUpdate: PolicyUpdateEnvelope = {
         ...update,
@@ -553,6 +626,7 @@ describe("remote agent CLI", () => {
         await runPromise;
       }
       stdout.restore();
+      stderr.restore();
     }
   });
 });
