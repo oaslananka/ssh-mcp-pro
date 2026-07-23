@@ -8,14 +8,16 @@ Defined in [vitest.config.ts](../../vitest.config.ts) as separate projects:
 | --- | --- | --- |
 | Unit | `test/unit/**` | `pnpm test` |
 | Integration | `test/integration/**` | `pnpm run test:integration` |
-| Integration (Windows SSH) | `test/integration/windows-ssh.integration.test.ts` | `pnpm run test:integration:windows` |
+| Windows command-path integration | `test/integration/windows-ssh.integration.test.ts` | `pnpm run test:integration:windows` |
 | E2E | `test/e2e/**` | `pnpm run test:e2e` |
 | Performance | `test/perf/**` | `pnpm run test:perf` (baseline: `test:perf:baseline`) |
 
 Integration and E2E projects run sequentially (single worker, no file parallelism) —
 they exercise a real SSH fixture (see `scripts/docker-ssh-fixture.mjs` and
 [docker-compose.yml](../../docker-compose.yml)) and aren't safe to parallelize against
-shared fixture state.
+shared fixture state. Protected CI verifies the Docker fixture before each Linux suite and then checks the generated JUnit report to ensure the env-gated tests executed instead of being silently skipped. Failure runs retain sanitized container state, fixture logs, and JUnit evidence for 14 days.
+
+The `Windows Command-Path Integration` job executes PowerShell-capable command selection and Windows package-manager paths locally on a Windows runner. It does not claim a network connection to a real Windows OpenSSH server.
 
 ## Coverage policy
 

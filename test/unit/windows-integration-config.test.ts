@@ -16,8 +16,10 @@ describe("Windows integration coverage configuration", () => {
     const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
 
     expect(workflow).toContain("integration-windows:");
+    expect(workflow).toContain("name: Windows Command-Path Integration");
     expect(workflow).toContain("runs-on: windows-2022");
     expect(workflow).toContain("pnpm run test:integration:windows");
     expect(workflow).toContain('RUN_WINDOWS_SSH_INTEGRATION: "1"');
+    expect(workflow).toContain("pnpm run check:fixture-results windows");
   });
 });

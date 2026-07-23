@@ -16,18 +16,22 @@ const requiredMainContexts = [
   "Unit Tests (Node 22)",
   "Unit Tests (Node 24)",
   "SSH Integration",
-  "Windows Integration",
+  "Windows Command-Path Integration",
   "SSH E2E",
   "Build, SBOM, and Pack",
   "Build and smoke image",
   "Analyze TypeScript",
   "Validate MCP Registry metadata",
+  "Secret scan (full history)",
+  "dependency-review",
 ];
 const protectedWorkflowFiles = [
   ".github/workflows/ci.yml",
   ".github/workflows/docker.yml",
   ".github/workflows/codeql.yml",
   ".github/workflows/mcp-registry.yml",
+  ".github/workflows/gitleaks.yml",
+  ".github/workflows/dependency-review.yml",
 ];
 
 if (!existsSync(rulesetDir)) {
@@ -126,11 +130,67 @@ function extractWorkflowJobNames(files) {
 }
 
 function extractJobNames(workflow) {
-  return [...workflow.matchAll(/^ {4}name:\s+(.+)$/gm)].map((match) => unquoteYamlScalar(match[1]));
+  const names = [];
+  let inJobs = false;
+  let currentJob;
+
+  for (const line of workflow.split("\n")) {
+    if (!inJobs) {
+      inJobs = line === "jobs:";
+      continue;
+    }
+
+    const jobId = jobIdFromLine(line);
+    if (jobId) {
+      appendResolvedJobName(names, currentJob);
+      currentJob = { id: jobId, name: undefined };
+      continue;
+    }
+
+    const jobName = jobNameFromLine(line);
+    if (currentJob && !currentJob.name && jobName) {
+      currentJob.name = jobName;
+    }
+  }
+
+  appendResolvedJobName(names, currentJob);
+  return names;
+}
+
+function appendResolvedJobName(names, job) {
+  if (job) {
+    names.push(job.name ?? job.id);
+  }
+}
+
+function jobIdFromLine(line) {
+  if (!line.startsWith("  ") || line.startsWith("    ")) {
+    return undefined;
+  }
+  const separator = line.indexOf(":", 2);
+  if (separator < 3) {
+    return undefined;
+  }
+  const id = line.slice(2, separator);
+  return /^[a-zA-Z0-9_-]+$/u.test(id) ? id : undefined;
+}
+
+function jobNameFromLine(line) {
+  const prefix = "    name:";
+  if (!line.startsWith(prefix)) {
+    return undefined;
+  }
+  const value = line.slice(prefix.length).trim();
+  return value ? unquoteYamlScalar(value) : undefined;
 }
 
 function unquoteYamlScalar(value) {
-  return value.trim().replace(/^["'](.*)["']$/, "$1");
+  const trimmed = value.trim();
+  const first = trimmed.at(0);
+  const last = trimmed.at(-1);
+  const isQuoted =
+    trimmed.length >= 2 && ((first === '"' && last === '"') || (first === "'" && last === "'"));
+  return isQuoted ? trimmed.slice(1, -1) : trimmed;
 }
 
 function workflowJobNameMatchesContext(jobName, context) {

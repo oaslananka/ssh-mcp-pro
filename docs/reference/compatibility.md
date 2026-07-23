@@ -23,7 +23,7 @@ installing the published package via npm/npx are unaffected — see
 | OS | Status | Evidence |
 | --- | --- | --- |
 | Linux | Passed | Primary CI target; SSH fixture-based integration/E2E tests |
-| Windows | Passed | Dedicated `test:integration:windows` project; CI matrix includes a Windows Integration job |
+| Windows command paths | Passed | Dedicated `test:integration:windows` project on `windows-2022`; the `Windows Command-Path Integration` job validates local PowerShell and package-manager dispatch, not a real Windows OpenSSH server |
 | macOS | Needs human confirmation | Listed as a supported platform in `mcp.json` (`platforms: [linux, macos, windows]`) but no macOS-specific CI job was found — likely covered incidentally by the cross-platform Node.js/SSH code paths, not by a dedicated test |
 
 ## Container platforms
