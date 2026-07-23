@@ -1,14 +1,9 @@
-import {
-  AGENT_NONCE_TTL_MS,
-  hasSeenNonce,
-  MAX_AGENT_CONNECTION_NONCES,
-  rememberNonce,
-} from "./http-util.js";
+import { AGENT_NONCE_TTL_MS, hasSeenNonce, rememberNonce } from "./http-util.js";
 import type { PolicyUpdateEnvelope } from "./types.js";
 
 export const POLICY_UPDATE_MAX_AGE_MS = AGENT_NONCE_TTL_MS;
 export const POLICY_UPDATE_MAX_FUTURE_SKEW_MS = 30_000;
-export const MAX_POLICY_UPDATE_NONCES = MAX_AGENT_CONNECTION_NONCES;
+export { MAX_AGENT_CONNECTION_NONCES as MAX_POLICY_UPDATE_NONCES } from "./http-util.js";
 
 export type PolicyUpdateRejectionReason =
   | "replay"
