@@ -1,4 +1,5 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
+import { CHATGPT_EXTRA_TOOLS } from "../../../src/connector-profile.js";
 import { createTestContainer } from "../helpers.js";
 import { ConnectorToolProvider } from "../../../src/tools/connector.provider.js";
 
@@ -8,6 +9,10 @@ async function destroyContainer(container: ReturnType<typeof createTestContainer
 }
 
 describe("ConnectorToolProvider", () => {
+  afterEach(() => {
+    CHATGPT_EXTRA_TOOLS.clear();
+  });
+
   test("exposes only remote-safe schemas without credential fields", async () => {
     const container = createTestContainer();
     const provider = new ConnectorToolProvider({
@@ -75,6 +80,34 @@ describe("ConnectorToolProvider", () => {
         rawCommandExecutionDefault: false,
         rawSudoExecutionDefault: false,
         destructiveExecutionDefault: false,
+      }),
+    );
+
+    await destroyContainer(container);
+  });
+
+  test("reports unsafe effective connector extensions as not remote-safe", async () => {
+    CHATGPT_EXTRA_TOOLS.add("proc_exec");
+    const container = createTestContainer();
+    const provider = new ConnectorToolProvider({
+      sessionManager: container.sessionManager,
+      metrics: container.metrics,
+      policy: container.policy,
+      config: {
+        ...container.config.getAll(),
+        connector: {
+          toolProfile: "chatgpt",
+          credentialProvider: "none",
+          credentialCommandArgs: [],
+          credentialCommandTimeoutMs: 5000,
+        },
+      },
+    });
+
+    await expect(provider.handleTool("connector_status", {})).resolves.toEqual(
+      expect.objectContaining({
+        toolProfile: "chatgpt",
+        safeRemoteToolsOnly: false,
       }),
     );
 

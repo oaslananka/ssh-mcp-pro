@@ -13,7 +13,7 @@ export const TOOL_PROFILES = [
 
 export type ToolProfile = (typeof TOOL_PROFILES)[number];
 
-const REMOTE_CONNECTOR_TOOL_NAMES = [
+const REMOTE_CONNECTOR_BASELINE_TOOL_NAMES = [
   "connector_status",
   "ssh_hosts_list",
   "ssh_policy_explain",
@@ -21,15 +21,28 @@ const REMOTE_CONNECTOR_TOOL_NAMES = [
   "ssh_mutation_plan",
 ] as const;
 
+export const REMOTE_SAFE_TOOL_NAMES = Object.freeze([
+  ...REMOTE_CONNECTOR_BASELINE_TOOL_NAMES,
+] as const);
+
+const REMOTE_SAFE_TOOL_NAME_SET = new Set<string>(REMOTE_SAFE_TOOL_NAMES);
+
 function createRemoteConnectorToolSet(): Set<string> {
-  return new Set<string>(REMOTE_CONNECTOR_TOOL_NAMES);
+  return new Set<string>(REMOTE_CONNECTOR_BASELINE_TOOL_NAMES);
+}
+
+function parseExtraToolNames(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((toolName) => toolName.trim())
+    .filter(Boolean);
 }
 
 export const CHATGPT_EXTRA_TOOLS = new Set<string>(
-  (process.env.SSH_MCP_CHATGPT_EXTRA_TOOLS ?? "").split(",").filter(Boolean),
+  parseExtraToolNames(process.env.SSH_MCP_CHATGPT_EXTRA_TOOLS),
 );
 export const CLAUDE_EXTRA_TOOLS = new Set<string>(
-  (process.env.SSH_MCP_CLAUDE_EXTRA_TOOLS ?? "").split(",").filter(Boolean),
+  parseExtraToolNames(process.env.SSH_MCP_CLAUDE_EXTRA_TOOLS),
 );
 
 export const PROFILE_TOOL_SETS: Record<ToolProfile, Set<string>> = {
@@ -45,18 +58,31 @@ const REMOTE_CONNECTOR_RESOURCES = new Set(["ssh-mcp-pro://capabilities/support-
 
 const REMOTE_CONNECTOR_PROMPTS = new Set(["inspect-host-capabilities", "plan-mutation"]);
 
-function getProfileToolSet(profile: ToolProfile): ReadonlySet<string> {
-  const profileTools = PROFILE_TOOL_SETS[profile];
+export function getEffectiveProfileToolSet(profile: ToolProfile): ReadonlySet<string> {
+  const effectiveTools = new Set<string>(PROFILE_TOOL_SETS[profile]);
 
-  if (profile === "chatgpt" && CHATGPT_EXTRA_TOOLS.size > 0) {
-    return new Set<string>([...profileTools, ...CHATGPT_EXTRA_TOOLS]);
+  if (profile === "chatgpt") {
+    for (const toolName of CHATGPT_EXTRA_TOOLS) {
+      effectiveTools.add(toolName);
+    }
   }
 
-  if (profile === "claude" && CLAUDE_EXTRA_TOOLS.size > 0) {
-    return new Set<string>([...profileTools, ...CLAUDE_EXTRA_TOOLS]);
+  if (profile === "claude") {
+    for (const toolName of CLAUDE_EXTRA_TOOLS) {
+      effectiveTools.add(toolName);
+    }
   }
 
-  return profileTools;
+  return effectiveTools;
+}
+
+export function getUnsafeRemoteToolNames(profile: ToolProfile): string[] {
+  if (profile === "full") {
+    return [];
+  }
+  return [...getEffectiveProfileToolSet(profile)]
+    .filter((toolName) => !REMOTE_SAFE_TOOL_NAME_SET.has(toolName))
+    .sort((left, right) => left.localeCompare(right));
 }
 
 export function parseToolProfile(value: string | undefined, fallback: ToolProfile): ToolProfile {
@@ -70,18 +96,18 @@ export function parseToolProfile(value: string | undefined, fallback: ToolProfil
 }
 
 export function isRemoteSafeToolProfile(profile: ToolProfile): boolean {
-  return profile !== "full";
+  return profile !== "full" && getUnsafeRemoteToolNames(profile).length === 0;
 }
 
 export function isToolAllowedForProfile(toolName: string, profile: ToolProfile): boolean {
-  return profile === "full" || getProfileToolSet(profile).has(toolName);
+  return profile === "full" || getEffectiveProfileToolSet(profile).has(toolName);
 }
 
 export function filterToolsForProfile(tools: Tool[], profile: ToolProfile): Tool[] {
   if (profile === "full") {
     return tools;
   }
-  const profileTools = getProfileToolSet(profile);
+  const profileTools = getEffectiveProfileToolSet(profile);
   return tools.filter((tool) => profileTools.has(tool.name));
 }
 
