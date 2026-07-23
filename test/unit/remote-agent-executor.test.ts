@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
@@ -173,10 +173,211 @@ describe("remote agent executor", () => {
     const result = await executor.execute(
       action("file_write", "files.write", { path: target, content: "agent-local" }),
     );
+    const overwrite = await executor.execute(
+      action("file_write", "files.write", { path: target, content: "updated-local" }),
+    );
 
     expect(result.status).toBe("ok");
-    expect(readFileSync(target, "utf8")).toBe("agent-local");
+    expect(overwrite.status).toBe("ok");
+    expect(readFileSync(target, "utf8")).toBe("updated-local");
   });
+
+  test("file log tailing preserves the last 100 lines and bounded output metadata", async () => {
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-tail-"));
+    const target = path.join(tempDir, "service.log");
+    const lines = Array.from(
+      { length: 120 },
+      (_, index) => `line-${String(index + 1).padStart(3, "0")}`,
+    );
+    writeFileSync(target, `${lines.join("\n")}\n`);
+    const keyPair = generateEd25519PemKeyPair();
+    const basePolicy = mergeCustomPolicy({
+      capabilities: { "logs.read": true },
+      allowPaths: [tempDir.replace(/\\/gu, "/")],
+      denyPaths: [],
+      maxOutputBytes: 10_000,
+    });
+    const executor = new AgentExecutor(basePolicy, keyPair.privateKeyPem);
+
+    const result = await executor.execute(
+      action("tail_logs", "logs.read", { unit_or_file: target, timeout_seconds: 10 }),
+    );
+
+    expect(result.status).toBe("ok");
+    expect(result.truncated).toBe(false);
+    expect(result.stdout).toBe(`${lines.slice(-100).join("\n")}\n`);
+
+    const boundedExecutor = new AgentExecutor(
+      mergeCustomPolicy({ ...basePolicy, maxOutputBytes: 32 }),
+      keyPair.privateKeyPem,
+    );
+    const bounded = await boundedExecutor.execute(
+      action("tail_logs", "logs.read", { unit_or_file: target, timeout_seconds: 10 }),
+    );
+    expect(bounded.status).toBe("ok");
+    expect(bounded.truncated).toBe(true);
+    expect(Buffer.byteLength(bounded.stdout ?? "", "utf8")).toBeLessThanOrEqual(32);
+    expect(bounded.stdout).toContain("truncated");
+
+    const longLineTarget = path.join(tempDir, "single-long-line.log");
+    writeFileSync(longLineTarget, "x".repeat(70 * 1024));
+    const boundedScan = await boundedExecutor.execute(
+      action("tail_logs", "logs.read", {
+        unit_or_file: longLineTarget,
+        timeout_seconds: 10,
+      }),
+    );
+    expect(boundedScan.status).toBe("ok");
+    expect(boundedScan.truncated).toBe(true);
+    expect(Buffer.byteLength(boundedScan.stdout ?? "", "utf8")).toBeLessThanOrEqual(32);
+    expect(boundedScan.stdout).toContain("truncated");
+  });
+
+  test("rejects directory-shaped write targets without creating a different path", async () => {
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-write-shape-"));
+    const target = path.join(tempDir, "unexpected-file");
+    const keyPair = generateEd25519PemKeyPair();
+    const executor = new AgentExecutor(
+      mergeCustomPolicy({
+        capabilities: { "files.write": true },
+        allowPaths: [tempDir.replace(/\\/gu, "/")],
+        denyPaths: [],
+      }),
+      keyPair.privateKeyPem,
+    );
+
+    const result = await executor.execute(
+      action("file_write", "files.write", { path: `${target}${path.sep}`, content: "no" }),
+    );
+
+    expect(result).toMatchObject({ status: "error", error_code: "POLICY_DENIED" });
+    expect(() => readFileSync(target, "utf8")).toThrow();
+  });
+
+  test.skipIf(process.platform === "win32")(
+    "rejects direct, nested, and chained symlink escapes for reads and log tailing",
+    async () => {
+      const root = mkdtempSync(path.join(os.tmpdir(), "sshautomator-path-boundary-"));
+      const allowedDir = path.join(root, "allowed");
+      const deniedDir = path.join(root, "denied");
+      mkdirSync(allowedDir);
+      mkdirSync(deniedDir);
+      const secretPath = path.join(deniedDir, "secret.log");
+      writeFileSync(secretPath, "sensitive-host-content\nlatest-secret");
+
+      const directLink = path.join(allowedDir, "direct.log");
+      const nestedLink = path.join(allowedDir, "nested");
+      const chainOne = path.join(allowedDir, "chain-one.log");
+      const chainTwo = path.join(allowedDir, "chain-two.log");
+      symlinkSync(secretPath, directLink);
+      symlinkSync(deniedDir, nestedLink, "dir");
+      symlinkSync("chain-two.log", chainOne);
+      symlinkSync(secretPath, chainTwo);
+
+      const keyPair = generateEd25519PemKeyPair();
+      const policy = mergeCustomPolicy({
+        capabilities: { "files.read": true, "logs.read": true },
+        allowPaths: [allowedDir],
+        denyPaths: [deniedDir],
+      });
+      const executor = new AgentExecutor(policy, keyPair.privateKeyPem);
+      const attempts = [
+        action("file_read", "files.read", { path: directLink }),
+        action("file_read", "files.read", { path: path.join(nestedLink, "secret.log") }),
+        action("tail_logs", "logs.read", { unit_or_file: chainOne, timeout_seconds: 10 }),
+      ];
+
+      for (const request of attempts) {
+        const result = await executor.execute(request);
+        expect(result).toMatchObject({
+          status: "error",
+          error_code: "POLICY_DENIED",
+        });
+        expect(result.message).not.toContain(secretPath);
+        expect(result.message).not.toContain(deniedDir);
+        expect(result.message).not.toContain("sensitive-host-content");
+      }
+    },
+  );
+
+  test.skipIf(process.platform === "win32")(
+    "rejects writes through final and parent symlinks without modifying denied targets",
+    async () => {
+      const root = mkdtempSync(path.join(os.tmpdir(), "sshautomator-write-boundary-"));
+      const allowedDir = path.join(root, "allowed");
+      const deniedDir = path.join(root, "denied");
+      mkdirSync(allowedDir);
+      mkdirSync(deniedDir);
+      const deniedFile = path.join(deniedDir, "state.txt");
+      writeFileSync(deniedFile, "original");
+      const finalLink = path.join(allowedDir, "state-link.txt");
+      const parentLink = path.join(allowedDir, "denied-parent");
+      symlinkSync(deniedFile, finalLink);
+      symlinkSync(deniedDir, parentLink, "dir");
+
+      const keyPair = generateEd25519PemKeyPair();
+      const policy = mergeCustomPolicy({
+        capabilities: { "files.write": true },
+        allowPaths: [allowedDir],
+        denyPaths: [deniedDir],
+      });
+      const executor = new AgentExecutor(policy, keyPair.privateKeyPem);
+
+      const finalResult = await executor.execute(
+        action("file_write", "files.write", { path: finalLink, content: "overwritten" }),
+      );
+      const parentResult = await executor.execute(
+        action("file_write", "files.write", {
+          path: path.join(parentLink, "created.txt"),
+          content: "created-outside-policy",
+        }),
+      );
+
+      for (const result of [finalResult, parentResult]) {
+        expect(result).toMatchObject({ status: "error", error_code: "POLICY_DENIED" });
+        expect(result.message).not.toContain(deniedDir);
+      }
+      expect(readFileSync(deniedFile, "utf8")).toBe("original");
+      expect(() => readFileSync(path.join(deniedDir, "created.txt"), "utf8")).toThrow();
+    },
+  );
+
+  test.skipIf(process.platform === "win32")(
+    "permits in-policy symlinks after canonical authorization",
+    async () => {
+      const allowedDir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-allowed-link-"));
+      const realDir = path.join(allowedDir, "real");
+      mkdirSync(realDir);
+      const realFile = path.join(realDir, "state.log");
+      const linkFile = path.join(allowedDir, "state-link.log");
+      writeFileSync(realFile, "one\ntwo\nthree");
+      symlinkSync(realFile, linkFile);
+
+      const keyPair = generateEd25519PemKeyPair();
+      const policy = mergeCustomPolicy({
+        capabilities: { "files.read": true, "files.write": true, "logs.read": true },
+        allowPaths: [allowedDir],
+        denyPaths: [],
+      });
+      const executor = new AgentExecutor(policy, keyPair.privateKeyPem);
+
+      const readResult = await executor.execute(
+        action("file_read", "files.read", { path: linkFile }),
+      );
+      const logResult = await executor.execute(
+        action("tail_logs", "logs.read", { unit_or_file: linkFile, timeout_seconds: 10 }),
+      );
+      const writeResult = await executor.execute(
+        action("file_write", "files.write", { path: linkFile, content: "updated" }),
+      );
+
+      expect(readResult).toMatchObject({ status: "ok", stdout: "one\ntwo\nthree" });
+      expect(logResult.status).toBe("ok");
+      expect(logResult.stdout).toContain("three");
+      expect(writeResult.status).toBe("ok");
+      expect(readFileSync(realFile, "utf8")).toBe("updated");
+    },
+  );
 
   test("truncates large command output with metadata", async () => {
     const keyPair = generateEd25519PemKeyPair();

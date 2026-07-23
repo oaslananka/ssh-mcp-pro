@@ -83,8 +83,19 @@ export function mergeCustomPolicy(policy: AgentPolicyPatch): AgentPolicy {
 }
 
 function normalizePolicyPath(value: string): string {
-  const normalized = path.posix.normalize(value.replace(/\\/gu, "/"));
-  return normalized.replace(/\/$/u, "") || "/";
+  let slashPath = value.replace(/\\/gu, "/");
+  if (/^\/\/\?\/UNC\//iu.test(slashPath)) {
+    slashPath = `//${slashPath.slice(8)}`;
+  } else if (/^\/\/[?.]\//u.test(slashPath)) {
+    slashPath = slashPath.slice(4);
+  }
+
+  const windowsLike = /^[A-Za-z]:\//u.test(slashPath) || slashPath.startsWith("//");
+  if (windowsLike) {
+    const normalized = path.win32.normalize(slashPath.replaceAll("/", "\\")).replaceAll("\\", "/");
+    return (normalized.replace(/\/$/u, "") || "/").toLowerCase();
+  }
+  return path.posix.normalize(slashPath).replace(/\/$/u, "") || "/";
 }
 
 export function isPathAllowed(policy: AgentPolicy, filePath: string): boolean {

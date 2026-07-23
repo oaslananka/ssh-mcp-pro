@@ -39,6 +39,38 @@ describe("remote agent policy", () => {
     expect(isPathAllowed(policy, "/home/user/.ssh/id_ed25519")).toBe(false);
   });
 
+  test("normalizes Windows drive paths case-insensitively while preserving deny prefixes", () => {
+    const policy = mergeCustomPolicy({
+      allowPaths: ["C:\\Agent\\Data"],
+      denyPaths: ["C:\\Agent\\Data\\Private"],
+    });
+
+    expect(isPathAllowed(policy, "c:/agent/data/logs/service.log")).toBe(true);
+    expect(isPathAllowed(policy, "C:\\AGENT\\DATA\\logs\\service.log")).toBe(true);
+    expect(isPathAllowed(policy, "c:/agent/data/private/secret.txt")).toBe(false);
+    expect(isPathAllowed(policy, "c:/agent/database.txt")).toBe(false);
+  });
+
+  test("normalizes Windows extended-length and UNC paths without crossing shares", () => {
+    const policy = mergeCustomPolicy({
+      allowPaths: ["\\\\?\\C:\\Agent\\Data", "\\\\Server\\Share\\Ops"],
+      denyPaths: ["\\\\?\\C:\\Agent\\Data\\Private"],
+    });
+
+    expect(isPathAllowed(policy, "C:\\agent\\data\\logs\\service.log")).toBe(true);
+    expect(isPathAllowed(policy, "\\\\?\\C:\\AGENT\\DATA\\logs\\service.log")).toBe(true);
+    expect(isPathAllowed(policy, "\\\\server\\share\\ops\\logs\\service.log")).toBe(true);
+    expect(isPathAllowed(policy, "\\\\server\\share-two\\ops\\service.log")).toBe(false);
+    expect(isPathAllowed(policy, "C:\\agent\\data\\private\\secret.txt")).toBe(false);
+  });
+
+  test("keeps POSIX path matching case-sensitive", () => {
+    const policy = mergeCustomPolicy({ allowPaths: ["/srv/App"], denyPaths: [] });
+
+    expect(isPathAllowed(policy, "/srv/App/config.json")).toBe(true);
+    expect(isPathAllowed(policy, "/srv/app/config.json")).toBe(false);
+  });
+
   test("custom policy merges explicit capability and path overrides", () => {
     const policy = mergeCustomPolicy({
       capabilities: { "files.write": true },

@@ -31,6 +31,14 @@ Operators who need privileged work should prefer `ensure_package`, `ensure_servi
 
 Destructive command execution and destructive filesystem operations are denied by default. Policy allowlists, path prefixes, and explicit destructive toggles are required before tools such as `fs_rmrf` can remove remote paths.
 
+## Remote Agent Local Path Boundaries
+
+Remote-agent `file_read`, `file_write`, and file-based `tail_logs` operations authorize both the requested path and the canonical filesystem target. Symlinks are permitted only when their resolved target remains inside an allowed path and outside every denied path; a lexically allowed link to a denied target fails closed.
+
+Existing files are opened through a verified file handle and rechecked against their canonical target before content is read or modified. New files require an existing, authorized canonical parent directory. On Linux, creation is anchored to the verified parent directory descriptor and uses no-follow flags; on other supported platforms the implementation uses canonical-parent and post-open identity checks. These controls reduce path-replacement race windows without exposing resolved host paths in action errors.
+
+Directory-shaped write targets are rejected rather than normalized into a different file path. File-backed log tailing uses a bounded backward scan; if discovering the requested line boundary exceeds that budget, the response remains byte-bounded and is explicitly marked truncated. Authorization failures return generic policy messages, and filesystem operation failures return generic operation messages so denied target names and contents are not reflected to the remote caller.
+
 ## Audit Redaction
 
 `AuditLog` stores policy decisions and selected action metadata. Before retention, it calls `redactSensitiveData()` and `redactErrorMessage()` so fields matching password, private key, passphrase, sudo password, secret, token, credential, auth, API key, bearer, and PEM patterns are redacted.
