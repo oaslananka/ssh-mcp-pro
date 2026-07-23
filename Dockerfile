@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24-alpine@sha256:2bdb65ed1dab192432bc31c95f94155ca5ad7fc1392fb7eb7526ab682fa5bf14 AS build
+FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS build
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -10,7 +10,7 @@ COPY tsconfig.json typedoc.json ./
 COPY src ./src
 RUN pnpm run build
 
-FROM node:24-alpine@sha256:2bdb65ed1dab192432bc31c95f94155ca5ad7fc1392fb7eb7526ab682fa5bf14 AS runtime
+FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS runtime
 WORKDIR /app
 
 ARG VCS_REF=unknown
@@ -34,7 +34,8 @@ RUN corepack enable && \
     rm -rf /root/.cache /root/.local/share/pnpm && \
     rm -rf /usr/local/lib/node_modules/npm && \
     rm -rf /usr/local/lib/node_modules/corepack && \
-    rm -f /usr/local/bin/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/pnpm /usr/local/bin/pnpx
+    rm -rf /opt/yarn-v* && \
+    rm -f /usr/local/bin/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/pnpm /usr/local/bin/pnpx /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 COPY --from=build /app/dist ./dist
 COPY README.md LICENSE SECURITY.md SECURITY_DECISIONS.md ARCHITECTURE.md REGISTRY_SUBMISSION.md ./
