@@ -1,8 +1,9 @@
 import { spawn } from "node:child_process";
-import { constants, createReadStream } from "node:fs";
-import { access, writeFile } from "node:fs/promises";
+import { access } from "node:fs/promises";
+import type { FileHandle } from "node:fs/promises";
 import os from "node:os";
-import { isContainerAllowed, isPathAllowed, isServiceAllowed } from "./policy.js";
+import { isContainerAllowed, isServiceAllowed } from "./policy.js";
+import { withAuthorizedRead, withAuthorizedWrite } from "./safe-file.js";
 import { TOOL_CAPABILITY_MAP } from "./types.js";
 import type {
   ActionRequestEnvelope,
@@ -119,34 +120,96 @@ function finalizeBoundedOutput(
   return appendTruncationMarker(value, maxBytes);
 }
 
-function readFileBounded(
-  filePath: string,
+async function readHandleRange(file: FileHandle, start: number, length: number): Promise<Buffer> {
+  const buffer = Buffer.alloc(Math.max(0, length));
+  let offset = 0;
+  while (offset < buffer.byteLength) {
+    const { bytesRead } = await file.read(
+      buffer,
+      offset,
+      buffer.byteLength - offset,
+      start + offset,
+    );
+    if (bytesRead === 0) {
+      break;
+    }
+    offset += bytesRead;
+  }
+  return buffer.subarray(0, offset);
+}
+
+async function readFileBounded(
+  file: FileHandle,
   maxBytes: number,
 ): Promise<{
   value: Buffer;
   truncated: boolean;
 }> {
-  return new Promise((resolve, reject) => {
-    const cappedBytes = Math.max(0, maxBytes);
-    const bytesToRead = cappedBytes + 1;
-    const chunks: Buffer[] = [];
-    let bytes = 0;
-    const stream = createReadStream(filePath, {
-      start: 0,
-      end: bytesToRead - 1,
-      highWaterMark: Math.max(1, Math.min(64 * 1024, bytesToRead)),
-    });
+  const cappedBytes = Math.max(0, maxBytes);
+  const buffer = await readHandleRange(file, 0, cappedBytes + 1);
+  return truncateBuffer(buffer, cappedBytes);
+}
 
-    stream.on("data", (chunk) => {
-      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      chunks.push(buffer);
-      bytes += buffer.byteLength;
-    });
-    stream.once("error", reject);
-    stream.once("end", () => {
-      resolve(truncateBuffer(Buffer.concat(chunks, bytes), cappedBytes));
-    });
-  });
+const TAIL_SCAN_CHUNK_BYTES = 64 * 1024;
+const MAX_TAIL_SCAN_BYTES = 8 * 1024 * 1024;
+
+interface TailStart {
+  offset: number;
+  scanTruncated: boolean;
+}
+
+async function findTailStart(
+  file: FileHandle,
+  size: number,
+  maxLines: number,
+  maxScanBytes: number,
+): Promise<TailStart> {
+  if (size <= 0 || maxLines <= 0) {
+    return { offset: size, scanTruncated: false };
+  }
+
+  let position = size;
+  const minimumPosition = Math.max(0, size - Math.max(0, maxScanBytes));
+  let includedLines = 1;
+  while (position > minimumPosition) {
+    const chunkSize = Math.min(TAIL_SCAN_CHUNK_BYTES, position - minimumPosition);
+    position -= chunkSize;
+    const chunk = await readHandleRange(file, position, chunkSize);
+    for (let index = chunk.byteLength - 1; index >= 0; index -= 1) {
+      const absoluteIndex = position + index;
+      if (chunk[index] !== 0x0a || absoluteIndex === size - 1) {
+        continue;
+      }
+      if (includedLines >= maxLines) {
+        return { offset: absoluteIndex + 1, scanTruncated: false };
+      }
+      includedLines += 1;
+    }
+  }
+  return { offset: minimumPosition, scanTruncated: minimumPosition > 0 };
+}
+
+async function readFileTailBounded(
+  file: FileHandle,
+  maxBytes: number,
+  maxLines = 100,
+): Promise<{
+  value: Buffer;
+  truncated: boolean;
+}> {
+  const cappedBytes = Math.max(0, maxBytes);
+  const stats = await file.stat();
+  const scanBytes = Math.max(
+    TAIL_SCAN_CHUNK_BYTES,
+    Math.min(MAX_TAIL_SCAN_BYTES, cappedBytes * 4 + 1),
+  );
+  const { offset, scanTruncated } = await findTailStart(file, stats.size, maxLines, scanBytes);
+  const bytesToRead = Math.min(stats.size - offset, cappedBytes + 1);
+  const buffer = await readHandleRange(file, offset, bytesToRead);
+  const bounded = truncateBuffer(buffer, cappedBytes);
+  return scanTruncated && !bounded.truncated
+    ? appendTruncationMarker(bounded.value, cappedBytes)
+    : bounded;
 }
 
 function isLogFileTarget(target: string): boolean {
@@ -348,36 +411,31 @@ export class AgentExecutor {
     });
   }
 
-  private tailLogs(target: string, timeoutSeconds: number): Promise<ExecResult> {
+  private async tailLogs(target: string, timeoutSeconds: number): Promise<ExecResult> {
     if (!target) {
       throw Object.assign(new Error("unit_or_file is required"), {
         code: "POLICY_DENIED" as const,
       });
     }
     const isFileTarget = isLogFileTarget(target);
-    if (isFileTarget && !isPathAllowed(this.policy, target)) {
-      throw Object.assign(new Error("Log path is not allowed by local policy"), {
-        code: "POLICY_DENIED" as const,
-      });
+    if (isFileTarget) {
+      return withAuthorizedRead(
+        this.policy,
+        target,
+        "Log path is not allowed by local policy",
+        "Log operation failed",
+        async (file) => {
+          const truncated = await readFileTailBounded(file, this.policy.maxOutputBytes);
+          return {
+            exitCode: 0,
+            stdout: truncated.value.toString("utf8"),
+            stderr: "",
+            truncated: truncated.truncated,
+          };
+        },
+      );
     }
     if (process.platform === "win32") {
-      if (isFileTarget) {
-        const escaped = target.replace(/'/gu, "''");
-        return runCommand(
-          "powershell.exe",
-          [
-            "-NoLogo",
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            `Get-Content -LiteralPath '${escaped}' -Tail 100`,
-          ],
-          {
-            timeoutSeconds,
-            maxOutputBytes: this.policy.maxOutputBytes,
-          },
-        );
-      }
       assertSafeIdentifier(target, "Log target");
       const escapedTarget = target.replace(/'/gu, "''");
       return runCommand(
@@ -394,12 +452,6 @@ export class AgentExecutor {
           maxOutputBytes: this.policy.maxOutputBytes,
         },
       );
-    }
-    if (isFileTarget) {
-      return runCommand("tail", ["-n", "100", target], {
-        timeoutSeconds,
-        maxOutputBytes: this.policy.maxOutputBytes,
-      });
     }
     assertSafeIdentifier(target, "Systemd unit");
     return runCommand("journalctl", ["-u", target, "-n", "100", "--no-pager"], {
@@ -456,28 +508,35 @@ export class AgentExecutor {
   }
 
   private async fileRead(filePath: string): Promise<ExecResult> {
-    if (!isPathAllowed(this.policy, filePath)) {
-      throw Object.assign(new Error("Path is not allowed by local policy"), {
-        code: "POLICY_DENIED" as const,
-      });
-    }
-    const truncated = await readFileBounded(filePath, this.policy.maxOutputBytes);
-    return {
-      exitCode: 0,
-      stdout: truncated.value.toString("utf8"),
-      stderr: "",
-      truncated: truncated.truncated,
-    };
+    return withAuthorizedRead(
+      this.policy,
+      filePath,
+      "Path is not allowed by local policy",
+      "File read failed",
+      async (file) => {
+        const truncated = await readFileBounded(file, this.policy.maxOutputBytes);
+        return {
+          exitCode: 0,
+          stdout: truncated.value.toString("utf8"),
+          stderr: "",
+          truncated: truncated.truncated,
+        };
+      },
+    );
   }
 
   private async fileWrite(filePath: string, content: string): Promise<ExecResult> {
-    if (!isPathAllowed(this.policy, filePath)) {
-      throw Object.assign(new Error("Path is not allowed by local policy"), {
-        code: "POLICY_DENIED" as const,
-      });
-    }
-    await writeFile(filePath, content, { mode: constants.S_IRUSR | constants.S_IWUSR });
-    return { exitCode: 0, stdout: "written", stderr: "", truncated: false };
+    return withAuthorizedWrite(
+      this.policy,
+      filePath,
+      "Path is not allowed by local policy",
+      "File write failed",
+      async (file) => {
+        await file.truncate(0);
+        await file.writeFile(content, { encoding: "utf8" });
+        return { exitCode: 0, stdout: "written", stderr: "", truncated: false };
+      },
+    );
   }
 
   private async runShell(
