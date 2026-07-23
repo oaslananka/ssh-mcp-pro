@@ -16,6 +16,7 @@ import { createContainer, type AppContainer } from "./container.js";
 import { SERVER_VERSION, SSHMCPServer } from "./mcp.js";
 import { logger } from "./logging.js";
 import { initTelemetry, shutdownTelemetry } from "./telemetry.js";
+import type { HttpServerRuntime } from "./server-http.js";
 
 function getPackageInfo() {
   try {
@@ -113,7 +114,8 @@ async function main() {
     if (opts.connectorCredentialProvider) {
       process.env.SSH_MCP_CONNECTOR_CREDENTIAL_PROVIDER = opts.connectorCredentialProvider;
     }
-    await import("./server-http.js");
+    const { startHttpServer } = await import("./server-http.js");
+    httpRuntime = await startHttpServer({ registerSignalHandlers: false });
     return;
   }
 
@@ -181,6 +183,7 @@ process.on("unhandledRejection", (reason, promise) => {
 // Handle graceful shutdown
 let shuttingDown = false;
 let container: AppContainer | undefined;
+let httpRuntime: HttpServerRuntime | undefined;
 
 async function gracefulShutdown(signal: string) {
   if (shuttingDown) {
@@ -198,11 +201,15 @@ async function gracefulShutdown(signal: string) {
   }, 2000);
 
   try {
-    container?.rateLimiter.destroy();
-    if (container) {
-      await container.sessionManager.destroy();
+    if (httpRuntime) {
+      await httpRuntime.close(signal);
+    } else {
+      container?.rateLimiter.destroy();
+      if (container) {
+        await container.sessionManager.destroy();
+      }
+      await shutdownTelemetry();
     }
-    await shutdownTelemetry();
   } catch (error) {
     logger.error("Shutdown error", { error });
   }

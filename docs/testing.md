@@ -1,5 +1,29 @@
 # Testing
 
+## HTTP boundary testing
+
+`test/integration/http-server-boundary.integration.test.ts` starts the real HTTP
+MCP runtime in-process on an ephemeral loopback port. It uses temporary bearer
+files, an injected clock, and deterministic remote-control-plane doubles; it
+does not require external OAuth, JWKS, SSH, or public-network services.
+
+The suite exercises the production request boundary rather than only helper
+functions. Coverage includes bearer and OAuth challenges, origin and CORS
+handling, request-size limits, rate-limit headers, protected-resource metadata,
+MCP session initialization, capacity eviction, idle expiry, legacy SSE,
+remote HTTP and WebSocket delegation, startup refusal, and idempotent shutdown.
+`test/unit/http-server-lifecycle.test.ts` separately locks lifecycle concurrency,
+bind failures, signal cleanup, and one-shot close behavior.
+
+Run the boundary suite with:
+
+```bash
+pnpm run test:integration -- test/integration/http-server-boundary.integration.test.ts
+```
+
+The HTTP runtime is included in the normal coverage denominator. Do not replace
+these tests with a coverage exclusion when adding routes or lifecycle branches.
+
 ## Mutation testing
 
 Mutation testing is configured for policy-critical security surfaces only. The

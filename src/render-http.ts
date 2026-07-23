@@ -13,4 +13,5 @@ if (bearerToken && !process.env.SSH_MCP_HTTP_BEARER_TOKEN_FILE) {
   process.env.SSH_MCP_HTTP_BEARER_TOKEN_FILE = tokenPath;
 }
 
-await import("./server-http.js");
+const { startHttpServer } = await import("./server-http.js");
+await startHttpServer({ registerSignalHandlers: true });
