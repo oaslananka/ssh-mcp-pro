@@ -3,6 +3,7 @@ packages:
 
 engineStrict: true
 strictDepBuilds: true
+blockExoticSubdeps: true
 
 allowBuilds:
   cpu-features: false

@@ -11,6 +11,7 @@
     "helpers:pinGitHubActionDigestsToSemver"
   ],
   "timezone": "Europe/Istanbul",
+  "minimumReleaseAge": "7 days",
   "labels": ["dependencies"],
   "dependencyDashboardLabels": ["dependencies"],
   "dependencyDashboardTitle": "Dependency Dashboard",
@@ -48,7 +49,7 @@
     {
       "description": "Apply npm release-age guard to reduce supply-chain churn.",
       "matchDatasources": ["npm"],
-      "minimumReleaseAge": "3 days",
+      "minimumReleaseAge": "7 days",
       "prCreation": "not-pending",
       "internalChecksFilter": "strict",
       "addLabels": ["javascript"]
@@ -56,7 +57,7 @@
     {
       "description": "Pin and group non-major GitHub Actions updates.",
       "matchManagers": ["github-actions"],
-      "minimumReleaseAge": "3 days",
+      "minimumReleaseAge": "7 days",
       "prCreation": "not-pending",
       "internalChecksFilter": "strict",
       "pinDigests": true,

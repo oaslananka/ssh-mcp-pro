@@ -29,7 +29,7 @@ defaults:
 
 env:
   NODE_VERSION: 26.3.0
-  PNPM_VERSION: 11.5.1
+  PNPM_VERSION: 11.9.0
 
 jobs:
   validate:
