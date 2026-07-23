@@ -67,6 +67,8 @@ describe("performance regression gate configuration", () => {
     expect(workflow).toContain("schedule:");
     expect(workflow).toContain("perf:");
     expect(workflow).toContain("github.event_name == 'schedule'");
+    expect(workflow).toContain("pnpm run docker:ssh-fixture:verify");
     expect(workflow).toContain("pnpm run test:perf");
+    expect(workflow).toContain("pnpm run check:fixture-results perf");
   });
 });

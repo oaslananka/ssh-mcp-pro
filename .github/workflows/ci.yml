@@ -193,8 +193,13 @@ jobs:
       - name: Start SSH fixture
         run: pnpm run docker:ssh-fixture:up
 
-      - name: Run integration tests
-        run: pnpm run test:integration
+      - name: Verify SSH fixture
+        run: pnpm run docker:ssh-fixture:verify
+
+      - name: Run integration tests and verify execution
+        run: |
+          pnpm run test:integration
+          pnpm run check:fixture-results integration
         env:
           RUN_SSH_INTEGRATION: "1"
           TEST_SSH_HOST: localhost
@@ -202,20 +207,27 @@ jobs:
           TEST_SSH_USER: testuser
           TEST_SSH_PASS: testpass
 
+      - name: Collect SSH fixture diagnostics
+        if: ${{ failure() }}
+        run: pnpm run docker:ssh-fixture:diagnostics artifacts/ssh-fixture/integration
+
       - name: Stop SSH fixture
-        if: ${{ !cancelled() }}
+        if: ${{ always() }}
         run: pnpm run docker:ssh-fixture:down
 
-      - name: Upload integration JUnit results
-        if: ${{ !cancelled() }}
+      - name: Upload integration evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: junit-integration
-          path: test-results/**/*.xml
+          name: ssh-integration-evidence
+          path: |
+            test-results/**/*.xml
+            artifacts/ssh-fixture/integration/**
           if-no-files-found: warn
+          retention-days: 14
 
   integration-windows:
-    name: Windows Integration
+    name: Windows Command-Path Integration
     if: >-
       ${{
         github.event_name != 'pull_request' ||
@@ -242,18 +254,21 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      - name: Run Windows integration tests
-        run: pnpm run test:integration:windows
+      - name: Run Windows command-path tests and verify execution
+        run: |
+          pnpm run test:integration:windows
+          pnpm run check:fixture-results windows
         env:
           RUN_WINDOWS_SSH_INTEGRATION: "1"
 
-      - name: Upload Windows integration JUnit results
-        if: ${{ !cancelled() }}
+      - name: Upload Windows command-path JUnit results
+        if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: junit-integration-windows
+          name: junit-windows-command-path
           path: test-results/**/*.xml
           if-no-files-found: warn
+          retention-days: 14
 
   e2e:
     name: SSH E2E
@@ -286,8 +301,13 @@ jobs:
       - name: Start SSH fixture
         run: pnpm run docker:ssh-fixture:up
 
-      - name: Run E2E tests
-        run: pnpm run test:e2e
+      - name: Verify SSH fixture
+        run: pnpm run docker:ssh-fixture:verify
+
+      - name: Run E2E tests and verify execution
+        run: |
+          pnpm run test:e2e
+          pnpm run check:fixture-results e2e
         env:
           RUN_SSH_E2E: "1"
           TEST_SSH_HOST: localhost
@@ -295,17 +315,24 @@ jobs:
           TEST_SSH_USER: testuser
           TEST_SSH_PASS: testpass
 
+      - name: Collect SSH fixture diagnostics
+        if: ${{ failure() }}
+        run: pnpm run docker:ssh-fixture:diagnostics artifacts/ssh-fixture/e2e
+
       - name: Stop SSH fixture
-        if: ${{ !cancelled() }}
+        if: ${{ always() }}
         run: pnpm run docker:ssh-fixture:down
 
-      - name: Upload E2E JUnit results
-        if: ${{ !cancelled() }}
+      - name: Upload E2E evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: junit-e2e
-          path: test-results/**/*.xml
+          name: ssh-e2e-evidence
+          path: |
+            test-results/**/*.xml
+            artifacts/ssh-fixture/e2e/**
           if-no-files-found: warn
+          retention-days: 14
 
   perf:
     name: Performance Baseline
@@ -334,25 +361,37 @@ jobs:
       - name: Start SSH fixture
         run: pnpm run docker:ssh-fixture:up
 
-      - name: Run performance baseline
-        run: pnpm run test:perf
+      - name: Verify SSH fixture
+        run: pnpm run docker:ssh-fixture:verify
+
+      - name: Run performance baseline and verify execution
+        run: |
+          pnpm run test:perf
+          pnpm run check:fixture-results perf
         env:
           TEST_SSH_HOST: localhost
           TEST_SSH_PORT: "2222"
           TEST_SSH_USER: testuser
           TEST_SSH_PASS: testpass
 
+      - name: Collect SSH fixture diagnostics
+        if: ${{ failure() }}
+        run: pnpm run docker:ssh-fixture:diagnostics artifacts/ssh-fixture/perf
+
       - name: Stop SSH fixture
-        if: ${{ !cancelled() }}
+        if: ${{ always() }}
         run: pnpm run docker:ssh-fixture:down
 
-      - name: Upload perf JUnit results
-        if: ${{ !cancelled() }}
+      - name: Upload performance evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: junit-perf
-          path: test-results/**/*.xml
+          name: ssh-performance-evidence
+          path: |
+            test-results/**/*.xml
+            artifacts/ssh-fixture/perf/**
           if-no-files-found: warn
+          retention-days: 14
 
   dependency-freshness:
     name: Dependency Freshness

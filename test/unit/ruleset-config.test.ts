@@ -9,12 +9,14 @@ const requiredProtectionContexts = [
   "Unit Tests (Node 22)",
   "Unit Tests (Node 24)",
   "SSH Integration",
-  "Windows Integration",
+  "Windows Command-Path Integration",
   "SSH E2E",
   "Build, SBOM, and Pack",
   "Build and smoke image",
   "Analyze TypeScript",
   "Validate MCP Registry metadata",
+  "Secret scan (full history)",
+  "dependency-review",
 ] as const;
 
 interface RequiredStatusCheck {
@@ -72,9 +74,67 @@ function ruleOfType(ruleset: BranchRuleset, type: string) {
 }
 
 function extractWorkflowJobNames(workflows: string) {
-  return [...workflows.matchAll(/^ {4}name:\s+(.+)$/gm)].map((match) =>
-    match[1].trim().replace(/^["'](.*)["']$/, "$1"),
-  );
+  const names: string[] = [];
+  let inJobs = false;
+  let currentJob: { id: string; name?: string } | undefined;
+
+  for (const line of workflows.split("\n")) {
+    if (!inJobs) {
+      inJobs = line === "jobs:";
+      continue;
+    }
+
+    const jobId = jobIdFromLine(line);
+    if (jobId) {
+      appendResolvedJobName(names, currentJob);
+      currentJob = { id: jobId };
+      continue;
+    }
+
+    const jobName = jobNameFromLine(line);
+    if (currentJob && !currentJob.name && jobName) {
+      currentJob.name = jobName;
+    }
+  }
+
+  appendResolvedJobName(names, currentJob);
+  return names;
+}
+
+function appendResolvedJobName(names: string[], job: { id: string; name?: string } | undefined) {
+  if (job) {
+    names.push(job.name ?? job.id);
+  }
+}
+
+function jobIdFromLine(line: string) {
+  if (!line.startsWith("  ") || line.startsWith("    ")) {
+    return undefined;
+  }
+  const separator = line.indexOf(":", 2);
+  if (separator < 3) {
+    return undefined;
+  }
+  const id = line.slice(2, separator);
+  return /^[a-zA-Z0-9_-]+$/u.test(id) ? id : undefined;
+}
+
+function jobNameFromLine(line: string) {
+  const prefix = "    name:";
+  if (!line.startsWith(prefix)) {
+    return undefined;
+  }
+  const value = line.slice(prefix.length).trim();
+  return value ? unquoteYamlScalar(value) : undefined;
+}
+
+function unquoteYamlScalar(value: string) {
+  const trimmed = value.trim();
+  const first = trimmed.at(0);
+  const last = trimmed.at(-1);
+  const isQuoted =
+    trimmed.length >= 2 && ((first === '"' && last === '"') || (first === "'" && last === "'"));
+  return isQuoted ? trimmed.slice(1, -1) : trimmed;
 }
 
 describe("GitHub branch protection ruleset configuration", () => {
@@ -126,6 +186,8 @@ describe("GitHub branch protection ruleset configuration", () => {
       readText(".github/workflows/docker.yml"),
       readText(".github/workflows/codeql.yml"),
       readText(".github/workflows/mcp-registry.yml"),
+      readText(".github/workflows/gitleaks.yml"),
+      readText(".github/workflows/dependency-review.yml"),
     ].join("\n");
     const workflowJobNames = extractWorkflowJobNames(workflows);
     const statusRule = ruleOfType(readRuleset(), "required_status_checks");
@@ -143,12 +205,14 @@ describe("GitHub branch protection ruleset configuration", () => {
         "Quality Gates",
         "Unit Tests (Node ${{ matrix.node_major }})",
         "SSH Integration",
-        "Windows Integration",
+        "Windows Command-Path Integration",
         "SSH E2E",
         "Build, SBOM, and Pack",
         "Build and smoke image",
         "Analyze TypeScript",
         "Validate MCP Registry metadata",
+        "Secret scan (full history)",
+        "dependency-review",
       ]),
     );
   });

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
+import { mkdirSync, writeFileSync } from "node:fs";
 import net from "node:net";
+import path from "node:path";
 import { capture as captureCommand, executable } from "./lib/command.mjs";
 
 const CONTAINER_NAME = "ssh-mcp-pro-test";
@@ -68,6 +70,69 @@ function canConnectToSsh() {
 
 function printFixtureLogs() {
   compose(["logs", "--no-color", "--tail", "120", "ssh-server"], { stdio: "inherit" });
+}
+
+function captureDiagnostic(command, args) {
+  const result = captureCommand(executable(command), args, { encoding: "utf8" });
+  return {
+    exitCode: result.status ?? 1,
+    stdout: result.stdout?.trim() ?? "",
+    stderr: result.stderr?.trim() ?? result.error?.message ?? "",
+  };
+}
+
+function writeDiagnostic(pathname, result) {
+  const sections = [
+    `exit_code=${result.exitCode}`,
+    result.stdout ? `stdout:\n${result.stdout}` : "stdout:",
+    result.stderr ? `stderr:\n${result.stderr}` : "stderr:",
+  ];
+  writeFileSync(pathname, `${sections.join("\n")}\n`, { mode: 0o600 });
+}
+
+async function diagnostics(outputDirectory) {
+  const resolvedOutput = path.resolve(outputDirectory);
+  mkdirSync(resolvedOutput, { recursive: true, mode: 0o700 });
+
+  const composeStatus = captureDiagnostic("docker", ["compose", "ps", "--all"]);
+  const containerState = captureDiagnostic("docker", [
+    "inspect",
+    "--format",
+    "{{json .State}}",
+    CONTAINER_NAME,
+  ]);
+  const fixtureLogs = captureDiagnostic("docker", [
+    "compose",
+    "logs",
+    "--no-color",
+    "--tail",
+    "200",
+    "ssh-server",
+  ]);
+  const status = getContainerStatus() || "unavailable";
+  const tcpReady = await canConnectToSsh();
+
+  writeDiagnostic(path.join(resolvedOutput, "compose-ps.txt"), composeStatus);
+  writeDiagnostic(path.join(resolvedOutput, "container-state.txt"), containerState);
+  writeDiagnostic(path.join(resolvedOutput, "ssh-server.log"), fixtureLogs);
+  writeFileSync(
+    path.join(resolvedOutput, "summary.json"),
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        container: CONTAINER_NAME,
+        host: SSH_HOST,
+        port: SSH_PORT,
+        status,
+        tcpReady,
+      },
+      null,
+      2,
+    )}
+`,
+    { mode: 0o600 },
+  );
+  console.log(`SSH fixture diagnostics written to ${resolvedOutput}.`);
 }
 
 async function waitForSshFixture() {
@@ -162,6 +227,16 @@ async function main() {
     return;
   }
 
+  if (action === "verify") {
+    await waitForSshFixture();
+    return;
+  }
+
+  if (action === "diagnostics" && suite) {
+    await diagnostics(suite);
+    return;
+  }
+
   if (action === "down") {
     process.exit(down());
   }
@@ -171,7 +246,9 @@ async function main() {
     return;
   }
 
-  console.error("Usage: docker-ssh-fixture.mjs up | down | run <integration|e2e>");
+  console.error(
+    "Usage: docker-ssh-fixture.mjs up | verify | diagnostics <output-dir> | down | run <integration|e2e>",
+  );
   process.exit(1);
 }
 
