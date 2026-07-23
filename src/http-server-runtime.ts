@@ -31,6 +31,7 @@ import { loadRemoteConfig } from "./remote/config.js";
 import type { RemoteConfig } from "./remote/types.js";
 import { userSafeError } from "./remote/util.js";
 import { createHttpServerLifecycle } from "./http-server-lifecycle.js";
+import { createHttpRequestHandler } from "./http-server-router.js";
 import { HttpSessionRegistry } from "./http-session-registry.js";
 
 type HttpTransport = StreamableHTTPServerTransport | SSEServerTransport;
@@ -122,21 +123,24 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     return url.toString();
   }
 
+  function requestProtocol(req: IncomingMessage): "http" | "https" {
+    const forwardedProto = req.headers["x-forwarded-proto"];
+    const rawProtocol = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
+    if (httpConfig.trustProxy && (rawProtocol === "http" || rawProtocol === "https")) {
+      return rawProtocol;
+    }
+    return isLoopbackHost(httpConfig.host) ? "http" : "https";
+  }
+
   function buildPublicMcpUrl(req: IncomingMessage): string {
     const configured = configuredPublicMcpUrl();
     if (configured) {
       return configured;
     }
 
-    const forwardedProto = req.headers["x-forwarded-proto"];
-    const rawProtocol = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
-    const protocol =
-      httpConfig.trustProxy && (rawProtocol === "http" || rawProtocol === "https")
-        ? rawProtocol
-        : isLoopbackHost(httpConfig.host)
-          ? "http"
-          : "https";
-    return `${protocol}://${req.headers.host ?? `localhost:${httpConfig.port}`}${endpoint}`;
+    const protocol = requestProtocol(req);
+    const authority = req.headers.host ?? `localhost:${httpConfig.port}`;
+    return `${protocol}://${authority}${endpoint}`;
   }
 
   function removeHttpSession(sessionId: string, reason: string): void {
@@ -376,99 +380,62 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     await session.transport.handlePostMessage(req, res);
   }
 
+  async function handleRemoteHttpRequest(
+    req: IncomingMessage,
+    res: ServerResponse,
+    pathname: string,
+  ): Promise<boolean> {
+    if (!remoteControlPlanePromise) {
+      return false;
+    }
+    const remoteControlPlane = await remoteControlPlanePromise;
+    return remoteControlPlane.handleHttp(req, res, pathname);
+  }
+
+  function errorResponse(error: unknown): {
+    statusCode: number;
+    payload: Record<string, unknown>;
+  } {
+    if (error && typeof error === "object" && "status" in error && "message" in error) {
+      const status = Number((error as { status: number }).status);
+      const message = String((error as { message: string }).message);
+      const code = "code" in error ? String((error as { code: string }).code) : undefined;
+      return {
+        statusCode: Number.isFinite(status) ? status : 500,
+        payload: { error: message, code },
+      };
+    }
+    if (error instanceof RequestBodyTooLargeError) {
+      return { statusCode: 413, payload: { error: "Request body is too large" } };
+    }
+    return { statusCode: 500, payload: { error: "Internal server error" } };
+  }
+
+  const handleHttpRequest = createHttpRequestHandler({
+    endpoint,
+    legacySseEndpoint,
+    legacyMessageEndpoint,
+    healthEndpoint,
+    oauthProtectedResourceEndpoint,
+    allowedOrigins: httpConfig.allowedOrigins,
+    enableLegacySse: httpConfig.enableLegacySse,
+    attachCurrentRateLimitHeaders,
+    handleRemoteHttpRequest,
+    protectedResourceMetadata,
+    rejectIfUnauthorized,
+    readJsonBody,
+    handleStreamableRequest,
+    handleLegacySseConnection,
+    handleLegacyMessage,
+    errorResponse,
+    onError: (error) => {
+      logger.error("HTTP MCP request failed", { error: userSafeError(error) });
+    },
+    sendJson,
+  });
+
   const httpServer = createNodeHttpServer((req, res) => {
-    void (async () => {
-      try {
-        const requestUrl = new URL(req.url ?? endpoint, "http://localhost");
-        attachCurrentRateLimitHeaders(res);
-
-        if (remoteControlPlanePromise) {
-          const remoteControlPlane = await remoteControlPlanePromise;
-          const handled = await remoteControlPlane.handleHttp(req, res, requestUrl.pathname);
-          if (handled) {
-            return;
-          }
-        }
-
-        if (requestUrl.pathname === oauthProtectedResourceEndpoint && req.method === "GET") {
-          sendJson(req, res, 200, protectedResourceMetadata(req));
-          return;
-        }
-
-        if (requestUrl.pathname === healthEndpoint && req.method === "GET") {
-          sendJson(req, res, 200, {
-            ok: true,
-            service: "ssh-mcp-pro",
-            transport: "streamable-http",
-          });
-          return;
-        }
-
-        if (requestUrl.pathname === endpoint && req.method === "OPTIONS") {
-          if (!isOriginAllowed(req.headers.origin, httpConfig.allowedOrigins)) {
-            sendJson(req, res, 403, { error: "Origin is not allowed" });
-            return;
-          }
-          res.writeHead(204, corsHeaders(req.headers.origin, httpConfig.allowedOrigins));
-          res.end();
-          return;
-        }
-
-        if (await rejectIfUnauthorized(req, res)) {
-          return;
-        }
-
-        if (requestUrl.pathname === endpoint) {
-          if (req.method !== "GET" && req.method !== "POST" && req.method !== "DELETE") {
-            sendJson(req, res, 405, { error: "Method not allowed" });
-            return;
-          }
-
-          const parsedBody = req.method === "POST" ? await readJsonBody(req) : undefined;
-          await handleStreamableRequest(req, res, parsedBody);
-          return;
-        }
-
-        if (httpConfig.enableLegacySse && requestUrl.pathname === legacySseEndpoint) {
-          if (req.method !== "GET") {
-            sendJson(req, res, 405, { error: "Method not allowed" });
-            return;
-          }
-          await handleLegacySseConnection(req, res);
-          return;
-        }
-
-        if (httpConfig.enableLegacySse && requestUrl.pathname === legacyMessageEndpoint) {
-          if (req.method !== "POST") {
-            sendJson(req, res, 405, { error: "Method not allowed" });
-            return;
-          }
-          await handleLegacyMessage(req, res);
-          return;
-        }
-
-        sendJson(req, res, 404, { error: "Not found" });
-      } catch (error) {
-        logger.error("HTTP MCP request failed", {
-          error: userSafeError(error),
-        });
-        if (!res.headersSent) {
-          if (error && typeof error === "object" && "status" in error && "message" in error) {
-            const status = Number((error as { status: number }).status);
-            const message = String((error as { message: string }).message);
-            const code = "code" in error ? String((error as { code: string }).code) : undefined;
-            sendJson(req, res, Number.isFinite(status) ? status : 500, { error: message, code });
-          } else {
-            const statusCode = error instanceof RequestBodyTooLargeError ? 413 : 500;
-            const message =
-              error instanceof RequestBodyTooLargeError
-                ? "Request body is too large"
-                : "Internal server error";
-            sendJson(req, res, statusCode, { error: message });
-          }
-        }
-      }
-    })();
+    void handleHttpRequest(req, res);
   });
 
   httpServer.on("upgrade", (req, socket, head) => {
