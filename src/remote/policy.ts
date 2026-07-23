@@ -92,7 +92,7 @@ function normalizePolicyPath(value: string): string {
 
   const windowsLike = /^[A-Za-z]:\//u.test(slashPath) || slashPath.startsWith("//");
   if (windowsLike) {
-    const normalized = path.win32.normalize(slashPath.replace(/\//gu, "\\")).replace(/\\/gu, "/");
+    const normalized = path.win32.normalize(slashPath.replaceAll("/", "\\")).replaceAll("\\", "/");
     return (normalized.replace(/\/$/u, "") || "/").toLowerCase();
   }
   return path.posix.normalize(slashPath).replace(/\/$/u, "") || "/";
