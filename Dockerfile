@@ -35,7 +35,9 @@ RUN corepack enable && \
     rm -rf /usr/local/lib/node_modules/npm && \
     rm -rf /usr/local/lib/node_modules/corepack && \
     rm -rf /opt/yarn-v* && \
-    rm -f /usr/local/bin/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/pnpm /usr/local/bin/pnpx /usr/local/bin/yarn /usr/local/bin/yarnpkg
+    rm -f /usr/local/bin/corepack /usr/local/bin/npm /usr/local/bin/npx && \
+    rm -f /usr/local/bin/pnpm /usr/local/bin/pnpx && \
+    rm -f /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 COPY --from=build /app/dist ./dist
 COPY README.md LICENSE SECURITY.md SECURITY_DECISIONS.md ARCHITECTURE.md REGISTRY_SUBMISSION.md ./
