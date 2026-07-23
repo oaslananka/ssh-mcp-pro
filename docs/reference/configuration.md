@@ -50,6 +50,14 @@ variables. No config-schema version field currently exists for the policy file (
 `SSH_MCP_OAUTH_JWKS_URL`, `SSH_MCP_OAUTH_RESOURCE`, `SSH_MCP_OAUTH_REQUIRED_SCOPES`,
 `SSH_MCP_OAUTH_ALLOWED_ALGORITHMS`.
 
+## Remote agent WebSocket boundary
+
+`AGENT_WS_PATH`, `AGENT_WS_HELLO_TIMEOUT_MS`, `AGENT_WS_HEARTBEAT_INTERVAL_MS`,
+`AGENT_WS_IDLE_TIMEOUT_MS`, `AGENT_WS_MAX_CONNECTIONS`,
+`AGENT_WS_MAX_CONNECTIONS_PER_AGENT`, `MAX_ACTION_TIMEOUT_SECONDS`,
+`MAX_OUTPUT_BYTES`. The idle timeout is normalized to at least two heartbeat intervals.
+See [docs/remote-mcp-hardening.md](../remote-mcp-hardening.md) for operational guidance.
+
 ## Tool exposure and connectors
 
 `SSH_MCP_TOOL_PROFILE` / `SSH_MCP_CONNECTOR_PROFILE`,

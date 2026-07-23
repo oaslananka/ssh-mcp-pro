@@ -80,7 +80,7 @@ async function jsonFetch(
   return payload as Record<string, unknown>;
 }
 
-function config(baseUrl: string, dir: string): RemoteConfig {
+function config(baseUrl: string, dir: string, overrides: Partial<RemoteConfig> = {}): RemoteConfig {
   return {
     enabled: true,
     publicBaseUrl: baseUrl,
@@ -99,10 +99,11 @@ function config(baseUrl: string, dir: string): RemoteConfig {
     maxActionTimeoutSeconds: 30,
     maxOutputBytes: 64_000,
     maxOAuthClients: 100,
+    ...overrides,
   };
 }
 
-async function startHarness(): Promise<{
+async function startHarness(overrides: Partial<RemoteConfig> = {}): Promise<{
   baseUrl: string;
   controlPlane: RemoteControlPlane;
   server: ReturnType<typeof createServer>;
@@ -110,7 +111,7 @@ async function startHarness(): Promise<{
   const port = await freePort();
   const baseUrl = `http://127.0.0.1:${port}`;
   const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-remote-"));
-  const controlPlane = new RemoteControlPlane(config(baseUrl, dir));
+  const controlPlane = new RemoteControlPlane(config(baseUrl, dir, overrides));
   await controlPlane.initialize();
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     void controlPlane
@@ -659,4 +660,76 @@ describe("remote control plane and outbound agent flow", () => {
       controlPlane.close();
     }
   }, 30_000);
+  test("closes unauthenticated agent sockets at the configured hello deadline", async () => {
+    const { baseUrl, controlPlane, server } = await startHarness({
+      agentHelloTimeoutMs: 1_000,
+      agentHeartbeatIntervalMs: 1_000,
+      agentIdleTimeoutMs: 2_000,
+      maxAgentConnections: 4,
+      maxAgentConnectionsPerAgent: 2,
+    });
+    try {
+      const websocketUrl = `${baseUrl.replace(/^http/u, "ws")}/api/agents/connect`;
+      const WebSocket = wsCtor();
+      const ws = new WebSocket(websocketUrl);
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("websocket did not open")), 5_000);
+        ws.onopen = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
+        ws.onerror = (error) => {
+          clearTimeout(timeout);
+          reject(new Error(String(error)));
+        };
+      });
+
+      const waiting = await jsonFetch(`${baseUrl}/readyz`, { expectedStatus: 200 });
+      expect(waiting).toEqual(
+        expect.objectContaining({
+          agent_connections_open: 1,
+          agent_connections_unauthenticated: 1,
+        }),
+      );
+
+      let errorCode: unknown;
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error("hello deadline was not enforced")),
+          5_000,
+        );
+        ws.onmessage = (event) => {
+          const payload = JSON.parse(String(event.data)) as Record<string, unknown>;
+          errorCode = payload.code;
+        };
+        ws.onclose = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
+        ws.onerror = (error) => {
+          clearTimeout(timeout);
+          reject(new Error(String(error)));
+        };
+      });
+      expect(errorCode).toBe("AGENT_TIMEOUT");
+
+      let closed: Record<string, unknown> | undefined;
+      for (let attempt = 0; attempt < 50; attempt += 1) {
+        closed = await jsonFetch(`${baseUrl}/readyz`, { expectedStatus: 200 });
+        if (closed.agent_connections_open === 0 && closed.agent_connections_unauthenticated === 0) {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      expect(closed).toEqual(
+        expect.objectContaining({
+          agent_connections_open: 0,
+          agent_connections_unauthenticated: 0,
+        }),
+      );
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      controlPlane.close();
+    }
+  }, 15_000);
 });

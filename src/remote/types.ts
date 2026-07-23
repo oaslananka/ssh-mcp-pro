@@ -298,6 +298,11 @@ export interface RemoteConfig {
   controlPlaneSigningKeyPath: string;
   jwtSigningKeyPath: string;
   agentWsPath: string;
+  agentHelloTimeoutMs?: number | undefined;
+  agentHeartbeatIntervalMs?: number | undefined;
+  agentIdleTimeoutMs?: number | undefined;
+  maxAgentConnections?: number | undefined;
+  maxAgentConnectionsPerAgent?: number | undefined;
   maxActionTimeoutSeconds: number;
   maxOutputBytes: number;
   maxOAuthClients: number;

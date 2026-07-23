@@ -17,6 +17,16 @@ function parseInteger(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function parseBoundedInteger(
+  value: string | undefined,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+): number {
+  const parsed = parseInteger(value, fallback);
+  return parsed >= minimum && parsed <= maximum ? parsed : fallback;
+}
+
 function stripTrailingSlash(value: string): string {
   return value.replace(/\/+$/u, "");
 }
@@ -27,6 +37,22 @@ export function loadRemoteConfig(): RemoteConfig {
       process.env.SSHAUTOMATOR_PUBLIC_BASE_URL ??
       "http://localhost:3000",
   );
+  const agentHeartbeatIntervalMs = parseBoundedInteger(
+    process.env.AGENT_WS_HEARTBEAT_INTERVAL_MS,
+    30_000,
+    1_000,
+    300_000,
+  );
+  const requestedAgentIdleTimeoutMs = parseBoundedInteger(
+    process.env.AGENT_WS_IDLE_TIMEOUT_MS,
+    90_000,
+    2_000,
+    900_000,
+  );
+  const agentIdleTimeoutMs =
+    requestedAgentIdleTimeoutMs >= agentHeartbeatIntervalMs * 2
+      ? requestedAgentIdleTimeoutMs
+      : Math.max(90_000, agentHeartbeatIntervalMs * 2);
   return {
     enabled: parseBoolean(
       process.env.SSH_MCP_REMOTE_AGENT_CONTROL_PLANE ??
@@ -58,6 +84,21 @@ export function loadRemoteConfig(): RemoteConfig {
       process.env.CONTROL_PLANE_SIGNING_KEY_PATH ?? path.join("data", "control-plane-ed25519.json"),
     jwtSigningKeyPath: process.env.JWT_SIGNING_KEY_PATH ?? path.join("data", "jwt-ed25519.json"),
     agentWsPath: process.env.AGENT_WS_PATH ?? "/api/agents/connect",
+    agentHelloTimeoutMs: parseBoundedInteger(
+      process.env.AGENT_WS_HELLO_TIMEOUT_MS,
+      10_000,
+      1_000,
+      60_000,
+    ),
+    agentHeartbeatIntervalMs,
+    agentIdleTimeoutMs,
+    maxAgentConnections: parseBoundedInteger(process.env.AGENT_WS_MAX_CONNECTIONS, 128, 1, 10_000),
+    maxAgentConnectionsPerAgent: parseBoundedInteger(
+      process.env.AGENT_WS_MAX_CONNECTIONS_PER_AGENT,
+      2,
+      1,
+      16,
+    ),
     maxActionTimeoutSeconds: parseInteger(process.env.MAX_ACTION_TIMEOUT_SECONDS, 120),
     maxOutputBytes: parseInteger(process.env.MAX_OUTPUT_BYTES, 200_000),
     maxOAuthClients: parseInteger(process.env.OAUTH_DCR_MAX_CLIENTS, 100),

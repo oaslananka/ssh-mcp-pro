@@ -983,6 +983,12 @@ describe("remote control plane remote-agent contracts", () => {
       expect(connection.sendJson).toHaveBeenCalledWith(
         expect.objectContaining({ type: "agent.ready", agent_id: agent.id }),
       );
+      const connectedAudit = harness.store
+        .listAudit(agent.userId, agent.id, 20)
+        .find((event) => event.eventType === "agent_connected");
+      expect(connectedAudit).toEqual(expect.objectContaining({ metadata: {} }));
+      expect(JSON.stringify(connectedAudit)).not.toContain("1.0.0");
+      expect(JSON.stringify(connectedAudit)).not.toContain("prod");
 
       expect(await harness.callRemoteTool(adminPrincipal, "list_hosts", {})).toEqual({
         hosts: [

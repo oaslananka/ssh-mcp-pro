@@ -1,183 +1,364 @@
-import type { IncomingMessage } from "node:http";
-import { Duplex } from "node:stream";
-import { describe, expect, test } from "vitest";
-import { acceptWebSocketUpgrade, MinimalWebSocketConnection } from "../../src/remote/websocket.js";
+import { once } from "node:events";
+import { createServer, type Server } from "node:http";
+import { connect, type Socket } from "node:net";
+import WebSocket from "ws";
+import { afterEach, describe, expect, test } from "vitest";
+import {
+  acceptWebSocketUpgrade,
+  MAX_AGENT_WEBSOCKET_MESSAGE_BYTES,
+  type MinimalWebSocketConnection,
+} from "../../src/remote/websocket.js";
 
-class FakeSocket extends Duplex {
-  readonly writes: Buffer[] = [];
-  destroyedByConnection = false;
-
-  _read(): void {}
-
-  _write(chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
-    this.writes.push(Buffer.from(chunk));
-    callback();
-  }
-
-  override destroy(error?: Error): this {
-    this.destroyedByConnection = true;
-    return super.destroy(error);
-  }
+interface RunningServer {
+  server: Server;
+  port: number;
+  connections: MinimalWebSocketConnection[];
 }
 
-function websocketRequest(key?: string): IncomingMessage {
-  return {
-    headers: key === undefined ? {} : { "sec-websocket-key": key },
-  } as IncomingMessage;
+interface ServerFrame {
+  opcode: number;
+  payload: Buffer;
 }
 
-function maskedFrame(opcode: number, body: string | Buffer): Buffer {
-  const payload = Buffer.isBuffer(body) ? body : Buffer.from(body, "utf8");
+const servers: Server[] = [];
+const clients: WebSocket[] = [];
+const rawSockets: Socket[] = [];
+
+async function startServer(): Promise<RunningServer> {
+  const connections: MinimalWebSocketConnection[] = [];
+  const server = createServer();
+  server.on("upgrade", (req, socket, head) => {
+    acceptWebSocketUpgrade(req, socket, head, (connection) => {
+      connections.push(connection);
+    });
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  servers.push(server);
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Expected TCP server address");
+  }
+  return { server, port: address.port, connections };
+}
+
+async function openClient(port: number): Promise<WebSocket> {
+  const client = new WebSocket(`ws://127.0.0.1:${port}`);
+  clients.push(client);
+  await once(client, "open");
+  return client;
+}
+
+async function waitForConnection(server: RunningServer): Promise<MinimalWebSocketConnection> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const connection = server.connections[0];
+    if (connection) {
+      return connection;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error("WebSocket connection was not accepted");
+}
+
+function clientFrame(options: {
+  opcode: number;
+  body: string | Buffer;
+  fin?: boolean;
+  masked?: boolean;
+}): Buffer {
+  const payload = Buffer.isBuffer(options.body) ? options.body : Buffer.from(options.body, "utf8");
   const mask = Buffer.from([0x11, 0x22, 0x33, 0x44]);
-  const header =
-    payload.length < 126
-      ? Buffer.from([0x80 | opcode, 0x80 | payload.length])
-      : Buffer.from([0x80 | opcode, 0x80 | 126, payload.length >> 8, payload.length & 0xff]);
-  const masked = Buffer.from(payload);
-  for (let index = 0; index < masked.length; index += 1) {
-    masked[index] = (masked[index] ?? 0) ^ (mask[index % mask.length] ?? 0);
+  const finBit = options.fin === false ? 0 : 0x80;
+  const masked = options.masked !== false;
+  const maskBit = masked ? 0x80 : 0;
+  let header: Buffer;
+  if (payload.length < 126) {
+    header = Buffer.from([finBit | options.opcode, maskBit | payload.length]);
+  } else if (payload.length <= 0xffff) {
+    header = Buffer.alloc(4);
+    header[0] = finBit | options.opcode;
+    header[1] = maskBit | 126;
+    header.writeUInt16BE(payload.length, 2);
+  } else {
+    header = Buffer.alloc(10);
+    header[0] = finBit | options.opcode;
+    header[1] = maskBit | 127;
+    header.writeBigUInt64BE(BigInt(payload.length), 2);
   }
-  return Buffer.concat([header, mask, masked]);
+  if (!masked) {
+    return Buffer.concat([header, payload]);
+  }
+  const encoded = Buffer.from(payload);
+  for (let index = 0; index < encoded.length; index += 1) {
+    encoded[index] = (encoded[index] ?? 0) ^ (mask[index % mask.length] ?? 0);
+  }
+  return Buffer.concat([header, mask, encoded]);
 }
 
-function oversizedFrameHeader(): Buffer {
-  const header = Buffer.alloc(10);
+function oversizedMaskedHeader(): Buffer {
+  const header = Buffer.alloc(14);
   header[0] = 0x81;
-  header[1] = 127;
-  header.writeBigUInt64BE(BigInt(Number.MAX_SAFE_INTEGER) + 1n, 2);
+  header[1] = 0x80 | 127;
+  header.writeBigUInt64BE(BigInt(MAX_AGENT_WEBSOCKET_MESSAGE_BYTES + 1), 2);
+  header.set([0x11, 0x22, 0x33, 0x44], 10);
   return header;
 }
 
-function tooLargeFrameHeader(): Buffer {
-  const header = Buffer.alloc(10);
-  header[0] = 0x81;
-  header[1] = 127;
-  header.writeBigUInt64BE(1_048_577n, 2);
-  return header;
+async function openRawWebSocket(port: number): Promise<{ socket: Socket; buffered: Buffer }> {
+  const socket = connect(port, "127.0.0.1");
+  rawSockets.push(socket);
+  await once(socket, "connect");
+  socket.write(
+    [
+      "GET / HTTP/1.1",
+      `Host: 127.0.0.1:${port}`,
+      "Upgrade: websocket",
+      "Connection: Upgrade",
+      "Sec-WebSocket-Version: 13",
+      `Sec-WebSocket-Key: ${Buffer.alloc(16, 7).toString("base64")}`,
+      "",
+      "",
+    ].join("\r\n"),
+  );
+  const response = await readUntil(socket, Buffer.alloc(0), (buffer) =>
+    buffer.includes(Buffer.from("\r\n\r\n")),
+  );
+  const headerEnd = response.indexOf(Buffer.from("\r\n\r\n")) + 4;
+  expect(response.subarray(0, headerEnd).toString("utf8")).toContain(
+    "HTTP/1.1 101 Switching Protocols",
+  );
+  return { socket, buffered: response.subarray(headerEnd) };
 }
 
-function decodeServerFrame(frame: Buffer): { opcode: number; payload: string } {
-  const opcode = frame[0] ?? 0;
-  const lengthMarker = frame[1] ?? 0;
+async function readServerFrame(socket: Socket, initial: Buffer): Promise<ServerFrame> {
+  const buffer = await readUntil(
+    socket,
+    initial,
+    (candidate) => frameLength(candidate) !== undefined,
+  );
+  const totalLength = frameLength(buffer);
+  if (totalLength === undefined) {
+    throw new Error("Incomplete server frame");
+  }
+  const first = buffer[0] ?? 0;
+  const marker = buffer[1] ?? 0;
   let offset = 2;
-  let length = lengthMarker & 0x7f;
+  let length = marker & 0x7f;
   if (length === 126) {
-    length = frame.readUInt16BE(2);
+    length = buffer.readUInt16BE(2);
     offset = 4;
   } else if (length === 127) {
-    length = Number(frame.readBigUInt64BE(2));
+    length = Number(buffer.readBigUInt64BE(2));
     offset = 10;
   }
-  return {
-    opcode: opcode & 0x0f,
-    payload: frame.subarray(offset, offset + length).toString("utf8"),
-  };
+  return { opcode: first & 0x0f, payload: buffer.subarray(offset, offset + length) };
 }
 
-describe("minimal remote WebSocket", () => {
-  test("drains masked text frames after enough bytes arrive and sends JSON frames", () => {
-    const socket = new FakeSocket();
-    const connection = new MinimalWebSocketConnection(socket);
-    const messages: string[] = [];
-    const frame = maskedFrame(0x1, "hello");
+function frameLength(buffer: Buffer): number | undefined {
+  if (buffer.length < 2) {
+    return undefined;
+  }
+  const marker = (buffer[1] ?? 0) & 0x7f;
+  let offset = 2;
+  let length = marker;
+  if (marker === 126) {
+    if (buffer.length < 4) {
+      return undefined;
+    }
+    length = buffer.readUInt16BE(2);
+    offset = 4;
+  } else if (marker === 127) {
+    if (buffer.length < 10) {
+      return undefined;
+    }
+    const longLength = buffer.readBigUInt64BE(2);
+    if (longLength > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error("Server frame length is not safe");
+    }
+    length = Number(longLength);
+    offset = 10;
+  }
+  const total = offset + length;
+  return buffer.length >= total ? total : undefined;
+}
 
-    connection.onText((message) => messages.push(message));
-    socket.emit("data", frame.subarray(0, 2));
-    expect(messages).toEqual([]);
+async function readUntil(
+  socket: Socket,
+  initial: Buffer,
+  predicate: (buffer: Buffer) => boolean,
+): Promise<Buffer> {
+  if (predicate(initial)) {
+    return initial;
+  }
+  return await new Promise<Buffer>((resolve, reject) => {
+    let buffer = initial;
+    const timeout = setTimeout(() => finish(new Error("Timed out waiting for socket data")), 3000);
+    const onData = (chunk: Buffer) => {
+      buffer = Buffer.concat([buffer, chunk]);
+      if (predicate(buffer)) {
+        finish();
+      }
+    };
+    const onClose = () => finish(new Error("Socket closed before expected data arrived"));
+    const onError = (error: Error) => finish(error);
+    const finish = (error?: Error) => {
+      clearTimeout(timeout);
+      socket.off("data", onData);
+      socket.off("close", onClose);
+      socket.off("error", onError);
+      if (error) {
+        reject(error);
+      } else {
+        resolve(buffer);
+      }
+    };
+    socket.on("data", onData);
+    socket.once("close", onClose);
+    socket.once("error", onError);
+  });
+}
 
-    socket.emit("data", frame.subarray(2));
-    expect(messages).toEqual(["hello"]);
+async function expectProtocolClose(
+  port: number,
+  frame: Buffer,
+  expectedCode: number,
+): Promise<void> {
+  const { socket, buffered } = await openRawWebSocket(port);
+  socket.write(frame);
+  const response = await readServerFrame(socket, buffered);
+  expect(response.opcode).toBe(0x8);
+  expect(response.payload.readUInt16BE(0)).toBe(expectedCode);
+  socket.destroy();
+}
 
+afterEach(async () => {
+  for (const client of clients.splice(0)) {
+    if (client.readyState === WebSocket.OPEN || client.readyState === WebSocket.CONNECTING) {
+      client.terminate();
+    }
+  }
+  for (const socket of rawSockets.splice(0)) {
+    socket.destroy();
+  }
+  for (const server of servers.splice(0)) {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+describe.sequential("remote WebSocket protocol", () => {
+  test("exchanges text and JSON messages and observes pong/close lifecycle", async () => {
+    const running = await startServer();
+    const client = await openClient(running.port);
+    const connection = await waitForConnection(running);
+    const text = new Promise<string>((resolve) => connection.onText(resolve));
+
+    client.send("hello");
+    await expect(text).resolves.toBe("hello");
+
+    const serverMessage = once(client, "message");
     connection.sendJson({ ok: true });
-    expect(decodeServerFrame(socket.writes.at(-1) ?? Buffer.alloc(0))).toEqual({
-      opcode: 0x1,
-      payload: JSON.stringify({ ok: true }),
-    });
+    const [data, isBinary] = (await serverMessage) as [Buffer, boolean];
+    expect(isBinary).toBe(false);
+    expect(JSON.parse(data.toString("utf8"))).toEqual({ ok: true });
+
+    const pong = new Promise<void>((resolve) => connection.onPong(resolve));
+    connection.ping();
+    await expect(pong).resolves.toBeUndefined();
+
+    const closed = new Promise<{ code: number; reason: string }>((resolve) =>
+      connection.onClose((code, reason) => resolve({ code, reason })),
+    );
+    client.close(1000, "done");
+    await expect(closed).resolves.toEqual({ code: 1000, reason: "done" });
   });
 
-  test("handles extended payloads, pings, close frames, and closed sends", () => {
-    const socket = new FakeSocket();
-    const connection = new MinimalWebSocketConnection(socket);
-    const messages: string[] = [];
-    let closes = 0;
+  test("reassembles fragmented text messages", async () => {
+    const running = await startServer();
+    const client = await openClient(running.port);
+    const connection = await waitForConnection(running);
+    const text = new Promise<string>((resolve) => connection.onText(resolve));
 
-    connection.onText((message) => messages.push(message));
-    connection.onClose(() => {
-      closes += 1;
-    });
-    socket.emit("data", maskedFrame(0x1, "x".repeat(130)));
-    expect(messages).toEqual(["x".repeat(130)]);
+    client.send("hel", { fin: false });
+    client.send("lo", { fin: true });
 
-    socket.emit("data", maskedFrame(0x9, "ping"));
-    expect(decodeServerFrame(socket.writes.at(-1) ?? Buffer.alloc(0))).toEqual({
-      opcode: 0x0a,
-      payload: "ping",
-    });
-
-    socket.emit("data", maskedFrame(0x8, ""));
-    const writesAfterClose = socket.writes.length;
-    expect(closes).toBe(1);
-
-    connection.sendText("ignored");
-    expect(socket.writes).toHaveLength(writesAfterClose);
+    await expect(text).resolves.toBe("hello");
   });
 
-  test("closes oversized frames and destroys oversized initial buffers", () => {
-    const socket = new FakeSocket();
-    const connection = new MinimalWebSocketConnection(socket);
-    let closes = 0;
-    connection.onClose(() => {
-      closes += 1;
-    });
+  test("rejects binary application messages with unsupported-data close code", async () => {
+    const running = await startServer();
+    const client = await openClient(running.port);
+    await waitForConnection(running);
+    const closed = once(client, "close");
 
-    socket.emit("data", oversizedFrameHeader());
+    client.send(Buffer.from([0x01]), { binary: true });
 
-    expect(closes).toBe(1);
-    expect(decodeServerFrame(socket.writes.at(-1) ?? Buffer.alloc(0)).opcode).toBe(0x8);
-
-    const initialSocket = new FakeSocket();
-    new MinimalWebSocketConnection(initialSocket, Buffer.alloc(1_048_577));
-    expect(initialSocket.destroyedByConnection).toBe(true);
+    const [code] = (await closed) as [number, Buffer];
+    expect(code).toBe(1003);
   });
 
-  test("waits for incomplete extended headers and writes large outbound frames", () => {
-    const partial16 = new FakeSocket();
-    new MinimalWebSocketConnection(partial16);
-    partial16.emit("data", Buffer.from([0x81, 126, 0x00]));
-    expect(partial16.writes).toEqual([]);
+  test("fails closed on unmasked, reserved, invalid UTF-8, invalid close, and fragmented control frames", async () => {
+    const running = await startServer();
 
-    const partial64 = new FakeSocket();
-    new MinimalWebSocketConnection(partial64);
-    partial64.emit("data", Buffer.from([0x81, 127, 0, 0]));
-    expect(partial64.writes).toEqual([]);
-
-    const tooLarge = new FakeSocket();
-    new MinimalWebSocketConnection(tooLarge);
-    tooLarge.emit("data", tooLargeFrameHeader());
-    expect(decodeServerFrame(tooLarge.writes.at(-1) ?? Buffer.alloc(0)).opcode).toBe(0x8);
-
-    const outbound = new FakeSocket();
-    const connection = new MinimalWebSocketConnection(outbound);
-    connection.sendText("y".repeat(70_000));
-    const frame = outbound.writes.at(-1) ?? Buffer.alloc(0);
-    expect(frame[1]).toBe(127);
-    expect(decodeServerFrame(frame).payload).toHaveLength(70_000);
+    await expectProtocolClose(
+      running.port,
+      clientFrame({ opcode: 0x1, body: "unmasked", masked: false }),
+      1002,
+    );
+    await expectProtocolClose(running.port, clientFrame({ opcode: 0x3, body: "reserved" }), 1002);
+    await expectProtocolClose(
+      running.port,
+      clientFrame({ opcode: 0x1, body: Buffer.from([0xc3, 0x28]) }),
+      1007,
+    );
+    const invalidClosePayload = Buffer.alloc(2);
+    invalidClosePayload.writeUInt16BE(1005, 0);
+    await expectProtocolClose(
+      running.port,
+      clientFrame({ opcode: 0x8, body: invalidClosePayload }),
+      1002,
+    );
+    await expectProtocolClose(
+      running.port,
+      clientFrame({ opcode: 0x9, body: "ping", fin: false }),
+      1002,
+    );
   });
 
-  test("accepts valid upgrades and rejects requests without websocket keys", () => {
-    const socket = new FakeSocket();
-    const connection = acceptWebSocketUpgrade(websocketRequest("dGhlIHNhbXBsZSBub25jZQ=="), socket);
+  test("rejects payload lengths above the configured maximum", async () => {
+    const running = await startServer();
+    await expectProtocolClose(running.port, oversizedMaskedHeader(), 1009);
+  });
 
-    expect(connection).toBeInstanceOf(MinimalWebSocketConnection);
-    expect(socket.writes[0]?.toString("utf8")).toContain("HTTP/1.1 101 Switching Protocols");
-    expect(socket.writes[0]?.toString("utf8")).toContain(
-      "Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=",
+  test("rejects invalid upgrade requests before accepting a connection", async () => {
+    const running = await startServer();
+    const socket = connect(running.port, "127.0.0.1");
+    rawSockets.push(socket);
+    await once(socket, "connect");
+    socket.write(
+      [
+        "GET / HTTP/1.1",
+        `Host: 127.0.0.1:${running.port}`,
+        "Upgrade: websocket",
+        "Connection: Upgrade",
+        "Sec-WebSocket-Version: 13",
+        "",
+        "",
+      ].join("\r\n"),
     );
 
-    const rejected = new FakeSocket();
-    expect(() => acceptWebSocketUpgrade(websocketRequest(), rejected)).toThrow(
-      "Missing Sec-WebSocket-Key",
-    );
-    expect(rejected.destroyedByConnection).toBe(true);
+    await expect(
+      new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("Invalid upgrade was not closed")), 3000);
+        socket.once("close", () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+        socket.once("error", (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
+      }),
+    ).resolves.toBeUndefined();
+    expect(running.connections).toEqual([]);
   });
 });

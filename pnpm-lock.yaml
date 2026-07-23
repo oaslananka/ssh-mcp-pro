@@ -51,6 +51,9 @@ importers:
       node-ssh:
         specifier: ^13.2.1
         version: 13.2.1
+      ws:
+        specifier: ^8.21.1
+        version: 8.21.1
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -70,6 +73,9 @@ importers:
       "@types/ssh2":
         specifier: ^1.15.5
         version: 1.15.5
+      "@types/ws":
+        specifier: ^8.18.1
+        version: 8.18.1
       "@typescript-eslint/eslint-plugin":
         specifier: ^8.62.0
         version: 8.62.0(@typescript-eslint/parser@8.62.0(eslint@10.5.0(jiti@2.7.0))(typescript@6.0.3))(eslint@10.5.0(jiti@2.7.0))(typescript@6.0.3)
@@ -2053,6 +2059,12 @@ packages:
     resolution:
       {
         integrity: sha512-N1ASjp/nXH3ovBHddRJpli4ozpk6UdDYIX4RJWFa9L1YKnzdhTlVmiGHm4DZnj/jLbqZpes4aeR30EFGQtvhQQ==,
+      }
+
+  "@types/ws@8.18.1":
+    resolution:
+      {
+        integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==,
       }
 
   "@types/unist@3.0.3":
@@ -4750,6 +4762,21 @@ packages:
         integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==,
       }
 
+  ws@8.21.1:
+    resolution:
+      {
+        integrity: sha512-+0NTnW77fFN/DjQi6k/Sq/Yvk4Sgajw7urW8V+asjXnRgDs9gyGkdb7EzgfhA4goXsRIZKE28fzIXBHEzhuiWw==,
+      }
+    engines: { node: ">=10.0.0" }
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: ">=5.0.2"
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   y18n@5.0.8:
     resolution:
       {
@@ -5972,6 +5999,10 @@ snapshots:
   "@types/ssh2@1.15.5":
     dependencies:
       "@types/node": 18.19.130
+
+  "@types/ws@8.18.1":
+    dependencies:
+      "@types/node": 24.13.1
 
   "@types/unist@3.0.3": {}
 
@@ -7585,6 +7616,8 @@ snapshots:
       strip-ansi: 6.0.1
 
   wrappy@1.0.2: {}
+
+  ws@8.21.1: {}
 
   y18n@5.0.8: {}
 
