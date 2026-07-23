@@ -164,7 +164,7 @@ export type WebSocketAcceptedHandler = (connection: MinimalWebSocketConnection) 
 export function acceptWebSocketUpgrade(
   req: IncomingMessage,
   socket: Duplex,
-  head: Buffer<ArrayBufferLike> = Buffer.alloc(0),
+  head: Buffer<ArrayBufferLike>,
   onAccepted: WebSocketAcceptedHandler,
 ): void {
   upgradeServer.handleUpgrade(req, socket, Buffer.from(head), (websocket) => {
