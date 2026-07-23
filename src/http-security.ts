@@ -25,7 +25,24 @@ function publicUnsafeToolNames(toolNames: string[]): string[] {
         SAFE_TOOL_NAME_PATTERN.test(toolName) ? toolName : "<invalid-tool-name>",
       ),
     ),
-  ].sort();
+  ].sort((left, right) => left.localeCompare(right));
+}
+
+function validateRemoteToolProfile(profile: ToolProfile): void {
+  if (profile === "full") {
+    throw new Error(
+      "Refusing non-loopback HTTP MCP binding with full tool profile. Set SSH_MCP_TOOL_PROFILE=remote-safe, chatgpt, claude, remote-readonly, or remote-broker.",
+    );
+  }
+
+  const unsafeToolNames = getUnsafeRemoteToolNames(profile);
+  if (unsafeToolNames.length === 0) {
+    return;
+  }
+  const reportedToolNames = publicUnsafeToolNames(unsafeToolNames);
+  throw new Error(
+    `Refusing non-loopback HTTP MCP binding because the ${profile} profile exposes tools outside the remote-safe allowlist: ${reportedToolNames.join(", ")}`,
+  );
 }
 
 export function isLoopbackHost(host: string): boolean {
@@ -87,19 +104,7 @@ export function validateHttpStartupConfig(
     );
   }
 
-  if (context.toolProfile === "full") {
-    throw new Error(
-      "Refusing non-loopback HTTP MCP binding with full tool profile. Set SSH_MCP_TOOL_PROFILE=remote-safe, chatgpt, claude, remote-readonly, or remote-broker.",
-    );
-  }
-
-  const unsafeToolNames = getUnsafeRemoteToolNames(context.toolProfile);
-  if (unsafeToolNames.length > 0) {
-    const reportedToolNames = publicUnsafeToolNames(unsafeToolNames);
-    throw new Error(
-      `Refusing non-loopback HTTP MCP binding because the ${context.toolProfile} profile exposes tools outside the remote-safe allowlist: ${reportedToolNames.join(", ")}`,
-    );
-  }
+  validateRemoteToolProfile(context.toolProfile);
 
   if (context.allowedHosts.length === 0) {
     throw new Error(

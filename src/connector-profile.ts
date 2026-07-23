@@ -82,7 +82,7 @@ export function getUnsafeRemoteToolNames(profile: ToolProfile): string[] {
   }
   return [...getEffectiveProfileToolSet(profile)]
     .filter((toolName) => !REMOTE_SAFE_TOOL_NAME_SET.has(toolName))
-    .sort();
+    .sort((left, right) => left.localeCompare(right));
 }
 
 export function parseToolProfile(value: string | undefined, fallback: ToolProfile): ToolProfile {
