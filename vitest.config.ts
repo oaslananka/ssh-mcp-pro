@@ -55,7 +55,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
-      exclude: ["src/**/*.d.ts", "src/index.ts", "src/server-http.ts", "src/render-http.ts"],
+      exclude: ["src/**/*.d.ts", "src/index.ts", "src/render-http.ts"],
       reporter: ["text", "lcov", "html", "cobertura"],
       thresholds: {
         branches: 85,

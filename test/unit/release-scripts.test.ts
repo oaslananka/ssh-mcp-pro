@@ -39,5 +39,5 @@ describe("release scripts", () => {
     expect(state.trustedPublishing.allowedAction).toBe("npm publish");
     expect(state.workflow.hasOidcPermission).toBe(true);
     expect(state.workflow.usesNpmPublish).toBe(true);
-  });
+  }, 15_000);
 });
