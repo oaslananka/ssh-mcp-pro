@@ -198,6 +198,8 @@ The parser also accepts non-`SSH_MCP_*` compatibility aliases `PORT`, `KNOWN_HOS
 | `remote-readonly` | Same remote connector subset as `remote-safe`. | Same remote connector subset as `remote-safe`. | Same remote connector subset as `remote-safe`. |
 | `remote-broker` | Same remote connector subset as `remote-safe`. | Same remote connector subset as `remote-safe`. | Same remote connector subset as `remote-safe`. |
 
+`SSH_MCP_CHATGPT_EXTRA_TOOLS` and `SSH_MCP_CLAUDE_EXTRA_TOOLS` can extend their profiles for loopback-only development. Non-loopback HTTP startup validates the fully resolved tool set against the canonical remote-safe allowlist and refuses unknown, session, transfer, filesystem mutation, process, sudo, service mutation, or tunnel tools. The startup error lists only the rejected tool names. Adding an extension locally does not make that tool approved for public connector exposure.
+
 ## Security Defaults
 
 ssh-mcp-pro starts with strict SSH host-key verification, denies root login, denies raw sudo, blocks destructive commands and filesystem operations unless policy allows them, and refuses non-loopback HTTP startup unless authentication, origins, public HTTPS URL, strict host-key verification, a remote-safe tool profile, and host allowlists are configured. See [SECURITY.md](SECURITY.md) for vulnerability reporting and [SECURITY_DECISIONS.md](SECURITY_DECISIONS.md) for the design rationale behind these defaults.

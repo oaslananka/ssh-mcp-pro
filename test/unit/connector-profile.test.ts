@@ -3,9 +3,12 @@ import {
   CHATGPT_EXTRA_TOOLS,
   CLAUDE_EXTRA_TOOLS,
   PROFILE_TOOL_SETS,
+  REMOTE_SAFE_TOOL_NAMES,
   filterPromptsForProfile,
   filterResourcesForProfile,
   filterToolsForProfile,
+  getEffectiveProfileToolSet,
+  getUnsafeRemoteToolNames,
   isPromptAllowedForProfile,
   isRemoteSafeToolProfile,
   isResourceAllowedForProfile,
@@ -44,6 +47,27 @@ describe("connector profile helpers", () => {
     expect(isRemoteSafeToolProfile("remote-readonly")).toBe(true);
   });
 
+  test("classifies remote safety from the effective tool set", () => {
+    CHATGPT_EXTRA_TOOLS.add("proc_exec");
+    CLAUDE_EXTRA_TOOLS.add("tunnel_local_forward");
+
+    expect(isToolAllowedForProfile("proc_exec", "chatgpt")).toBe(true);
+    expect(isToolAllowedForProfile("tunnel_local_forward", "claude")).toBe(true);
+    expect(getEffectiveProfileToolSet("chatgpt").has("proc_exec")).toBe(true);
+    expect(getUnsafeRemoteToolNames("chatgpt")).toEqual(["proc_exec"]);
+    expect(getUnsafeRemoteToolNames("claude")).toEqual(["tunnel_local_forward"]);
+    expect(isRemoteSafeToolProfile("chatgpt")).toBe(false);
+    expect(isRemoteSafeToolProfile("claude")).toBe(false);
+    expect(isRemoteSafeToolProfile("remote-safe")).toBe(true);
+  });
+
+  test("treats unknown client extension tools as unsafe for remote exposure", () => {
+    CHATGPT_EXTRA_TOOLS.add("future_unreviewed_tool");
+
+    expect(isToolAllowedForProfile("future_unreviewed_tool", "chatgpt")).toBe(true);
+    expect(isRemoteSafeToolProfile("chatgpt")).toBe(false);
+  });
+
   test("filters tools for remote connector profiles", () => {
     const tools = [
       { name: "connector_status" },
@@ -59,6 +83,11 @@ describe("connector profile helpers", () => {
     expect(isToolAllowedForProfile("ssh_open_session", "full")).toBe(true);
     expect(isToolAllowedForProfile("ssh_open_session", "chatgpt")).toBe(false);
     expect(isToolAllowedForProfile("ssh_policy_explain", "chatgpt")).toBe(true);
+  });
+
+  test("keeps the canonical remote-safe allowlist immutable", () => {
+    expect(Object.isFrozen(REMOTE_SAFE_TOOL_NAMES)).toBe(true);
+    expect(REMOTE_SAFE_TOOL_NAMES).toEqual(remoteConnectorToolNames);
   });
 
   test("defines per-profile tool sets and empty client extension points", () => {

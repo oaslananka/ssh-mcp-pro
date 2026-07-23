@@ -19,7 +19,7 @@ For non-loopback HTTP bindings, startup requires:
 - A non-empty host allowlist.
 - Strict SSH host-key verification.
 
-These checks prevent accidentally exposing the full local SSH automation surface on a public interface.
+These checks prevent accidentally exposing the full local SSH automation surface on a public interface. The tool-profile decision is based on the fully resolved effective tool set, including ChatGPT- or Claude-specific extensions, and uses the same canonical allowlist as profile filtering. Unknown or non-approved tools make the profile unsafe for non-loopback binding and are reported by name. Loopback bindings intentionally retain local development extensions; they do not carry the remote-safe exposure guarantee.
 
 ## Root Login And Raw Sudo
 

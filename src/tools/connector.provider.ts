@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import { isRemoteSafeToolProfile } from "../connector-profile.js";
 import {
   resolveConnectorCredentials,
   type ConnectorCredentialRequest,
@@ -222,7 +223,7 @@ export class ConnectorToolProvider implements ToolProvider {
       maxHttpSessions: http.maxSessions,
       httpSessionIdleTtlMs: http.sessionIdleTtlMs,
       hostAllowlistConfigured: policy.allowedHosts.length > 0,
-      safeRemoteToolsOnly: connector.toolProfile !== "full",
+      safeRemoteToolsOnly: isRemoteSafeToolProfile(connector.toolProfile),
       credentialEntryInChat: false,
       privateKeysInChat: false,
       rawCommandExecutionDefault: connector.toolProfile === "full",

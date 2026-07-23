@@ -1,4 +1,5 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
+import { CHATGPT_EXTRA_TOOLS, CLAUDE_EXTRA_TOOLS } from "../../src/connector-profile.js";
 import {
   corsHeaders,
   isLoopbackHost,
@@ -9,6 +10,11 @@ import {
 } from "../../src/http-security.js";
 
 describe("HTTP transport security guards", () => {
+  afterEach(() => {
+    CHATGPT_EXTRA_TOOLS.clear();
+    CLAUDE_EXTRA_TOOLS.clear();
+  });
+
   test("accepts loopback startup without bearer token", () => {
     expect(() =>
       validateHttpStartupConfig(
@@ -129,6 +135,132 @@ describe("HTTP transport security guards", () => {
         },
       ),
     ).toThrow("full tool profile");
+  });
+
+  test("rejects non-loopback startup when effective connector tools are unsafe", () => {
+    CHATGPT_EXTRA_TOOLS.add("proc_exec");
+    CHATGPT_EXTRA_TOOLS.add("ssh_open_session");
+    CHATGPT_EXTRA_TOOLS.add("future_unreviewed_tool");
+
+    expect(() =>
+      validateHttpStartupConfig(
+        {
+          host: "0.0.0.0",
+          allowedOrigins: ["https://chatgpt.com"],
+          bearerTokenFile: "/tmp/token",
+          publicUrl: "https://mcp.example/mcp",
+        },
+        "secret",
+        {
+          toolProfile: "chatgpt",
+          allowedHosts: ["prod"],
+          hostKeyPolicy: "strict",
+          authMode: "bearer",
+          oauthConfigured: false,
+        },
+      ),
+    ).toThrow("future_unreviewed_tool, proc_exec, ssh_open_session");
+  });
+
+  test.each(["fs_write", "file_upload", "proc_sudo", "service_restart", "tunnel_local_forward"])(
+    "rejects the unsafe remote connector extension %s",
+    (toolName) => {
+      CLAUDE_EXTRA_TOOLS.add(toolName);
+
+      expect(() =>
+        validateHttpStartupConfig(
+          {
+            host: "0.0.0.0",
+            allowedOrigins: ["https://claude.ai"],
+            bearerTokenFile: "/tmp/token",
+            publicUrl: "https://mcp.example/mcp",
+          },
+          "secret",
+          {
+            toolProfile: "claude",
+            allowedHosts: ["prod"],
+            hostKeyPolicy: "strict",
+            authMode: "bearer",
+            oauthConfigured: false,
+          },
+        ),
+      ).toThrow(toolName);
+    },
+  );
+
+  test("does not reflect malformed extension values in startup errors", () => {
+    const sensitiveValue = "token=do-not-log-this-value";
+    CHATGPT_EXTRA_TOOLS.add(sensitiveValue);
+
+    let thrown: unknown;
+    try {
+      validateHttpStartupConfig(
+        {
+          host: "0.0.0.0",
+          allowedOrigins: ["https://chatgpt.com"],
+          bearerTokenFile: "/tmp/token",
+          publicUrl: "https://mcp.example/mcp",
+        },
+        "secret",
+        {
+          toolProfile: "chatgpt",
+          allowedHosts: ["prod"],
+          hostKeyPolicy: "strict",
+          authMode: "bearer",
+          oauthConfigured: false,
+        },
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    expect((thrown as Error).message).toContain("<invalid-tool-name>");
+    expect((thrown as Error).message).not.toContain(sensitiveValue);
+  });
+
+  test("allows loopback development with local-only profile extensions", () => {
+    CHATGPT_EXTRA_TOOLS.add("proc_exec");
+
+    expect(() =>
+      validateHttpStartupConfig(
+        {
+          host: "127.0.0.1",
+          allowedOrigins: [],
+        },
+        undefined,
+        {
+          toolProfile: "chatgpt",
+          allowedHosts: [],
+          hostKeyPolicy: "insecure",
+          authMode: "bearer",
+          oauthConfigured: false,
+        },
+      ),
+    ).not.toThrow();
+  });
+
+  test("allows approved effective tools on non-loopback connector profiles", () => {
+    CHATGPT_EXTRA_TOOLS.add("ssh_hosts_list");
+
+    expect(() =>
+      validateHttpStartupConfig(
+        {
+          host: "0.0.0.0",
+          allowedOrigins: ["https://chatgpt.com"],
+          bearerTokenFile: "/tmp/token",
+          publicUrl: "https://mcp.example/mcp",
+        },
+        "secret",
+        {
+          toolProfile: "chatgpt",
+          allowedHosts: ["prod"],
+          hostKeyPolicy: "strict",
+          authMode: "bearer",
+          oauthConfigured: false,
+        },
+      ),
+    ).not.toThrow();
   });
 
   test("rejects non-loopback startup without host allowlist", () => {
