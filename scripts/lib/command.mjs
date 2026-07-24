@@ -64,11 +64,11 @@ function quoteWindowsCommandArg(value) {
   return `"${value.replace(/(["^&|<>])/gu, "^$1")}"`;
 }
 
-const SHELL_META_CHARS = /[;&|`$(){}!<>]/u;
+const SHELL_INJECTION_CHARS = /[;|&`$()\n\r]/u;
 
 function validateArgs(args) {
   for (const arg of args) {
-    if (typeof arg === "string" && SHELL_META_CHARS.test(arg)) {
+    if (typeof arg === "string" && SHELL_INJECTION_CHARS.test(arg)) {
       throw new Error(`Refusing to execute command with shell metacharacters in argument: ${arg}`);
     }
   }
