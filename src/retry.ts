@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import { logger } from "./logging.js";
 
 /**
@@ -70,9 +71,10 @@ function calculateDelay(attempt: number, options: RetryOptions): number {
   const cappedDelay = Math.min(exponentialDelay, options.maxDelayMs);
 
   if (options.jitter) {
-    // Add random jitter: ±25% of the delay
+    // Add random jitter: ±25% of the delay using CSPRNG
     const jitterRange = cappedDelay * 0.25;
-    const jitter = (Math.random() * 2 - 1) * jitterRange;
+    const jitterUnit = randomInt(10001);
+    const jitter = ((jitterUnit / 10000) * 2 - 1) * jitterRange;
     return Math.max(0, cappedDelay + jitter);
   }
 

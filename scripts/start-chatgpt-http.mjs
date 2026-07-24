@@ -1,9 +1,21 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { spawn, execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 
-const envFile = process.argv[2] ?? ".env";
+const rawEnvFile = process.argv[2] ?? ".env";
+const envFile = resolve(rawEnvFile);
+const canonicalEnvFile = realpathSync(envFile);
+const baseDir = realpathSync(resolve("."));
+
+if (
+  canonicalEnvFile !== baseDir &&
+  !canonicalEnvFile.startsWith(baseDir + "/") &&
+  !canonicalEnvFile.startsWith(baseDir + "\\")
+) {
+  console.error("start:chatgpt: env file path is outside the working directory");
+  process.exit(1);
+}
 
 function parseEnvFile(path) {
   const values = {};

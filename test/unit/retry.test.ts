@@ -1,5 +1,13 @@
-import { describe, expect, vi, test } from "vitest";
+import { describe, expect, vi, test, afterEach } from "vitest";
 import { retry, retryable, withRetry } from "../../src/retry.js";
+
+vi.mock("node:crypto", () => ({
+  randomInt: vi.fn(() => 10000),
+}));
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("withRetry", () => {
   test("returns result on first success", async () => {
@@ -81,35 +89,29 @@ describe("withRetry", () => {
   });
 
   test("records retry callbacks and caps jittered delays", async () => {
-    const originalRandom = Math.random;
-    Math.random = vi.fn(() => 1) as unknown as typeof Math.random;
     const onRetry = vi.fn();
     let calls = 0;
 
-    try {
-      const result = await withRetry(
-        async () => {
-          calls++;
-          if (calls === 1) {
-            throw new Error("network");
-          }
-          return "ok";
-        },
-        {
-          maxAttempts: 2,
-          initialDelayMs: 10,
-          maxDelayMs: 5,
-          backoffMultiplier: 3,
-          jitter: true,
-          onRetry,
-        },
-      );
+    const result = await withRetry(
+      async () => {
+        calls++;
+        if (calls === 1) {
+          throw new Error("network");
+        }
+        return "ok";
+      },
+      {
+        maxAttempts: 2,
+        initialDelayMs: 10,
+        maxDelayMs: 5,
+        backoffMultiplier: 3,
+        jitter: true,
+        onRetry,
+      },
+    );
 
-      expect(result.success).toBe(true);
-      expect(onRetry).toHaveBeenCalledWith(1, expect.any(Error), 6.25);
-    } finally {
-      Math.random = originalRandom;
-    }
+    expect(result.success).toBe(true);
+    expect(onRetry).toHaveBeenCalledWith(1, expect.any(Error), 6.25);
   });
 
   test("returns failure for non-error values", async () => {

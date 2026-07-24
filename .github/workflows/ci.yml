@@ -100,7 +100,7 @@ jobs:
           corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Quality gate parity
         run: pnpm run check:quality
@@ -141,7 +141,7 @@ jobs:
           corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Unit coverage
         run: pnpm run test:coverage
@@ -188,7 +188,7 @@ jobs:
           corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Start SSH fixture
         run: pnpm run docker:ssh-fixture:up
@@ -252,7 +252,7 @@ jobs:
           corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run Windows command-path tests and verify execution
         run: |
@@ -296,7 +296,7 @@ jobs:
           corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Start SSH fixture
         run: pnpm run docker:ssh-fixture:up
@@ -356,7 +356,7 @@ jobs:
           corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Start SSH fixture
         run: pnpm run docker:ssh-fixture:up
@@ -415,7 +415,7 @@ jobs:
           corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Generate dependency freshness report
         id: freshness
@@ -461,7 +461,7 @@ jobs:
           corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run mutation tests
         run: pnpm run test:mutation:ci
@@ -511,7 +511,7 @@ jobs:
           corepack prepare pnpm@11.9.0 --activate
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Package parity
         run: pnpm run check:package
