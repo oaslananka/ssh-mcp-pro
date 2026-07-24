@@ -1,6 +1,6 @@
 {
   "name": "ssh-mcp-pro",
-  "version": "1.1.5",
+  "version": "1.2.0",
   "mcpName": "io.github.oaslananka/ssh-mcp-pro",
   "description": "Model Context Protocol (MCP) SSH client server for remote automation",
   "type": "module",

@@ -10,7 +10,7 @@
   "mcp": {
     "serverName": "io.github.oaslananka/ssh-mcp-pro",
     "packageName": "ssh-mcp-pro",
-    "version": "1.1.5",
+    "version": "1.2.0",
     "endpointPath": "/mcp",
     "transports": [
       "streamable-http"
