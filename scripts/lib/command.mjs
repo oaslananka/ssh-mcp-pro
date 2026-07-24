@@ -64,9 +64,19 @@ function quoteWindowsCommandArg(value) {
   return `"${value.replace(/(["^&|<>])/gu, "^$1")}"`;
 }
 
+const SHELL_META_CHARS = /[;&|`$(){}!<>]/u;
+
+function validateArgs(args) {
+  for (const arg of args) {
+    if (typeof arg === "string" && SHELL_META_CHARS.test(arg)) {
+      throw new Error(`Refusing to execute command with shell metacharacters in argument: ${arg}`);
+    }
+  }
+}
+
 export function capture(command, args, options = {}) {
+  validateArgs(args);
   const target = invocation(command, args);
-  // codeql[js/indirect-command-line-injection] build/CI script helper — callers pass hardcoded args; Windows shim path uses quoteWindowsCommandArg
   return spawnSync(target.command, target.args, {
     encoding: "utf8",
     stdio: "pipe",
@@ -75,8 +85,8 @@ export function capture(command, args, options = {}) {
 }
 
 export function run(command, args, options = {}) {
+  validateArgs(args);
   const target = invocation(command, args);
-  // codeql[js/indirect-command-line-injection] build/CI script helper — callers pass hardcoded args; Windows shim path uses quoteWindowsCommandArg
   const result = spawnSync(target.command, target.args, {
     encoding: "utf8",
     stdio: "inherit",

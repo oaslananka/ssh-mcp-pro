@@ -70,7 +70,7 @@ jobs:
           corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Build package
         run: pnpm run build

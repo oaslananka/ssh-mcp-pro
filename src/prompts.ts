@@ -1,3 +1,4 @@
+import { randomInt } from "node:crypto";
 import {
   filterPromptsForProfile,
   isPromptAllowedForProfile,
@@ -215,7 +216,13 @@ export function getPromptsByCategory(category: PromptSuggestion["category"]): Pr
  * Get a random subset of prompts for initial suggestions
  */
 export function getRandomPrompts(count = 5): PromptSuggestion[] {
-  const shuffled = [...PROMPT_SUGGESTIONS].sort(() => Math.random() - 0.5);
+  const shuffled = [...PROMPT_SUGGESTIONS];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    const temp = shuffled[i]!;
+    shuffled[i] = shuffled[j]!;
+    shuffled[j] = temp;
+  }
   return shuffled.slice(0, count);
 }
 

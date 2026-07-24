@@ -62,7 +62,7 @@ jobs:
       - name: Install
         run: |
           set -euo pipefail
-          pnpm install --frozen-lockfile
+          pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Validate local metadata
         run: |
