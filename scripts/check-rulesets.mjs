@@ -23,7 +23,7 @@ const requiredMainContexts = [
   "Analyze TypeScript",
   "Validate MCP Registry metadata",
   "Secret scan (full history)",
-  "dependency-review",
+  "Dependency Review",
 ];
 const protectedWorkflowFiles = [
   ".github/workflows/ci.yml",
@@ -31,7 +31,6 @@ const protectedWorkflowFiles = [
   ".github/workflows/codeql.yml",
   ".github/workflows/mcp-registry.yml",
   ".github/workflows/gitleaks.yml",
-  ".github/workflows/dependency-review.yml",
 ];
 
 if (!existsSync(rulesetDir)) {
