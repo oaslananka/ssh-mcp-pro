@@ -18,7 +18,7 @@ import { createToolRegistry } from "./tools/index.js";
 import type { ToolProfile } from "./connector-profile.js";
 import type { RateLimitResult } from "./rate-limiter.js";
 
-export const SERVER_VERSION = "1.1.5"; // x-release-please-version
+export const SERVER_VERSION = "1.2.0"; // x-release-please-version
 export const SERVER_NAME = "io.github.oaslananka/ssh-mcp-pro";
 
 function getSessionIdFromArgs(args: unknown): string | undefined {
