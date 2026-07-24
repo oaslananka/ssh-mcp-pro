@@ -16,7 +16,7 @@ const requiredProtectionContexts = [
   "Analyze TypeScript",
   "Validate MCP Registry metadata",
   "Secret scan (full history)",
-  "dependency-review",
+  "Dependency Review",
 ] as const;
 
 interface RequiredStatusCheck {
@@ -187,7 +187,6 @@ describe("GitHub branch protection ruleset configuration", () => {
       readText(".github/workflows/codeql.yml"),
       readText(".github/workflows/mcp-registry.yml"),
       readText(".github/workflows/gitleaks.yml"),
-      readText(".github/workflows/dependency-review.yml"),
     ].join("\n");
     const workflowJobNames = extractWorkflowJobNames(workflows);
     const statusRule = ruleOfType(readRuleset(), "required_status_checks");
@@ -212,7 +211,7 @@ describe("GitHub branch protection ruleset configuration", () => {
         "Analyze TypeScript",
         "Validate MCP Registry metadata",
         "Secret scan (full history)",
-        "dependency-review",
+        "Dependency Review",
       ]),
     );
   });

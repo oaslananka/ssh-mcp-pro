@@ -19,9 +19,15 @@ choice, not an oversight (see the corresponding row in
 
 - `pnpm audit --audit-level moderate` (the `audit` script) runs as part of
   `check:quality`.
-- `dependency-review-action` (`fail-on-severity: moderate`) runs on every pull request
-  via the `dependency-review` job in [ci.yml](../../.github/workflows/ci.yml), blocking
-  PRs that introduce a moderate-or-worse vulnerable dependency.
+- The `Dependency Review` job in [ci.yml](../../.github/workflows/ci.yml) is the single
+  canonical dependency review for pull requests. It uses
+  `dependency-review-action` with `fail-on-severity: moderate`, so a newly introduced
+  advisory rated moderate, high, or critical blocks the pull request. A second standalone
+  dependency-review workflow is intentionally not used because duplicate checks can apply
+  contradictory thresholds and create ambiguous merge signals.
+- The same job enforces the repository license allowlist. The allowlist is kept identical
+  to [scripts/check-licenses.mjs](../../scripts/check-licenses.mjs) by a regression test;
+  changing either policy requires a reviewed pull request that updates both surfaces.
 - GitHub Dependabot alerts (vulnerability scanning, distinct from the version-update
   bot config above) apply automatically on a public GitHub repository. Whether
   "Dependabot security updates" (automatic fix PRs) is enabled is a repository Settings

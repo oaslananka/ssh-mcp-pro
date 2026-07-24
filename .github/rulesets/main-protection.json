@@ -65,7 +65,7 @@
             "context": "Secret scan (full history)"
           },
           {
-            "context": "dependency-review"
+            "context": "Dependency Review"
           }
         ],
         "strict_required_status_checks_policy": true
