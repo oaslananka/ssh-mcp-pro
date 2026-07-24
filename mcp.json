@@ -2,7 +2,7 @@
   "name": "ssh-mcp-pro",
   "display_name": "ssh-mcp-pro",
   "description": "Secure MCP SSH automation server with policy controls, resources, prompts, stdio, and HTTP.",
-  "version": "1.1.5",
+  "version": "1.2.0",
   "author": "Osman Aslan",
   "license": "MIT",
   "runtime": "node",
