@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.1.5...ssh-mcp-pro-v1.2.0) (2026-07-24)
+
+
+### Features
+
+* add device onboarding scripts and guide ([58f0104](https://github.com/oaslananka/ssh-mcp-pro/commit/58f0104122d7ee17e72dd3eb35064e6e55cd35db))
+* add process and system management tools ([a85f3e6](https://github.com/oaslananka/ssh-mcp-pro/commit/a85f3e60b9fe02c089c9e5a276af01dfa99d3d87))
+* SSH MCP server with remote control plane and ChatGPT connector ([d8058cd](https://github.com/oaslananka/ssh-mcp-pro/commit/d8058cd605c1dc9978c4217cb34ad255376856de))
+
+
+### Bug Fixes
+
+* **agent:** enforce canonical path boundaries ([#36](https://github.com/oaslananka/ssh-mcp-pro/issues/36)) ([026a7b2](https://github.com/oaslananka/ssh-mcp-pro/commit/026a7b2fadd4496c0c73aa5601d9edb056506db5)), closes [#20](https://github.com/oaslananka/ssh-mcp-pro/issues/20)
+* **agent:** reject replayed policy updates ([#38](https://github.com/oaslananka/ssh-mcp-pro/issues/38)) ([f1a7ffd](https://github.com/oaslananka/ssh-mcp-pro/commit/f1a7ffdf3b82e6c32ec8e44f9f2feae1916c9c2f))
+* **deps:** remediate dependency advisories ([#34](https://github.com/oaslananka/ssh-mcp-pro/issues/34)) ([081ab59](https://github.com/oaslananka/ssh-mcp-pro/commit/081ab5955318c54724c787916a42cdf969d16cbf)), closes [#23](https://github.com/oaslananka/ssh-mcp-pro/issues/23)
+* **http:** validate effective remote tool sets ([#37](https://github.com/oaslananka/ssh-mcp-pro/issues/37)) ([d22d7f1](https://github.com/oaslananka/ssh-mcp-pro/commit/d22d7f133c4b7714765551660bd40f1cfffbbe26)), closes [#21](https://github.com/oaslananka/ssh-mcp-pro/issues/21)
+* **lint:** enforce trailing default parameters ([4aedfe8](https://github.com/oaslananka/ssh-mcp-pro/commit/4aedfe837d5062c9523db2de3e382bf84c2c53a4))
+* **remote:** enforce tool capability invariant ([#33](https://github.com/oaslananka/ssh-mcp-pro/issues/33)) ([f5050dd](https://github.com/oaslananka/ssh-mcp-pro/commit/f5050dd04e411abf43f37f6b418a54888f407e95)), closes [#19](https://github.com/oaslananka/ssh-mcp-pro/issues/19)
+* **security:** resolve CodeQL alert [#1](https://github.com/oaslananka/ssh-mcp-pro/issues/1), add image scanning and publint ([#5](https://github.com/oaslananka/ssh-mcp-pro/issues/5)) ([1043dc8](https://github.com/oaslananka/ssh-mcp-pro/commit/1043dc80a5de75c97c8ed0705dde6ed5b68fa290))
+
 ## [1.1.4](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.1.3...ssh-mcp-pro-v1.1.4) (2026-06-16)
 
 
