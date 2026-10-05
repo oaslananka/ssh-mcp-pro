@@ -33,7 +33,7 @@ function errorCode(error: unknown): string | undefined {
 }
 
 function sameFileIdentity(
-  opened: Awaited<ReturnType<FileHandle["stat"]>>,
+  opened: ReturnType<typeof stat> extends Promise<infer T> ? T : never,
   resolved: Awaited<ReturnType<typeof stat>>,
 ): boolean {
   return opened.dev === resolved.dev && opened.ino === resolved.ino;
