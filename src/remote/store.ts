@@ -193,8 +193,7 @@ export class RemoteStore {
     githubId: string,
   ): { id: string; githubId: string; githubLogin: string } | undefined {
     const row = this.db.prepare("SELECT * FROM users WHERE github_id = ?").get(githubId) as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     if (!row) {
       return undefined;
     }
@@ -226,8 +225,7 @@ export class RemoteStore {
 
   getClient(clientId: string): OAuthClient | undefined {
     const row = this.db.prepare("SELECT * FROM oauth_clients WHERE client_id = ?").get(clientId) as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     if (!row) {
       return undefined;
     }
@@ -251,8 +249,7 @@ export class RemoteStore {
 
   countOAuthClients(): number {
     const row = this.db.prepare("SELECT COUNT(*) AS count FROM oauth_clients").get() as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     return Number(row?.count ?? 0);
   }
 
@@ -360,8 +357,7 @@ export class RemoteStore {
 
   getAgent(agentId: string): RemoteAgentRecord | undefined {
     const row = this.db.prepare("SELECT * FROM agents WHERE id = ?").get(agentId) as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     return row ? this.agentFromRow(row) : undefined;
   }
 

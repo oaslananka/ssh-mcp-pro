@@ -21,8 +21,7 @@ export class HttpSessionRegistry<TSession extends HttpSessionRecord> {
   private readonly sessionIdleTtlMs: number;
   private readonly now: () => number;
   private readonly onClose:
-    | ((sessionId: string, session: TSession, reason: string) => void)
-    | undefined;
+    ((sessionId: string, session: TSession, reason: string) => void) | undefined;
 
   constructor(options: HttpSessionRegistryOptions<TSession>) {
     this.maxSessions = options.maxSessions;
