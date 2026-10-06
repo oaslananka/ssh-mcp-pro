@@ -29,7 +29,7 @@ describe("supply-chain policy", () => {
       .map((name) => readText(path.join(".github/workflows", name)))
       .join("\n");
 
-    expect(packageJson.packageManager).toMatch(/^pnpm@11\.9\.0/u);
+    expect(packageJson.packageManager).toMatch(/^pnpm@11\.28\.5/u);
     expect(dockerfile).not.toContain("pnpm@11.5.1");
     expect(workflows).not.toContain("pnpm@11.5.1");
     expect(workflows).not.toContain("PNPM_VERSION: 11.5.1");
@@ -41,8 +41,8 @@ describe("supply-chain policy", () => {
     expect(dockerfile).not.toContain(
       "sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd",
     );
-    expect(dockerfile).toContain("pnpm@11.9.0");
-    expect(supportedVersionDocs).toContain("pnpm 11.9.0");
+    expect(dockerfile).toContain("pnpm@11.28.5");
+    expect(supportedVersionDocs).toContain("pnpm 11.28.5");
     expect(supportedVersionDocs).not.toMatch(/pnpm (?:11\.0\.9|`?\^11\.5\.1)/u);
     expect(dockerfile).toContain("rm -rf /usr/local/lib/node_modules/npm");
     expect(dockerfile).toContain("rm -rf /usr/local/lib/node_modules/corepack");
