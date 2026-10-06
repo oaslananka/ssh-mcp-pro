@@ -46,8 +46,8 @@ COPY docs ./docs
 COPY mcp.json server.json ./
 COPY registry ./registry
 
-RUN chown -R node:node /app
-RUN apk upgrade --no-cache libcrypto3 libssl3
+RUN chown -R node:node /app && \
+    apk upgrade --no-cache libcrypto3 libssl3
 USER node
 
 EXPOSE 3000
