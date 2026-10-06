@@ -15,13 +15,11 @@ export const LEGACY_AGENT_COMMAND_PATTERN = /npx ssh-mcp-pro agent|sshautomator-
 
 export function createAllowPolicy() {
   return {
-    assertAllowed: vi.fn(
-      (context: PolicyContext): PolicyDecision => ({
-        allowed: true,
-        mode: context.mode ?? "enforce",
-        action: context.action,
-      }),
-    ),
+    assertAllowed: vi.fn((context: PolicyContext): PolicyDecision => ({
+      allowed: true,
+      mode: context.mode ?? "enforce",
+      action: context.action,
+    })),
   };
 }
 
