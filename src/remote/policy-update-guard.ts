@@ -6,15 +6,10 @@ export const POLICY_UPDATE_MAX_FUTURE_SKEW_MS = 30_000;
 export { MAX_AGENT_CONNECTION_NONCES as MAX_POLICY_UPDATE_NONCES } from "./http-util.js";
 
 export type PolicyUpdateRejectionReason =
-  | "replay"
-  | "stale"
-  | "future"
-  | "version_mismatch"
-  | "not_newer";
+  "replay" | "stale" | "future" | "version_mismatch" | "not_newer";
 
 export type PolicyUpdateValidation =
-  | { accepted: true }
-  | { accepted: false; reason: PolicyUpdateRejectionReason };
+  { accepted: true } | { accepted: false; reason: PolicyUpdateRejectionReason };
 
 export function validatePolicyUpdate(
   update: PolicyUpdateEnvelope,

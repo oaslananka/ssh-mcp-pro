@@ -36,7 +36,7 @@ function sameFileIdentity(
   opened: Awaited<ReturnType<FileHandle["stat"]>>,
   resolved: Awaited<ReturnType<typeof stat>>,
 ): boolean {
-  return opened.dev === resolved.dev && opened.ino === resolved.ino;
+  return opened!.dev === resolved.dev && opened!.ino === resolved.ino;
 }
 
 async function closeQuietly(handle: FileHandle | undefined): Promise<void> {

@@ -111,16 +111,7 @@ export interface DirListResult {
 export type Platform = "linux" | "darwin" | "windows" | "unknown";
 
 export type PackageManager =
-  | "apt"
-  | "dnf"
-  | "yum"
-  | "pacman"
-  | "apk"
-  | "zypper"
-  | "brew"
-  | "choco"
-  | "winget"
-  | "unknown";
+  "apt" | "dnf" | "yum" | "pacman" | "apk" | "zypper" | "brew" | "choco" | "winget" | "unknown";
 
 export type InitSystem = "systemd" | "service" | "launchd" | "windows-service" | "unknown";
 
