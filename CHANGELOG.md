@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.2.0...ssh-mcp-pro-v1.2.1) (2026-10-06)
+
+
+### Bug Fixes
+
+* dependency audit failures and restore green Quality Gates on main ([#49](https://github.com/oaslananka/ssh-mcp-pro/issues/49)) ([7b29f74](https://github.com/oaslananka/ssh-mcp-pro/commit/7b29f74ae9d967c2e1032788c2626f78ba3fed47))
+* Security remediation: oaslananka/ssh-mcp-pro dependabot (8) ([#50](https://github.com/oaslananka/ssh-mcp-pro/issues/50)) ([7f8c389](https://github.com/oaslananka/ssh-mcp-pro/commit/7f8c389898ceb0f0fd2e76688339e24659353889))
+
 ## [1.2.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.1.5...ssh-mcp-pro-v1.2.0) (2026-07-24)
 
 
