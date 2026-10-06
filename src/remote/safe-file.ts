@@ -33,7 +33,7 @@ function errorCode(error: unknown): string | undefined {
 }
 
 function sameFileIdentity(
-  opened: Awaited<ReturnType<FileHandle["stat"]>>,
+  opened: Awaited<ReturnType<typeof stat>>,
   resolved: Awaited<ReturnType<typeof stat>>,
 ): boolean {
   return opened.dev === resolved.dev && opened.ino === resolved.ino;
@@ -58,9 +58,9 @@ function assertRequestedPath(policy: AgentPolicy, requestedPath: string, message
 
 async function openedCanonicalPath(handle: FileHandle, expectedPath: string): Promise<string> {
   if (process.platform === "linux") {
-    return realpath(`/proc/self/fd/${handle.fd}`);
+    return await realpath(`/proc/self/fd/${handle.fd}`);
   }
-  return realpath(expectedPath);
+  return await realpath(expectedPath);
 }
 
 async function verifyOpenedHandle(
