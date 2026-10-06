@@ -1,4 +1,4 @@
-import { constants } from "node:fs";
+import { constants, type Stats } from "node:fs";
 import { open, realpath, stat } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
@@ -32,11 +32,8 @@ function errorCode(error: unknown): string | undefined {
     : undefined;
 }
 
-function sameFileIdentity(
-  opened: Awaited<ReturnType<FileHandle["stat"]>>,
-  resolved: Awaited<ReturnType<typeof stat>>,
-): boolean {
-  return opened!.dev === resolved.dev && opened!.ino === resolved.ino;
+function sameFileIdentity(opened: Stats, resolved: Stats): boolean {
+  return opened.dev === resolved.dev && opened.ino === resolved.ino;
 }
 
 async function closeQuietly(handle: FileHandle | undefined): Promise<void> {

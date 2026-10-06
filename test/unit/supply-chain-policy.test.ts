@@ -35,7 +35,7 @@ describe("supply-chain policy", () => {
     expect(workflows).not.toContain("PNPM_VERSION: 11.5.1");
     expect(
       dockerfile.match(
-        /node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1/gu,
+        /node@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1/gu,
       ) ?? [],
     ).toHaveLength(2);
     expect(dockerfile).not.toContain(
