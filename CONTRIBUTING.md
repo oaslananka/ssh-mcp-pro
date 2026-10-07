@@ -221,6 +221,25 @@ npm publish ./artifacts/<tarball> --access public --provenance
 
 Use manual publishing only for a release artifact that was produced by the release workflow. Do not run `npm publish` from feature branches or dirty worktrees.
 
+### Trusted Publishing Recovery (ssh-mcp-pro@1.2.1)
+
+A one-time recovery path exists for `ssh-mcp-pro@1.2.1` from tag `ssh-mcp-pro-v1.2.1`. This path is integrated into `.github/workflows/release.yml` and is triggered manually via `workflow_dispatch` (no inputs).
+
+The recovery job:
+- Checks out the fixed tag `ssh-mcp-pro-v1.2.1`
+- Verifies the package version is exactly `1.2.1`
+- Runs the repository's version-consistency checks (`node scripts/sync-version.mjs --check`)
+- Builds and packs the package with SBOM and provenance attestations
+- Stages the package on npm using `npm stage publish` (requires npm >= 11.15.0), not `npm publish`
+- Reuses the existing `npm-production` environment and OIDC trust boundary; long-lived npm tokens are never used (`NODE_AUTH_TOKEN` and `NPM_CONFIG_USERCONFIG` are explicitly unset)
+- Does **not** run release-please, create or modify a GitHub Release, or directly publish the package
+
+To run the recovery:
+1. Go to the **Actions** tab in GitHub, select **Release**, click **Run workflow**, choose the target branch (typically `main`), and run it.
+2. The workflow will stage `ssh-mcp-pro@1.2.1` on npm. A maintainer with npm package ownership must then approve the staged version on npmjs.com to complete publication.
+
+Do not bypass this staged-publishing path for this recovery.
+
 ## Docker Fixture Commands
 
 | Command | Purpose |

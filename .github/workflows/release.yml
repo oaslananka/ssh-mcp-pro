@@ -24,7 +24,7 @@ defaults:
 jobs:
   release:
     name: Release Please
-    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' }}
+    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' && github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -163,7 +163,7 @@ jobs:
             fi
 
             if [[ "$attempt" == "18" ]]; then
-              echo "ssh-mcp-pro@${VERSION} was not verifiable on npm after retries." >&2
+              echo "ssh-mcp-pro@${VERSION} was not verifiable on npm after retries."
               exit 1
             fi
             sleep 10
@@ -174,3 +174,112 @@ jobs:
         run: |
           set -euo pipefail
           echo "npm publishing is disabled by AUTO_RELEASE_PUBLISH."
+
+  recovery:
+    name: Recovery - Stage ssh-mcp-pro@1.2.1 for Trusted Publishing
+    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' && github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: npm-production
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout tag ssh-mcp-pro-v1.2.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+          ref: ssh-mcp-pro-v1.2.1
+
+      - name: Verify version from tag
+        run: |
+          VERSION=$(node -e "console.log(require('./package.json').version)")
+          if [[ "$VERSION" != "1.2.1" ]]; then
+            echo "Version mismatch: expected 1.2.1, got $VERSION"
+            exit 1
+          fi
+
+      - name: Sync version files check
+        run: node scripts/sync-version.mjs --check
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 26.3.0
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+
+      - name: Ensure npm >= 11.15.0 for stage publish
+        run: |
+          set -euo pipefail
+          npm install -g "npm@>=11.15.0"
+          npm --version
+
+      - name: Enable pnpm
+        run: |
+          set -euo pipefail
+          corepack enable
+          corepack prepare "pnpm@${PNPM_VERSION}" --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Build package
+        run: pnpm run build
+
+      - name: Pack package
+        id: pack
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          pnpm run sbom
+          PACKAGE_FILE=$(
+            pnpm pack --pack-destination artifacts --json |
+              node scripts/extract-pack-filename.mjs
+          )
+          sha256sum "artifacts/${PACKAGE_FILE}" > "artifacts/${PACKAGE_FILE}.sha256"
+          sha256sum artifacts/sbom.cdx.json > artifacts/sbom.cdx.json.sha256
+          echo "package_file=${PACKAGE_FILE}" >> "$GITHUB_OUTPUT"
+
+      - name: Attest package artifact
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: artifacts/${{ steps.pack.outputs.package_file }}
+
+      - name: Attest SBOM
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          sbom-path: artifacts/sbom.cdx.json
+          subject-path: artifacts/${{ steps.pack.outputs.package_file }}
+
+      - name: Stage package for npm trusted publishing (OIDC)
+        env:
+          PACKAGE_FILE: ${{ steps.pack.outputs.package_file }}
+        run: |
+          set -euo pipefail
+          unset NODE_AUTH_TOKEN NPM_CONFIG_USERCONFIG
+          npm stage publish "./artifacts/${PACKAGE_FILE}" --access public --provenance
+
+      - name: Verify npm package staged
+        env:
+          VERSION: "1.2.1"
+        run: |
+          set -euo pipefail
+          unset NODE_AUTH_TOKEN NPM_CONFIG_USERCONFIG
+          for attempt in {1..18}; do
+            if staged_version="$(npm view "ssh-mcp-pro@${VERSION}" version --json 2>/dev/null | jq -r '.version // empty')"; then
+              if [[ "$staged_version" == "$VERSION" ]]; then
+                echo "Verified ssh-mcp-pro@${VERSION} staged on npm."
+                exit 0
+              fi
+              echo "npm returned version '${staged_version}', expected '${VERSION}'." >&2
+            else
+              echo "npm view did not find ssh-mcp-pro@${VERSION} on attempt ${attempt}." >&2
+            fi
+            if [[ "$attempt" == "18" ]]; then
+              echo "ssh-mcp-pro@${VERSION} was not verifiable on npm after retries." >&2
+              exit 1
+            fi
+            sleep 10
+          done
