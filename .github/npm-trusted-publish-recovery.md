@@ -1,1 +1,0 @@
-# npm trusted publish recovery
