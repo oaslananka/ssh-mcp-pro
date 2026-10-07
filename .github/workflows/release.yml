@@ -106,7 +106,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
           set -euo pipefail
-          npm install --global npm@11.21.0
+          npm install --global --ignore-scripts --no-audit --no-fund --loglevel=error npm@11.21.0
           test "$(npm --version)" = "11.21.0"
 
       - name: Enable pnpm
