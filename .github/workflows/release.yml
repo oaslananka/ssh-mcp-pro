@@ -24,7 +24,7 @@ defaults:
 jobs:
   release:
     name: Release Please
-    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' }}
+    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' && github.event_name != 'workflow_dispatch' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -50,7 +50,19 @@ jobs:
     name: Build, Publish, and Verify Release
     needs:
       - release
-    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' && needs.release.outputs.release_created == 'true' }}
+    if: >-
+      ${{
+        always() &&
+        github.repository == 'oaslananka/ssh-mcp-pro' &&
+        (
+          (
+            github.event_name != 'workflow_dispatch' &&
+            needs.release.result == 'success' &&
+            needs.release.outputs.release_created == 'true'
+          ) ||
+          github.event_name == 'workflow_dispatch'
+        )
+      }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: npm-production
@@ -59,16 +71,43 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - name: Checkout release source
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
+
+      - name: Checkout fixed recovery tag
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+          ref: ssh-mcp-pro-v1.2.1
 
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: 26.3.0
           package-manager-cache: false
           registry-url: https://registry.npmjs.org
+
+      - name: Verify fixed recovery source
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          if [[ "${VERSION}" != "1.2.1" ]]; then
+            echo "Version mismatch: expected 1.2.1, got ${VERSION}" >&2
+            exit 1
+          fi
+          node scripts/sync-version.mjs --check
+
+      - name: Pin npm for staged publishing
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          set -euo pipefail
+          npm install --global --ignore-scripts --no-audit --no-fund --loglevel=error npm@11.21.0
+          test "$(npm --version)" = "11.21.0"
 
       - name: Enable pnpm
         run: |
@@ -80,12 +119,13 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Generate dependency freshness report
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         id: freshness
         continue-on-error: true
         run: pnpm run check:freshness
 
       - name: Upload dependency freshness report
-        if: ${{ !cancelled() }}
+        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: dependency-freshness-${{ needs.release.outputs.version }}
@@ -93,11 +133,16 @@ jobs:
           if-no-files-found: warn
 
       - name: Fail on dependency freshness policy breach
-        if: ${{ steps.freshness.outcome == 'failure' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && steps.freshness.outcome == 'failure' }}
         run: exit 1
 
       - name: Verify release quality
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         run: pnpm run check
+
+      - name: Verify recovery package quality
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: pnpm run check:package
 
       - name: Build release assets
         id: pack
@@ -125,6 +170,7 @@ jobs:
           subject-path: artifacts/${{ steps.pack.outputs.package_file }}
 
       - name: Attach assets to GitHub Release
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.release.outputs.tag_name }}
@@ -133,7 +179,7 @@ jobs:
           gh release upload "$RELEASE_TAG" artifacts/* --repo "$GITHUB_REPOSITORY" --clobber
 
       - name: Publish to npm with trusted publishing
-        if: ${{ vars.AUTO_RELEASE_PUBLISH == 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && vars.AUTO_RELEASE_PUBLISH == 'true' }}
         env:
           PACKAGE_FILE: ${{ steps.pack.outputs.package_file }}
         run: |
@@ -142,7 +188,7 @@ jobs:
           npm publish "./artifacts/${PACKAGE_FILE}" --access public --provenance
 
       - name: Verify npm package
-        if: ${{ vars.AUTO_RELEASE_PUBLISH == 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && vars.AUTO_RELEASE_PUBLISH == 'true' }}
         env:
           VERSION: ${{ needs.release.outputs.version }}
         run: |
@@ -170,7 +216,26 @@ jobs:
           done
 
       - name: Record npm publish skip
-        if: ${{ vars.AUTO_RELEASE_PUBLISH != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && vars.AUTO_RELEASE_PUBLISH != 'true' }}
         run: |
           set -euo pipefail
           echo "npm publishing is disabled by AUTO_RELEASE_PUBLISH."
+
+      - name: Stage ssh-mcp-pro@1.2.1 with npm trusted publishing
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          PACKAGE_FILE: ${{ steps.pack.outputs.package_file }}
+        run: |
+          set -euo pipefail
+          unset NODE_AUTH_TOKEN NPM_CONFIG_USERCONFIG
+          npm stage publish "./artifacts/${PACKAGE_FILE}" --access public --provenance
+
+      - name: Record staged publishing handoff
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          {
+            echo "### ssh-mcp-pro@1.2.1 staged for review"
+            echo
+            echo "The npm stage publish command completed successfully."
+            echo "Review the staged package in npmjs.com → Staged Packages, then approve it with maintainer 2FA."
+          } >> "${GITHUB_STEP_SUMMARY}"

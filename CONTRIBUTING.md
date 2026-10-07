@@ -207,9 +207,9 @@ Automatic npm publishing is opt-in:
   - Repository: `ssh-mcp-pro`
   - Workflow filename: `release.yml`
   - Environment name: `npm-production`
-  - Allowed action: `npm publish`
+  - Allowed actions: `npm publish` for normal releases and `npm stage publish` for the fixed recovery path.
 - Confirm the intended trusted-publishing payload before enabling automatic publishing:
-  `npm trust github ssh-mcp-pro --file release.yml --repo oaslananka/ssh-mcp-pro --env npm-production --allow-publish --dry-run --json`.
+  `npm trust github ssh-mcp-pro --file release.yml --repo oaslananka/ssh-mcp-pro --env npm-production --allow-publish --allow-stage-publish --dry-run --json`.
 - Keep the release job on GitHub-hosted runners with `id-token: write`; npm trusted publishing uses OIDC and does not require a long-lived npm automation token.
 - Confirm `package.json` `repository.url` still matches `https://github.com/oaslananka/ssh-mcp-pro`.
 
@@ -220,6 +220,27 @@ npm publish ./artifacts/<tarball> --access public --provenance
 ```
 
 Use manual publishing only for a release artifact that was produced by the release workflow. Do not run `npm publish` from feature branches or dirty worktrees.
+
+### Trusted Publishing Recovery (ssh-mcp-pro@1.2.1)
+
+A one-time recovery path exists for `ssh-mcp-pro@1.2.1` from tag `ssh-mcp-pro-v1.2.1`. This path is integrated into `.github/workflows/release.yml` and is triggered manually via `workflow_dispatch` (no inputs).
+
+The manual recovery branch of the existing `release-assets` job:
+- Checks out the fixed tag `ssh-mcp-pro-v1.2.1`
+- Verifies the package version is exactly `1.2.1` and runs `node scripts/sync-version.mjs --check`
+- Runs the bounded package-quality gate (`pnpm run check:package`)
+- Pins npm `11.21.0` for staged publishing
+- Builds and packs the package with SBOM and provenance attestations
+- Stages the package on npm using `npm stage publish`, not `npm publish`
+- Reuses the existing `npm-production` environment and OIDC permission boundary; long-lived npm tokens are never used (`NODE_AUTH_TOKEN` and `NPM_CONFIG_USERCONFIG` are explicitly unset)
+- Does **not** run release-please, create or modify a GitHub Release, or directly publish the package
+- Treats a successful `npm stage publish` exit as the CI handoff. The staged version is reviewed afterward in npm's **Staged Packages** UI; it is not expected to appear through normal `npm view` before approval.
+
+To run the recovery:
+1. Go to the **Actions** tab in GitHub, select **Release**, click **Run workflow**, choose the target branch (typically `main`), and run it.
+2. After the workflow reports that staging succeeded, open npmjs.com → **Staged Packages**, inspect `ssh-mcp-pro@1.2.1`, and approve it with maintainer 2FA when ready.
+
+Do not bypass this staged-publishing path for this recovery.
 
 ## Docker Fixture Commands
 
