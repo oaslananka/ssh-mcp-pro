@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to recover (must be 1.2.1)'
+        description: "Version to recover (must be 1.2.1)"
         required: true
-        default: '1.2.1'
+        default: "1.2.1"
 
 permissions:
   contents: read
@@ -81,7 +81,7 @@ jobs:
 
       - name: Publish to npm with trusted publishing (OIDC)
         env:
-          NODE_AUTH_TOKEN: ''
+          NODE_AUTH_TOKEN: ""
         run: |
           set -euo pipefail
           npm publish "./artifacts/${{ steps.pack.outputs.package_file }}" --access public --provenance
