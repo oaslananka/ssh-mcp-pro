@@ -1,1 +1,0 @@
-# npm trusted publishing migration
