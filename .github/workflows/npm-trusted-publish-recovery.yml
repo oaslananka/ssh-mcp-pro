@@ -2,11 +2,6 @@ name: npm Trusted Publishing Recovery
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to recover (must be 1.2.1)"
-        required: true
-        default: "1.2.1"
 
 permissions:
   contents: read
@@ -21,16 +16,9 @@ jobs:
     name: Stage Package for Trusted Publishing
     runs-on: ubuntu-24.04
     environment: npm-production
-    if: ${{ github.event.inputs.version == '1.2.1' }}
+    if: true
 
     steps:
-      - name: Validate input version
-        run: |
-          if [[ "${{ github.event.inputs.version }}" != "1.2.1" ]]; then
-            echo "Invalid version: ${{ github.event.inputs.version }}. Must be 1.2.1."
-            exit 1
-          fi
-
       - name: Checkout tag ssh-mcp-pro-v1.2.1
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
@@ -88,7 +76,7 @@ jobs:
 
       - name: Verify npm package
         env:
-          VERSION: ${{ github.event.inputs.version }}
+          VERSION: "1.2.1"
         run: |
           set -euo pipefail
           for attempt in {1..18}; do
