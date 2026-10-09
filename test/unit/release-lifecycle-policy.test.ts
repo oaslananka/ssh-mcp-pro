@@ -28,25 +28,32 @@ describe("gated release lifecycle", () => {
     expect(releaseJob).toContain("needs.release-preflight.result == 'success'");
   });
 
-  test("ships exactly the preflight-tested artifact and blocks repeat staging", () => {
-    const publishing = release.slice(release.indexOf("  release-assets:"));
+  test("push releases attach only preflight-verified artifacts and trigger Docker", () => {
+    const publishing = section(release, "  release-assets:", "  publish-npm:");
     expect(publishing).toContain("release-preflight-artifacts");
     expect(publishing).toContain("sha256sum -c");
-    expect(publishing).toContain('cd artifacts && sha256sum "${PACKAGE_FILE}"');
-    expect(publishing).not.toContain('sha256sum "artifacts/${PACKAGE_FILE}"');
     expect(publishing).toContain("gh release upload");
-    expect(publishing).toContain("git rev-parse HEAD");
-    expect(publishing).toContain("Trigger immutable-tag GHCR publication");
-    expect(publishing).toMatch(
-      /Trigger immutable-tag GHCR publication[\s\S]*?if: \$\{\{ github\.event_name != 'workflow_dispatch' \}\}/u,
-    );
+    expect(publishing).toContain("Trigger immutable-tag Docker publication");
     expect(publishing).toContain("gh workflow run docker.yml");
-    expect(publishing).toContain("gh workflow run publish-mcp-registry.yml");
+    expect(publishing).not.toContain("npm publish");
     expect(publishing).not.toContain("npm stage publish");
-    expect(publishing).toContain(
-      "github.event_name != 'workflow_dispatch' && vars.AUTO_RELEASE_PUBLISH == 'true'",
-    );
-    expect(publishing).toContain("0180a3961a8b105aa8003c93da1f3af93769a211");
+  });
+
+  test("manual Release publishes the existing checked artifact directly via OIDC", () => {
+    const publishing = release.slice(release.indexOf("  publish-npm:"));
+    expect(publishing).toContain("github.event_name == 'workflow_dispatch'");
+    expect(publishing).toContain("github.ref == 'refs/heads/main'");
+    expect(publishing).toContain("id-token: write");
+    expect(publishing).toContain("gh release download");
+    expect(publishing).toContain("sha256sum -c");
+    expect(publishing).toContain("gh attestation verify");
+    expect(publishing).toContain("git merge-base --is-ancestor");
+    expect(publishing).toContain("already_published == 'false'");
+    expect(publishing).toContain("npm publish");
+    expect(publishing).not.toContain("npm stage publish");
+    expect(publishing).not.toContain("AUTO_RELEASE_PUBLISH");
+    expect(publishing).not.toContain("gh release upload");
+    expect(publishing).toContain("gh workflow run publish-mcp-registry.yml");
   });
 
   test("never publishes container or registry entries for an unverified tag/version", () => {

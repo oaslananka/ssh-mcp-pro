@@ -26,7 +26,14 @@ assertIncludes(
 );
 assertIncludes("OIDC permission", workflow, "id-token: write");
 assertIncludes("npm trusted publish command", workflow, "npm publish");
-assertIncludes("npm publish gate", workflow, "vars.AUTO_RELEASE_PUBLISH == 'true'");
+assertIncludes("manual npm publishing", workflow, "github.event_name == 'workflow_dispatch'");
+assertIncludes("published package integrity", workflow, "gh attestation verify");
+assertIncludes("immutable tarball checksum", workflow, "sha256sum -c");
+if (workflow.includes("npm stage publish") || workflow.includes("AUTO_RELEASE_PUBLISH")) {
+  failures.push(
+    "release workflow must use one-click direct npm publishing without stage or automatic publish toggle.",
+  );
+}
 assertEqual("publish access", packageJson.publishConfig?.access, "public");
 
 for (const target of config.packages?.["."]?.["extra-files"] ?? []) {
