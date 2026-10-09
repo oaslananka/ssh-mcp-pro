@@ -1,9 +1,7 @@
 import fs from "node:fs";
-import path from "node:path";
 import { describe, expect, test } from "vitest";
 
-const repoRoot = path.resolve(import.meta.dirname, "../..");
-const renovate = JSON.parse(fs.readFileSync(path.join(repoRoot, "renovate.json"), "utf8")) as {
+const renovate = JSON.parse(fs.readFileSync("renovate.json", "utf8")) as {
   prConcurrentLimit: number;
   branchConcurrentLimit: number;
   lockFileMaintenance: { addLabels: string[] };
@@ -15,7 +13,7 @@ const renovate = JSON.parse(fs.readFileSync(path.join(repoRoot, "renovate.json")
     addLabels?: string[];
   }>;
 };
-const mergify = fs.readFileSync(path.join(repoRoot, ".mergify.yml"), "utf8");
+const mergify = fs.readFileSync(".mergify.yml", "utf8");
 
 function rule(description: string) {
   const match = renovate.packageRules.find((r) => r.description === description);
