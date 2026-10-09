@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.2.1...ssh-mcp-pro-v1.2.2) (2026-10-09)
+
+
+### Bug Fixes
+
+* **docker:** install patched Alpine zlib in both stages ([#69](https://github.com/oaslananka/ssh-mcp-pro/issues/69)) ([459fd52](https://github.com/oaslananka/ssh-mcp-pro/commit/459fd52223e3d07dd36991b89f539eb09426b89f))
+* harden remote control plane and SSH session safety ([#67](https://github.com/oaslananka/ssh-mcp-pro/issues/67)) ([e265a4a](https://github.com/oaslananka/ssh-mcp-pro/commit/e265a4ab98fc6ad7737c6817790b64b358b35463))
+* **release:** gate releases before tagging and reconcile distribution ([#70](https://github.com/oaslananka/ssh-mcp-pro/issues/70)) ([eb638cb](https://github.com/oaslananka/ssh-mcp-pro/commit/eb638cb2e8ea39217f3e894f4a29a9a573d7ae57))
+* **release:** make published checksums artifact-relative ([#71](https://github.com/oaslananka/ssh-mcp-pro/issues/71)) ([eab0929](https://github.com/oaslananka/ssh-mcp-pro/commit/eab09299ac7aa21d114d089bfaeca9f3e5dc551b))
+
 ## [1.2.1](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.2.0...ssh-mcp-pro-v1.2.1) (2026-10-06)
 
 
