@@ -12,86 +12,163 @@
   ],
   "timezone": "Europe/Istanbul",
   "minimumReleaseAge": "7 days",
-  "labels": ["dependencies"],
-  "dependencyDashboardLabels": ["dependencies"],
+  "labels": [
+    "dependencies"
+  ],
+  "dependencyDashboardLabels": [
+    "dependencies"
+  ],
   "dependencyDashboardTitle": "Dependency Dashboard",
   "dependencyDashboardOSVVulnerabilitySummary": "unresolved",
-  "assignees": ["oaslananka"],
+  "assignees": [
+    "oaslananka"
+  ],
   "prHourlyLimit": 2,
-  "prConcurrentLimit": 8,
-  "branchConcurrentLimit": 8,
+  "prConcurrentLimit": 3,
+  "branchConcurrentLimit": 3,
   "commitHourlyLimit": 4,
   "rangeStrategy": "bump",
   "rebaseWhen": "conflicted",
-  "ignorePaths": ["**/node_modules/**", "**/dist/**", "**/build/**", "**/coverage/**"],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**"
+  ],
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["before 6am on monday"],
+    "schedule": [
+      "before 6am on monday"
+    ],
     "automerge": false,
-    "addLabels": ["lockfile"]
+    "addLabels": [
+      "lockfile",
+      "requires-review"
+    ]
   },
   "vulnerabilityAlerts": {
     "enabled": true,
-    "labels": ["security"],
+    "labels": [
+      "dependencies",
+      "security",
+      "risk:high",
+      "requires-review"
+    ],
     "prCreation": "immediate",
     "vulnerabilityFixStrategy": "highest"
   },
-  "osvVulnerabilityAlerts": true,
+  "osvVulnerabilityAlerts": false,
   "packageRules": [
     {
+      "description": "Delegate low-risk dependency merging to Mergify.",
+      "matchUpdateTypes": [
+        "patch",
+        "digest",
+        "pin"
+      ],
+      "automerge": false,
+      "addLabels": [
+        "automerge:enabled",
+        "risk:low"
+      ]
+    },
+    {
       "description": "Require explicit approval for major version changes.",
-      "matchUpdateTypes": ["major"],
+      "matchUpdateTypes": [
+        "major"
+      ],
       "dependencyDashboardApproval": true,
-      "addLabels": ["major", "requires-review"],
+      "addLabels": [
+        "major",
+        "requires-review"
+      ],
       "prPriority": -5,
       "automerge": false
     },
     {
       "description": "Apply npm release-age guard to reduce supply-chain churn.",
-      "matchDatasources": ["npm"],
+      "matchDatasources": [
+        "npm"
+      ],
       "minimumReleaseAge": "7 days",
       "prCreation": "not-pending",
       "internalChecksFilter": "strict",
-      "addLabels": ["javascript"]
+      "addLabels": [
+        "javascript"
+      ]
     },
     {
       "description": "Pin and group non-major GitHub Actions updates.",
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "minimumReleaseAge": "7 days",
       "prCreation": "not-pending",
       "internalChecksFilter": "strict",
       "pinDigests": true,
       "groupName": "GitHub Actions",
       "groupSlug": "github-actions",
-      "addLabels": ["ci", "github-actions"]
+      "addLabels": [
+        "ci",
+        "github-actions"
+      ]
     },
     {
       "description": "Group TypeScript quality toolchain updates.",
-      "matchPackageNames": ["typescript", "ts-node", "tsx", "eslint", "eslint-*", "@eslint/**", "@typescript-eslint/**", "typescript-eslint", "prettier", "@types/**"],
+      "matchPackageNames": [
+        "typescript",
+        "ts-node",
+        "tsx",
+        "eslint",
+        "eslint-*",
+        "@eslint/**",
+        "@typescript-eslint/**",
+        "typescript-eslint",
+        "prettier",
+        "@types/**"
+      ],
       "groupName": "TypeScript quality toolchain",
       "groupSlug": "typescript-quality-toolchain",
-      "addLabels": ["javascript"]
-    },
-    {
-      "description": "Automerge digest-only updates after checks pass.",
-      "matchUpdateTypes": ["digest"],
-      "automerge": true,
-      "automergeType": "pr",
-      "platformAutomerge": false,
-      "addLabels": ["automerge"]
+      "addLabels": [
+        "javascript"
+      ]
     },
     {
       "description": "MCP SDK and SSH/runtime-affecting dependencies require manual review.",
-      "matchPackageNames": ["@modelcontextprotocol/sdk", "ssh2", "node-pty", "execa"],
+      "matchPackageNames": [
+        "@modelcontextprotocol/sdk",
+        "ssh2",
+        "node-ssh",
+        "node-pty",
+        "execa",
+        "jose",
+        "ws",
+        "zod",
+        "@hono/node-server",
+        "@grpc/grpc-js",
+        "@opentelemetry/**"
+      ],
       "dependencyDashboardApproval": true,
       "automerge": false,
-      "addLabels": ["requires-review", "runtime"]
+      "addLabels": [
+        "requires-review",
+        "runtime-risk"
+      ]
     },
     {
       "description": "Keep Node runtime jumps explicit.",
-      "matchPackageNames": ["node", "@types/node"],
+      "matchPackageNames": [
+        "node",
+        "@types/node"
+      ],
       "dependencyDashboardApproval": true,
-      "addLabels": ["runtime", "requires-review"]
+      "addLabels": [
+        "runtime-risk",
+        "requires-review"
+      ]
     }
-  ]
+  ],
+  "automerge": false,
+  "automergeType": "pr",
+  "platformAutomerge": false
 }
