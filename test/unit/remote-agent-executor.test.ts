@@ -1,5 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
+import { open } from "node:fs/promises";
+import { vi } from "vitest";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
 import { AgentExecutor } from "../../src/remote/agent-executor.js";
@@ -180,6 +182,33 @@ describe("remote agent executor", () => {
     expect(result.status).toBe("ok");
     expect(overwrite.status).toBe("ok");
     expect(readFileSync(target, "utf8")).toBe("updated-local");
+  });
+
+  test("failed staged file replacement preserves the previous contents", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "file-atomic-"));
+    const target = path.join(dir, "original.txt");
+    writeFileSync(target, "important previous content");
+    const handle = await open(target, "r");
+    const prototype = Object.getPrototypeOf(handle) as { writeFile: typeof handle.writeFile };
+    await handle.close();
+    const failingWrite = vi
+      .spyOn(prototype, "writeFile")
+      .mockRejectedValueOnce(new Error("simulated write interruption"));
+    try {
+      const policy = mergeCustomPolicy({
+        capabilities: { "files.write": true },
+        allowPaths: [dir],
+        denyPaths: [],
+      });
+      const key = generateEd25519PemKeyPair();
+      const result = await new AgentExecutor(policy, key.privateKeyPem).execute(
+        action("file_write", "files.write", { path: target, content: "replacement" }),
+      );
+      expect(result.status).toBe("error");
+      expect(readFileSync(target, "utf8")).toBe("important previous content");
+    } finally {
+      failingWrite.mockRestore();
+    }
   });
 
   test("file log tailing preserves the last 100 lines and bounded output metadata", async () => {

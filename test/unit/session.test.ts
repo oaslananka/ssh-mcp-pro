@@ -739,6 +739,28 @@ describe("SessionManager", () => {
     expect(afterSecond).toBe(afterFirst);
   });
 
+  test("concurrent connections cannot exceed the configured limit", async () => {
+    await manager.destroy();
+    manager = new SessionManager(1, 1000, 10000);
+    const originalConnect = vi.spyOn(NodeSSH.prototype, "connect");
+    originalConnect.mockImplementation(async function (this: NodeSSH) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return this;
+    });
+    const results = await Promise.allSettled(
+      Array.from({ length: 4 }, () =>
+        manager.openSession({
+          host: "fixture",
+          username: "user",
+          auth: "password",
+          password: "test-only",
+        }),
+      ),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(manager.getActiveSessions()).toHaveLength(1);
+  });
+
   test("evicts oldest sessions and expires stale ones", async () => {
     await manager.openSession({
       host: "one",

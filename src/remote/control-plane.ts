@@ -133,6 +133,10 @@ export class RemoteControlPlane {
       await this.oauth.handleAuthorize(req, res);
       return true;
     }
+    if (pathname === "/oauth/approve" && req.method === "POST") {
+      await this.oauth.handleApprove(req, res);
+      return true;
+    }
     if (pathname === "/oauth/callback/github" && req.method === "GET") {
       await this.oauth.handleGitHubCallback(req, res);
       return true;
@@ -288,6 +292,9 @@ export class RemoteControlPlane {
       return;
     }
     if (pathname === "/api/agents" && req.method === "GET") {
+      if (!hasCapability(principal.capabilities, "agents.read")) {
+        throw safeError("INVALID_SCOPE", "agents:read scope is required", 403);
+      }
       jsonResponse(res, 200, {
         agents: this.store.listAgents(principal.userId).map(sanitizeAgent),
       });
@@ -300,6 +307,9 @@ export class RemoteControlPlane {
         throw safeError("AGENT_NOT_FOUND", "Agent not found", 404);
       }
       if (!agentMatch[2] && req.method === "GET") {
+        if (!hasCapability(principal.capabilities, "agents.read")) {
+          throw safeError("INVALID_SCOPE", "agents:read scope is required", 403);
+        }
         jsonResponse(res, 200, { agent: sanitizeAgent(agent) });
         return;
       }
@@ -316,6 +326,9 @@ export class RemoteControlPlane {
       }
     }
     if (pathname === "/api/audit" && req.method === "GET") {
+      if (!hasCapability(principal.capabilities, "audit.read")) {
+        throw safeError("INVALID_SCOPE", "agents:admin scope is required", 403);
+      }
       const url = new URL(req.url ?? "/api/audit", this.config.publicBaseUrl);
       const limit = Number(url.searchParams.get("limit") ?? 50);
       jsonResponse(res, 200, { events: this.store.listAudit(principal.userId, undefined, limit) });

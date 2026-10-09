@@ -41,10 +41,24 @@ export interface PendingAuthorize {
   scope: string;
   state: string;
   expiresAt: number;
+  approved?: boolean;
 }
 
 /** Handles OAuth 2.0 authorization code flow with PKCE and GitHub identity. */
 export class OAuthHandler {
+  private readonly registrationAttempts = new Map<string, { count: number; expiresAt: number }>();
+
+  private transactionCookie(value: string): string {
+    const secure = this.config.publicBaseUrl.startsWith("https://") ? "; Secure" : "";
+    return `ssh_mcp_oauth_tx=${value}; Path=/oauth; HttpOnly; SameSite=Lax; Max-Age=300${secure}`;
+  }
+
+  private matchingBrowser(req: IncomingMessage, transactionId: string): boolean {
+    return (req.headers.cookie ?? "")
+      .split(";")
+      .some((part) => part.trim() === `ssh_mcp_oauth_tx=${transactionId}`);
+  }
+
   constructor(
     private readonly config: RemoteConfig,
     private readonly store: RemoteStore,
@@ -90,6 +104,17 @@ export class OAuthHandler {
         "redirect_uris must contain HTTPS URLs or localhost HTTP URLs",
       );
     }
+    // Bound unauthenticated DCR registration by the TCP peer, not spoofable proxy headers.
+    const peer = req.socket?.remoteAddress ?? "local-test";
+    const nowMs = Date.now();
+    const previous = this.registrationAttempts.get(peer);
+    const window =
+      previous && previous.expiresAt > nowMs ? previous : { count: 0, expiresAt: nowMs + 300_000 };
+    if (window.count >= 20) {
+      throw safeError("FORBIDDEN", "OAuth client registration rate limit reached", 429);
+    }
+    window.count++;
+    this.registrationAttempts.set(peer, window);
     if (this.store.countOAuthClients() >= this.config.maxOAuthClients) {
       throw safeError("FORBIDDEN", "OAuth client registration limit reached", 429);
     }
@@ -176,6 +201,32 @@ export class OAuthHandler {
 
     const transactionId = id("code");
     this.authorizeTransactions.set(transactionId, pending);
+    const hostname = new URL(redirectUri).hostname.replaceAll("&", "&amp;").replaceAll("<", "&lt;");
+    res.writeHead(200, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Content-Security-Policy":
+        "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+      "X-Content-Type-Options": "nosniff",
+      "Set-Cookie": this.transactionCookie(transactionId),
+    });
+    res.end(
+      `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Authorize SSH MCP</title></head><body><h1>Authorize SSH MCP</h1><p>Allow the client at ${hostname} to request: ${scope.replaceAll("&", "&amp;").replaceAll("<", "&lt;")}?</p><form method="post" action="/oauth/approve"><input type="hidden" name="transaction" value="${transactionId}"><button type="submit">Continue with GitHub</button></form></body></html>`,
+    );
+  }
+
+  /** Explicit browser approval binds this client to the current login transaction. */
+  async handleApprove(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const form = await readJsonOrForm(req);
+    const transactionId = form.transaction ?? "";
+    const pending = this.authorizeTransactions.get(transactionId);
+    if (!pending || pending.expiresAt < Date.now() || !this.matchingBrowser(req, transactionId)) {
+      throw safeError("INVALID_TOKEN", "OAuth transaction is missing or expired", 403);
+    }
+    if (!this.config.githubClientId || !this.config.githubClientSecret) {
+      throw safeError("FORBIDDEN", "GitHub OAuth is not configured", 503);
+    }
+    pending.approved = true;
     const githubUrl = new URL("https://github.com/login/oauth/authorize");
     githubUrl.searchParams.set("client_id", this.config.githubClientId);
     githubUrl.searchParams.set("redirect_uri", this.config.githubCallbackUrl);
@@ -281,7 +332,12 @@ export class OAuthHandler {
     const state = url.searchParams.get("state") ?? "";
     const pending = this.authorizeTransactions.get(state);
     this.authorizeTransactions.delete(state);
-    if (!code || !pending || pending.expiresAt < Date.now()) {
+    if (
+      !code ||
+      !pending?.approved ||
+      pending.expiresAt < Date.now() ||
+      !this.matchingBrowser(req, state)
+    ) {
       throw safeError("INVALID_TOKEN", "OAuth transaction is missing or expired");
     }
     const githubUser = await this.fetchGitHubUser(code);
@@ -292,6 +348,7 @@ export class OAuthHandler {
     if (pending.state) {
       destination.searchParams.set("state", pending.state);
     }
+    res.setHeader("Set-Cookie", this.transactionCookie("").replace("Max-Age=300", "Max-Age=0"));
     redirect(res, destination.toString());
   }
 
@@ -431,6 +488,9 @@ export class OAuthHandler {
 
   /** Remove expired pending authorization transactions. */
   cleanupExpired(now = Date.now()): void {
+    for (const [peer, entry] of this.registrationAttempts) {
+      if (entry.expiresAt <= now) this.registrationAttempts.delete(peer);
+    }
     for (const [transactionId, transaction] of this.authorizeTransactions.entries()) {
       if (transaction.expiresAt <= now) {
         this.authorizeTransactions.delete(transactionId);
