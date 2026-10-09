@@ -326,7 +326,7 @@ export class RemoteControlPlane {
       }
     }
     if (pathname === "/api/audit" && req.method === "GET") {
-      if (!hasCapability(principal.capabilities, "audit.read")) {
+      if (!hasCapability(principal.capabilities, "agents.admin")) {
         throw safeError("INVALID_SCOPE", "agents:admin scope is required", 403);
       }
       const url = new URL(req.url ?? "/api/audit", this.config.publicBaseUrl);
