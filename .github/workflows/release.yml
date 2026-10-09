@@ -159,7 +159,7 @@ jobs:
           test "$RELEASE_TAG" = "ssh-mcp-pro-v${RELEASE_VERSION}"
           test -f "artifacts/ssh-mcp-pro-${RELEASE_VERSION}.tgz"
           (cd artifacts && sha256sum -c "ssh-mcp-pro-${RELEASE_VERSION}.tgz.sha256" && sha256sum -c sbom.cdx.json.sha256)
-          test "$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" --jq .object.sha)" = "$GITHUB_SHA"
+          test "$(gh api "repos/${GITHUB_REPOSITORY}/commits/${RELEASE_TAG}" --jq .sha)" = "$GITHUB_SHA"
 
       - name: Upload and verify GitHub Release assets
         env:
@@ -214,7 +214,7 @@ jobs:
           TAG="ssh-mcp-pro-v${VERSION}"
           FILE="ssh-mcp-pro-${VERSION}.tgz"
           test "$(node -p "require('./.release-please-manifest.json')['.']")" = "$VERSION"
-          TAG_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" --jq .object.sha)"
+          TAG_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${TAG}" --jq .sha)"
           test "$(git show "${TAG_SHA}:package.json" | node -p 'JSON.parse(require("node:fs").readFileSync(0,"utf8")).version')" = "$VERSION"
           git merge-base --is-ancestor "$TAG_SHA" HEAD
           mkdir -p artifacts

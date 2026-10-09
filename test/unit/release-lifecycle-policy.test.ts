@@ -32,6 +32,7 @@ describe("gated release lifecycle", () => {
     const publishing = section(release, "  release-assets:", "  publish-npm:");
     expect(publishing).toContain("release-preflight-artifacts");
     expect(publishing).toContain("sha256sum -c");
+    expect(publishing).toContain("commits/${RELEASE_TAG}");
     expect(publishing).toContain("gh release upload");
     expect(publishing).toContain("Trigger immutable-tag Docker publication");
     expect(publishing).toContain("gh workflow run docker.yml");
@@ -47,6 +48,7 @@ describe("gated release lifecycle", () => {
     expect(publishing).toContain("gh release download");
     expect(publishing).toContain("sha256sum -c");
     expect(publishing).toContain("gh attestation verify");
+    expect(publishing).toContain("commits/${TAG}");
     expect(publishing).toContain("git merge-base --is-ancestor");
     expect(publishing).toContain("already_published == 'false'");
     expect(publishing).toContain("npm publish");
