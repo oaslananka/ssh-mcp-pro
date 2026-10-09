@@ -60,6 +60,7 @@ interface CapturedResponse {
   headers?: Record<string, string>;
   body: string;
   writeHead(status: number, headers?: Record<string, string>): void;
+  setHeader(name: string, value: string): void;
   end(body?: string): void;
 }
 
@@ -69,6 +70,9 @@ function captureResponse(): CapturedResponse {
     writeHead(status: number, headers: Record<string, string> = {}) {
       this.statusCode = status;
       this.headers = headers;
+    },
+    setHeader(name: string, value: string) {
+      this.headers = { ...this.headers, [name]: value };
     },
     end(body = "") {
       this.body = body;
@@ -138,6 +142,57 @@ async function waitUntil(predicate: () => boolean): Promise<void> {
 }
 
 describe("remote control plane remote-agent contracts", () => {
+  test("limits repeated public OAuth client registrations", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "oauth-registration-"));
+    const cp = new RemoteControlPlane(testConfig(dir));
+    await cp.initialize();
+    try {
+      for (let index = 0; index < 20; index++) {
+        const response = captureResponse();
+        await cp.handleHttp(
+          jsonRequest("POST", "/oauth/register", {
+            redirect_uris: ["http://localhost/callback"],
+          }),
+          response as ServerResponse,
+          "/oauth/register",
+        );
+        expect(response.statusCode).toBe(201);
+      }
+      await expect(
+        cp.handleHttp(
+          jsonRequest("POST", "/oauth/register", {
+            redirect_uris: ["http://localhost/callback"],
+          }),
+          captureResponse() as ServerResponse,
+          "/oauth/register",
+        ),
+      ).rejects.toMatchObject({ status: 429 });
+    } finally {
+      cp.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("REST scope checks reject unrelated capability", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "scope-regression-"));
+    const cp = new RemoteControlPlane(testConfig(dir));
+    await cp.initialize();
+    try {
+      const auth = cp as unknown as {
+        authenticate(req: IncomingMessage): Promise<RemotePrincipal>;
+      };
+      vi.spyOn(auth, "authenticate").mockResolvedValue(principal(["hosts.read"]));
+      for (const route of ["/api/audit", "/api/agents"]) {
+        await expect(
+          cp.handleHttp(request("GET", route), captureResponse() as ServerResponse, route),
+        ).rejects.toMatchObject({ status: 403 });
+      }
+    } finally {
+      cp.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("serves OAuth metadata, dynamic client registration, authorization, token, and JWKS flows", async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-control-plane-"));
     const savedTestId = process.env.SSHAUTOMATOR_TEST_GITHUB_ID;
@@ -481,8 +536,31 @@ describe("remote control plane remote-agent contracts", () => {
         githubRedirect as ServerResponse,
         "/oauth/authorize",
       );
-      expect(githubRedirect.statusCode).toBe(302);
-      expect(String(githubRedirect.headers?.Location)).toContain(
+      expect(githubRedirect.statusCode).toBe(200);
+      expect(githubRedirect.body).toContain("Continue with GitHub");
+      const cookie = String(githubRedirect.headers?.["Set-Cookie"]).split(";")[0] ?? "";
+      const transaction =
+        /name="transaction" value="([^"]+)"/u.exec(githubRedirect.body)?.[1] ?? "";
+      await expect(
+        controlPlane.handleHttp(
+          request("POST", "/oauth/approve", `transaction=${encodeURIComponent(transaction)}`, {
+            "content-type": "application/x-www-form-urlencoded",
+          }),
+          captureResponse() as ServerResponse,
+          "/oauth/approve",
+        ),
+      ).rejects.toMatchObject({ status: 403 });
+      const approval = captureResponse();
+      await controlPlane.handleHttp(
+        request("POST", "/oauth/approve", `transaction=${encodeURIComponent(transaction)}`, {
+          cookie,
+          "content-type": "application/x-www-form-urlencoded",
+        }),
+        approval as ServerResponse,
+        "/oauth/approve",
+      );
+      expect(approval.statusCode).toBe(302);
+      expect(String(approval.headers?.Location)).toContain(
         "https://github.com/login/oauth/authorize",
       );
 
@@ -501,6 +579,7 @@ describe("remote control plane remote-agent contracts", () => {
         resource: config.mcpResourceUrl,
         scope: "hosts:read",
         state: "app-state",
+        approved: true,
         expiresAt: Date.now() + 30_000,
       });
       globalThis.fetch = vi.fn(async () => {
@@ -511,7 +590,9 @@ describe("remote control plane remote-agent contracts", () => {
       }) as typeof fetch;
       await expect(
         controlPlane.handleHttp(
-          request("GET", "/oauth/callback/github?code=bad&state=tx-fail"),
+          request("GET", "/oauth/callback/github?code=bad&state=tx-fail", "", {
+            cookie: "ssh_mcp_oauth_tx=tx-fail",
+          }),
           captureResponse() as ServerResponse,
           "/oauth/callback/github",
         ),
@@ -524,6 +605,7 @@ describe("remote control plane remote-agent contracts", () => {
         resource: config.mcpResourceUrl,
         scope: "hosts:read",
         state: "app-state",
+        approved: true,
         expiresAt: Date.now() + 30_000,
       });
       globalThis.fetch = vi
@@ -542,7 +624,9 @@ describe("remote control plane remote-agent contracts", () => {
         ) as unknown as typeof fetch;
       const callback = captureResponse();
       await controlPlane.handleHttp(
-        request("GET", "/oauth/callback/github?code=ok&state=tx-ok"),
+        request("GET", "/oauth/callback/github?code=ok&state=tx-ok", "", {
+          cookie: "ssh_mcp_oauth_tx=tx-ok",
+        }),
         callback as ServerResponse,
         "/oauth/callback/github",
       );
@@ -839,14 +923,13 @@ describe("remote control plane remote-agent contracts", () => {
       expect(responseBody(agents)).toEqual({ agents: [] });
 
       const audit = captureResponse();
-      await harness.handleApi(
-        request("GET", "/api/audit?limit=1", "", authHeaders),
-        audit as ServerResponse,
-        "/api/audit",
-      );
-      expect(responseBody(audit)).toEqual({
-        events: expect.arrayContaining([expect.objectContaining({ eventType: "user_login" })]),
-      });
+      await expect(
+        harness.handleApi(
+          request("GET", "/api/audit?limit=1", "", authHeaders),
+          audit as ServerResponse,
+          "/api/audit",
+        ),
+      ).rejects.toMatchObject({ status: 403, code: "INVALID_SCOPE" });
 
       const notFound = captureResponse();
       await harness.handleApi(

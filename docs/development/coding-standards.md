@@ -11,12 +11,12 @@ instead of requiring a tour of five config files.
 | Type safety | [tsconfig.json](../../tsconfig.json) (`strict` mode) | `pnpm run typecheck` |
 | Module size | [scripts/check-module-size.mjs](../../scripts/check-module-size.mjs) | `pnpm run check:module-size` |
 | Circular dependencies | [.dependency-cruiser.mjs](../../.dependency-cruiser.mjs) | `pnpm run check:circular` |
-| Unused code/exports | [knip.jsonc](../../knip.jsonc) | `pnpm run check:knip` |
+| Actionable unused files/dependencies | [knip.jsonc](../../knip.jsonc) | `pnpm run check:knip` |
 | Commit messages | [.commitlintrc.json](../../.commitlintrc.json) | see [commit-conventions.md](commit-conventions.md) |
 | Documentation prose | [scripts/check-doc-language.mjs](../../scripts/check-doc-language.mjs) | `pnpm run check:doc-language` |
 
 Run everything at once with `pnpm run check:maintainability` (module size + circular
-deps + unused exports) or `pnpm run check:quality` (formatting, lint, typecheck, audit,
+deps + actionable unused-file/dependency checks) or `pnpm run check:quality` (formatting, lint, typecheck, audit,
 licenses, and more — see [CONTRIBUTING.md](../../CONTRIBUTING.md) for the full gate).
 
 ## Security-sensitive code
@@ -33,3 +33,9 @@ against passing tests.
 `scripts/setup-git-hooks.mjs` (run automatically via the `prepare` npm script) run a
 subset of the above on staged files before commit, and the full `check:push` gate before
 push. See [CONTRIBUTING.md](../../CONTRIBUTING.md#git-hooks) for details.
+
+Knip export/type reports are advisory because published `dist` modules and dynamically
+registered MCP schemas can be externally referenced. Inspect them separately using
+`pnpm exec knip --exports`; do not delete a public export based only on a static
+usage report. The default Knip gate fails on unused files/dependencies, missing
+imports, and dependency cycles; dependency-cruiser fails on real module cycles.

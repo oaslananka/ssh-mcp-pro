@@ -14,7 +14,6 @@ if (!existsSync(reportPath)) {
   process.exit(0);
 }
 
-/** @type {import("./lib/stryker-report.js").StrykerJsonReport} */
 const report = JSON.parse(readFileSync(reportPath, "utf-8"));
 
 const score = report.mutationScore ?? report.framework?.mutationScore ?? 0;

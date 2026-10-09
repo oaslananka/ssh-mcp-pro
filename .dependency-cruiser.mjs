@@ -5,7 +5,7 @@ export default {
       name: "no-circular",
       comment:
         "Circular dependencies increase maintenance burden. Break the cycle by refactoring or extracting the shared dependency.",
-      severity: "warn",
+      severity: "error",
       from: {},
       to: {
         circular: true,

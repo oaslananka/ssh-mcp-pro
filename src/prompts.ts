@@ -3,6 +3,7 @@ import {
   filterPromptsForProfile,
   isPromptAllowedForProfile,
   type ToolProfile,
+  type MCPPromptDefinition,
 } from "./connector-profile.js";
 
 /**
@@ -17,16 +18,7 @@ export interface PromptSuggestion {
   category: "session" | "command" | "file" | "system" | "package";
 }
 
-export interface MCPPromptDefinition {
-  name: string;
-  title: string;
-  description: string;
-  arguments?: Array<{
-    name: string;
-    description: string;
-    required?: boolean;
-  }>;
-}
+export type { MCPPromptDefinition } from "./connector-profile.js";
 
 export const PROMPT_SUGGESTIONS: PromptSuggestion[] = [
   // Session management

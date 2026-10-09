@@ -21,6 +21,23 @@ Use this checklist before exposing `ssh-mcp-pro` through a public Streamable HTT
 
 ## OAuth and token verification
 
+The remote control plane requires explicit browser confirmation before redirecting
+users to GitHub OAuth. `/oauth/authorize` shows the client destination and scopes;
+a same-browser, short-lived HttpOnly/SameSite transaction cookie is required by
+`POST /oauth/approve` and the GitHub callback. Real HTTPS deployments add `Secure`.
+Clients must keep PKCE and exact registered redirect URI matching. Public dynamic
+client registrations are limited to 20 per TCP peer per five minutes per process,
+with the existing global database cap retained. Deployments behind shared proxies
+should also enforce edge rate limits and monitor registration exhaustion.
+
+Remote REST endpoints enforce OAuth token capabilities independently: agent list
+and details require `agents:read`; audit history requires `agents:admin`.
+
+Remote agent file writes use verified same-directory temporary files and atomic
+replacement so an interrupted write does not truncate an existing target. Renaming
+requires write permission on the containing directory, in addition to file access.
+
+
 - Prefer OAuth mode for public endpoints.
 - Configure `SSH_MCP_OAUTH_ISSUER`, `SSH_MCP_OAUTH_JWKS_URL`, and either `SSH_MCP_OAUTH_AUDIENCE` or `SSH_MCP_OAUTH_RESOURCE` explicitly.
 - Use `SSH_MCP_OAUTH_ALLOWED_ALGORITHMS` to pin accepted JWT algorithms when your authorization server has a stable signing policy.

@@ -1,5 +1,6 @@
 import { constants } from "node:fs";
-import { open, realpath, stat } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { open, realpath, rename, stat, unlink } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { isPathAllowed } from "./policy.js";
@@ -7,7 +8,6 @@ import type { AgentPolicy, RemoteErrorCode } from "./types.js";
 
 interface AuthorizedFile {
   file: FileHandle;
-  parent?: FileHandle;
 }
 
 const NO_FOLLOW = typeof constants.O_NOFOLLOW === "number" ? constants.O_NOFOLLOW : 0;
@@ -158,69 +158,6 @@ async function openCanonicalParent(
   }
 }
 
-async function createNewFile(
-  policy: AgentPolicy,
-  requestedPath: string,
-  message: string,
-): Promise<AuthorizedFile> {
-  const { canonicalParent, leaf } = await openCanonicalParent(policy, requestedPath, message);
-  let parent: FileHandle | undefined;
-  let file: FileHandle | undefined;
-  try {
-    if (process.platform === "linux") {
-      parent = await open(canonicalParent, constants.O_RDONLY | DIRECTORY_ONLY | NO_FOLLOW);
-      await verifyOpenedHandle(policy, parent, canonicalParent, "directory", message);
-      const anchoredPath = `/proc/self/fd/${parent.fd}/${leaf}`;
-      file = await open(
-        anchoredPath,
-        constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | NO_FOLLOW,
-        OWNER_READ_WRITE,
-      );
-      await verifyOpenedHandle(policy, file, path.join(canonicalParent, leaf), "file", message);
-      return { file, parent };
-    }
-
-    const canonicalCandidate = path.join(canonicalParent, leaf);
-    if (!isPathAllowed(policy, canonicalCandidate)) {
-      throw policyDenied(message);
-    }
-    file = await open(
-      canonicalCandidate,
-      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | NO_FOLLOW,
-      OWNER_READ_WRITE,
-    );
-    await verifyOpenedHandle(policy, file, canonicalCandidate, "file", message);
-    return { file };
-  } catch (error) {
-    await closeQuietly(file);
-    await closeQuietly(parent);
-    if (errorCode(error) === "POLICY_DENIED") {
-      throw error;
-    }
-    throw policyDenied(message);
-  }
-}
-
-async function openWritableFile(
-  policy: AgentPolicy,
-  requestedPath: string,
-  message: string,
-): Promise<AuthorizedFile> {
-  assertRequestedPath(policy, requestedPath, message);
-  try {
-    await realpath(requestedPath);
-    return openExistingFile(policy, requestedPath, constants.O_WRONLY, message);
-  } catch (error) {
-    if (errorCode(error) !== "ENOENT") {
-      if (errorCode(error) === "POLICY_DENIED") {
-        throw error;
-      }
-      throw policyDenied(message);
-    }
-    return createNewFile(policy, requestedPath, message);
-  }
-}
-
 export async function withAuthorizedRead<T>(
   policy: AgentPolicy,
   requestedPath: string,
@@ -243,20 +180,73 @@ export async function withAuthorizedRead<T>(
   }
 }
 
-export async function withAuthorizedWrite<T>(
+/** Stage verified writes in the destination directory before atomic replacement. */
+export async function writeAuthorizedFileAtomic(
   policy: AgentPolicy,
   requestedPath: string,
+  content: string,
   denialMessage: string,
   operationMessage: string,
-  operation: (file: FileHandle) => Promise<T>,
-): Promise<T> {
-  const authorized = await openWritableFile(policy, requestedPath, denialMessage);
+): Promise<void> {
+  assertRequestedPath(policy, requestedPath, denialMessage);
+  let target: string;
+  let mode = OWNER_READ_WRITE;
   try {
-    return await operation(authorized.file);
-  } catch {
+    target = await realpath(requestedPath);
+    const existing = await openExistingFile(
+      policy,
+      requestedPath,
+      constants.O_WRONLY,
+      denialMessage,
+    );
+    try {
+      mode = (await existing.file.stat()).mode & 0o777;
+    } finally {
+      await closeQuietly(existing.file);
+    }
+  } catch (error) {
+    if (errorCode(error) !== "ENOENT") {
+      throw errorCode(error) === "POLICY_DENIED" ? error : policyDenied(denialMessage);
+    }
+    target = requestedPath;
+  }
+  const { canonicalParent, leaf } = await openCanonicalParent(policy, target, denialMessage);
+  let parent: FileHandle | undefined;
+  let temporary: FileHandle | undefined;
+  let temporaryPath: string | undefined;
+  try {
+    if (process.platform === "linux") {
+      parent = await open(canonicalParent, constants.O_RDONLY | DIRECTORY_ONLY | NO_FOLLOW);
+      await verifyOpenedHandle(policy, parent, canonicalParent, "directory", denialMessage);
+    }
+    const anchor = parent ? `/proc/self/fd/${parent.fd}` : canonicalParent;
+    temporaryPath = path.join(anchor, `.${leaf}.${randomUUID()}.tmp`);
+    temporary = await open(
+      temporaryPath,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | NO_FOLLOW,
+      mode,
+    );
+    await verifyOpenedHandle(
+      policy,
+      temporary,
+      path.join(canonicalParent, path.basename(temporaryPath)),
+      "file",
+      denialMessage,
+    );
+    await temporary.chmod(mode);
+    await temporary.writeFile(content, "utf8");
+    await temporary.sync();
+    await temporary.close();
+    temporary = undefined;
+    await rename(temporaryPath, path.join(anchor, leaf));
+    temporaryPath = undefined;
+    if (parent) await parent.sync();
+  } catch (error) {
+    if (errorCode(error) === "POLICY_DENIED") throw error;
     throw operationFailed(operationMessage);
   } finally {
-    await closeQuietly(authorized.file);
-    await closeQuietly(authorized.parent);
+    await closeQuietly(temporary);
+    if (temporaryPath) await unlink(temporaryPath).catch(() => undefined);
+    await closeQuietly(parent);
   }
 }

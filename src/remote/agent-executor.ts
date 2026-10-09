@@ -3,7 +3,7 @@ import { access } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import os from "node:os";
 import { isContainerAllowed, isServiceAllowed } from "./policy.js";
-import { withAuthorizedRead, withAuthorizedWrite } from "./safe-file.js";
+import { withAuthorizedRead, writeAuthorizedFileAtomic } from "./safe-file.js";
 import { TOOL_CAPABILITY_MAP } from "./types.js";
 import type {
   ActionRequestEnvelope,
@@ -526,17 +526,14 @@ export class AgentExecutor {
   }
 
   private async fileWrite(filePath: string, content: string): Promise<ExecResult> {
-    return withAuthorizedWrite(
+    await writeAuthorizedFileAtomic(
       this.policy,
       filePath,
+      content,
       "Path is not allowed by local policy",
       "File write failed",
-      async (file) => {
-        await file.truncate(0);
-        await file.writeFile(content, { encoding: "utf8" });
-        return { exitCode: 0, stdout: "written", stderr: "", truncated: false };
-      },
     );
+    return { exitCode: 0, stdout: "written", stderr: "", truncated: false };
   }
 
   private async runShell(

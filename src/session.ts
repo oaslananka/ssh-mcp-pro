@@ -54,6 +54,8 @@ export type SessionCloseListener = (sessionId: string) => void | Promise<void>;
  */
 export class SessionManager {
   private readonly sessions = new Map<string, SSHSession>();
+  private pendingConnections = 0;
+  private admission: Promise<void> = Promise.resolve();
   private readonly maxSessions: number;
   private readonly defaultTtlMs: number;
   private cleanupInterval: NodeJS.Timeout | undefined;
@@ -166,6 +168,7 @@ export class SessionManager {
       };
     }
 
+    let reserved = false;
     try {
       if (rootDenied) {
         throw createPolicyError(
@@ -174,10 +177,8 @@ export class SessionManager {
         );
       }
 
-      // Clean up old sessions if we're at the limit
-      if (this.sessions.size >= this.maxSessions) {
-        this.evictOldestSession();
-      }
+      await this.reserveConnectionSlot();
+      reserved = true;
 
       const ssh = new NodeSSH();
       const authConfig = await this.buildAuthConfig(params);
@@ -320,6 +321,10 @@ export class SessionManager {
         `Failed to establish SSH connection: ${error instanceof Error ? error.message : String(error)}`,
         "Verify the host, port, and network connectivity",
       );
+    } finally {
+      if (reserved) {
+        this.pendingConnections--;
+      }
     }
   }
 
@@ -554,27 +559,44 @@ export class SessionManager {
   /**
    * Evicts the oldest (least recently used) session
    */
-  private evictOldestSession(): void {
-    let oldestSession: string | undefined;
-    let oldestTime = Date.now();
+  private async reserveConnectionSlot(): Promise<void> {
+    let release!: () => void;
+    const previous = this.admission;
+    this.admission = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      if (this.sessions.size + this.pendingConnections >= this.maxSessions) {
+        // Never evict a live session to make room for another in-flight connection.
+        if (this.pendingConnections > 0 || !(await this.evictOldestSession())) {
+          throw createConnectionError(
+            "SSH session limit reached",
+            "Close an idle session and retry",
+          );
+        }
+      }
+      if (this.sessions.size + this.pendingConnections >= this.maxSessions) {
+        throw createConnectionError("SSH session limit reached", "Close an idle session and retry");
+      }
+      this.pendingConnections++;
+    } finally {
+      release();
+    }
+  }
 
+  /** Evicts only an idle, non-closing session and waits for its cleanup. */
+  private async evictOldestSession(): Promise<boolean> {
+    let oldestSession: string | undefined;
+    let oldestTime = Infinity;
     for (const [sessionId, session] of this.sessions) {
-      if (this.closingSessions.has(sessionId)) {
-        continue;
-      }
-      if (this.hasActiveOperations(sessionId)) {
-        continue;
-      }
+      if (this.closingSessions.has(sessionId) || this.hasActiveOperations(sessionId)) continue;
       if (session.info.lastUsed < oldestTime) {
         oldestTime = session.info.lastUsed;
         oldestSession = sessionId;
       }
     }
-
-    if (oldestSession) {
-      logger.info("Evicting oldest session", { sessionId: oldestSession });
-      void this.closeSession(oldestSession);
-    }
+    return oldestSession ? this.closeSession(oldestSession) : false;
   }
 
   /**
