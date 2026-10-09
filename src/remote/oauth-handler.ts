@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { escape as escapeHtml } from "html-escaper";
 import { URL } from "node:url";
 import {
   hashSecret,
@@ -31,15 +32,6 @@ import type {
 } from "./types.js";
 import { REMOTE_SCOPES } from "./types.js";
 import { jsonResponse } from "./util.js";
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
 
 /** Pending OAuth authorization transaction. */
 export interface PendingAuthorize {
