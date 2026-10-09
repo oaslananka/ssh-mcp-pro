@@ -188,9 +188,11 @@ describe("remote agent executor", () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "file-atomic-"));
     const target = path.join(dir, "original.txt");
     writeFileSync(target, "important previous content");
-    const handle = await open(target, "r");
-    const prototype = Object.getPrototypeOf(handle) as { writeFile: typeof handle.writeFile };
-    await handle.close();
+    // Obtain FileHandle's prototype from a separate probe file; the target must
+    // not be checked and reopened while asserting atomic replacement behavior.
+    const probe = await open(path.join(dir, "prototype-probe.txt"), "wx");
+    const prototype = Object.getPrototypeOf(probe) as { writeFile: typeof probe.writeFile };
+    await probe.close();
     const failingWrite = vi
       .spyOn(prototype, "writeFile")
       .mockRejectedValueOnce(new Error("simulated write interruption"));
