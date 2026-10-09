@@ -53,6 +53,28 @@ describe("supply-chain policy", () => {
     expect(dockerfile).toContain("/usr/local/bin/yarn /usr/local/bin/yarnpkg");
   });
 
+  test("pins policy and MCP publishing checkout actions to Node 24", () => {
+    const pinnedCheckout = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1";
+    const legacyCheckout = "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5";
+    const affectedWorkflows = [
+      readText(".github/workflows/publish-mcp-registry.yml"),
+      readText(".github/workflows/ssh-safety-policy.yml"),
+      readText(".github/workflows/agent-runtime-config.yml"),
+    ];
+
+    for (const contents of affectedWorkflows) {
+      expect(contents).toContain(pinnedCheckout);
+      expect(contents).not.toContain(legacyCheckout);
+    }
+    const checkoutRefs = [
+      ...affectedWorkflows.join("\n").matchAll(/actions\/checkout@([^\s#]+)/gu),
+    ];
+    expect(checkoutRefs.length).toBe(4);
+    for (const [, ref] of checkoutRefs) {
+      expect(ref).toMatch(/^[a-f0-9]{40}$/u);
+    }
+  });
+
   test("holds dependency updates for seven days by default", () => {
     const renovate = JSON.parse(readText("renovate.json")) as {
       minimumReleaseAge?: string;
