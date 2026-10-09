@@ -1,5 +1,17 @@
-import type { MCPPromptDefinition } from "./prompts.js";
-import type { MCPResource } from "./resources.js";
+export interface MCPResource {
+  uri: string;
+  name: string;
+  description: string;
+  mimeType: string;
+}
+
+export interface MCPPromptDefinition {
+  name: string;
+  title: string;
+  description: string;
+  arguments?: Array<{ name: string; description: string; required?: boolean }>;
+}
+
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 
 export const TOOL_PROFILES = [

@@ -4,14 +4,10 @@ import {
   filterResourcesForProfile,
   isResourceAllowedForProfile,
   type ToolProfile,
+  type MCPResource,
 } from "./connector-profile.js";
 
-export interface MCPResource {
-  uri: string;
-  name: string;
-  description: string;
-  mimeType: string;
-}
+export type { MCPResource } from "./connector-profile.js";
 
 const RESOURCE_DEFINITIONS: readonly MCPResource[] = [
   {
