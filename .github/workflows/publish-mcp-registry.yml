@@ -8,8 +8,6 @@ on:
       - .github/workflows/publish-mcp-registry.yml
   release:
     types: [published]
-  schedule:
-    - cron: "17 5 * * *"
   workflow_dispatch:
     inputs:
       ref:
@@ -36,42 +34,6 @@ env:
   MCP_PUBLISHER_VERSION: v1.7.9
 
 jobs:
-  reconcile:
-    name: Reconcile approved npm releases with MCP Registry
-    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' && github.event_name == 'schedule' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    permissions:
-      actions: write
-      contents: read
-    steps:
-      - name: Dispatch the latest published npm version missing from MCP Registry
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          gh release list --repo "$GITHUB_REPOSITORY" --limit 25 --json tagName,isDraft,isPrerelease |
-            jq -r '.[] | select(.isDraft == false and .isPrerelease == false) | .tagName' |
-            while IFS= read -r TAG; do
-              [[ "$TAG" =~ ^ssh-mcp-pro-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
-              VERSION="${TAG#ssh-mcp-pro-v}"
-              VISIBLE="$(npm view "ssh-mcp-pro@${VERSION}" version --silent 2>/dev/null || true)"
-              [[ "$VISIBLE" == "$VERSION" ]] || continue
-              URL="https://registry.modelcontextprotocol.io/v0.1/servers/io.github.oaslananka%2Fssh-mcp-pro/versions/${VERSION}"
-              STATUS="$(curl --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' "$URL")"
-              if [[ "$STATUS" == 200 ]]; then
-                echo "MCP Registry already includes $TAG."
-                continue
-              fi
-              if [[ "$STATUS" != 404 ]]; then
-                echo "MCP Registry returned $STATUS; refusing to dispatch." >&2
-                exit 1
-              fi
-              gh workflow run publish-mcp-registry.yml --repo "$GITHUB_REPOSITORY" --ref main -f 'dry_run=false' -f "ref=${TAG}"
-              echo "Dispatched MCP Registry publication for verified npm version ${VERSION}."
-              break
-            done
-
   validate:
     if: >-
       ${{

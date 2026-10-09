@@ -31,7 +31,12 @@ describe("release scripts", () => {
     const state = JSON.parse(result.stdout) as {
       package: { name: string };
       trustedPublishing: { environment: string; allowedAction: string };
-      workflow: { hasOidcPermission: boolean; usesNpmPublish: boolean };
+      workflow: {
+        hasOidcPermission: boolean;
+        usesNpmPublish: boolean;
+        requiresManualDispatch: boolean;
+        verifiesReleasedArtifact: boolean;
+      };
     };
 
     expect(state.package.name).toBe("ssh-mcp-pro");
@@ -39,5 +44,7 @@ describe("release scripts", () => {
     expect(state.trustedPublishing.allowedAction).toBe("npm publish");
     expect(state.workflow.hasOidcPermission).toBe(true);
     expect(state.workflow.usesNpmPublish).toBe(true);
+    expect(state.workflow.requiresManualDispatch).toBe(true);
+    expect(state.workflow.verifiesReleasedArtifact).toBe(true);
   }, 15_000);
 });

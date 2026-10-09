@@ -4,6 +4,7 @@ import { describe, expect, test } from "vitest";
 const release = fs.readFileSync(".github/workflows/release.yml", "utf8");
 const docker = fs.readFileSync(".github/workflows/docker.yml", "utf8");
 const registry = fs.readFileSync(".github/workflows/publish-mcp-registry.yml", "utf8");
+const ci = fs.readFileSync(".github/workflows/ci.yml", "utf8");
 
 function section(text: string, start: string, end: string) {
   const begin = text.indexOf(start);
@@ -13,6 +14,15 @@ function section(text: string, start: string, end: string) {
 }
 
 describe("gated release lifecycle", () => {
+  test("avoids duplicate feature branch push and PR CI runs", () => {
+    const triggers = section(ci, "on:\n", "permissions:\n");
+    expect(triggers).toContain("  pull_request:");
+    expect(triggers).toContain("      - main");
+    expect(triggers).not.toContain("fix/**");
+    expect(triggers).not.toContain("chore/**");
+    expect(triggers).not.toContain("feature/**");
+  });
+
   test("preflights package, SBOM and provenance before release-please creates a tag", () => {
     const preflight = section(release, "  release-preflight:", "  release:\n");
     expect(preflight).toContain("pnpm run check:freshness");
@@ -28,25 +38,34 @@ describe("gated release lifecycle", () => {
     expect(releaseJob).toContain("needs.release-preflight.result == 'success'");
   });
 
-  test("ships exactly the preflight-tested artifact and blocks repeat staging", () => {
-    const publishing = release.slice(release.indexOf("  release-assets:"));
+  test("push releases attach only preflight-verified artifacts and trigger Docker", () => {
+    const publishing = section(release, "  release-assets:", "  publish-npm:");
     expect(publishing).toContain("release-preflight-artifacts");
     expect(publishing).toContain("sha256sum -c");
-    expect(publishing).toContain('cd artifacts && sha256sum "${PACKAGE_FILE}"');
-    expect(publishing).not.toContain('sha256sum "artifacts/${PACKAGE_FILE}"');
+    expect(publishing).toContain("commits/${RELEASE_TAG}");
     expect(publishing).toContain("gh release upload");
-    expect(publishing).toContain("git rev-parse HEAD");
-    expect(publishing).toContain("Trigger immutable-tag GHCR publication");
-    expect(publishing).toMatch(
-      /Trigger immutable-tag GHCR publication[\s\S]*?if: \$\{\{ github\.event_name != 'workflow_dispatch' \}\}/u,
-    );
+    expect(publishing).toContain("Trigger immutable-tag Docker publication");
     expect(publishing).toContain("gh workflow run docker.yml");
-    expect(publishing).toContain("gh workflow run publish-mcp-registry.yml");
+    expect(publishing).not.toContain("npm publish");
     expect(publishing).not.toContain("npm stage publish");
-    expect(publishing).toContain(
-      "github.event_name != 'workflow_dispatch' && vars.AUTO_RELEASE_PUBLISH == 'true'",
-    );
-    expect(publishing).toContain("0180a3961a8b105aa8003c93da1f3af93769a211");
+  });
+
+  test("manual Release publishes the existing checked artifact directly via OIDC", () => {
+    const publishing = release.slice(release.indexOf("  publish-npm:"));
+    expect(publishing).toContain("github.event_name == 'workflow_dispatch'");
+    expect(publishing).toContain("github.ref == 'refs/heads/main'");
+    expect(publishing).toContain("id-token: write");
+    expect(publishing).toContain("gh release download");
+    expect(publishing).toContain("sha256sum -c");
+    expect(publishing).toContain("gh attestation verify");
+    expect(publishing).toContain("commits/${TAG}");
+    expect(publishing).toContain("git merge-base --is-ancestor");
+    expect(publishing).toContain("already_published == 'false'");
+    expect(publishing).toContain("npm publish");
+    expect(publishing).not.toContain("npm stage publish");
+    expect(publishing).not.toContain("AUTO_RELEASE_PUBLISH");
+    expect(publishing).not.toContain("gh release upload");
+    expect(publishing).toContain("gh workflow run publish-mcp-registry.yml");
   });
 
   test("never publishes container or registry entries for an unverified tag/version", () => {
@@ -57,7 +76,7 @@ describe("gated release lifecycle", () => {
     expect(registry).toContain("Verify npm package exists");
     expect(registry).toContain("Check whether version is already in MCP Registry");
     expect(registry).toContain("steps.registry.outputs.exists == 'false'");
-    expect(registry).toContain("github.event_name == 'schedule'");
-    expect(registry).toContain("ref=${TAG}");
+    expect(registry).not.toContain("github.event_name == 'schedule'");
+    expect(registry).not.toContain("  reconcile:");
   });
 });

@@ -32,7 +32,7 @@ const state = {
     workflowFile: basename(".github/workflows/release.yml"),
     environment: "npm-production",
     allowedAction: "npm publish",
-    autoPublishVariable: "AUTO_RELEASE_PUBLISH",
+    publication: "manual workflow_dispatch on main",
   },
   localTools: {
     node: process.version,
@@ -57,7 +57,8 @@ function inspectWorkflow(workflow) {
     hasNpmProductionEnvironment: workflow.includes("environment: npm-production"),
     hasOidcPermission: workflow.includes("id-token: write"),
     usesNpmPublish: workflow.includes("npm publish"),
-    gatesPublishWithVariable: workflow.includes("vars.AUTO_RELEASE_PUBLISH == 'true'"),
+    requiresManualDispatch: workflow.includes("github.event_name == 'workflow_dispatch'"),
+    verifiesReleasedArtifact: workflow.includes("gh attestation verify"),
   };
 }
 
@@ -126,6 +127,6 @@ function runJsonCommand(command, commandArgs, label) {
 function printTextSummary(currentState) {
   console.log(`release-state: ${currentState.package.name}@${currentState.package.version}`);
   console.log(`release-state: environment ${currentState.trustedPublishing.environment}`);
-  console.log(`release-state: publish gate ${currentState.trustedPublishing.autoPublishVariable}`);
+  console.log(`release-state: publish trigger ${currentState.trustedPublishing.publication}`);
   console.log(`release-state: offline=${offline}`);
 }
