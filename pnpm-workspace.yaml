@@ -32,7 +32,7 @@ overrides:
   postcss: ^8.5.23
   proxy-addr: ^2.0.8
   qs: ^6.16.0
-  "@protobufjs/utf8": ^1.1.1
+  "@protobufjs/utf8": ^1.1.2
   protobufjs: ^7.6.5
   source-map-js: ^1.2.2
   test-exclude: ^8.0.0
