@@ -4,6 +4,7 @@ import { describe, expect, test } from "vitest";
 const release = fs.readFileSync(".github/workflows/release.yml", "utf8");
 const docker = fs.readFileSync(".github/workflows/docker.yml", "utf8");
 const registry = fs.readFileSync(".github/workflows/publish-mcp-registry.yml", "utf8");
+const ci = fs.readFileSync(".github/workflows/ci.yml", "utf8");
 
 function section(text: string, start: string, end: string) {
   const begin = text.indexOf(start);
@@ -13,6 +14,15 @@ function section(text: string, start: string, end: string) {
 }
 
 describe("gated release lifecycle", () => {
+  test("avoids duplicate feature branch push and PR CI runs", () => {
+    const triggers = section(ci, "on:\n", "permissions:\n");
+    expect(triggers).toContain("  pull_request:");
+    expect(triggers).toContain("      - main");
+    expect(triggers).not.toContain("fix/**");
+    expect(triggers).not.toContain("chore/**");
+    expect(triggers).not.toContain("feature/**");
+  });
+
   test("preflights package, SBOM and provenance before release-please creates a tag", () => {
     const preflight = section(release, "  release-preflight:", "  release:\n");
     expect(preflight).toContain("pnpm run check:freshness");
@@ -66,7 +76,7 @@ describe("gated release lifecycle", () => {
     expect(registry).toContain("Verify npm package exists");
     expect(registry).toContain("Check whether version is already in MCP Registry");
     expect(registry).toContain("steps.registry.outputs.exists == 'false'");
-    expect(registry).toContain("github.event_name == 'schedule'");
-    expect(registry).toContain("ref=${TAG}");
+    expect(registry).not.toContain("github.event_name == 'schedule'");
+    expect(registry).not.toContain("  reconcile:");
   });
 });

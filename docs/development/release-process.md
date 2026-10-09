@@ -18,7 +18,7 @@ GitHub does not override npm account/package security settings. If the npm publi
 
 The release workflow triggers `.github/workflows/docker.yml` with the immutable `ssh-mcp-pro-vX.Y.Z` tag. GHCR must grant this repository's GitHub Actions **Write** access to the existing `ghcr.io/oaslananka/ssh-mcp-pro` package. Package access is managed through **GitHub Packages → Package settings → Manage Actions access**. Docker publishing verifies the release tag and package version before pushing both platform tags.
 
-The MCP Registry job requires an existing GitHub Release and the *same publicly visible npm version*. It skips versions already registered and uses GitHub OIDC. A scheduled reconciliation is retained solely for previously missed registry registrations; it never publishes to npm.
+The MCP Registry job requires an existing GitHub Release and the *same publicly visible npm version*. It skips versions already registered and uses GitHub OIDC. There is no daily staged-publication reconciliation job. The manual npm publish workflow dispatches the MCP Registry publication only after npm confirms the version is public.
 
 ## Verify and troubleshoot
 
