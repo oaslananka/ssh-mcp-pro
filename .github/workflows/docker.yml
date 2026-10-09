@@ -48,11 +48,12 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event.release.tag_name || github.ref }}
 
       - name: Build local image
         run: |
           docker build \
-            --build-arg VCS_REF="${GITHUB_SHA}" \
+            --build-arg VCS_REF="$(git rev-parse HEAD)" \
             --build-arg BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             -t ssh-mcp-pro:local \
             .
@@ -69,7 +70,7 @@ jobs:
           test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.source" }}')" = "https://github.com/oaslananka/ssh-mcp-pro"
           test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.documentation" }}')" = "https://github.com/oaslananka/ssh-mcp-pro/blob/main/docs/docker.md"
           test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.licenses" }}')" = "MIT"
-          test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "${GITHUB_SHA}"
+          test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$(git rev-parse HEAD)"
 
       - name: Scan image for vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # 0.36.0
@@ -128,6 +129,8 @@ jobs:
           ref: ${{ env.VERSION_TAG }}
 
       - name: Validate release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if ! echo "${VERSION_TAG}" | grep -Eq '^(v|ssh-mcp-pro-v)[0-9]+\.[0-9]+\.[0-9]+$'; then
@@ -135,6 +138,12 @@ jobs:
             exit 1
           fi
           git rev-parse -q --verify "refs/tags/${VERSION_TAG}" >/dev/null
+          VERSION="${VERSION_TAG#ssh-mcp-pro-v}"
+          VERSION="${VERSION#v}"
+          test "$(node -p "require('./package.json').version")" = "${VERSION}"
+          test "$(git rev-parse HEAD)" = "$(git rev-list -n 1 "${VERSION_TAG}")"
+          gh release view "${VERSION_TAG}" --repo "${GITHUB_REPOSITORY}" --json assets |
+            jq -e --arg v "${VERSION}" '([.assets[].name] | index("ssh-mcp-pro-\($v).tgz")) != null' >/dev/null
 
       - name: Log in to GHCR
         env:

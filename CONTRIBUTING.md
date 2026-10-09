@@ -207,40 +207,19 @@ Automatic npm publishing is opt-in:
   - Repository: `ssh-mcp-pro`
   - Workflow filename: `release.yml`
   - Environment name: `npm-production`
-  - Allowed actions: `npm publish` for normal releases and `npm stage publish` for the fixed recovery path.
+  - Allowed actions: `npm publish` only if explicitly enabling future direct publication; historical 1.2.1 has already been staged and must not be restaged.
 - Confirm the intended trusted-publishing payload before enabling automatic publishing:
-  `npm trust github ssh-mcp-pro --file release.yml --repo oaslananka/ssh-mcp-pro --env npm-production --allow-publish --allow-stage-publish --dry-run --json`.
+  `npm trust github ssh-mcp-pro --file release.yml --repo oaslananka/ssh-mcp-pro --env npm-production --allow-publish --dry-run --json`.
 - Keep the release job on GitHub-hosted runners with `id-token: write`; npm trusted publishing uses OIDC and does not require a long-lived npm automation token.
 - Confirm `package.json` `repository.url` still matches `https://github.com/oaslananka/ssh-mcp-pro`.
 
-If `AUTO_RELEASE_PUBLISH` is not set to `true`, the workflow records that npm publishing was skipped after attaching release assets to the GitHub release. To publish manually from a verified release artifact, download the tarball into `artifacts/`, verify the checksum attached to the GitHub release, then run:
+If `AUTO_RELEASE_PUBLISH` is not set to `true`, the workflow records that npm publishing was skipped. Before merging a release PR, ensure the intended npm policy is documented and that GitHub Release, GHCR and MCP Registry are not confused with a public npm publication. See the release-process guide for the required sequence and immutable artifact checks.
 
-```bash
-npm publish ./artifacts/<tarball> --access public --provenance
-```
+### Trusted Publishing and Asset Recovery (ssh-mcp-pro@1.2.1)
 
-Use manual publishing only for a release artifact that was produced by the release workflow. Do not run `npm publish` from feature branches or dirty worktrees.
+The npm version `1.2.1` was staged under stage ID `a083f086-af6e-459b-8e4c-75e9719e6653` through GitHub OIDC. Its maintainer must approve that **existing** stage with 2FA before it is publicly available. Do not restage or directly publish it.
 
-### Trusted Publishing Recovery (ssh-mcp-pro@1.2.1)
-
-A one-time recovery path exists for `ssh-mcp-pro@1.2.1` from tag `ssh-mcp-pro-v1.2.1`. This path is integrated into `.github/workflows/release.yml` and is triggered manually via `workflow_dispatch` (no inputs).
-
-The manual recovery branch of the existing `release-assets` job:
-- Checks out the fixed tag `ssh-mcp-pro-v1.2.1`
-- Verifies the package version is exactly `1.2.1` and runs `node scripts/sync-version.mjs --check`
-- Runs the bounded package-quality gate (`pnpm run check:package`)
-- Pins npm `11.21.0` for staged publishing
-- Builds and packs the package with SBOM and provenance attestations
-- Stages the package on npm using `npm stage publish`, not `npm publish`
-- Reuses the existing `npm-production` environment and OIDC permission boundary; long-lived npm tokens are never used (`NODE_AUTH_TOKEN` and `NPM_CONFIG_USERCONFIG` are explicitly unset)
-- Does **not** run release-please, create or modify a GitHub Release, or directly publish the package
-- Treats a successful `npm stage publish` exit as the CI handoff. The staged version is reviewed afterward in npm's **Staged Packages** UI; it is not expected to appear through normal `npm view` before approval.
-
-To run the recovery:
-1. Go to the **Actions** tab in GitHub, select **Release**, click **Run workflow**, choose the target branch (typically `main`), and run it.
-2. After the workflow reports that staging succeeded, open npmjs.com → **Staged Packages**, inspect `ssh-mcp-pro@1.2.1`, and approve it with maintainer 2FA when ready.
-
-Do not bypass this staged-publishing path for this recovery.
+The manual `Release` workflow is now a separate **asset-only** recovery for the existing GitHub Release v1.2.1: it checks the immutable tag, runs package validation, generates and attests the missing assets, and attaches them to the existing release. This manual workflow never publishes or stages npm packages. See [Release Process](docs/development/release-process.md) for the full preflight → Release Please → asset → GHCR/registry sequence, and for verification steps after npm approval.
 
 ## Docker Fixture Commands
 
