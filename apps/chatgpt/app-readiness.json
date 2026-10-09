@@ -10,7 +10,7 @@
   "mcp": {
     "serverName": "io.github.oaslananka/ssh-mcp-pro",
     "packageName": "ssh-mcp-pro",
-    "version": "1.2.2",
+    "version": "1.2.3",
     "localCommand": "ssh-mcp-pro",
     "localResourcePath": "/mcp",
     "transports": [
