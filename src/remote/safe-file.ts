@@ -215,9 +215,11 @@ export async function writeAuthorizedFileAtomic(
   let temporary: FileHandle | undefined;
   let temporaryPath: string | undefined;
   try {
-    parent = await open(canonicalParent, constants.O_RDONLY | DIRECTORY_ONLY | NO_FOLLOW);
-    await verifyOpenedHandle(policy, parent, canonicalParent, "directory", denialMessage);
-    const anchor = process.platform === "linux" ? `/proc/self/fd/${parent.fd}` : canonicalParent;
+    if (process.platform === "linux") {
+      parent = await open(canonicalParent, constants.O_RDONLY | DIRECTORY_ONLY | NO_FOLLOW);
+      await verifyOpenedHandle(policy, parent, canonicalParent, "directory", denialMessage);
+    }
+    const anchor = parent ? `/proc/self/fd/${parent.fd}` : canonicalParent;
     temporaryPath = path.join(anchor, `.${leaf}.${randomUUID()}.tmp`);
     temporary = await open(
       temporaryPath,
@@ -238,7 +240,7 @@ export async function writeAuthorizedFileAtomic(
     temporary = undefined;
     await rename(temporaryPath, path.join(anchor, leaf));
     temporaryPath = undefined;
-    if (process.platform === "linux") await parent.sync();
+    if (parent) await parent.sync();
   } catch (error) {
     if (errorCode(error) === "POLICY_DENIED") throw error;
     throw operationFailed(operationMessage);
