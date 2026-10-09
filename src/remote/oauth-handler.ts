@@ -32,16 +32,13 @@ import type {
 import { REMOTE_SCOPES } from "./types.js";
 import { jsonResponse } from "./util.js";
 
-const HTML_ENTITIES: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/gu, (character) => HTML_ENTITIES[character] ?? character);
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 /** Pending OAuth authorization transaction. */
@@ -223,7 +220,16 @@ export class OAuthHandler {
       "Set-Cookie": this.transactionCookie(transactionId),
     });
     res.end(
-      `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Authorize SSH MCP</title></head><body><h1>Authorize SSH MCP</h1><p>Allow the client at ${hostname} to request: ${escapeHtml(scope)}?</p><form method="post" action="/oauth/approve"><input type="hidden" name="transaction" value="${escapeHtml(transactionId)}"><button type="submit">Continue with GitHub</button></form></body></html>`,
+      [
+        '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Authorize SSH MCP</title></head>',
+        "<body><h1>Authorize SSH MCP</h1><p>Allow the client at ",
+        hostname,
+        " to request: ",
+        escapeHtml(scope),
+        '?</p><form method="post" action="/oauth/approve"><input type="hidden" name="transaction" value="',
+        escapeHtml(transactionId),
+        '"><button type="submit">Continue with GitHub</button></form></body></html>',
+      ].join(""),
     );
   }
 
