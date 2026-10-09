@@ -78,8 +78,8 @@ jobs:
           mkdir -p artifacts
           pnpm run sbom
           PACKAGE_FILE="$(pnpm pack --pack-destination artifacts --json | node scripts/extract-pack-filename.mjs)"
-          sha256sum "artifacts/${PACKAGE_FILE}" > "artifacts/${PACKAGE_FILE}.sha256"
-          sha256sum artifacts/sbom.cdx.json > artifacts/sbom.cdx.json.sha256
+          (cd artifacts && sha256sum "${PACKAGE_FILE}" > "${PACKAGE_FILE}.sha256")
+          (cd artifacts && sha256sum sbom.cdx.json > sbom.cdx.json.sha256)
           echo "package_file=${PACKAGE_FILE}" >> "$GITHUB_OUTPUT"
       - name: Attest package before release creation
         if: ${{ steps.detect.outputs.candidate == 'true' }}
@@ -216,8 +216,8 @@ jobs:
             pnpm pack --pack-destination artifacts --json |
               node scripts/extract-pack-filename.mjs
           )"
-          sha256sum "artifacts/${PACKAGE_FILE}" > "artifacts/${PACKAGE_FILE}.sha256"
-          sha256sum artifacts/sbom.cdx.json > artifacts/sbom.cdx.json.sha256
+          (cd artifacts && sha256sum "${PACKAGE_FILE}" > "${PACKAGE_FILE}.sha256")
+          (cd artifacts && sha256sum sbom.cdx.json > sbom.cdx.json.sha256)
           echo "package_file=${PACKAGE_FILE}" >> "$GITHUB_OUTPUT"
 
       - name: Attest recovery package artifact

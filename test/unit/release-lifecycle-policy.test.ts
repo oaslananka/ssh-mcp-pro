@@ -18,6 +18,8 @@ describe("gated release lifecycle", () => {
     expect(preflight).toContain("pnpm run check:freshness");
     expect(preflight).toContain("pnpm run check\n");
     expect(preflight).toContain("pnpm run sbom");
+    expect(preflight).toContain('cd artifacts && sha256sum "${PACKAGE_FILE}"');
+    expect(preflight).toContain("cd artifacts && sha256sum sbom.cdx.json");
     expect(preflight).toContain("pnpm pack --pack-destination artifacts");
     expect(preflight).toContain("Attest package before release creation");
     expect(preflight).toContain("release-preflight-artifacts");
@@ -30,6 +32,8 @@ describe("gated release lifecycle", () => {
     const publishing = release.slice(release.indexOf("  release-assets:"));
     expect(publishing).toContain("release-preflight-artifacts");
     expect(publishing).toContain("sha256sum -c");
+    expect(publishing).toContain('cd artifacts && sha256sum "${PACKAGE_FILE}"');
+    expect(publishing).not.toContain('sha256sum "artifacts/${PACKAGE_FILE}"');
     expect(publishing).toContain("gh release upload");
     expect(publishing).toContain("git rev-parse HEAD");
     expect(publishing).toContain("Trigger immutable-tag GHCR publication");
