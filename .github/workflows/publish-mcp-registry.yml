@@ -8,8 +8,14 @@ on:
       - .github/workflows/publish-mcp-registry.yml
   release:
     types: [published]
+  schedule:
+    - cron: "17 5 * * *"
   workflow_dispatch:
     inputs:
+      ref:
+        description: Immutable ssh-mcp-pro-vX.Y.Z tag; required for publishing.
+        required: false
+        type: string
       dry_run:
         description: Validate metadata without publishing.
         type: boolean
@@ -30,6 +36,42 @@ env:
   MCP_PUBLISHER_VERSION: v1.7.9
 
 jobs:
+  reconcile:
+    name: Reconcile approved npm releases with MCP Registry
+    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' && github.event_name == 'schedule' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch the latest published npm version missing from MCP Registry
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 25 --json tagName,isDraft,isPrerelease |
+            jq -r '.[] | select(.isDraft == false and .isPrerelease == false) | .tagName' |
+            while IFS= read -r TAG; do
+              [[ "$TAG" =~ ^ssh-mcp-pro-v[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+              VERSION="${TAG#ssh-mcp-pro-v}"
+              VISIBLE="$(npm view "ssh-mcp-pro@${VERSION}" version --silent 2>/dev/null || true)"
+              [[ "$VISIBLE" == "$VERSION" ]] || continue
+              URL="https://registry.modelcontextprotocol.io/v0.1/servers/io.github.oaslananka%2Fssh-mcp-pro/versions/${VERSION}"
+              STATUS="$(curl --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' "$URL")"
+              if [[ "$STATUS" == 200 ]]; then
+                echo "MCP Registry already includes $TAG."
+                continue
+              fi
+              if [[ "$STATUS" != 404 ]]; then
+                echo "MCP Registry returned $STATUS; refusing to dispatch." >&2
+                exit 1
+              fi
+              gh workflow run publish-mcp-registry.yml --repo "$GITHUB_REPOSITORY" --ref main -f 'dry_run=false' -f "ref=${TAG}"
+              echo "Dispatched MCP Registry publication for verified npm version ${VERSION}."
+              break
+            done
+
   validate:
     if: >-
       ${{
@@ -75,6 +117,20 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
+          ref: ${{ github.event.release.tag_name || inputs.ref || github.ref }}
+          fetch-depth: 0
+      - name: Verify immutable source and GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.ref }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^ssh-mcp-pro-v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          VERSION="$(node -p "require('./package.json').version")"
+          test "$RELEASE_TAG" = "ssh-mcp-pro-v${VERSION}"
+          test "$(git rev-parse HEAD)" = "$(git rev-list -n 1 "$RELEASE_TAG")"
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets |
+            jq -e --arg v "$VERSION" '([.assets[].name] | index("ssh-mcp-pro-\($v).tgz")) != null' >/dev/null
       - name: Verify npm package exists
         run: |
           set -euo pipefail
@@ -91,7 +147,20 @@ jobs:
           done
           echo "npm package ${package_name}@${package_version} was not verifiable." >&2
           exit 1
+      - name: Check whether version is already in MCP Registry
+        id: registry
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          URL="https://registry.modelcontextprotocol.io/v0.1/servers/io.github.oaslananka%2Fssh-mcp-pro/versions/${VERSION}"
+          STATUS="$(curl --silent --show-error --max-time 20 --output /dev/null --write-out '%{http_code}' "$URL")"
+          case "$STATUS" in
+            200) echo 'exists=true' >> "$GITHUB_OUTPUT" ;;
+            404) echo 'exists=false' >> "$GITHUB_OUTPUT" ;;
+            *) echo "Unrecognized MCP Registry status: $STATUS" >&2; exit 1 ;;
+          esac
       - name: Install mcp-publisher
+        if: ${{ steps.registry.outputs.exists == 'false' }}
         run: |
           set -euo pipefail
           curl --proto "=https" -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" -o mcp-publisher.tar.gz
@@ -99,7 +168,15 @@ jobs:
           chmod +x mcp-publisher
           sudo mv mcp-publisher /usr/local/bin/mcp-publisher
       - name: Publish to MCP Registry
+        if: ${{ steps.registry.outputs.exists == 'false' }}
         run: |
           set -euo pipefail
           mcp-publisher login github-oidc
           mcp-publisher publish
+      - name: Verify version is registered
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          curl --fail --silent --show-error --max-time 30 \
+            "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.oaslananka%2Fssh-mcp-pro/versions/${VERSION}" |
+            jq -e --arg v "$VERSION" '.server.version == $v' >/dev/null

@@ -56,9 +56,9 @@ export function parseRootImporterVersions(lockText) {
       packageName = undefined;
       continue;
     }
-    const packageMatch = /^      (?:"([^"]+)"|([^:]+)):$/u.exec(line);
+    const packageMatch = /^      (?:"([^"]+)"|'([^']+)'|([^:]+)):$/u.exec(line);
     if (inRootImporter && group && packageMatch) {
-      packageName = packageMatch[1] ?? packageMatch[2];
+      packageName = packageMatch[1] ?? packageMatch[2] ?? packageMatch[3];
       continue;
     }
     const versionMatch = /^        version: (.+)$/u.exec(line);

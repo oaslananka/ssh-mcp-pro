@@ -23,9 +23,12 @@ describe("dependency freshness helpers", () => {
       "importers:",
       "  .:",
       "    dependencies:",
-      '      "@scope/package":',
+      "      '@scope/package':",
       "        specifier: ^1.2.3",
       "        version: 1.2.4(peer@1.0.0)",
+      '      "double-quoted":',
+      "        specifier: 2.1.0",
+      "        version: 2.1.0",
       "      zod:",
       "        specifier: ^4.4.3",
       "        version: 4.4.3",
@@ -39,6 +42,7 @@ describe("dependency freshness helpers", () => {
 
     expect(Object.fromEntries(freshness.parseRootImporterVersions(lockText))).toEqual({
       "@scope/package": "1.2.4",
+      "double-quoted": "2.1.0",
       typescript: "5.9.3",
       zod: "4.4.3",
     });
