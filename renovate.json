@@ -24,8 +24,8 @@
     "oaslananka"
   ],
   "prHourlyLimit": 2,
-  "prConcurrentLimit": 8,
-  "branchConcurrentLimit": 8,
+  "prConcurrentLimit": 3,
+  "branchConcurrentLimit": 3,
   "commitHourlyLimit": 4,
   "rangeStrategy": "bump",
   "rebaseWhen": "conflicted",
@@ -43,8 +43,7 @@
     "automerge": false,
     "addLabels": [
       "lockfile",
-      "automerge:enabled",
-      "risk:low"
+      "requires-review"
     ]
   },
   "vulnerabilityAlerts": {
@@ -135,30 +134,25 @@
       ]
     },
     {
-      "description": "Automerge digest-only updates after checks pass.",
-      "matchUpdateTypes": [
-        "digest"
-      ],
-      "automerge": false,
-      "automergeType": "pr",
-      "addLabels": [
-        "automerge",
-        "automerge:enabled"
-      ]
-    },
-    {
       "description": "MCP SDK and SSH/runtime-affecting dependencies require manual review.",
       "matchPackageNames": [
         "@modelcontextprotocol/sdk",
         "ssh2",
+        "node-ssh",
         "node-pty",
-        "execa"
+        "execa",
+        "jose",
+        "ws",
+        "zod",
+        "@hono/node-server",
+        "@grpc/grpc-js",
+        "@opentelemetry/**"
       ],
       "dependencyDashboardApproval": true,
       "automerge": false,
       "addLabels": [
         "requires-review",
-        "runtime"
+        "runtime-risk"
       ]
     },
     {
@@ -169,7 +163,7 @@
       ],
       "dependencyDashboardApproval": true,
       "addLabels": [
-        "runtime",
+        "runtime-risk",
         "requires-review"
       ]
     }
