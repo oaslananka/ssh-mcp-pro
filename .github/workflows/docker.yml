@@ -77,7 +77,7 @@ jobs:
           image-ref: ssh-mcp-pro:local
           format: sarif
           output: trivy-results.sarif
-          severity: CRITICAL,HIGH
+          severity: CRITICAL,HIGH,MEDIUM
           exit-code: "0"
 
       - name: Upload vulnerability scan results
