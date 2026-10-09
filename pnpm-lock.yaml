@@ -15,7 +15,7 @@ overrides:
   express-rate-limit: ^8.5.1
   fast-uri: ^3.1.8
   glob: ^13.0.6
-  hono: ^4.13.7
+  hono: ^4.13.12
   ip-address: ^10.7.1
   linkify-it: ^5.0.2
   markdown-it: ^14.3.1
@@ -522,7 +522,7 @@ packages:
     resolution: {integrity: sha512-TA//nWMqPhbfdfneACk6t5a9eqbS9lABEPyKn0/xZTah3H3U2XaVg85rJFl0/Fyit0I552YDHgXGVSf3GwqbUw==}
     engines: {node: '>=20'}
     peerDependencies:
-      hono: ^4.13.7
+      hono: ^4.13.12
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
