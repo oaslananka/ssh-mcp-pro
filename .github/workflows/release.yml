@@ -313,6 +313,8 @@ jobs:
           echo 'Restored v1.2.1 release assets only; npm stage a083f086-af6e-459b-8e4c-75e9719e6653 remains pending maintainer 2FA.' >> "$GITHUB_STEP_SUMMARY"
 
       - name: Trigger immutable-tag GHCR publication
+        # Historical v1.2.1 lacks the zlib patch later merged on main; do not publish its old image.
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.release.outputs.tag_name || 'ssh-mcp-pro-v1.2.1' }}

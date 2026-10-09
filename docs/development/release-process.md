@@ -32,7 +32,7 @@ A daily registry reconciliation job checks released versions against **public np
 
 ## Recovery for the incomplete v1.2.1 GitHub Release
 
-GitHub Release `ssh-mcp-pro-v1.2.1` was created on 2026-10-06, but the original release asset job failed after a dependency freshness check; the published GitHub Release had zero assets. After the recovery changes are merged, use **Actions → Release → Run workflow** once on `main` to perform the **asset-only** recovery. This dispatch checks out the fixed `ssh-mcp-pro-v1.2.1` tag, checks its known source SHA and metadata, runs package validation, rebuilds and attests the tarball/SBOM, attaches and verifies the assets, and dispatches the GHCR image workflow.
+GitHub Release `ssh-mcp-pro-v1.2.1` was created on 2026-10-06, but the original release asset job failed after a dependency freshness check; the published GitHub Release had zero assets. After the recovery changes are merged, use **Actions → Release → Run workflow** once on `main` to perform the **asset-only** recovery. This dispatch checks out the fixed `ssh-mcp-pro-v1.2.1` tag, checks its known source SHA and metadata, runs package validation, rebuilds and attests the tarball/SBOM, attaches and verifies the assets. It does **not** publish the historical v1.2.1 GHCR image: that immutable tag predates the Alpine zlib security patch. GHCR publication resumes automatically for the first newly validated release containing the patch.
 
 Crucially, manual Release workflow dispatch now **never** runs `npm stage publish`, `npm publish`, or Release Please. The already-staged npm 1.2.1 remains untouched and requires its original owner approval. Do not interpret successful asset recovery as npm publication.
 

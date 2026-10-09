@@ -37,6 +37,9 @@ describe("gated release lifecycle", () => {
     expect(publishing).toContain("gh release upload");
     expect(publishing).toContain("git rev-parse HEAD");
     expect(publishing).toContain("Trigger immutable-tag GHCR publication");
+    expect(publishing).toMatch(
+      /Trigger immutable-tag GHCR publication[\s\S]*?if: \$\{\{ github\.event_name != 'workflow_dispatch' \}\}/u,
+    );
     expect(publishing).toContain("gh workflow run docker.yml");
     expect(publishing).toContain("gh workflow run publish-mcp-registry.yml");
     expect(publishing).not.toContain("npm stage publish");
