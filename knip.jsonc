@@ -3,6 +3,8 @@
   "entry": [
     "src/index.ts",
     "test/**/*.test.ts",
+    "test/bench/**/*.bench.ts",
+    "vitest.bench.config.ts",
     "src/agent-bin.ts",
     "src/render-http.ts",
     "scripts/check-dependency-freshness.mjs",
