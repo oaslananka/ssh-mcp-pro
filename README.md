@@ -6,6 +6,7 @@
   <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
   <a href="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml/badge.svg" /></a>
   <a href="https://oaslananka.github.io/ssh-mcp-pro/"><img alt="API Docs" src="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/docs.yml/badge.svg" /></a>
+  <a href="https://app.codspeed.io/oaslananka/ssh-mcp-pro?utm_source=badge"><img src="https://img.shields.io/endpoint?url=https://codspeed.io/badge.json" alt="CodSpeed"/></a>
 </p>
 
 <p align="center">

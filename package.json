@@ -45,11 +45,11 @@
     "test:perf:baseline": "WRITE_BASELINE=true pnpm run test:perf",
     "test:mutation": "stryker run",
     "test:mutation:ci": "stryker run",
-    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\" \"vitest.config.ts\" \"vitest.mutation.config.ts\"",
-    "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.ts\" \"vitest.config.ts\" \"vitest.mutation.config.ts\" --fix",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\" \"vitest.config.ts\" \"vitest.mutation.config.ts\" \"vitest.bench.config.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.ts\" \"vitest.config.ts\" \"vitest.mutation.config.ts\" \"vitest.bench.config.ts\" --fix",
     "lint:staged": "node scripts/run-staged-checks.mjs --lint-only",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.{mjs,cjs}\" \"docs/**/*.md\" \".github/workflows/*.{yml,yaml}\" \"stryker.conf.mjs\" \"vitest.config.ts\" \"vitest.mutation.config.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.{mjs,cjs}\" \"docs/**/*.md\" \".github/workflows/*.{yml,yaml}\" \"stryker.conf.mjs\" \"vitest.config.ts\" \"vitest.mutation.config.ts\"",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.{mjs,cjs}\" \"docs/**/*.md\" \".github/workflows/*.{yml,yaml}\" \"stryker.conf.mjs\" \"vitest.config.ts\" \"vitest.mutation.config.ts\" \"vitest.bench.config.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"scripts/**/*.{mjs,cjs}\" \"docs/**/*.md\" \".github/workflows/*.{yml,yaml}\" \"stryker.conf.mjs\" \"vitest.config.ts\" \"vitest.mutation.config.ts\" \"vitest.bench.config.ts\"",
     "format:staged": "node scripts/run-staged-checks.mjs",
     "prepare": "node scripts/setup-git-hooks.mjs",
     "prepack": "pnpm run build && pnpm run sync-version -- --check && pnpm run validate:mcp-metadata && pnpm run validate:chatgpt-app && pnpm run validate:claude-connector",
@@ -100,7 +100,8 @@
     "hook:pre-commit": "pnpm run format:staged",
     "hook:pre-push": "pnpm run check:push",
     "release:dry-run": "node scripts/validate-release-please.mjs && node scripts/release-state.mjs --offline --json && pnpm run check:package",
-    "sbom": "node scripts/generate-sbom.mjs"
+    "sbom": "node scripts/generate-sbom.mjs",
+    "bench": "vitest bench --run --config vitest.bench.config.ts"
   },
   "keywords": [
     "mcp",
@@ -145,6 +146,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@codspeed/vitest-plugin": "^6.0.1",
     "@stryker-mutator/core": "9.6.1",
     "@stryker-mutator/typescript-checker": "9.6.1",
     "@stryker-mutator/vitest-runner": "9.6.1",
