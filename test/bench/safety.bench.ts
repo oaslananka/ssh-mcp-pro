@@ -7,7 +7,7 @@ const safeCommands = [
   "systemctl status nginx --no-pager",
   "df -h && free -m && uptime",
   "grep -R 'error' /var/log/syslog | tail -n 50",
-  "docker ps --format '{{.Names}}\\t{{.Status}}'",
+  String.raw`docker ps --format '{{.Names}}\t{{.Status}}'`,
   "journalctl -u sshd --since '1 hour ago' --no-pager",
   "find /home/deploy/app -name '*.log' -mtime +7 -print",
 ];

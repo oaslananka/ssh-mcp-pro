@@ -44,7 +44,12 @@ describe("shell command building", () => {
   });
 
   bench("powershell command with env and cwd", () => {
-    buildRemoteCommand("Get-ChildItem -Recurse C:\\Logs", windows, "C:\\Users\\deploy", env);
+    buildRemoteCommand(
+      String.raw`Get-ChildItem -Recurse C:\Logs`,
+      windows,
+      String.raw`C:\Users\deploy`,
+      env,
+    );
   });
 
   bench("sudo command", () => {

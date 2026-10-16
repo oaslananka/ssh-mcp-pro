@@ -17,7 +17,7 @@ const config: PolicyConfig = {
   commandDeny: ["shutdown", "reboot", "iptables -F"],
   pathAllowPrefixes: ["/srv/app", "/var/www", "/opt/releases"],
   pathDenyPrefixes: ["/etc/shadow", "/root", "/boot"],
-  localPathAllowPrefixes: ["/tmp", "/home/runner/work"],
+  localPathAllowPrefixes: ["/home/runner/work"],
   localPathDenyPrefixes: ["/home/runner/.ssh"],
   tunnelAllowBindHosts: ["127.0.0.1", "localhost"],
   tunnelDenyBindHosts: ["0.0.0.0"],
@@ -69,7 +69,7 @@ const rawPaths = [
   "/var/www/site/assets/../../site/index.html",
   "//root/.ssh/authorized_keys",
   "/home/deploy/app/node_modules/.bin/../package.json",
-  "/tmp/../etc/passwd",
+  "/var/www/../../etc/passwd",
 ];
 
 describe("PolicyEngine", () => {
