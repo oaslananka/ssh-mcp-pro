@@ -1,11 +1,15 @@
 import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 
-const cli = (script: string, args: string[]) =>
+const cli = (script: string, args: string[], cwd?: string) =>
   spawnSync(process.execPath, [resolve("scripts", script), ...args], {
     encoding: "utf8",
     timeout: 5_000,
+    cwd,
     env: { ...process.env, COMMIT_RANGE: "" },
   });
 
@@ -34,9 +38,29 @@ describe("maintenance CLI option boundaries", () => {
     },
   );
 
-  test("permits the existing conventional commit range", () => {
-    const result = cli("lint-commits.mjs", ["HEAD"]);
-    expect(result.status).toBe(0);
-    expect(result.stdout).toContain("lint-commits: validated");
+  test("permits HEAD when the revision points to a conventional commit", () => {
+    const repo = mkdtempSync(join(tmpdir(), "ssh-mcp-cli-revision-"));
+    try {
+      execFileSync("git", ["init", "--quiet"], { cwd: repo });
+      execFileSync(
+        "git",
+        [
+          "-c",
+          "user.name=CI",
+          "-c",
+          "user.email=ci@example.invalid",
+          "commit",
+          "--allow-empty",
+          "-m",
+          "test: validate revisions",
+        ],
+        { cwd: repo },
+      );
+      const result = cli("lint-commits.mjs", ["HEAD"], repo);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("lint-commits: validated 1 commit subject");
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });
