@@ -59,6 +59,22 @@ describe("resolve the two trusted maintenance CLIs", () => {
     expect(resolveExecutableOnPath("ssh-mcp-pro", binDir)).toBe(target);
   });
 
+  test.skipIf(process.platform === "win32")(
+    "rejects a symlink into a world-writable target directory",
+    () => {
+      const unsafe = fixture();
+      chmodSync(unsafe, 0o777);
+      const unsafeBinary = executable(unsafe, "gh");
+      const safePath = fixture();
+      symlinkSync(unsafeBinary, join(safePath, "gh"));
+      const fallbackDir = fixture();
+      const safeBinary = executable(fallbackDir, "gh");
+      expect(resolveExecutableOnPath("gh", [safePath, fallbackDir].join(delimiter))).toBe(
+        safeBinary,
+      );
+    },
+  );
+
   test("rejects unexpected executable names", () => {
     expect(() => resolveExecutableOnPath("bash")).toThrow("Unsupported executable name");
   });
