@@ -1,4 +1,8 @@
 import { exec } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { delimiter, join } from "node:path";
+import { capture } from "../../scripts/lib/command.mjs";
 import { promisify } from "node:util";
 import { describe, expect, test, vi } from "vitest";
 import { detectOS } from "../../src/detect.js";
@@ -93,6 +97,26 @@ function createWindowsEnsureService(packageManager: PackageManager) {
 }
 
 windowsDescribe("Windows SSH integration coverage", () => {
+  test("invokes bundled npm and npx CLIs without PATH-selected cmd shims", () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "ssh-mcp-windows-path-"));
+    const priorPath = process.env.PATH;
+    try {
+      for (const name of ["npm", "npx"]) {
+        writeFileSync(join(tempDir, `${name}.cmd`), "@echo off\r\nexit /b 31\r\n");
+      }
+      process.env.PATH = `${tempDir}${delimiter}${priorPath ?? ""}`;
+      for (const name of ["npm", "npx"]) {
+        const result = capture(name, ["--version"]);
+        expect(result.error).toBeUndefined();
+        expect(result.status).toBe(0);
+        expect(result.stdout).toMatch(/^\d+/u);
+      }
+    } finally {
+      process.env.PATH = priorPath;
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   test("os_detect uses the PowerShell-capable Windows command path", async () => {
     const result = await detectOS(createLocalWindowsSsh() as any);
 

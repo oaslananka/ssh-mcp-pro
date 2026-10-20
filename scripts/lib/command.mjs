@@ -39,8 +39,14 @@ function invocation(command, args) {
     return { command: executable(command), args };
   }
   const normalized = command.toLowerCase().replace(/\.cmd$/u, "");
+  const bundledCli = WINDOWS_NODE_CLIS[normalized];
+  // Bundled npm/npx JavaScript CLIs do not require cmd.exe or PATH shims.
+  if ((normalized === "npm" || normalized === "npx") && bundledCli && existsSync(bundledCli)) {
+    return { command: process.execPath, args: [bundledCli, ...args] };
+  }
   const pathShim = findShimInPath(normalized);
   if (pathShim) {
+    validateWindowsShimArgs(args);
     return {
       command: process.env.ComSpec ?? "cmd.exe",
       args: ["/d", "/c", pathShim, ...args],
@@ -50,11 +56,21 @@ function invocation(command, args) {
   if (cli && existsSync(cli)) {
     return { command: process.execPath, args: [cli, ...args] };
   }
+  validateWindowsShimArgs(args);
   const commandLine = [executable(command), ...args].map(quoteWindowsCommandArg).join(" ");
   return {
     command: process.env.ComSpec ?? "cmd.exe",
     args: ["/d", "/s", "/c", commandLine],
   };
+}
+
+function validateWindowsShimArgs(args) {
+  // cmd.exe expands percent and delayed variables even within double quotes.
+  for (const arg of args) {
+    if (typeof arg !== "string" || /[%!"^<>]/u.test(arg)) {
+      throw new Error("Refusing unsafe Windows command shim argument");
+    }
+  }
 }
 
 function quoteWindowsCommandArg(value) {
@@ -66,6 +82,12 @@ function quoteWindowsCommandArg(value) {
 
 const SHELL_INJECTION_CHARS = /[;|&`$()\n\r]/u;
 
+function validateSpawnOptions(options) {
+  if (options.shell || options.windowsVerbatimArguments) {
+    throw new Error("Refusing shell execution or verbatim Windows arguments");
+  }
+}
+
 function validateArgs(args) {
   for (const arg of args) {
     if (typeof arg === "string" && SHELL_INJECTION_CHARS.test(arg)) {
@@ -75,6 +97,7 @@ function validateArgs(args) {
 }
 
 export function capture(command, args, options = {}) {
+  validateSpawnOptions(options);
   validateArgs(args);
   const target = invocation(command, args);
   return spawnSync(target.command, target.args, {
@@ -85,6 +108,7 @@ export function capture(command, args, options = {}) {
 }
 
 export function run(command, args, options = {}) {
+  validateSpawnOptions(options);
   validateArgs(args);
   const target = invocation(command, args);
   const result = spawnSync(target.command, target.args, {
