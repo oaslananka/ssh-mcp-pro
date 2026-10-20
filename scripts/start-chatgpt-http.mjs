@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { spawn, execFileSync } from "node:child_process";
-import { resolve } from "node:path";
+import { isAbsolute, relative, resolve, sep } from "node:path";
 
 const rawEnvFile = process.argv[2] ?? ".env";
 const envFile = resolve(rawEnvFile);
 const canonicalEnvFile = realpathSync(envFile);
 const baseDir = realpathSync(resolve("."));
 
+// Resolve symlinks and compare path segments rather than string prefixes.
+const relativeEnvFile = relative(baseDir, canonicalEnvFile);
 if (
-  canonicalEnvFile !== baseDir &&
-  !canonicalEnvFile.startsWith(baseDir + "/") &&
-  !canonicalEnvFile.startsWith(baseDir + "\\")
+  relativeEnvFile === ".." ||
+  relativeEnvFile.startsWith(`..${sep}`) ||
+  isAbsolute(relativeEnvFile)
 ) {
   console.error("start:chatgpt: env file path is outside the working directory");
   process.exit(1);
@@ -72,7 +74,7 @@ if (!existsSync(envFile)) {
   fail(`${envFile} not found`);
 }
 
-const envFromFile = parseEnvFile(envFile);
+const envFromFile = parseEnvFile(canonicalEnvFile);
 const env = { ...envFromFile, ...process.env };
 const publicUrl = env.SSH_MCP_HTTP_PUBLIC_URL;
 const origins = parseList(env.SSH_MCP_HTTP_ALLOWED_ORIGINS);
