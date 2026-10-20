@@ -1,10 +1,74 @@
 import type { ServerConfig } from "./config.js";
+import type { PolicyConfig } from "./policy.js";
 import { loadPolicyFile, parseBoolean, parseHostKeyPolicy, parseList } from "./config-parsers.js";
 
 /** Prefer non-empty environment lists, otherwise retain file/default policy lists. */
 function resolvePolicyList(value: string | undefined, fallback: string[]): string[] {
   const parsed = parseList(value);
   return parsed.length ? parsed : fallback;
+}
+
+/** Keep ordinary allow/deny path and host lists independent from tunnel policy. */
+function resolveGeneralPolicyLists(config: ServerConfig, filePolicy: Partial<PolicyConfig>) {
+  return {
+    allowedHosts: resolvePolicyList(
+      process.env.SSH_MCP_ALLOWED_HOSTS,
+      filePolicy.allowedHosts ?? config.policy.allowedHosts,
+    ),
+    commandAllow: resolvePolicyList(
+      process.env.SSH_MCP_COMMAND_ALLOW,
+      filePolicy.commandAllow ?? config.policy.commandAllow,
+    ),
+    commandDeny: resolvePolicyList(
+      process.env.SSH_MCP_COMMAND_DENY,
+      filePolicy.commandDeny ?? config.policy.commandDeny,
+    ),
+    pathAllowPrefixes: resolvePolicyList(
+      process.env.SSH_MCP_PATH_ALLOW_PREFIXES,
+      filePolicy.pathAllowPrefixes ?? config.policy.pathAllowPrefixes,
+    ),
+    pathDenyPrefixes: resolvePolicyList(
+      process.env.SSH_MCP_PATH_DENY_PREFIXES,
+      filePolicy.pathDenyPrefixes ?? config.policy.pathDenyPrefixes,
+    ),
+    localPathAllowPrefixes: resolvePolicyList(
+      process.env.SSH_MCP_LOCAL_PATH_ALLOW_PREFIXES,
+      filePolicy.localPathAllowPrefixes ?? config.policy.localPathAllowPrefixes,
+    ),
+    localPathDenyPrefixes: resolvePolicyList(
+      process.env.SSH_MCP_LOCAL_PATH_DENY_PREFIXES,
+      filePolicy.localPathDenyPrefixes ?? config.policy.localPathDenyPrefixes,
+    ),
+  };
+}
+
+function resolveTunnelPolicyLists(config: ServerConfig, filePolicy: Partial<PolicyConfig>) {
+  return {
+    tunnelAllowBindHosts: resolvePolicyList(
+      process.env.SSH_MCP_TUNNEL_ALLOW_BIND_HOSTS,
+      filePolicy.tunnelAllowBindHosts ?? config.policy.tunnelAllowBindHosts,
+    ),
+    tunnelDenyBindHosts: resolvePolicyList(
+      process.env.SSH_MCP_TUNNEL_DENY_BIND_HOSTS,
+      filePolicy.tunnelDenyBindHosts ?? config.policy.tunnelDenyBindHosts,
+    ),
+    tunnelAllowRemoteHosts: resolvePolicyList(
+      process.env.SSH_MCP_TUNNEL_ALLOW_REMOTE_HOSTS,
+      filePolicy.tunnelAllowRemoteHosts ?? config.policy.tunnelAllowRemoteHosts,
+    ),
+    tunnelDenyRemoteHosts: resolvePolicyList(
+      process.env.SSH_MCP_TUNNEL_DENY_REMOTE_HOSTS,
+      filePolicy.tunnelDenyRemoteHosts ?? config.policy.tunnelDenyRemoteHosts,
+    ),
+    tunnelAllowPorts: resolvePolicyList(
+      process.env.SSH_MCP_TUNNEL_ALLOW_PORTS,
+      filePolicy.tunnelAllowPorts ?? config.policy.tunnelAllowPorts,
+    ),
+    tunnelDenyPorts: resolvePolicyList(
+      process.env.SSH_MCP_TUNNEL_DENY_PORTS,
+      filePolicy.tunnelDenyPorts ?? config.policy.tunnelDenyPorts,
+    ),
+  };
 }
 
 /** Apply security and policy environment values before programmatic overrides. */
@@ -51,58 +115,8 @@ export function applySecurityPolicyEnvironment(config: ServerConfig): void {
       process.env.SSH_MCP_ALLOW_DESTRUCTIVE_FS,
       filePolicy.allowDestructiveFs ?? config.policy.allowDestructiveFs,
     ),
-    allowedHosts: resolvePolicyList(
-      process.env.SSH_MCP_ALLOWED_HOSTS,
-      filePolicy.allowedHosts ?? config.policy.allowedHosts,
-    ),
-    commandAllow: resolvePolicyList(
-      process.env.SSH_MCP_COMMAND_ALLOW,
-      filePolicy.commandAllow ?? config.policy.commandAllow,
-    ),
-    commandDeny: resolvePolicyList(
-      process.env.SSH_MCP_COMMAND_DENY,
-      filePolicy.commandDeny ?? config.policy.commandDeny,
-    ),
-    pathAllowPrefixes: resolvePolicyList(
-      process.env.SSH_MCP_PATH_ALLOW_PREFIXES,
-      filePolicy.pathAllowPrefixes ?? config.policy.pathAllowPrefixes,
-    ),
-    pathDenyPrefixes: resolvePolicyList(
-      process.env.SSH_MCP_PATH_DENY_PREFIXES,
-      filePolicy.pathDenyPrefixes ?? config.policy.pathDenyPrefixes,
-    ),
-    localPathAllowPrefixes: resolvePolicyList(
-      process.env.SSH_MCP_LOCAL_PATH_ALLOW_PREFIXES,
-      filePolicy.localPathAllowPrefixes ?? config.policy.localPathAllowPrefixes,
-    ),
-    localPathDenyPrefixes: resolvePolicyList(
-      process.env.SSH_MCP_LOCAL_PATH_DENY_PREFIXES,
-      filePolicy.localPathDenyPrefixes ?? config.policy.localPathDenyPrefixes,
-    ),
-    tunnelAllowBindHosts: resolvePolicyList(
-      process.env.SSH_MCP_TUNNEL_ALLOW_BIND_HOSTS,
-      filePolicy.tunnelAllowBindHosts ?? config.policy.tunnelAllowBindHosts,
-    ),
-    tunnelDenyBindHosts: resolvePolicyList(
-      process.env.SSH_MCP_TUNNEL_DENY_BIND_HOSTS,
-      filePolicy.tunnelDenyBindHosts ?? config.policy.tunnelDenyBindHosts,
-    ),
-    tunnelAllowRemoteHosts: resolvePolicyList(
-      process.env.SSH_MCP_TUNNEL_ALLOW_REMOTE_HOSTS,
-      filePolicy.tunnelAllowRemoteHosts ?? config.policy.tunnelAllowRemoteHosts,
-    ),
-    tunnelDenyRemoteHosts: resolvePolicyList(
-      process.env.SSH_MCP_TUNNEL_DENY_REMOTE_HOSTS,
-      filePolicy.tunnelDenyRemoteHosts ?? config.policy.tunnelDenyRemoteHosts,
-    ),
-    tunnelAllowPorts: resolvePolicyList(
-      process.env.SSH_MCP_TUNNEL_ALLOW_PORTS,
-      filePolicy.tunnelAllowPorts ?? config.policy.tunnelAllowPorts,
-    ),
-    tunnelDenyPorts: resolvePolicyList(
-      process.env.SSH_MCP_TUNNEL_DENY_PORTS,
-      filePolicy.tunnelDenyPorts ?? config.policy.tunnelDenyPorts,
-    ),
+    ...resolveGeneralPolicyLists(config, filePolicy),
+    ...resolveTunnelPolicyLists(config, filePolicy),
   };
   config.policy.allowRootLogin = config.security.allowRootLogin;
 }
