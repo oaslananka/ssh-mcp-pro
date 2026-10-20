@@ -71,8 +71,8 @@ function resolveTunnelPolicyLists(config: ServerConfig, filePolicy: Partial<Poli
   };
 }
 
-/** Apply security and policy environment values before programmatic overrides. */
-export function applySecurityPolicyEnvironment(config: ServerConfig): void {
+/** Preserve host-key migration precedence and root-login policy coupling. */
+function applyHostKeyEnvironment(config: ServerConfig): void {
   const strictHostKeyChecking =
     process.env.STRICT_HOST_KEY_CHECKING ?? process.env.SSH_MCP_STRICT_HOST_KEY;
   if (strictHostKeyChecking !== undefined) {
@@ -93,6 +93,11 @@ export function applySecurityPolicyEnvironment(config: ServerConfig): void {
     config.security.allowRootLogin,
   );
   config.security.allowedCiphers = parseList(process.env.SSH_MCP_ALLOWED_CIPHERS);
+}
+
+/** Apply security and policy environment values before programmatic overrides. */
+export function applySecurityPolicyEnvironment(config: ServerConfig): void {
+  applyHostKeyEnvironment(config);
 
   const filePolicy = loadPolicyFile(process.env.SSH_MCP_POLICY_FILE);
   config.policy = {
