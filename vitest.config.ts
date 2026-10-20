@@ -54,7 +54,7 @@ export default defineConfig({
     ],
     coverage: {
       provider: "v8",
-      include: ["src/**/*.ts", "scripts/lib/maintenance-cli-input.mjs"],
+      include: ["src/**/*.ts", "scripts/lib/maintenance-cli-input.mjs", "scripts/lib/command.mjs"],
       exclude: ["src/**/*.d.ts", "src/index.ts", "src/render-http.ts"],
       reporter: ["text", "lcov", "html", "cobertura"],
       thresholds: {
