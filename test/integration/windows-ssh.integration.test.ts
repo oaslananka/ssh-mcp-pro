@@ -117,30 +117,29 @@ windowsDescribe("Windows SSH integration coverage", () => {
     }
   }, 30_000);
 
-  // Node 25+ Windows runners can install Corepack separately from node.exe.
-  // A bundled Corepack script is required for the shell-free pnpm branch.
-  test.skipIf(
-    !existsSync(join(dirname(process.execPath), "node_modules", "corepack", "dist", "pnpm.js")),
-  )(
-    "invokes bundled pnpm without a PATH-selected cmd shim",
-    () => {
-      const tempDir = mkdtempSync(join(tmpdir(), "ssh-mcp-windows-pnpm-path-"));
-      const priorPath = process.env.PATH;
-      try {
+  // Node 25+ runners may install Corepack outside the Node executable directory.
+  // When bundled, require the shell-free path to resist a spoofed PATH shim;
+  // otherwise verify that the existing global pnpm fallback still works.
+  test("supports pnpm through bundled Corepack or the existing Windows fallback", () => {
+    const bundledCorepack = existsSync(
+      join(dirname(process.execPath), "node_modules", "corepack", "dist", "pnpm.js"),
+    );
+    const tempDir = mkdtempSync(join(tmpdir(), "ssh-mcp-windows-pnpm-path-"));
+    const priorPath = process.env.PATH;
+    try {
+      if (bundledCorepack) {
         writeFileSync(join(tempDir, "pnpm.cmd"), "@echo off\r\nexit /b 31\r\n");
         process.env.PATH = `${tempDir}${delimiter}${priorPath ?? ""}`;
-        const result = capture("pnpm", ["--version"]);
-        expect(result.error).toBeUndefined();
-        expect(result.status).toBe(0);
-        expect(result.stdout).toMatch(/^\d+/u);
-      } finally {
-        process.env.PATH = priorPath;
-        rmSync(tempDir, { recursive: true, force: true });
       }
-    },
-    30_000,
-  );
-
+      const result = capture("pnpm", ["--version"]);
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(0);
+      expect(result.stdout).toMatch(/^\d+/u);
+    } finally {
+      process.env.PATH = priorPath;
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }, 30_000);
   test("os_detect uses the PowerShell-capable Windows command path", async () => {
     const result = await detectOS(createLocalWindowsSsh() as any);
 
