@@ -33,7 +33,7 @@ export function createStatFileInternal({
       return {
         size: Number(size),
         mtime: new Date(Number(mtime) * 1000),
-        mode: parseInt(mode, 8),
+        mode: Number.parseInt(mode, 8),
         type: type as FileStatInfo["type"],
       };
     }
