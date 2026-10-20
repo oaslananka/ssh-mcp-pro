@@ -1,15 +1,14 @@
-import { closeSync, constants, fstatSync, openSync, readFileSync, realpathSync } from "node:fs";
+import { closeSync, fstatSync, readFileSync, realpathSync } from "node:fs";
 
-// The caller must first resolve the path to a canonical file inside its allowed root.
-export function readValidatedEnvFile(canonicalPath) {
-  // Hold one descriptor throughout the read. POSIX rejects a replaced final
-  // symlink; Windows has no O_NOFOLLOW and needs a post-open path check.
-  const descriptor = openSync(canonicalPath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+// The caller must first open a canonical path confined to its allowed root.
+export function readValidatedEnvFile(descriptor, canonicalPath) {
   try {
     if (!fstatSync(descriptor).isFile()) {
       throw new Error("start:chatgpt: env file must be a regular file");
     }
-    if (constants.O_NOFOLLOW === undefined && realpathSync(canonicalPath) !== canonicalPath) {
+    // Windows has no O_NOFOLLOW. Catch a replaced final symlink before
+    // reading the opened descriptor; on POSIX the caller uses O_NOFOLLOW.
+    if (process.platform === "win32" && realpathSync(canonicalPath) !== canonicalPath) {
       throw new Error("start:chatgpt: env file changed during validation");
     }
     return readFileSync(descriptor, "utf8");

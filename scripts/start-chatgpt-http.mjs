@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, realpathSync, statSync } from "node:fs";
+import { constants, existsSync, openSync, realpathSync, statSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { resolveExecutableOnPath } from "./lib/resolve-executable.mjs";
@@ -24,7 +24,11 @@ if (
 function parseEnvFile(path) {
   const values = {};
   const errors = [];
-  const text = readValidatedEnvFile(path);
+  const descriptor = openSync(
+    path,
+    constants.O_RDONLY | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW),
+  );
+  const text = readValidatedEnvFile(descriptor, path);
 
   text.split(/\r?\n/u).forEach((rawLine, index) => {
     const line = rawLine.trim();

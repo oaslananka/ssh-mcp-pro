@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, openSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
@@ -18,10 +18,11 @@ describe("readValidatedEnvFile", () => {
   test("returns the contents of a regular file", () => {
     const path = join(fixtureDir(), ".env");
     writeFileSync(path, "SSH_MCP_TOOL_PROFILE=chatgpt\n");
-    expect(readValidatedEnvFile(path)).toBe("SSH_MCP_TOOL_PROFILE=chatgpt\n");
+    expect(readValidatedEnvFile(openSync(path, "r"), path)).toBe("SSH_MCP_TOOL_PROFILE=chatgpt\n");
   });
 
-  test("refuses a non-regular file", () => {
-    expect(() => readValidatedEnvFile(fixtureDir())).toThrow();
+  test.skipIf(process.platform === "win32")("refuses a non-regular file", () => {
+    const path = fixtureDir();
+    expect(() => readValidatedEnvFile(openSync(path, "r"), path)).toThrow("regular file");
   });
 });
