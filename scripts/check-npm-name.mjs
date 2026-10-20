@@ -2,8 +2,15 @@
 import { capture, failFromResult, printResultOutput } from "./lib/command.mjs";
 
 const packageName = process.argv[2];
-if (!packageName) {
-  throw new Error("Usage: check-npm-name.mjs <package-name>");
+// npm package names are identifiers, never command options or free-form shell input.
+const NPM_PACKAGE_NAME = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/u;
+if (
+  typeof packageName !== "string" ||
+  packageName.length === 0 ||
+  packageName.length > 214 ||
+  !NPM_PACKAGE_NAME.test(packageName)
+) {
+  throw new Error("Usage: check-npm-name.mjs <valid-package-name>");
 }
 
 const result = capture("npm", ["view", packageName, "name", "version", "--json"]);

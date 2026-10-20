@@ -3,6 +3,10 @@ import { capture, failFromResult } from "./lib/command.mjs";
 import { conventionalTitleHint, isConventionalTitle } from "./lib/conventional-title.mjs";
 
 const range = process.argv[2] ?? process.env.COMMIT_RANGE;
+// Revisions are data, not git flags: reject an option prefix and metacharacters.
+if (range && (range.startsWith("-") || !/^[a-zA-Z0-9_./~^@{}:+-]+$/u.test(range))) {
+  throw new Error("lint-commits: invalid revision range");
+}
 const subjects = range ? commitSubjects(["log", "--format=%s", range]) : defaultSubjects();
 const invalid = subjects.filter((subject) => !isConventionalTitle(subject));
 
