@@ -1,7 +1,7 @@
 import { exec } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { capture } from "../../scripts/lib/command.mjs";
 import { promisify } from "node:util";
 import { describe, expect, test, vi } from "vitest";
@@ -117,6 +117,29 @@ windowsDescribe("Windows SSH integration coverage", () => {
     }
   }, 30_000);
 
+  // Node 25+ runners may install Corepack outside the Node executable directory.
+  // When bundled, require the shell-free path to resist a spoofed PATH shim;
+  // otherwise verify that the existing global pnpm fallback still works.
+  test("supports pnpm through bundled Corepack or the existing Windows fallback", () => {
+    const bundledCorepack = existsSync(
+      join(dirname(process.execPath), "node_modules", "corepack", "dist", "pnpm.js"),
+    );
+    const tempDir = mkdtempSync(join(tmpdir(), "ssh-mcp-windows-pnpm-path-"));
+    const priorPath = process.env.PATH;
+    try {
+      if (bundledCorepack) {
+        writeFileSync(join(tempDir, "pnpm.cmd"), "@echo off\r\nexit /b 31\r\n");
+        process.env.PATH = `${tempDir}${delimiter}${priorPath ?? ""}`;
+      }
+      const result = capture("pnpm", ["--version"]);
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(0);
+      expect(result.stdout).toMatch(/^\d+/u);
+    } finally {
+      process.env.PATH = priorPath;
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }, 30_000);
   test("os_detect uses the PowerShell-capable Windows command path", async () => {
     const result = await detectOS(createLocalWindowsSsh() as any);
 

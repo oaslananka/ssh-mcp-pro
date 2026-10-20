@@ -62,6 +62,20 @@ describe("Windows maintenance command invocation", () => {
     );
   });
 
+  test("prefers the bundled pnpm Corepack entrypoint over a PATH shim", () => {
+    mockExists.mockImplementation(
+      (candidate) =>
+        String(candidate).endsWith("/corepack/dist/pnpm.js") ||
+        String(candidate).endsWith("pnpm.cmd"),
+    );
+    capture("pnpm", ["--version"]);
+    expect(mockSpawn).toHaveBeenCalledWith(
+      process.execPath,
+      [expect.stringContaining("corepack/dist/pnpm.js"), "--version"],
+      expect.objectContaining({ stdio: "pipe" }),
+    );
+  });
+
   test("uses a PATH pnpm shim when no bundled CLI is present", () => {
     mockExists.mockImplementation((candidate) => String(candidate).endsWith("pnpm.cmd"));
     capture("pnpm", ["list", "--json"]);
