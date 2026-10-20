@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveExecutableOnPath } from "./lib/resolve-executable.mjs";
 
 const DEFAULT_TAXONOMY_URL = new URL("../docs/governance/issue-taxonomy.json", import.meta.url);
 
@@ -235,7 +236,16 @@ function runGhJson(args, runGh) {
 }
 
 function defaultRunGh(args) {
-  return spawnSync("gh", args, { encoding: "utf8" });
+  const gh = resolveExecutableOnPath("gh");
+  if (!gh) {
+    return {
+      status: null,
+      stdout: "",
+      stderr: "",
+      error: new Error("gh not found on trusted PATH"),
+    };
+  }
+  return spawnSync(gh, args, { encoding: "utf8" });
 }
 
 function parseArgs(argv) {
