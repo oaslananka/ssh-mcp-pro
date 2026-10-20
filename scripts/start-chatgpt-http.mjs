@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { spawn, execFileSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { isAbsolute, relative, resolve, sep } from "node:path";
+import { resolveExecutableOnPath } from "./lib/resolve-executable.mjs";
 
 const rawEnvFile = process.argv[2] ?? ".env";
 const envFile = resolve(rawEnvFile);
@@ -152,10 +153,8 @@ if (authMode === "bearer") {
   fail("SSH_MCP_HTTP_AUTH_MODE must be 'bearer' or 'oauth'");
 }
 
-let serverBin;
-try {
-  serverBin = execFileSync("which", ["ssh-mcp-pro"], { encoding: "utf8" }).trim();
-} catch {
+const serverBin = resolveExecutableOnPath("ssh-mcp-pro");
+if (!serverBin) {
   fail("ssh-mcp-pro binary not found on PATH; run: npm install -g ssh-mcp-pro");
 }
 
