@@ -86,15 +86,15 @@ describe("Windows maintenance command invocation", () => {
     );
   });
 
-  test("quotes safe space-containing arguments in the cmd fallback", () => {
-    capture("pnpm", ["file with space", "--version"]);
-    const [command, args] = mockSpawn.mock.calls[0];
-    expect(command).toBe(process.env.ComSpec);
-    expect(args?.slice(0, 3)).toEqual(["/d", "/s", "/c"]);
-    expect(args?.[3]).toContain('"file with space"');
+  test("refuses absent Windows CLIs instead of searching the current directory", () => {
+    for (const tool of ["npm", "npx", "pnpm"]) {
+      expect(() => capture(tool, ["--version"])).toThrow(`Windows CLI ${tool} not found`);
+    }
+    expect(mockSpawn).not.toHaveBeenCalled();
   });
 
-  test("rejects unsafe cmd variable expansion in fallback", () => {
+  test("rejects unsafe cmd variable expansion in an explicitly resolved PATH shim", () => {
+    mockExists.mockImplementation((candidate) => String(candidate).endsWith("pnpm.cmd"));
     expect(() => capture("pnpm", ["%COMSPEC%"])).toThrow("unsafe Windows command shim");
     expect(mockSpawn).not.toHaveBeenCalled();
   });

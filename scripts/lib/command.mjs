@@ -52,16 +52,12 @@ function invocation(command, args) {
       args: ["/d", "/c", pathShim, ...args],
     };
   }
-  const cli = WINDOWS_NODE_CLIS[normalized];
-  if (cli && existsSync(cli)) {
-    return { command: process.execPath, args: [cli, ...args] };
-  }
-  validateWindowsShimArgs(args);
-  const commandLine = [executable(command), ...args].map(quoteWindowsCommandArg).join(" ");
-  return {
-    command: process.env.ComSpec ?? "cmd.exe",
-    args: ["/d", "/s", "/c", commandLine],
-  };
+  // Do not ask cmd.exe to search the current directory for a missing CLI.
+  // Windows command resolution can execute a workspace-local npm.cmd/pnpm.cmd
+  // even when its directory was never selected through PATH.
+  throw new Error(
+    `Windows CLI ${normalized} not found: install its Node/Corepack entrypoint or add its .cmd shim to PATH`,
+  );
 }
 
 function validateWindowsShimArgs(args) {
@@ -71,13 +67,6 @@ function validateWindowsShimArgs(args) {
       throw new Error("Refusing unsafe Windows command shim argument");
     }
   }
-}
-
-function quoteWindowsCommandArg(value) {
-  if (/^[a-zA-Z0-9_/:=.,@%+-]+$/u.test(value)) {
-    return value;
-  }
-  return `"${value.replace(/(["^&|<>])/gu, "^$1")}"`;
 }
 
 const SHELL_INJECTION_CHARS = /[;|&`$()\n\r]/u;
