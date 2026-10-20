@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import { capture, failFromResult, printResultOutput } from "./lib/command.mjs";
+import { isValidPackageName } from "./lib/maintenance-cli-input.mjs";
 
 const packageName = process.argv[2];
-if (!packageName) {
-  throw new Error("Usage: check-npm-name.mjs <package-name>");
+// npm package names are identifiers, never command options or free-form shell input.
+if (!isValidPackageName(packageName)) {
+  throw new Error("Usage: check-npm-name.mjs <valid-package-name>");
 }
 
 const result = capture("npm", ["view", packageName, "name", "version", "--json"]);

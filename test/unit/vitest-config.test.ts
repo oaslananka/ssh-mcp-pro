@@ -49,7 +49,7 @@ describe("Vitest suite pool configuration", () => {
 
   test("keeps unit tests on default parallel execution", () => {
     expect(project("unit")).toMatchObject({
-      include: ["test/unit/**/*.test.ts"],
+      include: ["test/unit/**/*.test.{ts,mjs}"],
     });
     expect(project("unit")?.pool).toBeUndefined();
     expect(project("unit")?.maxWorkers).toBeUndefined();
