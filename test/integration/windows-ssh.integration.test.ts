@@ -1,7 +1,7 @@
 import { exec } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, dirname, join } from "node:path";
 import { capture } from "../../scripts/lib/command.mjs";
 import { promisify } from "node:util";
 import { describe, expect, test, vi } from "vitest";
@@ -97,15 +97,15 @@ function createWindowsEnsureService(packageManager: PackageManager) {
 }
 
 windowsDescribe("Windows SSH integration coverage", () => {
-  test("invokes bundled npm, npx and pnpm CLIs without PATH-selected cmd shims", () => {
+  test("invokes bundled npm and npx CLIs without PATH-selected cmd shims", () => {
     const tempDir = mkdtempSync(join(tmpdir(), "ssh-mcp-windows-path-"));
     const priorPath = process.env.PATH;
     try {
-      for (const name of ["npm", "npx", "pnpm"]) {
+      for (const name of ["npm", "npx"]) {
         writeFileSync(join(tempDir, `${name}.cmd`), "@echo off\r\nexit /b 31\r\n");
       }
       process.env.PATH = `${tempDir}${delimiter}${priorPath ?? ""}`;
-      for (const name of ["npm", "npx", "pnpm"]) {
+      for (const name of ["npm", "npx"]) {
         const result = capture(name, ["--version"]);
         expect(result.error).toBeUndefined();
         expect(result.status).toBe(0);
@@ -116,6 +116,30 @@ windowsDescribe("Windows SSH integration coverage", () => {
       rmSync(tempDir, { recursive: true, force: true });
     }
   }, 30_000);
+
+  // Node 25+ Windows runners can install Corepack separately from node.exe.
+  // A bundled Corepack script is required for the shell-free pnpm branch.
+  test.skipIf(
+    !existsSync(join(dirname(process.execPath), "node_modules", "corepack", "dist", "pnpm.js")),
+  )(
+    "invokes bundled pnpm without a PATH-selected cmd shim",
+    () => {
+      const tempDir = mkdtempSync(join(tmpdir(), "ssh-mcp-windows-pnpm-path-"));
+      const priorPath = process.env.PATH;
+      try {
+        writeFileSync(join(tempDir, "pnpm.cmd"), "@echo off\r\nexit /b 31\r\n");
+        process.env.PATH = `${tempDir}${delimiter}${priorPath ?? ""}`;
+        const result = capture("pnpm", ["--version"]);
+        expect(result.error).toBeUndefined();
+        expect(result.status).toBe(0);
+        expect(result.stdout).toMatch(/^\d+/u);
+      } finally {
+        process.env.PATH = priorPath;
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    },
+    30_000,
+  );
 
   test("os_detect uses the PowerShell-capable Windows command path", async () => {
     const result = await detectOS(createLocalWindowsSsh() as any);
