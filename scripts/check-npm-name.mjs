@@ -3,13 +3,28 @@ import { capture, failFromResult, printResultOutput } from "./lib/command.mjs";
 
 const packageName = process.argv[2];
 // npm package names are identifiers, never command options or free-form shell input.
-const NPM_PACKAGE_NAME = /^(?:@[a-z0-9][a-z0-9._~-]*\/)?[a-z0-9][a-z0-9._~-]*$/u;
-if (
-  typeof packageName !== "string" ||
-  packageName.length === 0 ||
-  packageName.length > 214 ||
-  !NPM_PACKAGE_NAME.test(packageName)
-) {
+function validNamePart(part) {
+  if (part.length === 0) return false;
+  for (let index = 0; index < part.length; index += 1) {
+    const point = part.charCodeAt(index);
+    const letter = point >= 97 && point <= 122;
+    const digit = point >= 48 && point <= 57;
+    const punctuation = point === 45 || point === 46 || point === 95 || point === 126;
+    if (!letter && !digit && !(index > 0 && punctuation)) return false;
+  }
+  return true;
+}
+
+function isValidPackageName(name) {
+  if (typeof name !== "string" || name.length > 214) return false;
+  if (name.startsWith("@")) {
+    const parts = name.slice(1).split("/");
+    return parts.length === 2 && parts.every(validNamePart);
+  }
+  return validNamePart(name);
+}
+
+if (!isValidPackageName(packageName)) {
   throw new Error("Usage: check-npm-name.mjs <valid-package-name>");
 }
 
