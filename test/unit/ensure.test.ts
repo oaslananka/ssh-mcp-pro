@@ -208,6 +208,74 @@ describe("createEnsureService", () => {
     },
   );
 
+  test("rejects an expired session before probing or mutating packages", async () => {
+    const deps = createDeps();
+    deps.sessionManager.getSession.mockReturnValueOnce(undefined);
+    const service = createEnsureService(deps as any);
+
+    await expect(service.ensurePackage("expired", "curl")).rejects.toThrow(
+      "Session expired not found or expired",
+    );
+    expect(deps.processService.execCommand).not.toHaveBeenCalled();
+    expect(deps.processService.execSudo).not.toHaveBeenCalled();
+  });
+
+  test("handles a failed package presence probe without treating it as installed", async () => {
+    const deps = createDeps();
+    deps.processService.execCommand.mockRejectedValueOnce(new Error("probe failed"));
+    deps.processService.execSudo.mockResolvedValueOnce({
+      code: 0,
+      stdout: "installed",
+      stderr: "",
+      durationMs: 1,
+    });
+    const service = createEnsureService(deps as any);
+
+    await expect(service.ensurePackage("session-1", "curl")).resolves.toEqual(
+      expect.objectContaining({ ok: true, pm: "apt", stdout: "installed" }),
+    );
+    expect(deps.processService.execSudo).toHaveBeenCalledOnce();
+  });
+
+  test.each([
+    ["present", 1, false],
+    ["absent", 0, true],
+  ] as const)("reports package %s command failures", async (state, installedExit, destructive) => {
+    const deps = createDeps();
+    deps.processService.execCommand.mockResolvedValueOnce({
+      code: installedExit,
+      stdout: "",
+      stderr: "",
+    });
+    deps.processService.execSudo.mockResolvedValueOnce({
+      code: 7,
+      stdout: "",
+      stderr: "permission denied",
+      durationMs: 1,
+    });
+    const service = createEnsureService(deps as any);
+
+    await expect(service.ensurePackage("session-1", "curl", state)).resolves.toEqual({
+      ok: false,
+      pm: "apt",
+      code: 7,
+      stdout: "",
+      stderr: "permission denied",
+    });
+    expect(deps.processService.execSudo).toHaveBeenCalledWith(
+      "session-1",
+      expect.any(String),
+      undefined,
+      undefined,
+      undefined,
+      expect.objectContaining({
+        policyAction: "ensure.package",
+        rawSudo: false,
+        ...(destructive ? { destructive: true } : {}),
+      }),
+    );
+  });
+
   test("manages services through init systems", async () => {
     const deps = createDeps();
     deps.processService.execSudo.mockResolvedValue({
