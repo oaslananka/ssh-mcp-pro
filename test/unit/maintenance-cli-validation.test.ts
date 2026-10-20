@@ -5,12 +5,29 @@ import { join } from "node:path";
 import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 
+// Git hooks export GIT_DIR and related variables, which would otherwise make
+// fixture commands operate on the real repository instead of the temporary one.
+function fixtureGitEnv() {
+  const env = { ...process.env };
+  for (const key of [
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_COMMON_DIR",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  ]) {
+    delete env[key];
+  }
+  return env;
+}
+
 const cli = (script: string, args: string[], cwd?: string) =>
   spawnSync(process.execPath, [resolve("scripts", script), ...args], {
     encoding: "utf8",
     timeout: 5_000,
     cwd,
-    env: { ...process.env, COMMIT_RANGE: "" },
+    env: { ...fixtureGitEnv(), COMMIT_RANGE: "" },
   });
 
 describe("maintenance CLI option boundaries", () => {
@@ -41,7 +58,7 @@ describe("maintenance CLI option boundaries", () => {
   test("permits HEAD when the revision points to a conventional commit", () => {
     const repo = mkdtempSync(join(tmpdir(), "ssh-mcp-cli-revision-"));
     try {
-      execFileSync("git", ["init", "--quiet"], { cwd: repo });
+      execFileSync("git", ["init", "--quiet"], { cwd: repo, env: fixtureGitEnv() });
       execFileSync(
         "git",
         [
@@ -54,7 +71,7 @@ describe("maintenance CLI option boundaries", () => {
           "-m",
           "test: validate revisions",
         ],
-        { cwd: repo },
+        { cwd: repo, env: fixtureGitEnv() },
       );
       const result = cli("lint-commits.mjs", ["HEAD"], repo);
       expect(result.status).toBe(0);
