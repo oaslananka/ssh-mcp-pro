@@ -40,8 +40,8 @@ function invocation(command, args) {
   }
   const normalized = command.toLowerCase().replace(/\.cmd$/u, "");
   const bundledCli = WINDOWS_NODE_CLIS[normalized];
-  // Bundled npm/npx JavaScript CLIs do not require cmd.exe or PATH shims.
-  if ((normalized === "npm" || normalized === "npx") && bundledCli && existsSync(bundledCli)) {
+  // Bundled Node/Corepack CLIs do not require cmd.exe or PATH-selected shims.
+  if (bundledCli && existsSync(bundledCli)) {
     return { command: process.execPath, args: [bundledCli, ...args] };
   }
   const pathShim = findShimInPath(normalized);

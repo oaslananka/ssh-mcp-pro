@@ -97,15 +97,15 @@ function createWindowsEnsureService(packageManager: PackageManager) {
 }
 
 windowsDescribe("Windows SSH integration coverage", () => {
-  test("invokes bundled npm and npx CLIs without PATH-selected cmd shims", () => {
+  test("invokes bundled npm, npx and pnpm CLIs without PATH-selected cmd shims", () => {
     const tempDir = mkdtempSync(join(tmpdir(), "ssh-mcp-windows-path-"));
     const priorPath = process.env.PATH;
     try {
-      for (const name of ["npm", "npx"]) {
+      for (const name of ["npm", "npx", "pnpm"]) {
         writeFileSync(join(tempDir, `${name}.cmd`), "@echo off\r\nexit /b 31\r\n");
       }
       process.env.PATH = `${tempDir}${delimiter}${priorPath ?? ""}`;
-      for (const name of ["npm", "npx"]) {
+      for (const name of ["npm", "npx", "pnpm"]) {
         const result = capture(name, ["--version"]);
         expect(result.error).toBeUndefined();
         expect(result.status).toBe(0);
