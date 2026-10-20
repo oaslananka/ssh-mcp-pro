@@ -20,18 +20,24 @@ export function resolveExecutableOnPath(name, path = process.env.PATH ?? "") {
       if (!mode.isDirectory()) continue;
       if (process.platform !== "win32" && (mode.mode & 0o002) !== 0) continue;
 
-      for (const executable of candidates) {
-        try {
-          const result = realpathSync(join(canonicalDir, executable));
-          if (!statSync(result).isFile()) continue;
-          accessSync(result, constants.X_OK);
-          return result;
-        } catch {
-          // Candidate not executable; inspect the next candidate or directory.
-        }
-      }
+      const executable = findExecutableInDirectory(canonicalDir, candidates);
+      if (executable) return executable;
     } catch {
       // Missing or unsuitable PATH entry; do not execute anything from it.
+    }
+  }
+  return null;
+}
+
+function findExecutableInDirectory(directory, candidates) {
+  for (const candidate of candidates) {
+    try {
+      const result = realpathSync(join(directory, candidate));
+      if (!statSync(result).isFile()) continue;
+      accessSync(result, constants.X_OK);
+      return result;
+    } catch {
+      // Candidate missing or not executable; inspect the next candidate.
     }
   }
   return null;
