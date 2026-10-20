@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { resolveExecutableOnPath } from "./lib/resolve-executable.mjs";
+import { readValidatedEnvFile } from "./lib/read-validated-env-file.mjs";
 
 const rawEnvFile = process.argv[2] ?? ".env";
 const envFile = resolve(rawEnvFile);
@@ -23,7 +24,7 @@ if (
 function parseEnvFile(path) {
   const values = {};
   const errors = [];
-  const text = readFileSync(path, "utf8");
+  const text = readValidatedEnvFile(path);
 
   text.split(/\r?\n/u).forEach((rawLine, index) => {
     const line = rawLine.trim();

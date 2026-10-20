@@ -59,6 +59,7 @@ export default defineConfig({
         "scripts/lib/maintenance-cli-input.mjs",
         "scripts/lib/command.mjs",
         "scripts/lib/resolve-executable.mjs",
+        "scripts/lib/read-validated-env-file.mjs",
       ],
       exclude: ["src/**/*.d.ts", "src/index.ts", "src/render-http.ts"],
       reporter: ["text", "lcov", "html", "cobertura"],
