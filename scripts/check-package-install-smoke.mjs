@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { copyFileSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { parsePnpmPackOutput } from "./pack-json.mjs";
@@ -34,7 +34,13 @@ try {
   );
   const workspaceYaml = join(process.cwd(), "pnpm-workspace.yaml");
   if (existsSync(workspaceYaml)) {
-    copyFileSync(workspaceYaml, join(workspace, "pnpm-workspace.yaml"));
+    // Consumer installs must not inherit development-tool patches; unused
+    // workspace patches cause pnpm to reject an otherwise valid package.
+    const consumerWorkspace = readFileSync(workspaceYaml, "utf8").replace(
+      /^patchedDependencies:\r?\n(?:[ \t]+[^\r\n]*\r?\n?)*/mu,
+      "",
+    );
+    writeFileSync(join(workspace, "pnpm-workspace.yaml"), consumerWorkspace);
   }
   run("pnpm", ["add", tarball], workspace);
   run("node", ["node_modules/ssh-mcp-pro/dist/index.js", "--version"], workspace);
