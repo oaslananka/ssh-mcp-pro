@@ -53,7 +53,8 @@ function powerShell(command: string, args: string[] = []): { command: string; ar
 }
 
 function posixSingleQuote(value: string): string {
-  return `'${value.replaceAll("'", String.raw`'\''`)}'`;
+  const escaped = value.replaceAll("'", String.raw`'\''`);
+  return `'${escaped}'`;
 }
 
 function truncationMarker(maxBytes: number): Buffer {
