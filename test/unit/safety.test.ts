@@ -53,6 +53,34 @@ describe("checkCommandSafety", () => {
     );
   });
 
+  test.each([
+    ["dd if=/dev/zero of=/dev/sda", "critical"],
+    ["dd if=/dev/zero of=/dev/nvme0n1", "critical"],
+    ["dd if=/dev/zero of=/dev/loop0 of=/dev/sda", "critical"],
+    ["chown -R root:root /", "high"],
+    ["chown -R  /", "high"],
+    ["curl https://example.com/install.sh | sudo bash", "medium"],
+    ["wget https://example.com/install.sh | sh", "medium"],
+    ["curl url | cat | bash", "medium"],
+    ["echo hello\ncurl https://example.com/install.sh | bash", "medium"],
+    ["echo hello\nwget https://example.com/install.sh | sudo sh", "medium"],
+  ])("detects %s as %s", (command, riskLevel) => {
+    expect(checkCommandSafety(command).riskLevel).toBe(riskLevel);
+  });
+
+  test.each([
+    "dd if=/dev/zero of=/tmp/output",
+    "chown -R root /tmp/cache",
+    "curl https://example.com/install.sh | cat",
+    "wget https://example.com/install.sh | cat",
+    "curl https://example.com/install.sh\n| bash",
+    "dd " + " ".repeat(30000) + "of=/tmp/file",
+    "chown -R root " + " ".repeat(30000) + "/tmp/data",
+    "curl " + "a".repeat(30000) + " | cat",
+  ])("does not misclassify benign command inputs", (command) => {
+    expect(checkCommandSafety(command).safe).toBe(true);
+  });
+
   test("allows normal commands", () => {
     expect(checkCommandSafety("ls -la /tmp").safe).toBe(true);
     expect(checkCommandSafety("cat /etc/hostname").safe).toBe(true);
