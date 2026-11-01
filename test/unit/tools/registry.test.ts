@@ -167,6 +167,46 @@ describe("ToolRegistry", () => {
     );
   });
 
+  test("preserves structured provider errors from toJSON()", async () => {
+    const registry = new ToolRegistry().register({
+      namespace: "structured-errors",
+      getTools: () => [],
+      handleTool: (name) =>
+        name === "fail_structured"
+          ? Promise.reject({
+              toJSON: () => ({
+                code: "EPOLICY",
+                message: "Operation blocked",
+                hint: "Use explain mode",
+              }),
+            })
+          : undefined,
+    });
+
+    const result = await registry.dispatch("fail_structured", {});
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toEqual({
+      error: true,
+      code: "EPOLICY",
+      message: "Operation blocked",
+      hint: "Use explain mode",
+    });
+  });
+
+  test("handles a non-Error rejection without discarding the message", async () => {
+    const registry = new ToolRegistry().register({
+      namespace: "primitive-errors",
+      getTools: () => [],
+      handleTool: (name) => (name === "fail_primitive" ? Promise.reject("denied") : undefined),
+    });
+    const result = await registry.dispatch("fail_primitive", {});
+    expect(result.structuredContent).toEqual({
+      error: true,
+      code: "ETOOL",
+      message: "denied",
+    });
+  });
+
   test("all production tools expose required MCP annotations", async () => {
     const container = createTestContainer();
     const registry = createToolRegistry(container);

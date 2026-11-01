@@ -52,8 +52,15 @@ export function getTelemetryConfig(
 }
 
 export function normalizeOtlpEndpoint(endpoint: string): string {
-  const trimmed = endpoint.trim().replace(/\/+$/, "");
-  return trimmed.endsWith("/v1/traces") ? trimmed : `${trimmed}/v1/traces`;
+  const trimmed = endpoint.trim();
+  let end = trimmed.length;
+  while (end > 0 && trimmed[end - 1] === "/") {
+    end--;
+  }
+  const withoutTrailingSlashes = trimmed.slice(0, end);
+  return withoutTrailingSlashes.endsWith("/v1/traces")
+    ? withoutTrailingSlashes
+    : `${withoutTrailingSlashes}/v1/traces`;
 }
 
 export function initTelemetry(overrides: Partial<Omit<TelemetryConfig, "enabled">> = {}): boolean {

@@ -65,6 +65,15 @@ describe("loadRemoteConfig", () => {
     );
   });
 
+  test.each([
+    ["https://remote.example///", "https://remote.example"],
+    ["https://remote.example", "https://remote.example"],
+    ["/", ""],
+  ])("removes only trailing URL slashes in %s", (input, expected) => {
+    process.env.PUBLIC_BASE_URL = input;
+    expect(loadRemoteConfig().publicBaseUrl).toBe(expected);
+  });
+
   test("parses explicit numeric limits and resource URL overrides", () => {
     process.env.MCP_RESOURCE_URL = "https://mcp.example/resource";
     process.env.ACCESS_TOKEN_TTL_SECONDS = "1200";
