@@ -156,7 +156,7 @@ function readReleaseFields(
 }
 
 function isAsciiDigit(value: string, index: number): boolean {
-  const code = value.charCodeAt(index);
+  const code = value.codePointAt(index) ?? -1;
   return code >= 48 && code <= 57;
 }
 
