@@ -730,6 +730,7 @@ describe("remote control plane remote-agent contracts", () => {
       const harness = controlPlane as unknown as {
         handleMcp(req: IncomingMessage, res: ServerResponse): Promise<void>;
         handleApi(req: IncomingMessage, res: ServerResponse, pathname: string): Promise<void>;
+        store: RemoteControlPlane["store"];
         oauth: {
           upsertGitHubUser(user: { id: string; login: string }): {
             id: string;
@@ -921,6 +922,78 @@ describe("remote control plane remote-agent contracts", () => {
         "/api/agents",
       );
       expect(responseBody(agents)).toEqual({ agents: [] });
+
+      const apiAgent = agentRecord({ id: "agt_api_routes", alias: "api-route" });
+      harness.store.insertAgent(apiAgent);
+
+      const agentDetails = captureResponse();
+      await harness.handleApi(
+        request("GET", "/api/agents/agt_api_routes", "", authHeaders),
+        agentDetails as ServerResponse,
+        "/api/agents/agt_api_routes",
+      );
+      expect(responseBody(agentDetails)).toMatchObject({
+        agent: { id: apiAgent.id, alias: apiAgent.alias, status: "offline" },
+      });
+
+      await expect(
+        harness.handleApi(
+          request("GET", "/api/agents/nonexistent", "", authHeaders),
+          captureResponse() as ServerResponse,
+          "/api/agents/nonexistent",
+        ),
+      ).rejects.toMatchObject({ status: 404, code: "AGENT_NOT_FOUND" });
+
+      const patchBody = JSON.stringify({ policy: { profile: "read-only" } });
+      await expect(
+        harness.handleApi(
+          request("PATCH", "/api/agents/agt_api_routes/policy", patchBody, {
+            ...authHeaders,
+            "content-type": "application/json",
+          }),
+          captureResponse() as ServerResponse,
+          "/api/agents/agt_api_routes/policy",
+        ),
+      ).rejects.toMatchObject({ status: 403, code: "INVALID_SCOPE" });
+
+      const adminToken = await issueAccessToken(
+        config,
+        jwtKeyPair,
+        { id: "github:1", githubId: "1", githubLogin: "tester" },
+        ["agents:read", "agents:admin"],
+      );
+      const adminHeaders = {
+        authorization: `Bearer ${adminToken.token}`,
+        "content-type": "application/json",
+      };
+      const updatedPolicy = captureResponse();
+      await harness.handleApi(
+        request("PATCH", "/api/agents/agt_api_routes/policy", patchBody, adminHeaders),
+        updatedPolicy as ServerResponse,
+        "/api/agents/agt_api_routes/policy",
+      );
+      expect(responseBody(updatedPolicy)).toMatchObject({
+        agent: { id: apiAgent.id },
+      });
+      expect(harness.store.getAgent(apiAgent.id)?.policyVersion).toBe(2);
+
+      const revokedAgent = captureResponse();
+      await harness.handleApi(
+        request("POST", "/api/agents/agt_api_routes/revoke", "", adminHeaders),
+        revokedAgent as ServerResponse,
+        "/api/agents/agt_api_routes/revoke",
+      );
+      expect(responseBody(revokedAgent)).toMatchObject({
+        agent: { id: apiAgent.id, status: "revoked" },
+      });
+
+      const unsupportedRoute = captureResponse();
+      await harness.handleApi(
+        request("GET", "/api/agents/agt_api_routes/revoke", "", adminHeaders),
+        unsupportedRoute as ServerResponse,
+        "/api/agents/agt_api_routes/revoke",
+      );
+      expect(unsupportedRoute.statusCode).toBe(404);
 
       const audit = captureResponse();
       await expect(

@@ -47,6 +47,47 @@ export interface SSHSession {
   osInfo?: OSInfo;
 }
 
+function translateSshConnectionError(error: unknown): SSHMCPError {
+  if (error instanceof SSHMCPError) {
+    return error;
+  }
+
+  if (error instanceof Error) {
+    if (error.message.includes("authentication")) {
+      return createAuthError(
+        "SSH authentication failed",
+        "Check your username, password, or SSH key configuration",
+      );
+    }
+    if (error.message.includes("timeout") || error.message.includes("ETIMEDOUT")) {
+      return createTimeoutError(
+        "SSH connection timeout",
+        "Check if the host is reachable and the SSH service is running",
+      );
+    }
+    if (error.message.includes("ECONNREFUSED")) {
+      return createConnectionError(
+        "SSH connection refused",
+        "Check if the SSH service is running on the target port",
+      );
+    }
+    if (
+      error.message.toLowerCase().includes("host key") ||
+      error.message.toLowerCase().includes("host denied")
+    ) {
+      return createHostKeyError(
+        "SSH host key verification failed",
+        "Check known_hosts, hostKeyPolicy, or expectedHostKeySha256",
+      );
+    }
+  }
+
+  return createConnectionError(
+    `Failed to establish SSH connection: ${error instanceof Error ? error.message : String(error)}`,
+    "Verify the host, port, and network connectivity",
+  );
+}
+
 export type SessionCloseListener = (sessionId: string) => void | Promise<void>;
 
 /**
@@ -199,22 +240,7 @@ export class SessionManager {
         };
       }
 
-      if (params.expectedHostKeySha256) {
-        connectConfig.hostHash = "sha256";
-        connectConfig.hostVerifier = (hashedKey: string) =>
-          normalizeSha256Fingerprint(hashedKey) ===
-          normalizeSha256Fingerprint(params.expectedHostKeySha256 ?? "");
-      } else if (hostKeyPolicy === "insecure") {
-        connectConfig.hostVerifier = () => true;
-      } else if (hostKeyPolicy === "accept-new") {
-        connectConfig.hostHash = "sha256";
-        connectConfig.hostVerifier = (hashedKey: string) =>
-          this.verifyAcceptNewHostKey(params.host, params.port ?? 22, hashedKey);
-      } else {
-        connectConfig.hostHash = "sha256";
-        connectConfig.hostVerifier = (hashedKey: string) =>
-          this.verifyKnownHostKey(params.host, params.port ?? 22, knownHostsPath, hashedKey);
-      }
+      this.configureHostKeyVerification(connectConfig, params, hostKeyPolicy, knownHostsPath);
 
       logger.debug("Connecting to SSH server");
       await ssh.connect(connectConfig);
@@ -280,51 +306,35 @@ export class SessionManager {
     } catch (error) {
       logger.error("Failed to open SSH session", { error, host: params.host });
 
-      if (error instanceof SSHMCPError) {
-        throw error;
-      }
-
-      if (error instanceof Error) {
-        if (error.message.includes("authentication")) {
-          throw createAuthError(
-            "SSH authentication failed",
-            "Check your username, password, or SSH key configuration",
-          );
-        }
-        if (error.message.includes("timeout") || error.message.includes("ETIMEDOUT")) {
-          throw createTimeoutError(
-            "SSH connection timeout",
-            "Check if the host is reachable and the SSH service is running",
-          );
-        }
-        if (error.message.includes("ECONNREFUSED")) {
-          throw createConnectionError(
-            "SSH connection refused",
-            "Check if the SSH service is running on the target port",
-          );
-        }
-        if (error.message.toLowerCase().includes("host key")) {
-          throw createHostKeyError(
-            "SSH host key verification failed",
-            "Check known_hosts, hostKeyPolicy, or expectedHostKeySha256",
-          );
-        }
-        if (error.message.toLowerCase().includes("host denied")) {
-          throw createHostKeyError(
-            "SSH host key verification failed",
-            "Check known_hosts, hostKeyPolicy, or expectedHostKeySha256",
-          );
-        }
-      }
-
-      throw createConnectionError(
-        `Failed to establish SSH connection: ${error instanceof Error ? error.message : String(error)}`,
-        "Verify the host, port, and network connectivity",
-      );
+      throw translateSshConnectionError(error);
     } finally {
       if (reserved) {
         this.pendingConnections--;
       }
+    }
+  }
+
+  private configureHostKeyVerification(
+    connectConfig: SSHConnectConfig,
+    params: ConnectionParams,
+    hostKeyPolicy: HostKeyPolicy,
+    knownHostsPath: string,
+  ): void {
+    if (params.expectedHostKeySha256) {
+      connectConfig.hostHash = "sha256";
+      connectConfig.hostVerifier = (hashedKey: string) =>
+        normalizeSha256Fingerprint(hashedKey) ===
+        normalizeSha256Fingerprint(params.expectedHostKeySha256 ?? "");
+    } else if (hostKeyPolicy === "insecure") {
+      connectConfig.hostVerifier = () => true;
+    } else if (hostKeyPolicy === "accept-new") {
+      connectConfig.hostHash = "sha256";
+      connectConfig.hostVerifier = (hashedKey: string) =>
+        this.verifyAcceptNewHostKey(params.host, params.port ?? 22, hashedKey);
+    } else {
+      connectConfig.hostHash = "sha256";
+      connectConfig.hostVerifier = (hashedKey: string) =>
+        this.verifyKnownHostKey(params.host, params.port ?? 22, knownHostsPath, hashedKey);
     }
   }
 
