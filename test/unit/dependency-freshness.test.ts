@@ -16,6 +16,15 @@ describe("dependency freshness helpers", () => {
     ]);
   });
 
+  test("rejects malformed package manager versions and preserves valid semver prefixes", () => {
+    expect(() => freshness.parsePackageManager("pnpm")).toThrow("Unsupported packageManager");
+    expect(() => freshness.parsePackageManager("pnpm@1.2")).toThrow("Unsupported packageManager");
+    expect(freshness.parsePackageManager("pnpm@11.0.9+sha512.hash")).toEqual({
+      name: "pnpm",
+      version: "11.0.9",
+    });
+  });
+
   test("extracts root importer versions from pnpm lockfile text", () => {
     const lockText = [
       'lockfileVersion: "9.0"',
