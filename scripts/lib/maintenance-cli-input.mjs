@@ -40,7 +40,7 @@ export function parsePinnedPackageManager(value) {
   for (let group = 0; group < 3; group++) {
     const groupStart = position;
     while (position < text.length) {
-      const digit = text.charCodeAt(position);
+      const digit = text.codePointAt(position) ?? -1;
       if (digit < 48 || digit > 57) break;
       position++;
     }
@@ -60,6 +60,17 @@ export function stripLockPeerSuffix(version) {
   return opening >= 0 && opening < unquoted.length - 1 ? unquoted.slice(0, opening) : unquoted;
 }
 
+function skipWhitespace(value, offset) {
+  while (offset < value.length && /\s/u.test(value[offset])) offset++;
+  return offset;
+}
+
+function licenseOperatorLength(value, offset) {
+  if (value.startsWith("OR", offset)) return 2;
+  if (value.startsWith("AND", offset)) return 3;
+  return 0;
+}
+
 /** Split SPDX license expression operators without overlapping whitespace patterns. */
 export function splitLicenseExpression(license) {
   const parts = [];
@@ -77,16 +88,12 @@ export function splitLicenseExpression(license) {
       continue;
     }
     const before = position;
-    while (whitespace(license[position])) position++;
-    const operatorLength = license.startsWith("OR", position)
-      ? 2
-      : license.startsWith("AND", position)
-        ? 3
-        : 0;
+    position = skipWhitespace(license, position);
+    const operatorLength = licenseOperatorLength(license, position);
     if (operatorLength && whitespace(license[position + operatorLength])) {
       parts.push(license.slice(start, before));
       position += operatorLength;
-      while (whitespace(license[position])) position++;
+      position = skipWhitespace(license, position);
       start = position;
     }
   }
