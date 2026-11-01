@@ -320,30 +320,8 @@ export class RemoteControlPlane {
       });
       return;
     }
-    const agentMatch = /^\/api\/agents\/([^/]+)(?:\/(policy|revoke))?$/u.exec(pathname);
-    if (agentMatch) {
-      const agent = this.resolveAgent(principal.userId, agentMatch[1] ?? "");
-      if (!agent) {
-        throw safeError("AGENT_NOT_FOUND", "Agent not found", 404);
-      }
-      if (!agentMatch[2] && req.method === "GET") {
-        if (!hasCapability(principal.capabilities, "agents.read")) {
-          throw safeError("INVALID_SCOPE", "agents:read scope is required", 403);
-        }
-        jsonResponse(res, 200, { agent: sanitizeAgent(agent) });
-        return;
-      }
-      if ((!agentMatch[2] || agentMatch[2] === "policy") && req.method === "PATCH") {
-        const body = await readJson(req);
-        jsonResponse(res, 200, {
-          agent: sanitizeAgent(this.updateAgentPolicy(principal, agent, body.policy)),
-        });
-        return;
-      }
-      if (agentMatch[2] === "revoke" && req.method === "POST") {
-        jsonResponse(res, 200, { agent: sanitizeAgent(this.revokeAgent(principal, agent)) });
-        return;
-      }
+    if (await this.handleAgentApiRoute(req, res, pathname, principal)) {
+      return;
     }
     if (pathname === "/api/audit" && req.method === "GET") {
       if (!hasCapability(principal.capabilities, "agents.admin")) {
@@ -355,6 +333,40 @@ export class RemoteControlPlane {
       return;
     }
     jsonResponse(res, 404, { error: "Not found" });
+  }
+
+  private async handleAgentApiRoute(
+    req: IncomingMessage,
+    res: ServerResponse,
+    pathname: string,
+    principal: RemotePrincipal,
+  ): Promise<boolean> {
+    const agentMatch = /^\/api\/agents\/([^/]+)(?:\/(policy|revoke))?$/u.exec(pathname);
+    if (agentMatch) {
+      const agent = this.resolveAgent(principal.userId, agentMatch[1] ?? "");
+      if (!agent) {
+        throw safeError("AGENT_NOT_FOUND", "Agent not found", 404);
+      }
+      if (!agentMatch[2] && req.method === "GET") {
+        if (!hasCapability(principal.capabilities, "agents.read")) {
+          throw safeError("INVALID_SCOPE", "agents:read scope is required", 403);
+        }
+        jsonResponse(res, 200, { agent: sanitizeAgent(agent) });
+        return true;
+      }
+      if ((!agentMatch[2] || agentMatch[2] === "policy") && req.method === "PATCH") {
+        const body = await readJson(req);
+        jsonResponse(res, 200, {
+          agent: sanitizeAgent(this.updateAgentPolicy(principal, agent, body.policy)),
+        });
+        return true;
+      }
+      if (agentMatch[2] === "revoke" && req.method === "POST") {
+        jsonResponse(res, 200, { agent: sanitizeAgent(this.revokeAgent(principal, agent)) });
+        return true;
+      }
+    }
+    return false;
   }
 
   private async handleAgentEnroll(req: IncomingMessage, res: ServerResponse): Promise<void> {
