@@ -95,7 +95,7 @@ const DANGEROUS_PATTERNS: Array<{
 }> = [
   // Critical: System destruction
   {
-    pattern: recursiveRmTargetPattern(String.raw`(?:"/"|'/'|/)`),
+    pattern: recursiveRmTargetPattern(`(?:"/"|'/'|/)`),
     riskLevel: "critical",
     warning: "This command will delete the entire root filesystem!",
     suggestion: "Double-check the path before executing",

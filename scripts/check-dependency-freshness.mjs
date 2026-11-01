@@ -5,7 +5,6 @@ import { pathToFileURL } from "node:url";
 import {
   findNodeEngineFloorVersions,
   parsePinnedPackageManager,
-  stripLockPeerSuffix,
   nodeRuntimeStatus,
   parseRootImporterVersions,
 } from "./lib/maintenance-cli-input.mjs";
@@ -291,10 +290,6 @@ function parseVersion(version) {
     throw new Error(`Unsupported version string: ${version}`);
   }
   return match.slice(1, 4).map((part) => Number.parseInt(part, 10));
-}
-
-function stripLockVersion(version) {
-  return stripLockPeerSuffix(version);
 }
 
 function escapeMarkdown(value) {

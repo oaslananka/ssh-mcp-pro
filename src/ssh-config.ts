@@ -231,7 +231,7 @@ export class SSHConfigParser {
 
     // Convert SSH pattern to regex
     const regexPattern = pattern
-      .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+      .replace(/[.+^${}()|[\]\\]/g, String.raw`\$&`)
       .replaceAll("*", ".*")
       .replaceAll("?", ".");
 

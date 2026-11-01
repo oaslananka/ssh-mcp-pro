@@ -160,8 +160,10 @@ export function oauthWwwAuthenticateHeader(
     parts.push(`scope="${scopes.join(" ")}"`);
   }
   if (includeErrorDetails) {
-    parts.push('error="invalid_token"');
-    parts.push('error_description="A valid OAuth access token is required"');
+    parts.push(
+      'error="invalid_token"',
+      'error_description="A valid OAuth access token is required"',
+    );
   }
   return `Bearer ${parts.join(", ")}`;
 }
