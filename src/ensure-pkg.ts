@@ -42,7 +42,7 @@ function powerShellQuote(value: string): string {
 }
 
 function escapeRegExp(value: string): string {
-  return value.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
+  return value.replace(/[\\^$.*+?()[\]{}|]/g, String.raw`\$&`);
 }
 
 export function getRemoveCommand(pm: PackageManager, packageName: string): string {
@@ -115,7 +115,7 @@ export function getPackageCheckCommand(
       return `brew list --versions ${packageName}`;
     case "winget":
       return `$idPattern = ${powerShellQuote(
-        `(^|\\s)${escapeRegExp(packageName)}(\\s|$)`,
+        String.raw`(^|\s)${escapeRegExp(packageName)}(\s|$)`,
       )}; $package = winget list --id ${powerShellQuote(
         packageName,
       )} --exact --disable-interactivity; if ($LASTEXITCODE -eq 0 -and ($package -match $idPattern)) { exit 0 } exit 1`;

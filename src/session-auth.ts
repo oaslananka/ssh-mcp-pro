@@ -168,7 +168,7 @@ export function knownHostPatternMatches(hosts: string, host: string, port: numbe
 
     const regex = new RegExp(
       `^${pattern
-        .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+        .replace(/[.+^${}()|[\]\\]/g, String.raw`\$&`)
         .replaceAll("*", ".*")
         .replaceAll("?", ".")}$`,
     );
