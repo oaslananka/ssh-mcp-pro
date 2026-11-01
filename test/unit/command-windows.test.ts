@@ -86,6 +86,25 @@ describe("Windows maintenance command invocation", () => {
     );
   });
 
+  test.each(["unsafe%PATH%", "unsafe!PATH!", "unsafe&PATH", "unsafe|PATH", "unsafe^PATH"])(
+    "refuses a PATH-selected cmd shim containing command metacharacters: %s",
+    (dir) => {
+      process.env.PATH = `C:\\${dir};C:\\node`;
+      mockExists.mockImplementation((candidate) => String(candidate).endsWith("pnpm.cmd"));
+      expect(() => capture("pnpm", ["--version"])).toThrow(
+        "Refusing unsafe Windows command shim path",
+      );
+      expect(mockSpawn).not.toHaveBeenCalled();
+    },
+  );
+
+  test("accepts a normal PATH shim directory containing spaces", () => {
+    process.env.PATH = "C:\\Program Files\\nodejs";
+    mockExists.mockImplementation((candidate) => String(candidate).endsWith("pnpm.cmd"));
+    capture("pnpm", ["--version"]);
+    expect(mockSpawn).toHaveBeenCalledOnce();
+  });
+
   test("refuses absent Windows CLIs instead of searching the current directory", () => {
     for (const tool of ["npm", "npx", "pnpm"]) {
       expect(() => capture(tool, ["--version"])).toThrow(`Windows CLI ${tool} not found`);
