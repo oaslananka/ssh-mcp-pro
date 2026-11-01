@@ -82,6 +82,30 @@ describe("SSH config cache management", () => {
     });
   });
 
+  test("parses long whitespace runs without requiring a backtracking key-value regex", async () => {
+    const configPath = path.join(tempDir, "long-whitespace-config");
+    fs.writeFileSync(
+      configPath,
+      [
+        "Host" + " ".repeat(40_000) + "large",
+        "  HostName	  large.example.test",
+        "  User	" + " ".repeat(40_000) + "operator",
+        "InvalidLineWithoutValue",
+        "  ProxyJump   ",
+      ].join("\n"),
+    );
+
+    const { SSHConfigParser } = await import("../../src/ssh-config.js");
+    const parser = new SSHConfigParser(configPath);
+    await parser.parse();
+
+    expect(parser.getAllHosts()).toEqual(["large"]);
+    expect(parser.resolveHost("large")).toEqual({
+      host: "large.example.test",
+      username: "operator",
+    });
+  });
+
   test("handles missing config files gracefully", async () => {
     const missingPath = path.join(tempDir, "missing-config");
     const { SSHConfigParser } = await import("../../src/ssh-config.js");
