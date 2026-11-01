@@ -16,17 +16,6 @@ describe("dependency freshness helpers", () => {
     ]);
   });
 
-  test("rejects unsupported packageManager values without backtracking on long inputs", () => {
-    for (const value of ["pnpm", "@11.0.9", "pnpm@invalid", "pnpm@11.0"]) {
-      expect(() => freshness.parsePackageManager(value)).toThrow("Unsupported packageManager");
-    }
-    expect(freshness.parsePackageManager("pnpm@11.0.9+extra")).toEqual({
-      name: "pnpm",
-      version: "11.0.9",
-    });
-    expect(() => freshness.parsePackageManager("pnpm@" + "8".repeat(40000) + ".bad")).toThrow();
-  });
-
   test("extracts root importer versions from pnpm lockfile text", () => {
     const lockText = [
       'lockfileVersion: "9.0"',

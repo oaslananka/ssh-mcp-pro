@@ -22,13 +22,11 @@ export function compareVersions(left, right) {
 }
 
 export function parsePackageManager(value) {
-  const separator = (value ?? "").indexOf("@");
-  const name = (value ?? "").slice(0, separator);
-  const match = /^\d+\.\d+\.\d+/u.exec((value ?? "").slice(separator + 1));
-  if (separator < 1 || !match) {
+  const match = /^(?<name>[^@]+)@(?<version>\d+\.\d+\.\d+)/u.exec(value ?? "");
+  if (!match?.groups) {
     throw new Error(`Unsupported packageManager value: ${value}`);
   }
-  return { name, version: match[0] };
+  return { name: match.groups.name, version: match.groups.version };
 }
 
 export function parseNodeEngineFloors(range) {
@@ -320,9 +318,7 @@ function parseVersion(version) {
 }
 
 function stripLockVersion(version) {
-  const unquoted = version.trim().replace(/^"|"$/gu, "");
-  const suffix = unquoted.indexOf("(");
-  return suffix >= 0 && suffix < unquoted.length - 1 ? unquoted.slice(0, suffix) : unquoted;
+  return version.trim().replace(/^"|"$/gu, "").replace(/\(.+$/u, "");
 }
 
 function escapeMarkdown(value) {

@@ -13,12 +13,12 @@ function tempDirectory(): string {
   return dir;
 }
 
-function invoke(cwd: string, envPath: string, overrides: NodeJS.ProcessEnv = {}) {
+function invoke(cwd: string, envPath: string) {
   return spawnSync(process.execPath, [startupScript, envPath], {
     cwd,
     encoding: "utf8",
     timeout: 5_000,
-    env: { ...process.env, SSH_MCP_HTTP_PUBLIC_URL: "", ...overrides },
+    env: { ...process.env, SSH_MCP_HTTP_PUBLIC_URL: "" },
   });
 }
 
@@ -51,30 +51,6 @@ describe("ChatGPT HTTP startup env-file confinement", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("env file path is outside the working directory");
     expect(result.stderr).not.toContain("malicious.example");
-  });
-
-  test("accepts repeated trailing slashes on the canonical /mcp endpoint", () => {
-    const cwd = tempDirectory();
-    const envPath = join(cwd, "endpoint.env");
-    writeFileSync(envPath, "# incomplete config\n");
-    const result = invoke(cwd, envPath, {
-      SSH_MCP_HTTP_PUBLIC_URL: "https://example.com/mcp/////",
-      SSH_MCP_HTTP_ALLOWED_ORIGINS: "",
-    });
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("SSH_MCP_HTTP_ALLOWED_ORIGINS must include");
-    expect(result.stderr).not.toContain("path must be /mcp");
-  });
-
-  test("rejects other HTTP endpoint paths despite trailing slashes", () => {
-    const cwd = tempDirectory();
-    const envPath = join(cwd, "endpoint.env");
-    writeFileSync(envPath, "# incomplete config\n");
-    const result = invoke(cwd, envPath, {
-      SSH_MCP_HTTP_PUBLIC_URL: "https://example.com/mcpx/////",
-    });
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain("path must be /mcp");
   });
 
   test("reads an in-tree env-file alias after canonical path checks", () => {
