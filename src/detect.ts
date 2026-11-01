@@ -94,12 +94,10 @@ async function detectPlatform(ssh: NodeSSH): Promise<{ platform: Platform; versi
 
 async function detectWindows(ssh: NodeSSH, arch: string, version: string): Promise<OSInfo> {
   const platform: Platform = "windows";
-  let defaultShell: ShellType = "unknown";
-  let tempDir: string | undefined;
-  defaultShell = "powershell";
+  const defaultShell: ShellType = "powershell";
   const psShell = await safeExec(ssh, "echo $env:SHELL");
   const shell = psShell.stdout.trim();
-  tempDir =
+  const tempDir =
     normalizeWindowsPath(
       (await safeExec(ssh, 'powershell -NoLogo -NoProfile -Command "$env:TEMP"')).stdout.trim(),
     ) ?? "C:/Windows/Temp";
@@ -157,6 +155,33 @@ function readReleaseFields(
   return { distro, version };
 }
 
+function isAsciiDigit(value: string, index: number): boolean {
+  const code = value.charCodeAt(index);
+  return code >= 48 && code <= 57;
+}
+
+function firstDottedVersion(value: string): string | undefined {
+  for (let index = 0; index < value.length; index++) {
+    if (!isAsciiDigit(value, index)) {
+      continue;
+    }
+    const start = index;
+    while (isAsciiDigit(value, index)) {
+      index++;
+    }
+    if (value[index] !== "." || !isAsciiDigit(value, index + 1)) {
+      index--;
+      continue;
+    }
+    index++;
+    while (isAsciiDigit(value, index)) {
+      index++;
+    }
+    return value.slice(start, index);
+  }
+  return undefined;
+}
+
 function parseLinuxRelease(
   command: string,
   stdout: string,
@@ -169,8 +194,7 @@ function parseLinuxRelease(
   }
   const output = stdout.toLowerCase();
   if (output.includes("red hat") || output.includes("rhel") || output.includes("centos")) {
-    const versionMatch = /(\d+\.\d+)/u.exec(stdout);
-    return { distro: "rhel", version: versionMatch?.[1] ?? "unknown" };
+    return { distro: "rhel", version: firstDottedVersion(stdout) ?? "unknown" };
   }
   if (output.includes("debian")) {
     return { distro: "debian", version: stdout.trim() };
