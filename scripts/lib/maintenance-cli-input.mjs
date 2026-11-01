@@ -188,6 +188,13 @@ export function mutationScoreSymbol(score) {
   return "❌";
 }
 
+function recordRootImporterVersion(line, group, packageName, versions) {
+  const match = /^ {8}version: (.+)$/u.exec(line);
+  if (group && packageName && match) {
+    versions.set(packageName, stripLockPeerSuffix(match[1]));
+  }
+}
+
 export function parseRootImporterVersions(lockText) {
   const versions = new Map();
   let inRootImporter = false;
@@ -213,9 +220,8 @@ export function parseRootImporterVersions(lockText) {
       packageName = packageMatch[1] ?? packageMatch[2] ?? packageMatch[3];
       continue;
     }
-    const versionMatch = /^ {8}version: (.+)$/u.exec(line);
-    if (inRootImporter && group && packageName && versionMatch) {
-      versions.set(packageName, stripLockPeerSuffix(versionMatch[1]));
+    if (inRootImporter) {
+      recordRootImporterVersion(line, group, packageName, versions);
     }
   }
   return versions;
