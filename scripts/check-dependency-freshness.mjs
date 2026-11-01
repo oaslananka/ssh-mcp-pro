@@ -2,6 +2,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
+import { parsePinnedPackageManager, stripLockPeerSuffix } from "./lib/maintenance-cli-input.mjs";
 
 const NODE_INDEX_URL = "https://nodejs.org/dist/index.json";
 const NODE_SCHEDULE_URL = "https://raw.githubusercontent.com/nodejs/Release/main/schedule.json";
@@ -22,11 +23,11 @@ export function compareVersions(left, right) {
 }
 
 export function parsePackageManager(value) {
-  const match = /^(?<name>[^@]+)@(?<version>\d+\.\d+\.\d+)/u.exec(value ?? "");
-  if (!match?.groups) {
+  const parsed = parsePinnedPackageManager(value);
+  if (!parsed) {
     throw new Error(`Unsupported packageManager value: ${value}`);
   }
-  return { name: match.groups.name, version: match.groups.version };
+  return parsed;
 }
 
 export function parseNodeEngineFloors(range) {
@@ -318,7 +319,7 @@ function parseVersion(version) {
 }
 
 function stripLockVersion(version) {
-  return version.trim().replace(/^"|"$/gu, "").replace(/\(.+$/u, "");
+  return stripLockPeerSuffix(version);
 }
 
 function escapeMarkdown(value) {

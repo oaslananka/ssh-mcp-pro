@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { capture, failFromResult } from "./lib/command.mjs";
+import { splitLicenseExpression } from "./lib/maintenance-cli-input.mjs";
 
 const allowedLicenses = new Set([
   "0BSD",
@@ -41,8 +42,7 @@ try {
 const denied = [];
 
 for (const [license, packages] of Object.entries(report)) {
-  const parts = license
-    .split(/\s+OR\s+|\s+AND\s+|\s*\/\s*/u)
+  const parts = splitLicenseExpression(license)
     .map((part) => part.replace(/[()]/gu, "").trim())
     .filter(Boolean);
   const accepted = parts.some((part) => allowedLicenses.has(part));

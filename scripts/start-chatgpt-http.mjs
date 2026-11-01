@@ -3,6 +3,7 @@ import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { resolveExecutableOnPath } from "./lib/resolve-executable.mjs";
+import { hasMcpEndpointPath, parseEnvAssignment } from "./lib/maintenance-cli-input.mjs";
 
 const rawEnvFile = process.argv[2] ?? ".env";
 const envFile = resolve(rawEnvFile);
@@ -31,13 +32,13 @@ function parseEnvFile(path) {
       return;
     }
 
-    const match = rawLine.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/u);
+    const match = parseEnvAssignment(rawLine);
     if (!match) {
       errors.push(`${path}:${index + 1}: invalid .env assignment`);
       return;
     }
 
-    let value = match[2] ?? "";
+    let value = match.value;
     if (
       (value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'"))
@@ -49,7 +50,7 @@ function parseEnvFile(path) {
         value = value.slice(0, commentIndex).trimEnd();
       }
     }
-    values[match[1]] = value;
+    values[match.key] = value;
   });
 
   if (errors.length > 0) {
@@ -99,7 +100,7 @@ try {
 if (parsedPublicUrl.protocol !== "https:") {
   fail("SSH_MCP_HTTP_PUBLIC_URL must use https:");
 }
-if (parsedPublicUrl.pathname.replace(/\/+$/u, "") !== "/mcp") {
+if (!hasMcpEndpointPath(parsedPublicUrl.pathname)) {
   fail("SSH_MCP_HTTP_PUBLIC_URL path must be /mcp");
 }
 
