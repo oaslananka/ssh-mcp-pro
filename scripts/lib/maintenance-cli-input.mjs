@@ -135,3 +135,36 @@ export function hasMcpEndpointPath(pathname) {
   while (end > 0 && pathname[end - 1] === "/") end--;
   return pathname.slice(0, end) === "/mcp";
 }
+
+/** Scan Node engine version triples without restarting regex searches in long digit runs. */
+export function findNodeEngineFloorVersions(range) {
+  const versions = [];
+  let index = 0;
+  while (index < range.length) {
+    let position = range[index] === "^" ? index + 1 : index;
+    const start = position;
+    let valid = true;
+    for (let group = 0; group < 3; group++) {
+      const digitStart = position;
+      while (position < range.length) {
+        const point = range.codePointAt(position) ?? -1;
+        if (point < 48 || point > 57) break;
+        position++;
+      }
+      if (position === digitStart) {
+        valid = false;
+        break;
+      }
+      if (group < 2) {
+        if (range[position] !== ".") {
+          valid = false;
+          break;
+        }
+        position++;
+      }
+    }
+    if (valid) versions.push(range.slice(start, position));
+    index = Math.max(index + 1, position);
+  }
+  return versions;
+}
