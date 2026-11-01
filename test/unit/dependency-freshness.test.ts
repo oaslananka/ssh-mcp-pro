@@ -16,6 +16,13 @@ describe("dependency freshness helpers", () => {
     ]);
   });
 
+  test("extracts versions from mixed engine constraints with malformed alternatives", () => {
+    expect(freshness.parseNodeEngineFloors("20..21 || ^22.0.1 || 24.1.2.3")).toEqual([
+      { major: 22, version: "22.0.1" },
+      { major: 24, version: "24.1.2" },
+    ]);
+  });
+
   test("rejects malformed package manager versions and preserves valid semver prefixes", () => {
     expect(() => freshness.parsePackageManager("pnpm")).toThrow("Unsupported packageManager");
     expect(() => freshness.parsePackageManager("pnpm@1.2")).toThrow("Unsupported packageManager");

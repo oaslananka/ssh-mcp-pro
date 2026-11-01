@@ -135,3 +135,42 @@ export function hasMcpEndpointPath(pathname) {
   while (end > 0 && pathname[end - 1] === "/") end--;
   return pathname.slice(0, end) === "/mcp";
 }
+
+/** Return the end of a contiguous digit run without regex backtracking. */
+function scanDigits(value, start) {
+  let cursor = start;
+  while (cursor < value.length) {
+    const point = value.codePointAt(cursor) ?? -1;
+    if (point < 48 || point > 57) break;
+    cursor++;
+  }
+  return cursor;
+}
+
+/** Check a single major.minor.patch candidate; return where scanning stopped. */
+function scanVersionTriple(value, start) {
+  let cursor = start;
+  for (let group = 0; group < 3; group++) {
+    const end = scanDigits(value, cursor);
+    if (end === cursor) return { end, valid: false };
+    cursor = end;
+    if (group < 2) {
+      if (value[cursor] !== ".") return { end: cursor, valid: false };
+      cursor++;
+    }
+  }
+  return { end: cursor, valid: true };
+}
+
+/** Scan Node engine version triples without restarting searches in long digit runs. */
+export function findNodeEngineFloorVersions(range) {
+  const versions = [];
+  let index = 0;
+  while (index < range.length) {
+    const start = range[index] === "^" ? index + 1 : index;
+    const candidate = scanVersionTriple(range, start);
+    if (candidate.valid) versions.push(range.slice(start, candidate.end));
+    index = Math.max(index + 1, candidate.end);
+  }
+  return versions;
+}

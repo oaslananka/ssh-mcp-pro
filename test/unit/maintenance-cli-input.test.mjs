@@ -7,6 +7,7 @@ import {
   splitLicenseExpression,
   parseEnvAssignment,
   hasMcpEndpointPath,
+  findNodeEngineFloorVersions,
 } from "../../scripts/lib/maintenance-cli-input.mjs";
 
 describe("pure maintenance CLI input validation", () => {
@@ -126,5 +127,28 @@ describe("bounded maintenance-script parsers", () => {
     ["", false],
   ])("matches exact MCP endpoint %s", (path, expected) => {
     expect(hasMcpEndpointPath(path)).toBe(expected);
+  });
+});
+
+describe("bounded Node engine version scanner", () => {
+  test.each([
+    ["^22.22.2 || ^24.15.0", ["22.22.2", "24.15.0"]],
+    ["node >=20.1.0 <=22.1.9", ["20.1.0", "22.1.9"]],
+    ["1.2.3.4", ["1.2.3"]],
+    ["^1.2.3-rc.1", ["1.2.3"]],
+    ["foo1.2.3bar", ["1.2.3"]],
+    ["1..2.3.4", ["2.3.4"]],
+    ["^a1.2.3", ["1.2.3"]],
+    ["", []],
+    ["22.22", []],
+    ["23.4.foo", []],
+  ])("extracts numeric version triples from %s", (value, output) => {
+    expect(findNodeEngineFloorVersions(value)).toEqual(output);
+  });
+
+  test("rejects long unmatched digit runs with linear scanning", () => {
+    const long = "8".repeat(40_000);
+    expect(findNodeEngineFloorVersions(long + "x 24.15.0")).toEqual(["24.15.0"]);
+    expect(findNodeEngineFloorVersions("^22." + long + ".24")).toEqual(["22." + long + ".24"]);
   });
 });

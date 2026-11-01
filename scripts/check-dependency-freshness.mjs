@@ -2,7 +2,11 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
-import { parsePinnedPackageManager, stripLockPeerSuffix } from "./lib/maintenance-cli-input.mjs";
+import {
+  findNodeEngineFloorVersions,
+  parsePinnedPackageManager,
+  stripLockPeerSuffix,
+} from "./lib/maintenance-cli-input.mjs";
 
 const NODE_INDEX_URL = "https://nodejs.org/dist/index.json";
 const NODE_SCHEDULE_URL = "https://raw.githubusercontent.com/nodejs/Release/main/schedule.json";
@@ -31,10 +35,10 @@ export function parsePackageManager(value) {
 }
 
 export function parseNodeEngineFloors(range) {
-  return [...range.matchAll(/\^?(\d+\.\d+\.\d+)/gu)].map((match) => {
-    const version = match[1];
-    return { major: parseVersion(version)[0], version };
-  });
+  return findNodeEngineFloorVersions(range).map((version) => ({
+    major: parseVersion(version)[0],
+    version,
+  }));
 }
 
 export function parseRootImporterVersions(lockText) {
