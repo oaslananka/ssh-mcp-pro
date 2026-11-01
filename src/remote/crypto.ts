@@ -107,7 +107,11 @@ export function canonicalJson(value: unknown): string {
   }
   const entries = Object.entries(value as Record<string, unknown>)
     .filter(([, entryValue]) => entryValue !== undefined)
-    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+    .sort(([left], [right]) => {
+      if (left < right) return -1;
+      if (left > right) return 1;
+      return 0;
+    });
   const properties = entries.map(
     ([key, entryValue]) => JSON.stringify(key) + ":" + canonicalJson(entryValue),
   );

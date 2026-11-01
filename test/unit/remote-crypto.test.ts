@@ -55,6 +55,11 @@ describe("remote crypto helpers", () => {
     expect(canonicalJson(payload)).toBe(expected);
   });
 
+  test("canonical JSON sorts keys by code-unit order independently of locale", () => {
+    const payload = { z: 1, ä: 2, A: 3, a: 4 };
+    expect(canonicalJson(payload)).toBe('{"A":3,"a":4,"z":1,"ä":2}');
+  });
+
   test("hashes and compares secrets without storing plaintext", () => {
     const hash = hashSecret("one-time-token");
 

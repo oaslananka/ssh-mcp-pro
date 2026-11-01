@@ -126,6 +126,17 @@ describe("parseArgs", () => {
     expect(parseArgs(["--host", "first", "--host", "second", "--port"])).not.toHaveProperty("port");
   });
 
+  test("agent command preserves all trailing arguments without interpreting global flags", () => {
+    expect(
+      parseArgs(["--help", "agent", "http", "--version", "--host", "localhost"]),
+    ).toMatchObject({
+      help: true,
+      version: false,
+      transport: "stdio",
+      agentArgs: ["http", "--version", "--host", "localhost"],
+    });
+  });
+
   test("agent enroll captures agent args", () => {
     expect(parseArgs(["agent", "enroll", "--server", "https://example.test"])).toMatchObject({
       agentArgs: ["enroll", "--server", "https://example.test"],

@@ -31,8 +31,8 @@ export interface SSHHostConfig {
  * SSH config file parser with TTL-based cache invalidation
  */
 export class SSHConfigParser {
-  private configPath: string;
-  private hosts: Map<string, SSHHostConfig> = new Map();
+  private readonly configPath: string;
+  private readonly hosts: Map<string, SSHHostConfig> = new Map();
   private parsed = false;
   private lastParsedAt = 0;
   private static readonly CACHE_TTL_MS = 300000; // 5 minutes

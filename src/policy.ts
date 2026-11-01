@@ -153,7 +153,8 @@ function resolveLocalExistingPrefix(normalizedPath: string): string {
   while (true) {
     try {
       const resolvedPrefix = fs.realpathSync.native(candidate);
-      return path.join(resolvedPrefix, ...pendingSegments.reverse());
+      pendingSegments.reverse();
+      return path.join(resolvedPrefix, ...pendingSegments);
     } catch {
       const parent = path.dirname(candidate);
       if (parent === candidate) {
