@@ -30,11 +30,11 @@ export function negotiateMcpProtocolVersion(params: unknown): string {
 }
 
 export function quotePosixArg(value: string): string {
-  return `'${value.replace(/'/gu, `'"'"'`)}'`;
+  return `'${value.replaceAll("'", `'"'"'`)}'`;
 }
 
 export function quotePowerShellArg(value: string): string {
-  return `'${value.replace(/'/gu, "''")}'`;
+  return `'${value.replaceAll("'", "''")}'`;
 }
 
 export function asStringArray(value: unknown): string[] {

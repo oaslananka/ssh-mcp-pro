@@ -51,7 +51,7 @@ export interface FsServiceDeps {
 }
 
 function shellQuote(value: string): string {
-  return `'${String(value).replace(/'/g, `'"'"'`)}'`;
+  return `'${String(value).replaceAll("'", `'"'"'`)}'`;
 }
 
 function createDirListResult(entries: DirEntry[], nextToken?: string): DirListResult {
@@ -59,7 +59,7 @@ function createDirListResult(entries: DirEntry[], nextToken?: string): DirListRe
 }
 
 function tempPathFor(targetPath: string): string {
-  const normalizedPath = targetPath.replace(/\\/g, "/");
+  const normalizedPath = targetPath.replaceAll("\\", "/");
   const slashIndex = normalizedPath.lastIndexOf("/");
   const directory = slashIndex >= 0 ? normalizedPath.slice(0, slashIndex + 1) : "";
   const baseName = slashIndex >= 0 ? normalizedPath.slice(slashIndex + 1) : normalizedPath;

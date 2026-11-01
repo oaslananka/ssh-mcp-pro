@@ -22,7 +22,7 @@ async function safeExec(
 
 function normalizeWindowsPath(path: string | undefined): string | undefined {
   if (!path) return undefined;
-  return path.replace(/\\\\/g, "/").replace(/\\/g, "/");
+  return path.replaceAll("\\\\", "/").replaceAll("\\", "/");
 }
 
 function parseKeyValueLine(line: string): { key: string; value: string } | undefined {
@@ -35,7 +35,7 @@ function parseKeyValueLine(line: string): { key: string; value: string } | undef
     key: line.slice(0, separatorIndex),
     value: line
       .slice(separatorIndex + 1)
-      .replace(/\"/g, "")
+      .replaceAll('"', "")
       .trim(),
   };
 }

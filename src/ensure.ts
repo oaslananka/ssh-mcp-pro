@@ -54,7 +54,7 @@ function sanitizeServiceName(name: string): string {
 }
 
 function shellQuote(value: string): string {
-  return `'${String(value).replace(/'/g, `'"'"'`)}'`;
+  return `'${String(value).replaceAll("'", `'"'"'`)}'`;
 }
 
 function describeError(error: unknown): string {

@@ -3,11 +3,11 @@ import { OSInfo } from "./types.js";
 export const POSIX_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/u;
 
 function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'\"'\"'`)}'`;
+  return `'${value.replaceAll("'", `'\"'\"'`)}'`;
 }
 
 function powerShellQuote(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
+  return `'${value.replaceAll("'", "''")}'`;
 }
 
 export function assertValidEnvironment(env?: Record<string, string>): void {
@@ -118,7 +118,7 @@ export function buildSudoCommand(command: string, osInfo: OSInfo, cwd?: string):
 
 export function resolveRemoteTempDir(osInfo: OSInfo): string {
   if (osInfo.tempDir) {
-    return osInfo.tempDir.replace(/\\\\/g, "/").replace(/\\/g, "/");
+    return osInfo.tempDir.replaceAll("\\\\", "/").replaceAll("\\", "/");
   }
 
   if (osInfo.platform === "windows") {

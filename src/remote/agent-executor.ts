@@ -53,7 +53,7 @@ function powerShell(command: string, args: string[] = []): { command: string; ar
 }
 
 function posixSingleQuote(value: string): string {
-  return `'${value.replace(/'/gu, "'\\''")}'`;
+  return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
 function truncationMarker(maxBytes: number): Buffer {
@@ -437,7 +437,7 @@ export class AgentExecutor {
     }
     if (process.platform === "win32") {
       assertSafeIdentifier(target, "Log target");
-      const escapedTarget = target.replace(/'/gu, "''");
+      const escapedTarget = target.replaceAll("'", "''");
       return runCommand(
         "powershell.exe",
         [

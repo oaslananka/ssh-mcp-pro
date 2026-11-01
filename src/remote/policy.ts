@@ -83,7 +83,7 @@ export function mergeCustomPolicy(policy: AgentPolicyPatch): AgentPolicy {
 }
 
 function normalizePolicyPath(value: string): string {
-  let slashPath = value.replace(/\\/gu, "/");
+  let slashPath = value.replaceAll("\\", "/");
   if (/^\/\/\?\/UNC\//iu.test(slashPath)) {
     slashPath = `//${slashPath.slice(8)}`;
   } else if (/^\/\/[?.]\//u.test(slashPath)) {
