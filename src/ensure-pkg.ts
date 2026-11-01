@@ -26,7 +26,7 @@ export function sanitizePackageName(name: string): string {
     );
   }
 
-  const dangerousChars = /[;&|`$(){}\[\]<>\\\"'\n\r]/;
+  const dangerousChars = /[;&|`$(){}[\]<>\\"'\n\r]/;
   if (dangerousChars.test(name)) {
     throw createBadRequestError(
       "Package name contains potentially dangerous characters",

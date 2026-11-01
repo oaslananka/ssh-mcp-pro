@@ -48,8 +48,7 @@ export function parseArgs(argv: string[]): CliOptions {
     switch (arg) {
       case "agent":
         opts.agentArgs = argv.slice(index + 1);
-        index = argv.length;
-        break;
+        return opts;
       case "http":
         opts.transport = "http";
         break;
