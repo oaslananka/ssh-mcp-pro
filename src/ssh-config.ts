@@ -101,13 +101,13 @@ export class SSHConfigParser {
       }
 
       // Parse key-value pairs
-      const match = line.match(/^(\S+)\s+(.+)$/);
-      if (!match) {
+      const whitespaceIndex = line.search(/\s/u);
+      if (whitespaceIndex < 0) {
         continue;
       }
 
-      const key = match[1];
-      const value = match[2];
+      const key = line.slice(0, whitespaceIndex);
+      const value = line.slice(whitespaceIndex).trimStart();
       if (!key || !value) {
         continue;
       }

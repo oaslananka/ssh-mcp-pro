@@ -116,15 +116,11 @@ export class RemoteControlPlane {
     this.agentHandler.cleanupEphemeralState(now);
   }
 
-  async handleHttp(req: IncomingMessage, res: ServerResponse, pathname: string): Promise<boolean> {
-    if (pathname === "/.well-known/oauth-protected-resource" && req.method === "GET") {
-      jsonResponse(res, 200, this.oauth.protectedResourceMetadata(), addNoStore());
-      return true;
-    }
-    if (pathname === "/.well-known/oauth-authorization-server" && req.method === "GET") {
-      jsonResponse(res, 200, this.oauth.authorizationServerMetadata(), addNoStore());
-      return true;
-    }
+  private async handleOAuthRequest(
+    req: IncomingMessage,
+    res: ServerResponse,
+    pathname: string,
+  ): Promise<boolean> {
     if (pathname === "/oauth/register" && req.method === "POST") {
       await this.oauth.handleRegister(req, res);
       return true;
@@ -147,6 +143,21 @@ export class RemoteControlPlane {
     }
     if (pathname === "/oauth/jwks.json" && req.method === "GET") {
       await this.oauth.handleJwks(res);
+      return true;
+    }
+    return false;
+  }
+
+  async handleHttp(req: IncomingMessage, res: ServerResponse, pathname: string): Promise<boolean> {
+    if (pathname === "/.well-known/oauth-protected-resource" && req.method === "GET") {
+      jsonResponse(res, 200, this.oauth.protectedResourceMetadata(), addNoStore());
+      return true;
+    }
+    if (pathname === "/.well-known/oauth-authorization-server" && req.method === "GET") {
+      jsonResponse(res, 200, this.oauth.authorizationServerMetadata(), addNoStore());
+      return true;
+    }
+    if (await this.handleOAuthRequest(req, res, pathname)) {
       return true;
     }
     if (pathname === "/readyz" && req.method === "GET") {
@@ -227,50 +238,59 @@ export class RemoteControlPlane {
       return;
     }
     if (method === "tools/call") {
-      const params = isRecord(body.params) ? body.params : {};
-      const name = asString(params.name) as RemoteToolName | undefined;
-      const args = isRecord(params.arguments) ? params.arguments : {};
-      if (!name || !(name in TOOL_CAPABILITY_MAP)) {
-        jsonResponse(res, 200, {
-          jsonrpc: "2.0",
-          id: rpcId,
-          error: { code: -32602, message: "Unknown tool" },
-        });
-        return;
-      }
-      let callResult: unknown;
-      try {
-        callResult = await this.callRemoteTool(principal, name, args);
-      } catch (error) {
-        const isStructured = error !== null && typeof error === "object" && "message" in error;
-        const message = isStructured
-          ? String((error as { message: string }).message)
-          : "Tool call failed";
-        const errorCode =
-          isStructured && "code" in error
-            ? String((error as { code: string }).code)
-            : "TOOL_CALL_FAILED";
-        jsonResponse(res, 200, {
-          jsonrpc: "2.0",
-          id: rpcId,
-          error: { code: -32000, message, data: { code: errorCode } },
-        });
-        return;
-      }
-      jsonResponse(res, 200, {
-        jsonrpc: "2.0",
-        id: rpcId,
-        result: {
-          content: [{ type: "text", text: JSON.stringify(callResult, null, 2) }],
-          structuredContent: callResult,
-        },
-      });
+      await this.handleMcpToolCall(principal, body, rpcId, res);
       return;
     }
     jsonResponse(res, 200, {
       jsonrpc: "2.0",
       id: rpcId,
       error: { code: -32601, message: "Method not found" },
+    });
+  }
+
+  private async handleMcpToolCall(
+    principal: RemotePrincipal,
+    body: Record<string, unknown>,
+    rpcId: unknown,
+    res: ServerResponse,
+  ): Promise<void> {
+    const params = isRecord(body.params) ? body.params : {};
+    const name = asString(params.name) as RemoteToolName | undefined;
+    const args = isRecord(params.arguments) ? params.arguments : {};
+    if (!name || !(name in TOOL_CAPABILITY_MAP)) {
+      jsonResponse(res, 200, {
+        jsonrpc: "2.0",
+        id: rpcId,
+        error: { code: -32602, message: "Unknown tool" },
+      });
+      return;
+    }
+    let callResult: unknown;
+    try {
+      callResult = await this.callRemoteTool(principal, name, args);
+    } catch (error) {
+      const isStructured = error !== null && typeof error === "object" && "message" in error;
+      const message = isStructured
+        ? String((error as { message: string }).message)
+        : "Tool call failed";
+      const errorCode =
+        isStructured && "code" in error
+          ? String((error as { code: string }).code)
+          : "TOOL_CALL_FAILED";
+      jsonResponse(res, 200, {
+        jsonrpc: "2.0",
+        id: rpcId,
+        error: { code: -32000, message, data: { code: errorCode } },
+      });
+      return;
+    }
+    jsonResponse(res, 200, {
+      jsonrpc: "2.0",
+      id: rpcId,
+      result: {
+        content: [{ type: "text", text: JSON.stringify(callResult, null, 2) }],
+        structuredContent: callResult,
+      },
     });
   }
 
