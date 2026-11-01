@@ -187,6 +187,22 @@ describe("detectOS", () => {
     );
   });
 
+  test("parses RHEL versions without backtracking on long digit runs", async () => {
+    const ssh = createSSH({
+      "uname -m": { code: 0, stdout: "x86_64" },
+      "uname -s": { code: 0, stdout: "Linux" },
+      "echo $SHELL": { code: 0, stdout: "/bin/bash" },
+      "cat /etc/os-release": { code: 1 },
+      "cat /etc/lsb-release": { code: 1 },
+      "cat /etc/redhat-release": {
+        code: 0,
+        stdout: "RHEL " + "9".repeat(50000) + " no dotted version 12.34",
+      },
+    });
+    const result = await detectOS(ssh);
+    expect(result).toMatchObject({ distro: "rhel", version: "12.34" });
+  });
+
   test("detects macOS via fallback and Windows with Chocolatey", async () => {
     const mac = createSSH({
       "uname -m": { code: 0, stdout: "arm64\n" },
