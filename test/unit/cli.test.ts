@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { parseArgs } from "../../src/cli.js";
+import { applyHttpCliEnvironment, parseArgs } from "../../src/cli.js";
 
 describe("parseArgs", () => {
   test("returns stdio defaults with optional values unset", () => {
@@ -129,6 +129,48 @@ describe("parseArgs", () => {
   test("agent enroll captures agent args", () => {
     expect(parseArgs(["agent", "enroll", "--server", "https://example.test"])).toMatchObject({
       agentArgs: ["enroll", "--server", "https://example.test"],
+    });
+  });
+});
+
+describe("HTTP CLI environment overrides", () => {
+  test("applies all supplied options without changing unrelated environment variables", () => {
+    const options = parseArgs([
+      "http",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "3100",
+      "--bearer-token-file",
+      "/tmp/token",
+      "--enable-legacy-sse",
+      "--tool-profile",
+      "remote-safe",
+      "--connector-credential-provider",
+      "agent",
+    ]);
+    const env: NodeJS.ProcessEnv = { UNRELATED: "preserve" };
+    applyHttpCliEnvironment(options, env);
+    expect(env).toEqual({
+      UNRELATED: "preserve",
+      SSH_MCP_HTTP_HOST: "127.0.0.1",
+      SSH_MCP_HTTP_PORT: "3100",
+      SSH_MCP_HTTP_BEARER_TOKEN_FILE: "/tmp/token",
+      SSH_MCP_ENABLE_LEGACY_SSE: "true",
+      SSH_MCP_TOOL_PROFILE: "remote-safe",
+      SSH_MCP_CONNECTOR_CREDENTIAL_PROVIDER: "agent",
+    });
+  });
+
+  test("leaves existing overrides untouched when HTTP options are absent", () => {
+    const env: NodeJS.ProcessEnv = {
+      SSH_MCP_HTTP_PORT: "4000",
+      SSH_MCP_ENABLE_LEGACY_SSE: "false",
+    };
+    applyHttpCliEnvironment(parseArgs(["http"]), env);
+    expect(env).toEqual({
+      SSH_MCP_HTTP_PORT: "4000",
+      SSH_MCP_ENABLE_LEGACY_SSE: "false",
     });
   });
 });

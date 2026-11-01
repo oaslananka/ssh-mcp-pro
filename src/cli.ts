@@ -88,3 +88,28 @@ export function parseArgs(argv: string[]): CliOptions {
 
   return opts;
 }
+
+// Apply HTTP CLI overrides without changing values omitted by the caller.
+export function applyHttpCliEnvironment(
+  opts: CliOptions,
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  if (opts.host) {
+    env.SSH_MCP_HTTP_HOST = opts.host;
+  }
+  if (opts.port) {
+    env.SSH_MCP_HTTP_PORT = opts.port;
+  }
+  if (opts.bearerTokenFile) {
+    env.SSH_MCP_HTTP_BEARER_TOKEN_FILE = opts.bearerTokenFile;
+  }
+  if (opts.enableLegacySse) {
+    env.SSH_MCP_ENABLE_LEGACY_SSE = "true";
+  }
+  if (opts.toolProfile) {
+    env.SSH_MCP_TOOL_PROFILE = opts.toolProfile;
+  }
+  if (opts.connectorCredentialProvider) {
+    env.SSH_MCP_CONNECTOR_CREDENTIAL_PROVIDER = opts.connectorCredentialProvider;
+  }
+}

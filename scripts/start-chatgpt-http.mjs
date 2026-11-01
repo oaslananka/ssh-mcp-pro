@@ -99,7 +99,11 @@ try {
 if (parsedPublicUrl.protocol !== "https:") {
   fail("SSH_MCP_HTTP_PUBLIC_URL must use https:");
 }
-if (parsedPublicUrl.pathname.replace(/\/+$/u, "") !== "/mcp") {
+let endpointPath = parsedPublicUrl.pathname;
+while (endpointPath.endsWith("/")) {
+  endpointPath = endpointPath.slice(0, -1);
+}
+if (endpointPath !== "/mcp") {
   fail("SSH_MCP_HTTP_PUBLIC_URL path must be /mcp");
 }
 
