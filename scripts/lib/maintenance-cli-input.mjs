@@ -55,13 +55,19 @@ export function parsePinnedPackageManager(value) {
 
 /** Only strip a peer suffix when an opening parenthesis has content after it. */
 export function stripLockPeerSuffix(version) {
-  const unquoted = version.trim().replace(/^"|"$/gu, "");
+  let unquoted = version.trim();
+  if (unquoted.startsWith('"')) unquoted = unquoted.slice(1);
+  if (unquoted.endsWith('"')) unquoted = unquoted.slice(0, -1);
   const opening = unquoted.indexOf("(");
   return opening >= 0 && opening < unquoted.length - 1 ? unquoted.slice(0, opening) : unquoted;
 }
 
+function isWhitespace(char) {
+  return char !== undefined && char.trim().length === 0;
+}
+
 function skipWhitespace(value, offset) {
-  while (offset < value.length && /\s/u.test(value[offset])) offset++;
+  while (offset < value.length && isWhitespace(value[offset])) offset++;
   return offset;
 }
 
@@ -76,7 +82,7 @@ export function splitLicenseExpression(license) {
   const parts = [];
   let start = 0;
   let position = 0;
-  const whitespace = (char) => char !== undefined && /\s/u.test(char);
+  const whitespace = isWhitespace;
   while (position < license.length) {
     if (license[position] === "/") {
       parts.push(license.slice(start, position));
@@ -104,11 +110,11 @@ export function splitLicenseExpression(license) {
 /** Parse a single .env assignment while preserving whitespace within the value. */
 export function parseEnvAssignment(rawLine) {
   let text = rawLine.trimStart();
-  if (text.startsWith("export") && /\s/u.test(text[6] ?? "")) {
-    const candidate = text.slice(6).trimStart();
-    if (/^[A-Za-z_]/u.test(candidate)) text = candidate;
-  }
   const isLetter = (char) => (char >= "A" && char <= "Z") || (char >= "a" && char <= "z");
+  if (text.startsWith("export") && isWhitespace(text[6])) {
+    const candidate = text.slice(6).trimStart();
+    if (isLetter(candidate[0]) || candidate[0] === "_") text = candidate;
+  }
   if (!text || (!isLetter(text[0]) && text[0] !== "_")) return undefined;
   let end = 1;
   while (end < text.length) {
