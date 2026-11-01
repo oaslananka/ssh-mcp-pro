@@ -3,7 +3,8 @@ import { OSInfo } from "./types.js";
 export const POSIX_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/u;
 
 function shellQuote(value: string): string {
-  return `'${value.replaceAll("'", `'\"'\"'`)}'`;
+  const escaped = value.replaceAll("'", "'\"'\"'");
+  return `'${escaped}'`;
 }
 
 function powerShellQuote(value: string): string {

@@ -51,7 +51,8 @@ export interface FsServiceDeps {
 }
 
 function shellQuote(value: string): string {
-  return `'${String(value).replaceAll("'", `'"'"'`)}'`;
+  const escaped = String(value).replaceAll("'", "'\"'\"'");
+  return `'${escaped}'`;
 }
 
 function createDirListResult(entries: DirEntry[], nextToken?: string): DirListResult {

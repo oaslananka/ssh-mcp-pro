@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
 import {
+  canonicalJson,
   ensurePemKeyPair,
   generateEd25519PemKeyPair,
   hashSecret,
@@ -40,6 +41,20 @@ function testConfig(dir: string): RemoteConfig {
 }
 
 describe("remote crypto helpers", () => {
+  test("canonical JSON preserves nested key ordering for signed payloads", () => {
+    const payload = {
+      z: 1,
+      nested: { b: true, a: 'quoted "value"' },
+      a: [3, { y: null, x: "ok" }],
+    };
+    const expected = JSON.stringify({
+      a: [3, { x: "ok", y: null }],
+      nested: { a: 'quoted "value"', b: true },
+      z: 1,
+    });
+    expect(canonicalJson(payload)).toBe(expected);
+  });
+
   test("hashes and compares secrets without storing plaintext", () => {
     const hash = hashSecret("one-time-token");
 
