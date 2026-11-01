@@ -76,6 +76,14 @@ function isPermissionError(error: unknown): boolean {
   );
 }
 
+function removeTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end--;
+  }
+  return value.slice(0, end);
+}
+
 export function createEnsureService({
   sessionManager,
   processService,
@@ -234,7 +242,7 @@ export function createEnsureService({
           }
 
           const tempDir = resolveRemoteTempDir(osInfo);
-          const baseTempDir = tempDir.replace(/\/+$/, "");
+          const baseTempDir = removeTrailingSlashes(tempDir);
           const tempFile = `${baseTempDir}/ssh-mcp-${randomUUID()}.tmp`;
 
           try {
@@ -357,7 +365,7 @@ export function createEnsureService({
       }
 
       const tempDir = resolveRemoteTempDir(osInfo);
-      const baseTempDir = tempDir.replace(/\/+$/, "");
+      const baseTempDir = removeTrailingSlashes(tempDir);
       const tempPatchFile = `${baseTempDir}/ssh-mcp-patch-${randomUUID()}.patch`;
       await fsService.writeFile(sessionId, tempPatchFile, diff);
 

@@ -131,7 +131,7 @@ describe("remote agent CLI", () => {
       await runAgentCli([
         "enroll",
         "--server",
-        "https://sshautomator.example/",
+        "https://sshautomator.example///",
         "--token",
         oneTimeToken,
         "--alias",

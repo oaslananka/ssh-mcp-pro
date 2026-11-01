@@ -50,7 +50,7 @@ export function normalizeSha256Fingerprint(fingerprint: string): string {
 /** Compute SHA256 fingerprint(s) from a base64 key blob. */
 export function knownHostKeyFingerprints(keyBlob: string): string[] {
   const key = Buffer.from(keyBlob, "base64");
-  const base64 = createHash("sha256").update(key).digest("base64").replace(/=+$/, "");
+  const base64 = createHash("sha256").update(key).digest("base64").replaceAll("=", "");
   const hex = createHash("sha256").update(key).digest("hex");
   return [base64, hex];
 }

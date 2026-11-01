@@ -91,6 +91,18 @@ async function execWithTimeout<T>(work: Promise<T>, timeoutMs: number, label: st
   }
 }
 
+function isSudoAuthenticationFailure(result: { code?: number | null; stderr?: string }): boolean {
+  if ((result.code ?? 0) === 0 || !result.stderr) {
+    return false;
+  }
+  const stderrLower = result.stderr.toLowerCase();
+  return (
+    stderrLower.includes("password") ||
+    stderrLower.includes("authentication") ||
+    stderrLower.includes("sorry")
+  );
+}
+
 export function createProcessService({
   sessionManager,
   config,
@@ -244,18 +256,11 @@ export function createProcessService({
         "Sudo command",
       );
 
-      if ((result.code ?? 0) !== 0 && result.stderr) {
-        const stderrLower = result.stderr.toLowerCase();
-        if (
-          stderrLower.includes("password") ||
-          stderrLower.includes("authentication") ||
-          stderrLower.includes("sorry")
-        ) {
-          throw createSudoError(
-            "Sudo authentication failed",
-            "Configure a restricted NOPASSWD sudoers profile for approved commands.",
-          );
-        }
+      if (isSudoAuthenticationFailure(result)) {
+        throw createSudoError(
+          "Sudo authentication failed",
+          "Configure a restricted NOPASSWD sudoers profile for approved commands.",
+        );
       }
 
       const execResult: ExecResult = {
