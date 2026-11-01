@@ -70,27 +70,6 @@ function printVersion() {
   process.stdout.write(`${pkg.version ?? "0.0.0"}\n`);
 }
 
-function configureHttpEnvironment(opts: ReturnType<typeof parseArgs>): void {
-  if (opts.host) {
-    process.env.SSH_MCP_HTTP_HOST = opts.host;
-  }
-  if (opts.port) {
-    process.env.SSH_MCP_HTTP_PORT = opts.port;
-  }
-  if (opts.bearerTokenFile) {
-    process.env.SSH_MCP_HTTP_BEARER_TOKEN_FILE = opts.bearerTokenFile;
-  }
-  if (opts.enableLegacySse) {
-    process.env.SSH_MCP_ENABLE_LEGACY_SSE = "true";
-  }
-  if (opts.toolProfile) {
-    process.env.SSH_MCP_TOOL_PROFILE = opts.toolProfile;
-  }
-  if (opts.connectorCredentialProvider) {
-    process.env.SSH_MCP_CONNECTOR_CREDENTIAL_PROVIDER = opts.connectorCredentialProvider;
-  }
-}
-
 async function main() {
   const argv = process.argv.slice(2);
   const opts = parseArgs(argv);
@@ -117,7 +96,24 @@ async function main() {
   }
 
   if (opts.transport === "http") {
-    configureHttpEnvironment(opts);
+    if (opts.host) {
+      process.env.SSH_MCP_HTTP_HOST = opts.host;
+    }
+    if (opts.port) {
+      process.env.SSH_MCP_HTTP_PORT = opts.port;
+    }
+    if (opts.bearerTokenFile) {
+      process.env.SSH_MCP_HTTP_BEARER_TOKEN_FILE = opts.bearerTokenFile;
+    }
+    if (opts.enableLegacySse) {
+      process.env.SSH_MCP_ENABLE_LEGACY_SSE = "true";
+    }
+    if (opts.toolProfile) {
+      process.env.SSH_MCP_TOOL_PROFILE = opts.toolProfile;
+    }
+    if (opts.connectorCredentialProvider) {
+      process.env.SSH_MCP_CONNECTOR_CREDENTIAL_PROVIDER = opts.connectorCredentialProvider;
+    }
     const { startHttpServer } = await import("./server-http.js");
     httpRuntime = await startHttpServer({ registerSignalHandlers: false });
     return;
