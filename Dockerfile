@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
 FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS alpine-patched
-# The pinned Node image predates the Alpine zlib CVE-2026-85091 fix.
-# Fail closed if the patched package is unavailable; keep build/runtime aligned.
-RUN apk add --no-cache 'zlib>=1.3.2-r1'
+# Keep the pinned base digest while applying Alpine's patched zlib and musl packages.
+# Fail closed if a fix is unavailable; keep build/runtime aligned.
+RUN apk add --no-cache 'zlib>=1.3.2-r1' 'musl>=1.2.6-r3' 'musl-utils>=1.2.6-r3'
 
 FROM alpine-patched AS build
 WORKDIR /app
