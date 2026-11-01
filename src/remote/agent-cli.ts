@@ -138,8 +138,16 @@ function runtimeWebSocket(): RuntimeWebSocketConstructor {
   return candidate;
 }
 
+function removeTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end--;
+  }
+  return value.slice(0, end);
+}
+
 async function enroll(argv: string[]): Promise<void> {
-  const server = parseFlag(argv, "--server")?.replace(/\/+$/u, "");
+  const server = removeTrailingSlashes(parseFlag(argv, "--server") ?? "");
   const token = parseFlag(argv, "--token");
   const alias = parseFlag(argv, "--alias") ?? os.hostname();
   if (!server || !token) {

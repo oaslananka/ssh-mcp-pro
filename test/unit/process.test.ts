@@ -100,6 +100,28 @@ describe("createProcessService", () => {
     });
   });
 
+  test.each(["password required", "authentication failed", "Sorry, try again"])(
+    "classifies sudo authentication stderr: %s",
+    async (stderr) => {
+      const { config, execCommand, policy, sessionManager } = createDeps();
+      execCommand.mockResolvedValue({ code: 1, stdout: "", stderr });
+      const service = createProcessService({ sessionManager, config, policy } as any);
+      await expect(service.execSudo("session-1", "id")).rejects.toMatchObject({
+        code: ErrorCode.ENOSUDO,
+      });
+    },
+  );
+
+  test("does not classify a successful sudo command with warning text as failed authentication", async () => {
+    const { config, execCommand, policy, sessionManager } = createDeps();
+    execCommand.mockResolvedValue({ code: 0, stdout: "ok", stderr: "password warning" });
+    const service = createProcessService({ sessionManager, config, policy } as any);
+    await expect(service.execSudo("session-1", "id")).resolves.toMatchObject({
+      code: 0,
+      stdout: "ok",
+    });
+  });
+
   test("rejects sudo passwords before constructing a remote command", async () => {
     const { config, execCommand, policy, sessionManager } = createDeps();
     const service = createProcessService({ sessionManager, config, policy } as any);
