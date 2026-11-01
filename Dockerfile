@@ -9,6 +9,7 @@ FROM alpine-patched AS build
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 RUN corepack enable && corepack prepare pnpm@11.28.5 --activate && pnpm install --frozen-lockfile --ignore-scripts
 
 COPY tsconfig.json typedoc.json ./
@@ -32,6 +33,7 @@ LABEL org.opencontainers.image.title="ssh-mcp-pro" \
 ENV NODE_ENV=production
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY patches ./patches
 RUN corepack enable && \
     corepack prepare pnpm@11.28.5 --activate && \
     pnpm install --prod --frozen-lockfile --ignore-scripts && \
