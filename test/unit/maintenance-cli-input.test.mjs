@@ -8,6 +8,8 @@ import {
   parseEnvAssignment,
   hasMcpEndpointPath,
   findNodeEngineFloorVersions,
+  nodeRuntimeStatus,
+  mutationScoreSymbol,
 } from "../../scripts/lib/maintenance-cli-input.mjs";
 
 describe("pure maintenance CLI input validation", () => {
@@ -150,5 +152,29 @@ describe("bounded Node engine version scanner", () => {
     const long = "8".repeat(40_000);
     expect(findNodeEngineFloorVersions(long + "x 24.15.0")).toEqual(["24.15.0"]);
     expect(findNodeEngineFloorVersions("^22." + long + ".24")).toEqual(["22." + long + ".24"]);
+  });
+});
+
+describe("maintenance report classification", () => {
+  test.each([
+    [{ status: "fail" }, true, "fail"],
+    [{ status: "fail" }, false, "fail"],
+    [{ status: "pass" }, true, "advisory"],
+    [{ status: "pass" }, false, "pass"],
+    [{ status: "pass" }, undefined, "pass"],
+  ])("preserves lifecycle precedence for %j and %s", (lifecycle, newer, expected) => {
+    expect(nodeRuntimeStatus(lifecycle, newer)).toBe(expected);
+  });
+
+  test.each([
+    [100, "✅"],
+    [80, "✅"],
+    [79.9, "⚠️"],
+    [60, "⚠️"],
+    [59.9, "❌"],
+    [0, "❌"],
+    [Number.NaN, "❌"],
+  ])("formats mutation score band for %s", (score, expected) => {
+    expect(mutationScoreSymbol(score)).toBe(expected);
   });
 });

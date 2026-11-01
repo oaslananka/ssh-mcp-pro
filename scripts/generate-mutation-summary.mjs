@@ -3,6 +3,7 @@
 import { readFileSync, existsSync, appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { mutationScoreSymbol } from "./lib/maintenance-cli-input.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const reportPath = join(__dirname, "..", "reports", "mutation", "mutation.json");
@@ -22,7 +23,7 @@ const totalUndetected = (report.survived ?? 0) + (report.noCoverage ?? 0);
 const total = totalDetected + totalUndetected;
 const scoreFormatted = score.toFixed(1);
 
-const status = score >= 80 ? "✅" : score >= 60 ? "⚠️" : "❌";
+const status = mutationScoreSymbol(score);
 
 const lines = [
   "## Mutation Test Report",

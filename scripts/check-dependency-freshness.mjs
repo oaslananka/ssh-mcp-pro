@@ -6,6 +6,7 @@ import {
   findNodeEngineFloorVersions,
   parsePinnedPackageManager,
   stripLockPeerSuffix,
+  nodeRuntimeStatus,
 } from "./lib/maintenance-cli-input.mjs";
 
 const NODE_INDEX_URL = "https://nodejs.org/dist/index.json";
@@ -55,18 +56,18 @@ export function parseRootImporterVersions(lockText) {
     if (inRootImporter && line.startsWith("  ") && !line.startsWith("    ")) {
       break;
     }
-    const groupMatch = /^    (dependencies|devDependencies):$/u.exec(line);
+    const groupMatch = /^ {4}(dependencies|devDependencies):$/u.exec(line);
     if (inRootImporter && groupMatch) {
       group = groupMatch[1];
       packageName = undefined;
       continue;
     }
-    const packageMatch = /^      (?:"([^"]+)"|'([^']+)'|([^:]+)):$/u.exec(line);
+    const packageMatch = /^ {6}(?:"([^"]+)"|'([^']+)'|([^:]+)):$/u.exec(line);
     if (inRootImporter && group && packageMatch) {
       packageName = packageMatch[1] ?? packageMatch[2] ?? packageMatch[3];
       continue;
     }
-    const versionMatch = /^        version: (.+)$/u.exec(line);
+    const versionMatch = /^ {8}version: (.+)$/u.exec(line);
     if (inRootImporter && group && packageName && versionMatch) {
       versions.set(packageName, stripLockVersion(versionMatch[1]));
     }
@@ -161,7 +162,7 @@ function nodeRuntimeEntries(packageJson, nodeIndex, nodeSchedule, today) {
       component: `node ${major} engine floor`,
       current: version,
       latest,
-      status: lifecycle.status === "fail" ? "fail" : newer ? "advisory" : "pass",
+      status: nodeRuntimeStatus(lifecycle, newer),
       note: nodeNote(lifecycle, newer),
     };
   });
@@ -195,7 +196,7 @@ async function localToolchainEntries(nodeIndex, nodeSchedule, today) {
       component: file,
       current: version,
       latest,
-      status: lifecycle.status === "fail" ? "fail" : newer ? "advisory" : "pass",
+      status: nodeRuntimeStatus(lifecycle, newer),
       note: nodeNote(lifecycle, newer),
     });
   }

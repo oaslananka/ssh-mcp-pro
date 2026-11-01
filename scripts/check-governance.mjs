@@ -95,7 +95,8 @@ export function validateProjectItems(projectPayload, issues) {
 }
 
 export function formatFailures(failures) {
-  return `Governance check failed:\n${failures.map((failure) => `- ${failure}`).join("\n")}`;
+  const items = failures.map((failure) => `- ${failure}`).join("\n");
+  return `Governance check failed:\n${items}`;
 }
 
 export function formatGhFailure(args, result) {

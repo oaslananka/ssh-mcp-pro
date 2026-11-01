@@ -174,3 +174,16 @@ export function findNodeEngineFloorVersions(range) {
   }
   return versions;
 }
+
+/** Keep runtime advisory precedence below failed lifecycle checks. */
+export function nodeRuntimeStatus(lifecycle, newer) {
+  if (lifecycle.status === "fail") return "fail";
+  return newer ? "advisory" : "pass";
+}
+
+/** Classify mutation scores without nested ternaries. */
+export function mutationScoreSymbol(score) {
+  if (score >= 80) return "✅";
+  if (score >= 60) return "⚠️";
+  return "❌";
+}

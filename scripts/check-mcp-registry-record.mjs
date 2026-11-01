@@ -104,8 +104,10 @@ async function main() {
 const invokedScriptUrl = process.argv[1] ? pathToFileURL(process.argv[1]).href : undefined;
 
 if (import.meta.url === invokedScriptUrl) {
-  main().catch((error) => {
+  try {
+    await main();
+  } catch (error) {
     console.error(formatError(error));
     process.exitCode = 1;
-  });
+  }
 }

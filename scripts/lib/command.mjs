@@ -148,6 +148,6 @@ export function commandFailure(label, result) {
   return {
     ok: false,
     status: result.status ?? null,
-    error: `${label} failed${output ? `: ${output.trim()}` : "."}`,
+    error: output ? `${label} failed: ${output.trim()}` : `${label} failed.`,
   };
 }

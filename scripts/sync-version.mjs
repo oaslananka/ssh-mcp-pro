@@ -13,7 +13,7 @@ const jsonTargets = [
   ["apps/claude/connector-readiness.json", ["mcp", "version"]],
 ];
 
-const textTargets = [["src/mcp.ts", /export const SERVER_VERSION = "([^"]+)";/u]];
+const textTargets = [{ file: "src/mcp.ts", pattern: /export const SERVER_VERSION = "([^"]+)";/u }];
 const mismatches = [];
 
 function getPath(object, path) {
@@ -44,7 +44,7 @@ for (const [file, ...paths] of jsonTargets) {
   }
 }
 
-for (const [file, pattern] of textTargets) {
+for (const { file, pattern } of textTargets) {
   const text = readFileSync(file, "utf8");
   const match = text.match(pattern);
   if (!match) {
