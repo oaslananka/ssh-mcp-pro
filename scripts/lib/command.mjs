@@ -46,6 +46,11 @@ function invocation(command, args) {
   }
   const pathShim = findShimInPath(normalized);
   if (pathShim) {
+    // cmd.exe expands variables in script paths as well as in arguments.
+    // A PATH entry containing metacharacters must not become command text.
+    if (/[&|<>^%!"\r\n]/u.test(pathShim)) {
+      throw new Error("Refusing unsafe Windows command shim path");
+    }
     validateWindowsShimArgs(args);
     return {
       command: process.env.ComSpec ?? "cmd.exe",
