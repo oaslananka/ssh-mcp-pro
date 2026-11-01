@@ -50,18 +50,18 @@ export function parseRootImporterVersions(lockText) {
     if (inRootImporter && line.startsWith("  ") && !line.startsWith("    ")) {
       break;
     }
-    const groupMatch = /^ {4}(dependencies|devDependencies):$/u.exec(line);
+    const groupMatch = /^    (dependencies|devDependencies):$/u.exec(line);
     if (inRootImporter && groupMatch) {
       group = groupMatch[1];
       packageName = undefined;
       continue;
     }
-    const packageMatch = /^ {6}(?:"([^"]+)"|'([^']+)'|([^:]+)):$/u.exec(line);
+    const packageMatch = /^      (?:"([^"]+)"|'([^']+)'|([^:]+)):$/u.exec(line);
     if (inRootImporter && group && packageMatch) {
       packageName = packageMatch[1] ?? packageMatch[2] ?? packageMatch[3];
       continue;
     }
-    const versionMatch = /^ {8}version: (.+)$/u.exec(line);
+    const versionMatch = /^        version: (.+)$/u.exec(line);
     if (inRootImporter && group && packageName && versionMatch) {
       versions.set(packageName, stripLockVersion(versionMatch[1]));
     }
@@ -322,7 +322,7 @@ function stripLockVersion(version) {
 }
 
 function escapeMarkdown(value) {
-  return String(value).replaceAll("\\", "\\\\").replaceAll("|", "\\|");
+  return String(value).replace(/\\/gu, "\\\\").replace(/\|/gu, "\\|");
 }
 
 function appendReleaseNotes(note, releaseNotesUrl, status) {
