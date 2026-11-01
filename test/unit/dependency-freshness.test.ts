@@ -64,6 +64,27 @@ describe("dependency freshness helpers", () => {
     });
   });
 
+  test("requires exact lockfile indentation for root importer groups and versions", () => {
+    const text = [
+      "importers:",
+      "  .:",
+      "    dependencies:",
+      "      valid:",
+      "        version: 1.2.3",
+      "       version: 9.9.9",
+      "     invalid:",
+      "       version: 8.8.8",
+      "    devDependencies:",
+      "      other:",
+      "        version: 3.4.5",
+      "packages:",
+    ].join("\n");
+    expect(Object.fromEntries(freshness.parseRootImporterVersions(text))).toEqual({
+      valid: "1.2.3",
+      other: "3.4.5",
+    });
+  });
+
   test("treats newer versions as advisory and deprecations as failures", () => {
     expect(freshness.statusForPackage("1.0.0", "1.1.0")).toMatchObject({
       status: "advisory",

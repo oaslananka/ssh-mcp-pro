@@ -6,6 +6,8 @@ import {
   findNodeEngineFloorVersions,
   parsePinnedPackageManager,
   stripLockPeerSuffix,
+  nodeRuntimeStatus,
+  parseRootImporterVersions,
 } from "./lib/maintenance-cli-input.mjs";
 
 const NODE_INDEX_URL = "https://nodejs.org/dist/index.json";
@@ -41,38 +43,7 @@ export function parseNodeEngineFloors(range) {
   }));
 }
 
-export function parseRootImporterVersions(lockText) {
-  const versions = new Map();
-  let inRootImporter = false;
-  let group;
-  let packageName;
-
-  for (const line of lockText.split(/\r?\n/u)) {
-    if (line === "  .:") {
-      inRootImporter = true;
-      continue;
-    }
-    if (inRootImporter && line.startsWith("  ") && !line.startsWith("    ")) {
-      break;
-    }
-    const groupMatch = /^    (dependencies|devDependencies):$/u.exec(line);
-    if (inRootImporter && groupMatch) {
-      group = groupMatch[1];
-      packageName = undefined;
-      continue;
-    }
-    const packageMatch = /^      (?:"([^"]+)"|'([^']+)'|([^:]+)):$/u.exec(line);
-    if (inRootImporter && group && packageMatch) {
-      packageName = packageMatch[1] ?? packageMatch[2] ?? packageMatch[3];
-      continue;
-    }
-    const versionMatch = /^        version: (.+)$/u.exec(line);
-    if (inRootImporter && group && packageName && versionMatch) {
-      versions.set(packageName, stripLockVersion(versionMatch[1]));
-    }
-  }
-  return versions;
-}
+export { parseRootImporterVersions };
 
 export function statusForPackage(current, latest, deprecated) {
   if (deprecated) {
@@ -161,7 +132,7 @@ function nodeRuntimeEntries(packageJson, nodeIndex, nodeSchedule, today) {
       component: `node ${major} engine floor`,
       current: version,
       latest,
-      status: lifecycle.status === "fail" ? "fail" : newer ? "advisory" : "pass",
+      status: nodeRuntimeStatus(lifecycle, newer),
       note: nodeNote(lifecycle, newer),
     };
   });
@@ -195,7 +166,7 @@ async function localToolchainEntries(nodeIndex, nodeSchedule, today) {
       component: file,
       current: version,
       latest,
-      status: lifecycle.status === "fail" ? "fail" : newer ? "advisory" : "pass",
+      status: nodeRuntimeStatus(lifecycle, newer),
       note: nodeNote(lifecycle, newer),
     });
   }

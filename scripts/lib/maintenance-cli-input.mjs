@@ -174,3 +174,55 @@ export function findNodeEngineFloorVersions(range) {
   }
   return versions;
 }
+
+/** Keep runtime advisory precedence below failed lifecycle checks. */
+export function nodeRuntimeStatus(lifecycle, newer) {
+  if (lifecycle.status === "fail") return "fail";
+  return newer ? "advisory" : "pass";
+}
+
+/** Classify mutation scores without nested ternaries. */
+export function mutationScoreSymbol(score) {
+  if (score >= 80) return "✅";
+  if (score >= 60) return "⚠️";
+  return "❌";
+}
+
+function recordRootImporterVersion(line, group, packageName, versions) {
+  const match = /^ {8}version: (.+)$/u.exec(line);
+  if (group && packageName && match) {
+    versions.set(packageName, stripLockPeerSuffix(match[1]));
+  }
+}
+
+export function parseRootImporterVersions(lockText) {
+  const versions = new Map();
+  let inRootImporter = false;
+  let group;
+  let packageName;
+
+  for (const line of lockText.split(/\r?\n/u)) {
+    if (line === "  .:") {
+      inRootImporter = true;
+      continue;
+    }
+    if (inRootImporter && line.startsWith("  ") && !line.startsWith("    ")) {
+      break;
+    }
+    const groupMatch = /^ {4}(dependencies|devDependencies):$/u.exec(line);
+    if (inRootImporter && groupMatch) {
+      group = groupMatch[1];
+      packageName = undefined;
+      continue;
+    }
+    const packageMatch = /^ {6}(?:"([^"]+)"|'([^']+)'|([^:]+)):$/u.exec(line);
+    if (inRootImporter && group && packageMatch) {
+      packageName = packageMatch[1] ?? packageMatch[2] ?? packageMatch[3];
+      continue;
+    }
+    if (inRootImporter) {
+      recordRootImporterVersion(line, group, packageName, versions);
+    }
+  }
+  return versions;
+}

@@ -15,6 +15,7 @@ type GovernanceModule = {
   ): string[];
   extractProjectItemIssueNumbers(projectPayload: unknown): Set<number>;
   validateProjectItems(projectPayload: unknown, issues: Issue[] | null | undefined): string[];
+  formatFailures(failures: string[]): string;
   formatGhFailure(args: string[], result: GhFailureResult): string;
 };
 
@@ -148,6 +149,14 @@ describe("governance check", () => {
         ],
       }),
     ).toEqual(new Set([50, 48]));
+  });
+
+  test("formats governance failures with the existing Markdown line layout", async () => {
+    const { formatFailures } = await loadGovernanceCheck();
+    expect(formatFailures([])).toBe("Governance check failed:\n");
+    expect(formatFailures(["missing field", "mismatched label"])).toBe(
+      "Governance check failed:\n- missing field\n- mismatched label",
+    );
   });
 
   test("explains the project auth scope needed by the GitHub CLI", async () => {

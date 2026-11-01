@@ -8,6 +8,9 @@ import {
   parseEnvAssignment,
   hasMcpEndpointPath,
   findNodeEngineFloorVersions,
+  nodeRuntimeStatus,
+  mutationScoreSymbol,
+  parseRootImporterVersions,
 } from "../../scripts/lib/maintenance-cli-input.mjs";
 
 describe("pure maintenance CLI input validation", () => {
@@ -150,5 +153,83 @@ describe("bounded Node engine version scanner", () => {
     const long = "8".repeat(40_000);
     expect(findNodeEngineFloorVersions(long + "x 24.15.0")).toEqual(["24.15.0"]);
     expect(findNodeEngineFloorVersions("^22." + long + ".24")).toEqual(["22." + long + ".24"]);
+  });
+});
+
+describe("maintenance report classification", () => {
+  test.each([
+    [{ status: "fail" }, true, "fail"],
+    [{ status: "fail" }, false, "fail"],
+    [{ status: "pass" }, true, "advisory"],
+    [{ status: "pass" }, false, "pass"],
+    [{ status: "pass" }, undefined, "pass"],
+  ])("preserves lifecycle precedence for %j and %s", (lifecycle, newer, expected) => {
+    expect(nodeRuntimeStatus(lifecycle, newer)).toBe(expected);
+  });
+
+  test.each([
+    [100, "✅"],
+    [80, "✅"],
+    [79.9, "⚠️"],
+    [60, "⚠️"],
+    [59.9, "❌"],
+    [0, "❌"],
+    [Number.NaN, "❌"],
+  ])("formats mutation score band for %s", (score, expected) => {
+    expect(mutationScoreSymbol(score)).toBe(expected);
+  });
+});
+
+describe("covered pnpm root importer parser", () => {
+  test("ignores package records outside the root importer", () => {
+    const input = [
+      "importers:",
+      "  other:",
+      "    dependencies:",
+      "      should-not-match:",
+      "        version: 1.2.3",
+      "packages:",
+    ].join("\n");
+    expect([...parseRootImporterVersions(input)]).toEqual([]);
+  });
+
+  test("preserves quoted package names, peer suffixes, and root section boundaries", () => {
+    const input = [
+      "importers:",
+      "  .:",
+      "    dependencies:",
+      "      '@scope/lib':",
+      "        version: 2.1.0(peer@3.0.0)",
+      '      "double-quoted":',
+      "        version: 3.4.5",
+      "    devDependencies:",
+      "      eslint:",
+      '        version: "9.0.1"',
+      "  next:",
+      "    dependencies:",
+      "      ignored:",
+      "        version: 9.9.9",
+    ].join("\n");
+    expect(Object.fromEntries(parseRootImporterVersions(input))).toEqual({
+      "@scope/lib": "2.1.0",
+      "double-quoted": "3.4.5",
+      eslint: "9.0.1",
+    });
+  });
+
+  test("ignores unrecognized lockfile sections and missing package identifiers", () => {
+    const input = [
+      "importers:",
+      "  .:",
+      "    dependencies:",
+      "        version: orphan",
+      "      valid:",
+      "        version: 1.2.3",
+      "    optionalDependencies:",
+      "      optional:",
+      "        version: 4.0.0",
+    ].join("\n");
+    const result = parseRootImporterVersions(input);
+    expect(result.get("valid")).toBe("1.2.3");
   });
 });

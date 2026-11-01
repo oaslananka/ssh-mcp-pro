@@ -209,4 +209,4 @@ process.on("SIGTERM", () => {
 });
 
 // Run the server
-void main();
+await main();

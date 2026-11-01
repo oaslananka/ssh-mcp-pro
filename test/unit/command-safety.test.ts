@@ -58,6 +58,19 @@ describe("maintenance subprocess security boundaries", () => {
     );
   });
 
+  test("preserves failure message punctuation and nonempty diagnostic output", () => {
+    expect(commandFailure("node", { status: 2, stderr: "", stdout: "" })).toEqual({
+      ok: false,
+      status: 2,
+      error: "node failed.",
+    });
+    expect(commandFailure("npm", { status: null, stderr: "  denied \n", stdout: "" })).toEqual({
+      ok: false,
+      status: null,
+      error: "npm failed: denied",
+    });
+  });
+
   test("rejects cmd.exe variable-expansion arguments for Windows shim fallback", () => {
     const dir = mkdtempSync(join(tmpdir(), "ssh-mcp-windows-shim-"));
     try {
