@@ -62,7 +62,7 @@ function changesRootOwnership(command: string): boolean {
   for (const match of command.matchAll(/chown\s+-R\s+/gi)) {
     const beforeRoot = trimmed.slice(match.index + match[0].length, -1);
     const trailingWhitespace = /\s/u.test(beforeRoot.at(-1) ?? "");
-    const flagWhitespace = /\s+$/u.exec(match[0])?.[0].length ?? 0;
+    const flagWhitespace = match[0].length - match[0].trimEnd().length;
     if (
       (trailingWhitespace || (beforeRoot.length === 0 && flagWhitespace > 1)) &&
       !/[\r\n]/u.test(beforeRoot.trimEnd())
