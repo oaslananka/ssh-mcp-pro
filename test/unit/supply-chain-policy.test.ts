@@ -69,7 +69,7 @@ describe("supply-chain policy", () => {
     const checkoutRefs = [
       ...affectedWorkflows.join("\n").matchAll(/actions\/checkout@([^\s#]+)/gu),
     ];
-    expect(checkoutRefs.length).toBe(4);
+    expect(checkoutRefs).toHaveLength(4);
     for (const [, ref] of checkoutRefs) {
       expect(ref).toMatch(/^[a-f0-9]{40}$/u);
     }

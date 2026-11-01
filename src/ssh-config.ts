@@ -5,9 +5,9 @@
  * Supports common SSH config options: Host, HostName, User, Port, IdentityFile, ProxyJump
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
 import { logger } from "./logging.js";
 
 /**
@@ -232,8 +232,8 @@ export class SSHConfigParser {
     // Convert SSH pattern to regex
     const regexPattern = pattern
       .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-      .replace(/\*/g, ".*")
-      .replace(/\?/g, ".");
+      .replaceAll("*", ".*")
+      .replaceAll("?", ".");
 
     const regex = new RegExp(`^${regexPattern}$`, "i");
     return regex.test(hostname);

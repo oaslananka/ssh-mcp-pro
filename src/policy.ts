@@ -171,7 +171,7 @@ export function normalizeRemotePosixPath(pathValue: string): string {
     throw new Error("Path contains NUL byte");
   }
 
-  const unixSeparators = pathValue.replace(/\\/g, "/");
+  const unixSeparators = pathValue.replaceAll("\\", "/");
   const absolutePath = unixSeparators.startsWith("/") ? unixSeparators : `/${unixSeparators}`;
   const normalized = posixPath.normalize(absolutePath);
   return stripTrailingSeparators(normalized, "/", "/");

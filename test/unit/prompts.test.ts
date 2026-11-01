@@ -19,7 +19,7 @@ describe("prompt suggestions", () => {
   test("returns a bounded random selection", () => {
     const prompts = getRandomPrompts(3);
 
-    expect(prompts.length).toBe(3);
+    expect(prompts).toHaveLength(3);
     expect(prompts.every((prompt) => PROMPT_SUGGESTIONS.includes(prompt))).toBe(true);
   });
 

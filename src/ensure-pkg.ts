@@ -38,7 +38,7 @@ export function sanitizePackageName(name: string): string {
 }
 
 function powerShellQuote(value: string): string {
-  return `'${value.replace(/'/g, "''")}'`;
+  return `'${value.replaceAll("'", "''")}'`;
 }
 
 function escapeRegExp(value: string): string {

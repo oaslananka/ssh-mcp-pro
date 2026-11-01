@@ -8,9 +8,9 @@
  * execution, file operations, transfers, tunnels, and system administration.
  */
 
-import { readFileSync } from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "./cli.js";
 import { createContainer, type AppContainer } from "./container.js";
 import { SERVER_VERSION, SSHMCPServer } from "./mcp.js";

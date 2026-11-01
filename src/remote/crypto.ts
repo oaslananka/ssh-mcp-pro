@@ -32,7 +32,7 @@ export function nowIso(): string {
 }
 
 export function id(prefix: string): string {
-  return `${prefix}_${randomUUID().replace(/-/gu, "")}`;
+  return `${prefix}_${randomUUID().replaceAll("-", "")}`;
 }
 
 export function randomToken(bytes = 32): string {
