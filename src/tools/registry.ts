@@ -116,6 +116,26 @@ function normalizeDataResult(data: unknown): ToolCallResult {
   };
 }
 
+function toolHandlerError(toolName: string, error: unknown): ToolCallResult {
+  logger.error("Tool handler error", {
+    toolName,
+    error: error instanceof Error ? error.message : String(error),
+  });
+
+  if (
+    error &&
+    typeof error === "object" &&
+    "toJSON" in error &&
+    typeof error.toJSON === "function"
+  ) {
+    const structuredError = error.toJSON() as Record<string, unknown>;
+    return errorResult(structuredError);
+  }
+
+  const message = error instanceof Error ? error.message : String(error);
+  return errorResult({ message });
+}
+
 export class ToolRegistry {
   private readonly providers = new Map<string, ToolProvider>();
 
@@ -168,23 +188,7 @@ export class ToolRegistry {
         }
         return normalizeDataResult(data);
       } catch (error) {
-        logger.error("Tool handler error", {
-          toolName,
-          error: error instanceof Error ? error.message : String(error),
-        });
-
-        if (
-          error &&
-          typeof error === "object" &&
-          "toJSON" in error &&
-          typeof error.toJSON === "function"
-        ) {
-          const structuredError = error.toJSON() as Record<string, unknown>;
-          return errorResult(structuredError);
-        }
-
-        const message = error instanceof Error ? error.message : String(error);
-        return errorResult({ message });
+        return toolHandlerError(toolName, error);
       }
     }
 

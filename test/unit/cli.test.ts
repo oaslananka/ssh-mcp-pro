@@ -104,6 +104,28 @@ describe("parseArgs", () => {
     });
   });
 
+  test.each([
+    ["--host", "host"],
+    ["--port", "port"],
+    ["--bearer-token-file", "bearerTokenFile"],
+    ["--tool-profile", "toolProfile"],
+    ["--connector-credential-provider", "connectorCredentialProvider"],
+  ] as const)("consumes the following token as the value of %s", (flag, key) => {
+    expect(parseArgs([flag, "agent", "--version"])).toMatchObject({
+      [key]: "agent",
+      version: true,
+    });
+    expect(parseArgs([flag, "http"]).transport).toBe("stdio");
+  });
+
+  test("preserves the last value while continuing past flags without values", () => {
+    expect(parseArgs(["--host", "first", "--host", "second", "--port"])).toMatchObject({
+      host: "second",
+      transport: "stdio",
+    });
+    expect(parseArgs(["--host", "first", "--host", "second", "--port"])).not.toHaveProperty("port");
+  });
+
   test("agent enroll captures agent args", () => {
     expect(parseArgs(["agent", "enroll", "--server", "https://example.test"])).toMatchObject({
       agentArgs: ["enroll", "--server", "https://example.test"],

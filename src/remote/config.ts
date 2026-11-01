@@ -28,7 +28,11 @@ function parseBoundedInteger(
 }
 
 function stripTrailingSlash(value: string): string {
-  return value.replace(/\/+$/u, "");
+  let end = value.length;
+  while (end > 0 && value[end - 1] === "/") {
+    end--;
+  }
+  return value.slice(0, end);
 }
 
 export function loadRemoteConfig(): RemoteConfig {

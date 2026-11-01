@@ -13,6 +13,17 @@ export interface CliOptions {
   agentArgs?: string[];
 }
 
+const VALUE_OPTIONS = new Map<
+  string,
+  "host" | "port" | "bearerTokenFile" | "toolProfile" | "connectorCredentialProvider"
+>([
+  ["--host", "host"],
+  ["--port", "port"],
+  ["--bearer-token-file", "bearerTokenFile"],
+  ["--tool-profile", "toolProfile"],
+  ["--connector-credential-provider", "connectorCredentialProvider"],
+]);
+
 export function parseArgs(argv: string[]): CliOptions {
   const opts: CliOptions = {
     help: false,
@@ -25,6 +36,15 @@ export function parseArgs(argv: string[]): CliOptions {
 
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
+    const valueOption = VALUE_OPTIONS.get(arg ?? "");
+    if (valueOption) {
+      const next = argv[index + 1];
+      if (next !== undefined) {
+        opts[valueOption] = next;
+        index++;
+      }
+      continue;
+    }
     switch (arg) {
       case "agent":
         opts.agentArgs = argv.slice(index + 1);
@@ -54,53 +74,8 @@ export function parseArgs(argv: string[]): CliOptions {
       case "--transport=stdio":
         opts.transport = "stdio";
         break;
-      case "--host":
-        {
-          const next = argv[index + 1];
-          if (next !== undefined) {
-            opts.host = next;
-            index++;
-          }
-        }
-        break;
-      case "--port":
-        {
-          const next = argv[index + 1];
-          if (next !== undefined) {
-            opts.port = next;
-            index++;
-          }
-        }
-        break;
-      case "--bearer-token-file":
-        {
-          const next = argv[index + 1];
-          if (next !== undefined) {
-            opts.bearerTokenFile = next;
-            index++;
-          }
-        }
-        break;
       case "--enable-legacy-sse":
         opts.enableLegacySse = true;
-        break;
-      case "--tool-profile":
-        {
-          const next = argv[index + 1];
-          if (next !== undefined) {
-            opts.toolProfile = next;
-            index++;
-          }
-        }
-        break;
-      case "--connector-credential-provider":
-        {
-          const next = argv[index + 1];
-          if (next !== undefined) {
-            opts.connectorCredentialProvider = next;
-            index++;
-          }
-        }
         break;
       case "--no-stdio":
         opts.unsupportedNoStdio = true;

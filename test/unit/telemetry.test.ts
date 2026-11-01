@@ -65,6 +65,13 @@ describe("telemetry helpers", () => {
     expect(normalizeOtlpEndpoint("http://localhost:4318/v1/traces")).toBe(
       "http://localhost:4318/v1/traces",
     );
+    expect(normalizeOtlpEndpoint(" http://localhost:4318//// ")).toBe(
+      "http://localhost:4318/v1/traces",
+    );
+    expect(normalizeOtlpEndpoint("http://localhost:4318/v1/traces///")).toBe(
+      "http://localhost:4318/v1/traces",
+    );
+    expect(normalizeOtlpEndpoint("///")).toBe("/v1/traces");
   });
 
   test("uses non-deprecated semantic convention constants", () => {
