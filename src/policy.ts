@@ -276,86 +276,9 @@ export class PolicyEngine {
       }
     }
 
-    if (context.action === "tunnel.local" || context.action === "tunnel.remote") {
-      const bindHost = context.localBindHost;
-      if (
-        bindHost &&
-        (this.config.tunnelDenyBindHosts ?? []).length > 0 &&
-        matchesPolicyValue(bindHost, this.config.tunnelDenyBindHosts)
-      ) {
-        return denied({
-          mode,
-          action: context.action,
-          reason: `Tunnel bind host ${bindHost} is denied by policy`,
-          hint: "Choose an allowed bind host or adjust tunnelDenyBindHosts.",
-        });
-      }
-      if (
-        bindHost &&
-        (this.config.tunnelAllowBindHosts ?? []).length > 0 &&
-        !matchesPolicyValue(bindHost, this.config.tunnelAllowBindHosts)
-      ) {
-        return denied({
-          mode,
-          action: context.action,
-          reason: `Tunnel bind host ${bindHost} is outside allowed policy`,
-          hint: "Choose an allowed bind host or adjust tunnelAllowBindHosts.",
-        });
-      }
-
-      const remoteHost = context.remoteHost;
-      if (
-        remoteHost &&
-        (this.config.tunnelDenyRemoteHosts ?? []).length > 0 &&
-        matchesPolicyValue(remoteHost, this.config.tunnelDenyRemoteHosts)
-      ) {
-        return denied({
-          mode,
-          action: context.action,
-          reason: `Tunnel remote host ${remoteHost} is denied by policy`,
-          hint: "Choose an allowed remote host or adjust tunnelDenyRemoteHosts.",
-        });
-      }
-      if (
-        remoteHost &&
-        (this.config.tunnelAllowRemoteHosts ?? []).length > 0 &&
-        !matchesPolicyValue(remoteHost, this.config.tunnelAllowRemoteHosts)
-      ) {
-        return denied({
-          mode,
-          action: context.action,
-          reason: `Tunnel remote host ${remoteHost} is outside allowed policy`,
-          hint: "Choose an allowed remote host or adjust tunnelAllowRemoteHosts.",
-        });
-      }
-
-      const ports = [context.localPort, context.remotePort].filter(
-        (port): port is number => typeof port === "number",
-      );
-      for (const port of ports) {
-        if (
-          (this.config.tunnelDenyPorts ?? []).length > 0 &&
-          matchesPortPolicy(port, this.config.tunnelDenyPorts)
-        ) {
-          return denied({
-            mode,
-            action: context.action,
-            reason: `Tunnel port ${port} is denied by policy`,
-            hint: "Choose a different port or adjust tunnelDenyPorts.",
-          });
-        }
-        if (
-          (this.config.tunnelAllowPorts ?? []).length > 0 &&
-          !matchesPortPolicy(port, this.config.tunnelAllowPorts)
-        ) {
-          return denied({
-            mode,
-            action: context.action,
-            reason: `Tunnel port ${port} is outside allowed policy`,
-            hint: "Choose an allowed port or adjust tunnelAllowPorts.",
-          });
-        }
-      }
+    const tunnelDecision = this.checkTunnelPolicy(context, mode);
+    if (tunnelDecision) {
+      return tunnelDecision;
     }
 
     if (context.username === "root" && !this.config.allowRootLogin) {
@@ -376,6 +299,129 @@ export class PolicyEngine {
       });
     }
 
+    const commandDecision = this.checkCommandPolicy(context, mode);
+    if (commandDecision) {
+      return commandDecision;
+    }
+
+    return this.checkPathPolicy(context, mode);
+  }
+
+  private checkTunnelPolicy(context: PolicyContext, mode: PolicyMode): PolicyDecision | undefined {
+    if (context.action === "tunnel.local" || context.action === "tunnel.remote") {
+      const bindDecision = this.checkTunnelBindHost(context, mode);
+      if (bindDecision) {
+        return bindDecision;
+      }
+      const remoteDecision = this.checkTunnelRemoteHost(context, mode);
+      if (remoteDecision) {
+        return remoteDecision;
+      }
+
+      return this.checkTunnelPorts(context, mode);
+    }
+    return undefined;
+  }
+
+  private checkTunnelBindHost(
+    context: PolicyContext,
+    mode: PolicyMode,
+  ): PolicyDecision | undefined {
+    const bindHost = context.localBindHost;
+    if (
+      bindHost &&
+      (this.config.tunnelDenyBindHosts ?? []).length > 0 &&
+      matchesPolicyValue(bindHost, this.config.tunnelDenyBindHosts)
+    ) {
+      return denied({
+        mode,
+        action: context.action,
+        reason: `Tunnel bind host ${bindHost} is denied by policy`,
+        hint: "Choose an allowed bind host or adjust tunnelDenyBindHosts.",
+      });
+    }
+    if (
+      bindHost &&
+      (this.config.tunnelAllowBindHosts ?? []).length > 0 &&
+      !matchesPolicyValue(bindHost, this.config.tunnelAllowBindHosts)
+    ) {
+      return denied({
+        mode,
+        action: context.action,
+        reason: `Tunnel bind host ${bindHost} is outside allowed policy`,
+        hint: "Choose an allowed bind host or adjust tunnelAllowBindHosts.",
+      });
+    }
+
+    return undefined;
+  }
+
+  private checkTunnelRemoteHost(
+    context: PolicyContext,
+    mode: PolicyMode,
+  ): PolicyDecision | undefined {
+    const remoteHost = context.remoteHost;
+    if (
+      remoteHost &&
+      (this.config.tunnelDenyRemoteHosts ?? []).length > 0 &&
+      matchesPolicyValue(remoteHost, this.config.tunnelDenyRemoteHosts)
+    ) {
+      return denied({
+        mode,
+        action: context.action,
+        reason: `Tunnel remote host ${remoteHost} is denied by policy`,
+        hint: "Choose an allowed remote host or adjust tunnelDenyRemoteHosts.",
+      });
+    }
+    if (
+      remoteHost &&
+      (this.config.tunnelAllowRemoteHosts ?? []).length > 0 &&
+      !matchesPolicyValue(remoteHost, this.config.tunnelAllowRemoteHosts)
+    ) {
+      return denied({
+        mode,
+        action: context.action,
+        reason: `Tunnel remote host ${remoteHost} is outside allowed policy`,
+        hint: "Choose an allowed remote host or adjust tunnelAllowRemoteHosts.",
+      });
+    }
+
+    return undefined;
+  }
+
+  private checkTunnelPorts(context: PolicyContext, mode: PolicyMode): PolicyDecision | undefined {
+    const ports = [context.localPort, context.remotePort].filter(
+      (port): port is number => typeof port === "number",
+    );
+    for (const port of ports) {
+      if (
+        (this.config.tunnelDenyPorts ?? []).length > 0 &&
+        matchesPortPolicy(port, this.config.tunnelDenyPorts)
+      ) {
+        return denied({
+          mode,
+          action: context.action,
+          reason: `Tunnel port ${port} is denied by policy`,
+          hint: "Choose a different port or adjust tunnelDenyPorts.",
+        });
+      }
+      if (
+        (this.config.tunnelAllowPorts ?? []).length > 0 &&
+        !matchesPortPolicy(port, this.config.tunnelAllowPorts)
+      ) {
+        return denied({
+          mode,
+          action: context.action,
+          reason: `Tunnel port ${port} is outside allowed policy`,
+          hint: "Choose an allowed port or adjust tunnelAllowPorts.",
+        });
+      }
+    }
+
+    return undefined;
+  }
+
+  private checkCommandPolicy(context: PolicyContext, mode: PolicyMode): PolicyDecision | undefined {
     if (context.command) {
       if (
         this.config.commandDeny.length > 0 &&
@@ -414,59 +460,78 @@ export class PolicyEngine {
       }
     }
 
+    return undefined;
+  }
+
+  private checkPathPolicy(context: PolicyContext, mode: PolicyMode): PolicyDecision {
     const paths = [context.path, context.secondaryPath].filter((pathValue): pathValue is string =>
       Boolean(pathValue),
     );
     if (LOCAL_TRANSFER_ACTIONS.has(context.action)) {
-      for (const pathValue of paths) {
-        let normalizedPath: string;
-        try {
-          normalizedPath = normalizeLocalPolicyPath(pathValue);
-        } catch {
-          return denied({
-            mode,
-            action: context.action,
-            reason: "Local path contains NUL byte",
-            hint: "Choose a valid local path without NUL bytes.",
-          });
-        }
+      return this.checkLocalPaths(context, mode, paths);
+    }
+    return this.checkRemotePaths(context, mode, paths);
+  }
 
-        if (
-          this.localPathDenyPrefixes.some((prefix) => isPathUnder(normalizedPath, prefix, path.sep))
-        ) {
-          return denied({
-            mode,
-            action: context.action,
-            reason: `Local path ${pathValue} is denied by policy`,
-            hint: "Choose a different local path or adjust localPathDenyPrefixes.",
-          });
-        }
-
-        if (this.localPathAllowPrefixes.length === 0) {
-          return denied({
-            mode,
-            action: context.action,
-            reason: "Local transfer path policy has no allowed prefixes",
-            hint: "Set localPathAllowPrefixes for MCP-server-host transfer paths.",
-          });
-        }
-
-        const underAllowedPrefix = this.localPathAllowPrefixes.some((prefix) =>
-          isPathUnder(normalizedPath, prefix, path.sep),
-        );
-        if (!underAllowedPrefix) {
-          return denied({
-            mode,
-            action: context.action,
-            reason: `Local path ${pathValue} is outside allowed prefixes`,
-            hint: `Allowed local transfer prefixes: ${this.localPathAllowPrefixes.join(", ")}`,
-          });
-        }
+  private checkLocalPaths(
+    context: PolicyContext,
+    mode: PolicyMode,
+    paths: string[],
+  ): PolicyDecision {
+    for (const pathValue of paths) {
+      let normalizedPath: string;
+      try {
+        normalizedPath = normalizeLocalPolicyPath(pathValue);
+      } catch {
+        return denied({
+          mode,
+          action: context.action,
+          reason: "Local path contains NUL byte",
+          hint: "Choose a valid local path without NUL bytes.",
+        });
       }
 
-      return allowed({ mode, action: context.action });
+      if (
+        this.localPathDenyPrefixes.some((prefix) => isPathUnder(normalizedPath, prefix, path.sep))
+      ) {
+        return denied({
+          mode,
+          action: context.action,
+          reason: `Local path ${pathValue} is denied by policy`,
+          hint: "Choose a different local path or adjust localPathDenyPrefixes.",
+        });
+      }
+
+      if (this.localPathAllowPrefixes.length === 0) {
+        return denied({
+          mode,
+          action: context.action,
+          reason: "Local transfer path policy has no allowed prefixes",
+          hint: "Set localPathAllowPrefixes for MCP-server-host transfer paths.",
+        });
+      }
+
+      const underAllowedPrefix = this.localPathAllowPrefixes.some((prefix) =>
+        isPathUnder(normalizedPath, prefix, path.sep),
+      );
+      if (!underAllowedPrefix) {
+        return denied({
+          mode,
+          action: context.action,
+          reason: `Local path ${pathValue} is outside allowed prefixes`,
+          hint: `Allowed local transfer prefixes: ${this.localPathAllowPrefixes.join(", ")}`,
+        });
+      }
     }
 
+    return allowed({ mode, action: context.action });
+  }
+
+  private checkRemotePaths(
+    context: PolicyContext,
+    mode: PolicyMode,
+    paths: string[],
+  ): PolicyDecision {
     for (const pathValue of paths) {
       let normalizedPath: string;
       try {
