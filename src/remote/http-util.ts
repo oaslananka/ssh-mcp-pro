@@ -30,7 +30,8 @@ export function negotiateMcpProtocolVersion(params: unknown): string {
 }
 
 export function quotePosixArg(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`;
+  const escaped = value.replaceAll("'", "'\"'\"'");
+  return `'${escaped}'`;
 }
 
 export function quotePowerShellArg(value: string): string {

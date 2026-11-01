@@ -39,7 +39,7 @@ usage() {
   exit "${1:-0}"
 }
 
-while [ $# -gt 0 ]; do
+while [[ $# -gt 0 ]]; do
   case "$1" in
     --server)
       SERVER="${2:-}"
@@ -70,9 +70,9 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-[ -n "$SERVER" ] || die "--server is required"
-[ -n "$TOKEN" ] || die "--token is required"
-[ -n "$ALIAS" ] || die "--alias must not be empty"
+[[ -n "$SERVER" ]] || die "--server is required"
+[[ -n "$TOKEN" ]] || die "--token is required"
+[[ -n "$ALIAS" ]] || die "--alias must not be empty"
 
 command -v node >/dev/null 2>&1 || die "node is not installed (need Node 22.22+ or 24+)"
 command -v npm >/dev/null 2>&1 || die "npm is not installed"
@@ -80,11 +80,11 @@ command -v npm >/dev/null 2>&1 || die "npm is not installed"
 # WebSocket is exposed as a global from Node 22.22+ (and all of 23/24+).
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
 NODE_MINOR="$(node -p 'process.versions.node.split(".")[1]')"
-if [ "$NODE_MAJOR" -lt 22 ] || { [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -lt 22 ]; }; then
+if [[ "$NODE_MAJOR" -lt 22 ]] || { [[ "$NODE_MAJOR" -eq 22 ]] && [[ "$NODE_MINOR" -lt 22 ]]; }; then
   die "Node $(node -v) is too old; install Node 22.22+ or 24+"
 fi
 
-if [ "$SCOPE" = "system" ] && [ "$(id -u)" -ne 0 ]; then
+if [[ "$SCOPE" == "system" ]] && [[ "$(id -u)" -ne 0 ]]; then
   die "--system requires root; re-run with sudo"
 fi
 
@@ -113,7 +113,7 @@ RestartSec=5
 EOF
 }
 
-if [ "$SCOPE" = "system" ]; then
+if [[ "$SCOPE" == "system" ]]; then
   RUN_USER="${SUDO_USER:-root}"
   RUN_HOME="$(eval echo "~${RUN_USER}")"
   UNIT="/etc/systemd/system/ssh-mcp-pro-agent.service"

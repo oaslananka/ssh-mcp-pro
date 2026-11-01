@@ -1,3 +1,7 @@
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, test } from "vitest";
 import {
   buildPosixCommand,
@@ -16,6 +20,28 @@ describe("shell helpers", () => {
     expect(command).toContain("export NAME=");
     expect(command).toContain("value");
   });
+
+  test.skipIf(process.platform === "win32")(
+    "POSIX quoting preserves single quotes in environment values and paths",
+    () => {
+      const root = mkdtempSync(path.join(tmpdir(), "ssh-mcp-quote-"));
+      const directory = path.join(root, "it's-safe");
+      try {
+        mkdirSync(directory);
+        const command = buildPosixCommand('printf %s "$TOKEN"', directory, {
+          TOKEN: "a'b",
+        });
+        const result = spawnSync("sh", ["-c", command], {
+          encoding: "utf8",
+          timeout: 5_000,
+        });
+        expect(result.status).toBe(0);
+        expect(result.stdout).toBe("a'b");
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
 
   test("buildPowerShellCommand handles env and cwd", () => {
     const command = buildPowerShellCommand("Write-Host hi", "C:/Temp", { NAME: "value" });

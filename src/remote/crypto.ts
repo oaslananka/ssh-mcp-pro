@@ -108,7 +108,10 @@ export function canonicalJson(value: unknown): string {
   const entries = Object.entries(value as Record<string, unknown>)
     .filter(([, entryValue]) => entryValue !== undefined)
     .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
-  return `{${entries.map(([key, entryValue]) => `${JSON.stringify(key)}:${canonicalJson(entryValue)}`).join(",")}}`;
+  const properties = entries.map(
+    ([key, entryValue]) => JSON.stringify(key) + ":" + canonicalJson(entryValue),
+  );
+  return `{${properties.join(",")}}`;
 }
 
 export function signEnvelope<T extends Record<string, unknown>>(
