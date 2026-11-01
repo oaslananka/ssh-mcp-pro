@@ -46,7 +46,7 @@ for (const [file, ...paths] of jsonTargets) {
 
 for (const { file, pattern } of textTargets) {
   const text = readFileSync(file, "utf8");
-  const match = text.match(pattern);
+  const match = pattern.exec(text);
   if (!match) {
     throw new Error(`${file} does not contain SERVER_VERSION.`);
   }

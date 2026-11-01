@@ -187,3 +187,36 @@ export function mutationScoreSymbol(score) {
   if (score >= 60) return "⚠️";
   return "❌";
 }
+
+export function parseRootImporterVersions(lockText) {
+  const versions = new Map();
+  let inRootImporter = false;
+  let group;
+  let packageName;
+
+  for (const line of lockText.split(/\r?\n/u)) {
+    if (line === "  .:") {
+      inRootImporter = true;
+      continue;
+    }
+    if (inRootImporter && line.startsWith("  ") && !line.startsWith("    ")) {
+      break;
+    }
+    const groupMatch = /^ {4}(dependencies|devDependencies):$/u.exec(line);
+    if (inRootImporter && groupMatch) {
+      group = groupMatch[1];
+      packageName = undefined;
+      continue;
+    }
+    const packageMatch = /^ {6}(?:"([^"]+)"|'([^']+)'|([^:]+)):$/u.exec(line);
+    if (inRootImporter && group && packageMatch) {
+      packageName = packageMatch[1] ?? packageMatch[2] ?? packageMatch[3];
+      continue;
+    }
+    const versionMatch = /^ {8}version: (.+)$/u.exec(line);
+    if (inRootImporter && group && packageName && versionMatch) {
+      versions.set(packageName, stripLockPeerSuffix(versionMatch[1]));
+    }
+  }
+  return versions;
+}
