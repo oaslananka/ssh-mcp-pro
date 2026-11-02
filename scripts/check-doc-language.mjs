@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 const files = ["AGENTS.md", "INSTALL.md", "examples/README.md", "apps/chatgpt/README.md"];
 const unfinishedMarker = ["TO", "DO"].join("");
-const forbidden = new RegExp(`\\b(${unfinishedMarker}|TBD|lorem ipsum)\\b`, "iu");
+const forbidden = new RegExp(String.raw`\\b(${unfinishedMarker}|TBD|lorem ipsum)\\b`, "iu");
 
 for (const file of files) {
   const text = readFileSync(join(process.cwd(), file), "utf8");

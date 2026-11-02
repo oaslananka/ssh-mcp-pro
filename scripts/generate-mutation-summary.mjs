@@ -41,8 +41,12 @@ const lines = [
 ];
 
 if (report.files && Object.keys(report.files).length > 0) {
-  lines.push("### Per-File Results", "", "| File | Score | Killed | Survived |");
-  lines.push("|---|---:|---:|---:|");
+  lines.push(
+    "### Per-File Results",
+    "",
+    "| File | Score | Killed | Survived |",
+    "|---|---:|---:|---:|",
+  );
 
   for (const [filePath, fileResult] of Object.entries(report.files)) {
     if (!fileResult) continue;
@@ -57,8 +61,7 @@ if (report.files && Object.keys(report.files).length > 0) {
 if (report.thresholds) {
   const thresholds = report.thresholds;
   if (thresholds.high != null || thresholds.low != null || thresholds.break != null) {
-    lines.push("### Thresholds", "", "| Threshold | Value |");
-    lines.push("|---|---:|");
+    lines.push("### Thresholds", "", "| Threshold | Value |", "|---|---:|");
     if (thresholds.high != null) lines.push(`| High | ${thresholds.high} |`);
     if (thresholds.low != null) lines.push(`| Low | ${thresholds.low} |`);
     if (thresholds.break != null) lines.push(`| Break | ${thresholds.break} |`);

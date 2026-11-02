@@ -14,7 +14,7 @@ export const CONVENTIONAL_TYPES = [
 
 const typeAlternation = CONVENTIONAL_TYPES.join("|");
 const conventionalPattern = new RegExp(
-  `^(?:${typeAlternation})(?:\\([a-z0-9._-]+\\))?!?: .{1,200}$`,
+  String.raw`^(?:${typeAlternation})(?:\\([a-z0-9._-]+\\))?!?: .{1,200}$`,
   "u",
 );
 const revertPattern = /^Revert ".+"$/u;

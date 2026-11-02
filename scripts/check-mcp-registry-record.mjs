@@ -53,7 +53,7 @@ export async function checkPublishedRegistryRecord({
   timeoutMs = DEFAULT_TIMEOUT_MS,
 } = {}) {
   if (typeof fetchImpl !== "function") {
-    throw new Error("A fetch implementation is required.");
+    throw new TypeError("A fetch implementation is required.");
   }
 
   const { serverName, registryLatestUrl } = resolvePublishedRegistryTarget({ serverPath });
