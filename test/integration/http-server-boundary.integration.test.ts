@@ -159,6 +159,42 @@ async function pingSession(harness: Harness, sessionId: string): Promise<Respons
   });
 }
 
+async function postLocalMcp(
+  harness: Harness,
+  headers: Record<string, string>,
+  body: string,
+): Promise<Response> {
+  const address = harness.runtime.server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("HTTP boundary test server must be listening on loopback");
+  }
+  return new Promise((resolve, reject) => {
+    const request = httpRequest(
+      { hostname: "127.0.0.1", port: address.port, path: "/mcp", method: "POST", headers },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("error", reject);
+        response.on("end", () => {
+          const responseHeaders = new Headers();
+          for (const [name, value] of Object.entries(response.headers)) {
+            if (typeof value === "string") responseHeaders.set(name, value);
+            else if (Array.isArray(value)) responseHeaders.set(name, value.join(", "));
+          }
+          resolve(
+            new Response(Buffer.concat(chunks), {
+              status: response.statusCode ?? 500,
+              headers: responseHeaders,
+            }),
+          );
+        });
+      },
+    );
+    request.on("error", reject);
+    request.end(body);
+  });
+}
+
 async function openLegacySse(harness: Harness): Promise<{
   response: IncomingMessage;
   sessionId: string;
@@ -256,25 +292,17 @@ describe("real HTTP server boundary", () => {
       "Mcp-Method": "server/discover",
     });
 
-    const noToken = await fetch(harness.baseUrl + "/mcp", {
-      method: "POST",
-      headers: { ...headers, Authorization: "" },
-      body,
-    });
+    const noToken = await postLocalMcp(harness, { ...headers, Authorization: "" }, body);
     expect(noToken.status).toBe(401);
 
-    const forbiddenOrigin = await fetch(harness.baseUrl + "/mcp", {
-      method: "POST",
-      headers: { ...headers, Origin: "https://untrusted.example" },
+    const forbiddenOrigin = await postLocalMcp(
+      harness,
+      { ...headers, Origin: "https://untrusted.example" },
       body,
-    });
+    );
     expect(forbiddenOrigin.status).toBe(403);
 
-    const approved = await fetch(harness.baseUrl + "/mcp", {
-      method: "POST",
-      headers,
-      body,
-    });
+    const approved = await postLocalMcp(harness, headers, body);
     expect(approved.status).toBe(200);
     expect(approved.headers.get("access-control-allow-origin")).toBe(allowedOrigin);
     expect(approved.headers.get("vary")).toContain("Origin");

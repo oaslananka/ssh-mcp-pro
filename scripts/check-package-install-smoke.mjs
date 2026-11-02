@@ -21,34 +21,40 @@ function run(command, args, cwd, { printSuccess = false } = {}) {
 }
 
 async function verifyPackedStdioMcp(workspace) {
-  for (const mode of ["auto", "legacy"]) {
-    const transport = new StdioClientTransport({
-      command: process.execPath,
-      args: [join(workspace, "node_modules/ssh-mcp-pro/dist/index.js")],
-      cwd: workspace,
-    });
-    const client = new Client(
-      { name: "ssh-mcp-pro-package-smoke", version: "1.0.0" },
-      { versionNegotiation: { mode } },
-    );
-    try {
-      await client.connect(transport);
-      const expectedEra = mode === "auto" ? "modern" : "legacy";
-      if (client.getProtocolEra() !== expectedEra) {
-        throw new Error("Packed MCP stdio negotiated an unexpected protocol era");
+  try {
+    for (const mode of ["auto", "legacy"]) {
+      const transport = new StdioClientTransport({
+        command: process.execPath,
+        args: [join(workspace, "node_modules/ssh-mcp-pro/dist/index.js")],
+        cwd: workspace,
+      });
+      const client = new Client(
+        { name: "ssh-mcp-pro-package-smoke", version: "1.0.0" },
+        { versionNegotiation: { mode } },
+      );
+      try {
+        await client.connect(transport);
+        const expectedEra = mode === "auto" ? "modern" : "legacy";
+        if (client.getProtocolEra() !== expectedEra) {
+          throw new Error("Packed MCP stdio negotiated an unexpected protocol era");
+        }
+        const { tools } = await client.listTools();
+        if (!tools.some((tool) => tool.name === "connector_status")) {
+          throw new Error("Packed MCP stdio did not expose connector_status");
+        }
+        const status = await client.callTool({ name: "connector_status", arguments: {} });
+        if (status.isError === true || !status.structuredContent) {
+          throw new Error("Packed MCP stdio connector_status failed");
+        }
+        console.log("check-package-install-smoke: " + expectedEra + " stdio MCP client passed.");
+      } finally {
+        await client.close();
       }
-      const { tools } = await client.listTools();
-      if (!tools.some((tool) => tool.name === "connector_status")) {
-        throw new Error("Packed MCP stdio did not expose connector_status");
-      }
-      const status = await client.callTool({ name: "connector_status", arguments: {} });
-      if (status.isError === true || !status.structuredContent) {
-        throw new Error("Packed MCP stdio connector_status failed");
-      }
-      console.log("check-package-install-smoke: " + expectedEra + " stdio MCP client passed.");
-    } finally {
-      await client.close();
     }
+    return true;
+  } catch (error) {
+    console.error("check-package-install-smoke: MCP client acceptance failed:", error);
+    return false;
   }
 }
 
@@ -77,9 +83,11 @@ try {
   // A packed consumer does not install workspace-only development patches.
   run("pnpm", ["add", tarball, "--config.allow-unused-patches=true"], workspace);
   run("node", ["node_modules/ssh-mcp-pro/dist/index.js", "--version"], workspace);
-  await verifyPackedStdioMcp(workspace);
-
-  console.log("check-package-install-smoke: package installs and CLI starts.");
+  if (await verifyPackedStdioMcp(workspace)) {
+    console.log("check-package-install-smoke: package installs and CLI starts.");
+  } else {
+    process.exitCode = 1;
+  }
 } finally {
   rmSync(workspace, { recursive: true, force: true });
 }

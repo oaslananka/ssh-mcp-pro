@@ -1,7 +1,8 @@
-import { createServer, type Server } from "node:http";
+import { createServer, request as httpRequest, type Server } from "node:http";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { AddressInfo } from "node:net";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { afterEach, describe, expect, test } from "vitest";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
@@ -100,18 +101,44 @@ async function invoke(
   params: Record<string, unknown>,
   token?: string,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
-  const response = await fetch(harness.endpoint, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(token ? { authorization: "Bearer " + token } : {}),
-    },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 11, method, params }),
+  const address = harness.server.address() as AddressInfo | null;
+  if (!address || typeof address === "string") {
+    throw new Error("Remote MCP boundary server is not listening on loopback");
+  }
+  return new Promise((resolve, reject) => {
+    const request = httpRequest(
+      {
+        hostname: "127.0.0.1",
+        port: address.port,
+        path: "/mcp",
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(token ? { authorization: "Bearer " + token } : {}),
+        },
+      },
+      (response) => {
+        let text = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk: string) => {
+          text += chunk;
+        });
+        response.on("error", reject);
+        response.on("end", () => {
+          try {
+            resolve({
+              status: response.statusCode ?? 500,
+              body: JSON.parse(text) as Record<string, unknown>,
+            });
+          } catch (error) {
+            reject(error);
+          }
+        });
+      },
+    );
+    request.on("error", reject);
+    request.end(JSON.stringify({ jsonrpc: "2.0", id: 11, method, params }));
   });
-  return {
-    status: response.status,
-    body: (await response.json()) as Record<string, unknown>,
-  };
 }
 
 describe("remote-agent MCP real HTTP authorization boundary", () => {
