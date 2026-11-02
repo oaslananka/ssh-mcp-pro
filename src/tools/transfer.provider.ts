@@ -1,4 +1,4 @@
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/server";
 import { logger } from "../logging.js";
 import type { TransferService } from "../transfer.js";
 import { FileDownloadSchema, FileUploadSchema } from "../types.js";

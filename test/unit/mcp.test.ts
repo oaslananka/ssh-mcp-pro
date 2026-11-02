@@ -1,16 +1,6 @@
 import { afterAll, beforeEach, describe, expect, vi, test } from "vitest";
 import { readFileSync } from "fs";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import {
-  CallToolRequestSchema,
-  GetPromptRequestSchema,
-  InitializeRequestSchema,
-  LATEST_PROTOCOL_VERSION,
-  ListResourcesRequestSchema,
-  ListPromptsRequestSchema,
-  ReadResourceRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { Server, LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/server";
 import type { AppContainer } from "../../src/container.js";
 import { ConfigManager, type ServerConfig } from "../../src/config.js";
 import { createTestContainer } from "./helpers.js";
@@ -172,7 +162,7 @@ describe("SSHMCPServer", () => {
 
     try {
       await expect(
-        handlers.get(InitializeRequestSchema)?.({
+        handlers.get("initialize")?.({
           params: {
             protocolVersion: LATEST_PROTOCOL_VERSION,
             capabilities: {},
@@ -202,7 +192,7 @@ describe("SSHMCPServer", () => {
     const server = new SSHMCPServer(container);
     const handlers = getHandlers(server);
 
-    await expect(handlers.get(ListResourcesRequestSchema)?.()).resolves.toEqual(
+    await expect(handlers.get("resources/list")?.()).resolves.toEqual(
       expect.objectContaining({
         resources: expect.arrayContaining([
           expect.objectContaining({ uri: "ssh-mcp-pro://sessions/active" }),
@@ -212,7 +202,7 @@ describe("SSHMCPServer", () => {
     );
 
     await expect(
-      handlers.get(ReadResourceRequestSchema)?.({
+      handlers.get("resources/read")?.({
         params: { uri: "ssh-mcp-pro://metrics/json" },
       }),
     ).resolves.toEqual(
@@ -227,7 +217,7 @@ describe("SSHMCPServer", () => {
       }),
     );
 
-    await expect(handlers.get(ListToolsRequestSchema)?.()).resolves.toEqual(
+    await expect(handlers.get("tools/list")?.()).resolves.toEqual(
       expect.objectContaining({
         tools: expect.arrayContaining([
           expect.objectContaining({ name: "connector_status" }),
@@ -237,7 +227,7 @@ describe("SSHMCPServer", () => {
       }),
     );
 
-    await expect(handlers.get(ListPromptsRequestSchema)?.()).resolves.toEqual(
+    await expect(handlers.get("prompts/list")?.()).resolves.toEqual(
       expect.objectContaining({
         prompts: expect.arrayContaining([
           expect.objectContaining({ name: "safe-connect" }),
@@ -247,7 +237,7 @@ describe("SSHMCPServer", () => {
     );
 
     await expect(
-      handlers.get(GetPromptRequestSchema)?.({
+      handlers.get("prompts/get")?.({
         params: {
           name: "safe-connect",
           arguments: { host: "prod-1", username: "deploy" },
@@ -265,7 +255,7 @@ describe("SSHMCPServer", () => {
       }),
     );
 
-    const result = (await handlers.get(CallToolRequestSchema)?.({
+    const result = (await handlers.get("tools/call")?.({
       params: { name: "ssh_list_sessions", arguments: {} },
     })) as {
       content: Array<{ text: string }>;
@@ -313,7 +303,7 @@ describe("SSHMCPServer", () => {
 
     const server = new SSHMCPServer(container);
     const handlers = getHandlers(server);
-    const listTools = (await handlers.get(ListToolsRequestSchema)?.()) as {
+    const listTools = (await handlers.get("tools/list")?.()) as {
       tools: Array<{ name: string; inputSchema?: { properties?: Record<string, unknown> } }>;
     };
     const toolNames = listTools.tools.map((tool) => tool.name);
@@ -333,7 +323,7 @@ describe("SSHMCPServer", () => {
     );
 
     await expect(
-      handlers.get(CallToolRequestSchema)?.({
+      handlers.get("tools/call")?.({
         params: { name: "ssh_open_session", arguments: {} },
       }),
     ).resolves.toEqual(
@@ -369,7 +359,7 @@ describe("SSHMCPServer", () => {
     const handlers = getHandlers(server);
 
     await expect(
-      handlers.get(CallToolRequestSchema)?.({
+      handlers.get("tools/call")?.({
         params: { name: "ssh_list_sessions", arguments: { sessionId: "session-1" } },
       }),
     ).resolves.toEqual(
@@ -420,7 +410,7 @@ describe("SSHMCPServer", () => {
 
     const server = new SSHMCPServer(container);
     const handlers = getHandlers(server);
-    const result = (await handlers.get(CallToolRequestSchema)?.({
+    const result = (await handlers.get("tools/call")?.({
       params: { name: "proc_exec", arguments: { sessionId: "session-1", command: "uptime" } },
     })) as {
       content: Array<{ text: string }>;
@@ -472,19 +462,19 @@ describe("SSHMCPServer", () => {
     const handlers = getHandlers(server);
 
     try {
-      const firstSessionA = (await handlers.get(CallToolRequestSchema)?.({
+      const firstSessionA = (await handlers.get("tools/call")?.({
         params: { name: "ssh_list_sessions", arguments: { sessionId: "session-a" } },
       })) as { isError?: boolean };
-      const secondSessionA = (await handlers.get(CallToolRequestSchema)?.({
+      const secondSessionA = (await handlers.get("tools/call")?.({
         params: { name: "ssh_list_sessions", arguments: { sessionId: "session-a" } },
       })) as { isError?: boolean; content: Array<{ text: string }> };
-      const firstSessionB = (await handlers.get(CallToolRequestSchema)?.({
+      const firstSessionB = (await handlers.get("tools/call")?.({
         params: { name: "ssh_list_sessions", arguments: { sessionId: "session-b" } },
       })) as { isError?: boolean };
 
       now += 60;
 
-      const sessionAAfterReset = (await handlers.get(CallToolRequestSchema)?.({
+      const sessionAAfterReset = (await handlers.get("tools/call")?.({
         params: { name: "ssh_list_sessions", arguments: { sessionId: "session-a" } },
       })) as { isError?: boolean };
 
@@ -532,7 +522,7 @@ describe("SSHMCPServer", () => {
 
     const server = new SSHMCPServer(container);
     const handlers = getHandlers(server);
-    const result = (await handlers.get(CallToolRequestSchema)?.({
+    const result = (await handlers.get("tools/call")?.({
       params: { name: "ssh_list_sessions", arguments: { sessionId: "session-disabled" } },
     })) as {
       content: Array<{ text: string }>;
@@ -568,7 +558,7 @@ describe("SSHMCPServer", () => {
 
     const server = new SSHMCPServer(container);
     const handlers = getHandlers(server);
-    const result = (await handlers.get(CallToolRequestSchema)?.({
+    const result = (await handlers.get("tools/call")?.({
       params: { name: "ssh_list_sessions" },
     })) as {
       content: Array<{ text: string }>;
@@ -601,7 +591,7 @@ describe("SSHMCPServer", () => {
     expect(errorSpy).toHaveBeenCalledWith("Server error", {
       error: "string-error",
     });
-    expect(connectSpy).toHaveBeenCalledTimes(1);
+    expect(connectSpy).not.toHaveBeenCalled();
     expect(infoSpy).toHaveBeenCalledWith("SSH MCP Server started successfully");
 
     await destroyContainer(container);

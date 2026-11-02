@@ -1,10 +1,5 @@
 import { afterAll, beforeAll, describe, expect, vi, test } from "vitest";
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import {
-  CallToolRequestSchema,
-  ListResourcesRequestSchema,
-  ReadResourceRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { Server } from "@modelcontextprotocol/server";
 import { createContainer, type AppContainer } from "../../src/container.js";
 import { SSHMCPServer } from "../../src/mcp.js";
 
@@ -84,7 +79,7 @@ integrationDescribe("MCP integration tests", () => {
     const server = new SSHMCPServer(container);
     const handlers = getHandlers(server);
 
-    await expect(handlers.get(ListResourcesRequestSchema)?.()).resolves.toEqual(
+    await expect(handlers.get("resources/list")?.()).resolves.toEqual(
       expect.objectContaining({
         resources: expect.arrayContaining([
           expect.objectContaining({ uri: "ssh-mcp-pro://sessions/active" }),
@@ -92,7 +87,7 @@ integrationDescribe("MCP integration tests", () => {
       }),
     );
 
-    const sessionsResource = (await handlers.get(ReadResourceRequestSchema)?.({
+    const sessionsResource = (await handlers.get("resources/read")?.({
       params: { uri: "ssh-mcp-pro://sessions/active" },
     })) as {
       contents: Array<{ text: string }>;
@@ -103,7 +98,7 @@ integrationDescribe("MCP integration tests", () => {
 
     expect(parsedSessions.some((session) => session.sessionId === sessionId)).toBe(true);
 
-    const metricsResource = (await handlers.get(ReadResourceRequestSchema)?.({
+    const metricsResource = (await handlers.get("resources/read")?.({
       params: { uri: "ssh-mcp-pro://metrics/prometheus" },
     })) as {
       contents: Array<{ text: string }>;
@@ -128,12 +123,12 @@ integrationDescribe("MCP integration tests", () => {
     const server = new SSHMCPServer(limited);
     const handlers = getHandlers(server);
 
-    const first = (await handlers.get(CallToolRequestSchema)?.({
+    const first = (await handlers.get("tools/call")?.({
       params: { name: "ssh_list_sessions", arguments: {} },
     })) as {
       isError?: boolean;
     };
-    const second = (await handlers.get(CallToolRequestSchema)?.({
+    const second = (await handlers.get("tools/call")?.({
       params: { name: "ssh_list_sessions", arguments: {} },
     })) as {
       isError?: boolean;

@@ -4,7 +4,7 @@
 
 - **[renovate.json](../../renovate.json)** manages the `npm` ecosystem (production and
   dev dependencies). Patch/minor devDependency updates automerge; the MCP SDK
-  (`@modelcontextprotocol/sdk`) is explicitly excluded from automerge given how central
+  (`@modelcontextprotocol/server`, `@modelcontextprotocol/core`, and related v2 packages) is explicitly excluded from automerge given how central
   it is; typescript-eslint packages are grouped.
 - **[.github/dependabot.yml](../../.github/dependabot.yml)** manages the
   `github-actions` ecosystem only, weekly, capped at 5 open PRs.

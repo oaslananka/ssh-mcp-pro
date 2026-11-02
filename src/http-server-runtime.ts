@@ -7,10 +7,13 @@ import {
 } from "node:http";
 import { readFileSync } from "node:fs";
 import { URL } from "node:url";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import { SSEServerTransport } from "@modelcontextprotocol/server-legacy/sse";
+import {
+  createMcpHandler,
+  isLegacyRequest,
+  isInitializeRequest,
+} from "@modelcontextprotocol/server";
+import { NodeStreamableHTTPServerTransport } from "@modelcontextprotocol/node";
 import { isBearerAuthorizationValid } from "./auth.js";
 import { createContainer, type AppContainer } from "./container.js";
 import { SERVER_VERSION, SSHMCPServer } from "./mcp.js";
@@ -33,8 +36,9 @@ import { userSafeError } from "./remote/util.js";
 import { createHttpServerLifecycle } from "./http-server-lifecycle.js";
 import { createHttpRequestHandler } from "./http-server-router.js";
 import { HttpSessionRegistry } from "./http-session-registry.js";
+import { toMcpWebRequest, sendMcpWebResponse } from "./mcp-http-web.js";
 
-type HttpTransport = StreamableHTTPServerTransport | SSEServerTransport;
+type HttpTransport = NodeStreamableHTTPServerTransport | SSEServerTransport;
 
 interface HttpSession {
   server: SSHMCPServer;
@@ -74,6 +78,11 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
   const remoteControlPlaneFactory = options.remoteControlPlaneFactory ?? createRemoteControlPlane;
   let remoteControlPlanePromise: ReturnType<typeof createRemoteControlPlane> | undefined;
   let cleanupInterval: NodeJS.Timeout | undefined;
+
+  const modernMcp = createMcpHandler(() => new SSHMCPServer(container).getSdkServer(), {
+    legacy: "reject",
+    maxRequestBodySize: httpConfig.maxRequestBodyBytes,
+  });
 
   const sessions = new HttpSessionRegistry<HttpSession>({
     maxSessions: httpConfig.maxSessions,
@@ -277,6 +286,20 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     await withSpan(
       "http.streamable.request",
       async (span) => {
+        const webRequest = toMcpWebRequest(req, parsedBody);
+        // Let the official classifier handle malformed modern envelopes and
+        // version-header mismatches instead of downgrading them to legacy.
+        if (!(await isLegacyRequest(webRequest, parsedBody))) {
+          // Preserve the existing, allowlisted HTTP CORS response policy for
+          // browser-based modern clients as well as legacy MCP connections.
+          for (const [name, value] of Object.entries(
+            corsHeaders(req.headers.origin, httpConfig.allowedOrigins),
+          )) {
+            res.setHeader(name, value);
+          }
+          await sendMcpWebResponse(res, await modernMcp.fetch(webRequest));
+          return;
+        }
         const sessionHeader = req.headers["mcp-session-id"];
         const sessionId = Array.isArray(sessionHeader) ? sessionHeader[0] : sessionHeader;
         cleanupExpiredHttpSessions();
@@ -292,7 +315,7 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
           if (!canOpenHttpSession(req, res)) {
             return;
           }
-          const transport = new StreamableHTTPServerTransport({
+          const transport = new NodeStreamableHTTPServerTransport({
             sessionIdGenerator: () => randomUUID(),
             onsessioninitialized: (newSessionId) => {
               sessions.set(newSessionId, { server, transport, lastSeenAt: now() });
@@ -309,7 +332,7 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
           transport.onerror = (error) => {
             logger.error("Streamable HTTP MCP transport error", { error: error.message });
           };
-          await server.connect(transport as Transport);
+          await server.connect(transport);
           session = { server, transport, lastSeenAt: now() };
         }
 
@@ -325,7 +348,7 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
           return;
         }
 
-        if (!(session.transport instanceof StreamableHTTPServerTransport)) {
+        if (!(session.transport instanceof NodeStreamableHTTPServerTransport)) {
           sendJson(req, res, 400, {
             error: "Session exists but uses a different transport protocol",
           });
@@ -509,6 +532,7 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
         }),
       );
       sessions.clear();
+      await modernMcp.close();
       container.rateLimiter.destroy();
       await container.sessionManager.destroy();
       if (remoteControlPlanePromise) {

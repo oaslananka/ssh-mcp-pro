@@ -12,7 +12,7 @@ export interface MCPPromptDefinition {
   arguments?: Array<{ name: string; description: string; required?: boolean }>;
 }
 
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/server";
 
 export const TOOL_PROFILES = [
   "full",

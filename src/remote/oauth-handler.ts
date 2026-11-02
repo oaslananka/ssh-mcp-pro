@@ -83,6 +83,7 @@ export class OAuthHandler {
   authorizationServerMetadata(): Record<string, unknown> {
     return {
       issuer: this.config.publicBaseUrl,
+      authorization_response_iss_parameter_supported: true,
       authorization_endpoint: `${this.config.publicBaseUrl}/oauth/authorize`,
       token_endpoint: `${this.config.publicBaseUrl}/oauth/token`,
       registration_endpoint: `${this.config.publicBaseUrl}/oauth/register`,
@@ -189,6 +190,7 @@ export class OAuthHandler {
       const code = this.issueAuthorizationCode(pending, user.id);
       const destination = new URL(redirectUri);
       destination.searchParams.set("code", code);
+      destination.searchParams.set("iss", this.config.publicBaseUrl);
       if (state) {
         destination.searchParams.set("state", state);
       }
@@ -355,6 +357,7 @@ export class OAuthHandler {
     const authCode = this.issueAuthorizationCode(pending, user.id);
     const destination = new URL(pending.redirectUri);
     destination.searchParams.set("code", authCode);
+    destination.searchParams.set("iss", this.config.publicBaseUrl);
     if (pending.state) {
       destination.searchParams.set("state", pending.state);
     }

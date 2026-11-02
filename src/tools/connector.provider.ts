@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/server";
 import { isRemoteSafeToolProfile } from "../connector-profile.js";
 import {
   resolveConnectorCredentials,

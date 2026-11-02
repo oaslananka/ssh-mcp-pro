@@ -1,10 +1,7 @@
 import { createPublicKey } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { URL } from "node:url";
-import {
-  LATEST_PROTOCOL_VERSION,
-  SUPPORTED_PROTOCOL_VERSIONS,
-} from "@modelcontextprotocol/sdk/types.js";
+import { LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from "@modelcontextprotocol/server";
 import { sha256Base64Url } from "./crypto.js";
 import { parseScopes } from "./scopes.js";
 import type { RemoteAgentRecord, RemoteErrorCode, RemoteScope } from "./types.js";

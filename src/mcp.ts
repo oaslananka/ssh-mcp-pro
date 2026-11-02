@@ -1,14 +1,6 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import {
-  CallToolRequestSchema,
-  GetPromptRequestSchema,
-  ListResourcesRequestSchema,
-  ListPromptsRequestSchema,
-  ReadResourceRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import { McpServer } from "@modelcontextprotocol/server";
+import type { Transport } from "@modelcontextprotocol/server";
 import type { AppContainer } from "./container.js";
 import { logger } from "./logging.js";
 import { listResources, readResource } from "./resources.js";
@@ -92,7 +84,7 @@ export class SSHMCPServer {
   }
 
   private setupHandlers(): void {
-    this.server.setRequestHandler(ListResourcesRequestSchema, async () =>
+    this.server.setRequestHandler("resources/list", async () =>
       withSpan(
         "mcp.list_resources",
         (span) => {
@@ -108,7 +100,7 @@ export class SSHMCPServer {
       ),
     );
 
-    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) =>
+    this.server.setRequestHandler("resources/read", async (request) =>
       withSpan(
         "mcp.read_resource",
         async (span) => {
@@ -126,7 +118,7 @@ export class SSHMCPServer {
       ),
     );
 
-    this.server.setRequestHandler(ListPromptsRequestSchema, async () =>
+    this.server.setRequestHandler("prompts/list", async () =>
       withSpan(
         "mcp.list_prompts",
         (span) => {
@@ -142,7 +134,7 @@ export class SSHMCPServer {
       ),
     );
 
-    this.server.setRequestHandler(GetPromptRequestSchema, async (request) =>
+    this.server.setRequestHandler("prompts/get", async (request) =>
       withSpan(
         "mcp.get_prompt",
         (span) => {
@@ -164,11 +156,11 @@ export class SSHMCPServer {
       ),
     );
 
-    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    this.server.setRequestHandler("tools/list", async () => ({
       tools: this.registry.getAllTools(),
     }));
 
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) =>
+    this.server.setRequestHandler("tools/call", async (request) =>
       withSpan(
         "mcp.call_tool",
         async (span) => {
@@ -222,9 +214,17 @@ export class SSHMCPServer {
     };
   }
 
+  /** Expose the configured SDK server to per-request 2026-era transport factories. */
+  getSdkServer(): McpServer {
+    return this.mcpServer;
+  }
+
   async run(): Promise<void> {
-    const transport = new StdioServerTransport();
-    await this.connect(transport);
+    // One SDK-managed connection serves both modern discover and legacy initialize.
+    serveStdio(() => new SSHMCPServer(this.container).getSdkServer(), {
+      onerror: (error) => logger.error("stdio MCP error", { error: error.message }),
+    });
+    logger.info("SSH MCP Server started successfully");
   }
 
   async connect(transport: Transport): Promise<void> {

@@ -4,7 +4,8 @@ import { createConnection, type AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
+import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/server";
+import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { createContainer, type AppContainer } from "../../src/container.js";
 import { DEFAULT_CONFIG, type ServerConfig } from "../../src/config.js";
 import {
@@ -158,6 +159,42 @@ async function pingSession(harness: Harness, sessionId: string): Promise<Respons
   });
 }
 
+async function postLocalMcp(
+  harness: Harness,
+  headers: Record<string, string>,
+  body: string,
+): Promise<Response> {
+  const address = harness.runtime.server.address();
+  if (!address || typeof address === "string") {
+    throw new Error("HTTP boundary test server must be listening on loopback");
+  }
+  return new Promise((resolve, reject) => {
+    const request = httpRequest(
+      { hostname: "127.0.0.1", port: address.port, path: "/mcp", method: "POST", headers },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk: Buffer) => chunks.push(chunk));
+        response.on("error", reject);
+        response.on("end", () => {
+          const responseHeaders = new Headers();
+          for (const [name, value] of Object.entries(response.headers)) {
+            if (typeof value === "string") responseHeaders.set(name, value);
+            else if (Array.isArray(value)) responseHeaders.set(name, value.join(", "));
+          }
+          resolve(
+            new Response(Buffer.concat(chunks), {
+              status: response.statusCode ?? 500,
+              headers: responseHeaders,
+            }),
+          );
+        });
+      },
+    );
+    request.on("error", reject);
+    request.end(body);
+  });
+}
+
 async function openLegacySse(harness: Harness): Promise<{
   response: IncomingMessage;
   sessionId: string;
@@ -213,6 +250,94 @@ afterEach(async () => {
 });
 
 describe("real HTTP server boundary", () => {
+  test("serves modern discover and tools on the existing authenticated HTTP endpoint", async () => {
+    const harness = await startHarness();
+    const client = new Client(
+      { name: "modern-http-acceptance", version: "1.0.0" },
+      { versionNegotiation: { mode: "auto" } },
+    );
+    const transport = new StreamableHTTPClientTransport(new URL("/mcp", harness.baseUrl), {
+      requestInit: { headers: authorizedHeaders() },
+    });
+    try {
+      await client.connect(transport);
+      expect(client.getProtocolEra()).toBe("modern");
+      const listed = await client.listTools();
+      expect(listed.tools.map((tool) => tool.name)).toContain("connector_status");
+      const result = await client.callTool({ name: "connector_status", arguments: {} });
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toBeDefined();
+    } finally {
+      await client.close();
+    }
+  });
+
+  test("rejects modern discovery without authorization or with an untrusted Origin", async () => {
+    const harness = await startHarness();
+    const discover = {
+      jsonrpc: "2.0",
+      id: 51,
+      method: "server/discover",
+      params: {
+        _meta: {
+          "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+          "io.modelcontextprotocol/clientInfo": { name: "auth-boundary-test", version: "1.0.0" },
+          "io.modelcontextprotocol/clientCapabilities": {},
+        },
+      },
+    };
+    const body = JSON.stringify(discover);
+    const headers = authorizedHeaders({
+      "MCP-Protocol-Version": "2026-07-28",
+      "Mcp-Method": "server/discover",
+    });
+
+    const noToken = await postLocalMcp(harness, { ...headers, Authorization: "" }, body);
+    expect(noToken.status).toBe(401);
+
+    const forbiddenOrigin = await postLocalMcp(
+      harness,
+      { ...headers, Origin: "https://untrusted.example" },
+      body,
+    );
+    expect(forbiddenOrigin.status).toBe(403);
+
+    const approved = await postLocalMcp(harness, headers, body);
+    expect(approved.status).toBe(200);
+    expect(approved.headers.get("access-control-allow-origin")).toBe(allowedOrigin);
+    expect(approved.headers.get("vary")).toContain("Origin");
+    const result = (await approved.json()) as { result?: Record<string, unknown>; error?: unknown };
+    expect(result.result).toBeDefined();
+    expect(result.error).toBeUndefined();
+  });
+
+  test("rejects inconsistent modern protocol headers without falling back to legacy", async () => {
+    const harness = await startHarness();
+    const response = await fetch(`${harness.baseUrl}/mcp`, {
+      method: "POST",
+      headers: authorizedHeaders({
+        "MCP-Protocol-Version": "2026-07-28",
+        "Mcp-Method": "tools/call",
+      }),
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 29,
+        method: "tools/list",
+        params: {
+          _meta: {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientInfo": { name: "header-test", version: "1.0" },
+            "io.modelcontextprotocol/clientCapabilities": {},
+          },
+        },
+      }),
+    });
+    expect(response.status).toBe(400);
+    expect((await response.json()) as Record<string, unknown>).toMatchObject({
+      error: { code: -32020 },
+    });
+  });
+
   test("enforces bearer authorization and origin allowlists before MCP dispatch", async () => {
     const harness = await startHarness();
 
@@ -276,10 +401,24 @@ describe("real HTTP server boundary", () => {
 
     const allowed = await fetch(`${harness.baseUrl}/mcp`, {
       method: "OPTIONS",
-      headers: { Origin: allowedOrigin },
+      headers: {
+        Origin: allowedOrigin,
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers":
+          "authorization, content-type, mcp-protocol-version, mcp-method, mcp-name",
+      },
     });
     expect(allowed.status).toBe(204);
     expect(allowed.headers.get("access-control-allow-origin")).toBe(allowedOrigin);
+    const allowedHeaders = new Set(
+      (allowed.headers.get("access-control-allow-headers") ?? "")
+        .toLowerCase()
+        .split(",")
+        .map((header) => header.trim()),
+    );
+    for (const header of ["mcp-protocol-version", "mcp-method", "mcp-name"]) {
+      expect(allowedHeaders.has(header)).toBe(true);
+    }
 
     const denied = await fetch(`${harness.baseUrl}/mcp`, {
       method: "OPTIONS",

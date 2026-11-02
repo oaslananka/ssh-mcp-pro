@@ -1,4 +1,4 @@
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/server";
 import { logger } from "../logging.js";
 import type { MetricsCollector } from "../metrics.js";
 import type { ProcessService } from "../process.js";
