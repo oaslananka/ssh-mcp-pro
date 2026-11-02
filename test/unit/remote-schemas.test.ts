@@ -29,6 +29,72 @@ const host = {
 };
 
 describe("remote protocol schemas", () => {
+  test("enforces UTC ISO datetime fields across all signed envelope types", () => {
+    const valid = "2026-11-02T12:34:56.123Z";
+    const invalid = [
+      "2026-11-02T12:34:56+03:00",
+      "2026-11-02T12:34:56",
+      "2026-11-02T12:34Z",
+      "2026-11-02T12:60:00Z",
+    ];
+    const hello = {
+      type: "agent.hello",
+      agent_id: "test",
+      timestamp: valid,
+      nonce: "a".repeat(20),
+      capabilities: ["system.read"],
+      agent_version: "test",
+      host,
+      signature: "sig",
+    };
+    const action = {
+      type: "action.request",
+      action_id: "test",
+      agent_id: "test",
+      user_id: "user",
+      tool: "get_system_status",
+      capability: "system.read",
+      args: {},
+      policy_version: 1,
+      issued_at: valid,
+      deadline: valid,
+      nonce: "a".repeat(20),
+      signature: "sig",
+    };
+    const result = {
+      type: "action.result",
+      action_id: "test",
+      agent_id: "test",
+      nonce: "a".repeat(20),
+      status: "ok",
+      started_at: valid,
+      finished_at: valid,
+      truncated: false,
+      signature: "sig",
+    };
+    const policyUpdate = {
+      type: "policy.update",
+      agent_id: "test",
+      policy: createAgentPolicy("read-only"),
+      policy_version: 1,
+      issued_at: valid,
+      nonce: "a".repeat(20),
+      signature: "sig",
+    };
+    expect(parseAgentHelloEnvelope(hello).timestamp).toBe(valid);
+    expect(parseActionRequestEnvelope(action).deadline).toBe(valid);
+    expect(parseActionResultEnvelope(result).finished_at).toBe(valid);
+    expect(parsePolicyUpdateEnvelope(policyUpdate).issued_at).toBe(valid);
+    for (const date of invalid) {
+      expect(() => parseAgentHelloEnvelope({ ...hello, timestamp: date })).toThrow();
+      expect(() => parseActionRequestEnvelope({ ...action, issued_at: date })).toThrow();
+      expect(() => parseActionRequestEnvelope({ ...action, deadline: date })).toThrow();
+      expect(() => parseActionResultEnvelope({ ...result, started_at: date })).toThrow();
+      expect(() => parseActionResultEnvelope({ ...result, finished_at: date })).toThrow();
+      expect(() => parsePolicyUpdateEnvelope({ ...policyUpdate, issued_at: date })).toThrow();
+    }
+  });
+
   test("validates complete agent policy objects", () => {
     const policy = createAgentPolicy("read-only");
 
