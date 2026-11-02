@@ -158,7 +158,7 @@ export function sftpChmod(sftp: SFTPWrapper, path: string, mode: number): Promis
  * Recursively create directories via SFTP.
  */
 export async function sftpMkdirRecursive(sftp: SFTPWrapper, dirPath: string): Promise<void> {
-  const parts = dirPath.split("/").filter((part) => part);
+  const parts = dirPath.split("/").filter(Boolean);
   let currentPath = dirPath.startsWith("/") ? "" : ".";
 
   for (const part of parts) {

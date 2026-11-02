@@ -3,7 +3,6 @@ import * as path from "node:path";
 import { logger } from "./logging.js";
 import { applySecurityPolicyEnvironment } from "./config-security-env.js";
 import {
-  CONNECTOR_CREDENTIAL_PROVIDERS,
   parseBoolean,
   parseInteger,
   parseList,
@@ -14,7 +13,7 @@ import {
 } from "./config-parsers.js";
 
 /** @deprecated Import from config-parsers.js directly */
-export { CONNECTOR_CREDENTIAL_PROVIDERS };
+export { CONNECTOR_CREDENTIAL_PROVIDERS } from "./config-parsers.js";
 import { parseToolProfile, type ToolProfile } from "./connector-profile.js";
 import type { PolicyConfig } from "./policy.js";
 import type { HostKeyPolicy } from "./types.js";

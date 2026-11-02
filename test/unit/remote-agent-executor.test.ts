@@ -32,6 +32,25 @@ function action(
 }
 
 describe("remote agent executor", () => {
+  test.each([
+    ["run_shell", "shell.exec", { command: { unexpected: "shell code" } }],
+    ["file_write", "files.write", { path: { unexpected: "file path" }, content: "payload" }],
+    ["restart_service", "service.manage", { service: ["ssh"] }],
+    ["tail_logs", "logs.read", { unit_or_file: { unexpected: "log target" } }],
+  ] as const)("denies non-scalar action arguments for %s", async (tool, capability, args) => {
+    const keyPair = generateEd25519PemKeyPair();
+    const executor = new AgentExecutor(createAgentPolicy("full-admin"), keyPair.privateKeyPem);
+    const result = await executor.execute(action(tool, capability, args));
+    expect(result).toMatchObject({
+      status: "error",
+      error_code: "POLICY_DENIED",
+      message: "Action arguments must be scalar values",
+    });
+    expect(verifyEnvelope(result as unknown as Record<string, unknown>, keyPair.publicKeyPem)).toBe(
+      true,
+    );
+  });
+
   test("agent-side policy denies shell execution in read-only profile", async () => {
     const keyPair = generateEd25519PemKeyPair();
     const executor = new AgentExecutor(createAgentPolicy("read-only"), keyPair.privateKeyPem);

@@ -196,8 +196,11 @@ export async function verifyRemoteAccessToken(
 function principalFromPayload(payload: JWTPayload): RemotePrincipal {
   const scopes =
     typeof payload.scope === "string" ? payload.scope.split(/\s+/u).filter(Boolean) : [];
-  const githubId = String(payload.github_id ?? "");
-  const githubLogin = String(payload.github_login ?? "");
+  if (typeof payload.github_id !== "string" || typeof payload.github_login !== "string") {
+    throw new Error("Invalid GitHub identity claims");
+  }
+  const githubId = payload.github_id;
+  const githubLogin = payload.github_login;
   return {
     userId: String(payload.sub),
     githubId,

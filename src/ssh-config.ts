@@ -139,7 +139,7 @@ export class SSHConfigParser {
         host.user = value;
         break;
       case "port":
-        host.port = parseInt(value, 10);
+        host.port = Number.parseInt(value, 10);
         break;
       case "identityfile":
         // Expand ~ to home directory
@@ -162,7 +162,7 @@ export class SSHConfigParser {
           : value.replace(/^~/, os.homedir());
         break;
       case "connecttimeout":
-        host.connectTimeout = parseInt(value, 10);
+        host.connectTimeout = Number.parseInt(value, 10);
         break;
       default:
         // Store other options as-is

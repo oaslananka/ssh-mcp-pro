@@ -22,6 +22,18 @@ interface ExecResult {
 
 const SAFE_IDENTIFIER_PATTERN = /^[A-Za-z0-9_.@:-]{1,128}$/u;
 
+function scalarActionArgument(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  throw Object.assign(new Error("Action arguments must be scalar values"), {
+    code: "POLICY_DENIED" as const,
+  });
+}
+
 interface OutputAccumulator {
   bytes: number;
   chunks: Buffer[];
@@ -361,9 +373,9 @@ export class AgentExecutor {
       case "get_system_status":
         return this.getSystemStatus(timeoutSeconds);
       case "tail_logs":
-        return this.tailLogs(String(action.args.unit_or_file ?? ""), timeoutSeconds);
+        return this.tailLogs(scalarActionArgument(action.args.unit_or_file ?? ""), timeoutSeconds);
       case "restart_service":
-        return this.restartService(String(action.args.service ?? ""), timeoutSeconds);
+        return this.restartService(scalarActionArgument(action.args.service ?? ""), timeoutSeconds);
       case "docker_ps":
         return runCommand("docker", ["ps", "--format", "json"], {
           timeoutSeconds,
@@ -371,26 +383,32 @@ export class AgentExecutor {
         });
       case "docker_logs":
         return this.dockerLogs(
-          String(action.args.container ?? ""),
+          scalarActionArgument(action.args.container ?? ""),
           Number(action.args.lines ?? 100),
           timeoutSeconds,
         );
       case "docker_restart":
-        return this.dockerRestart(String(action.args.container ?? ""), timeoutSeconds);
+        return this.dockerRestart(
+          scalarActionArgument(action.args.container ?? ""),
+          timeoutSeconds,
+        );
       case "file_read":
-        return this.fileRead(String(action.args.path ?? ""));
+        return this.fileRead(scalarActionArgument(action.args.path ?? ""));
       case "file_write":
-        return this.fileWrite(String(action.args.path ?? ""), String(action.args.content ?? ""));
+        return this.fileWrite(
+          scalarActionArgument(action.args.path ?? ""),
+          scalarActionArgument(action.args.content ?? ""),
+        );
       case "run_shell":
         return this.runShell(
-          String(action.args.command ?? ""),
-          action.args.cwd ? String(action.args.cwd) : undefined,
+          scalarActionArgument(action.args.command ?? ""),
+          action.args.cwd ? scalarActionArgument(action.args.cwd) : undefined,
           timeoutSeconds,
         );
       case "run_shell_as_root":
         return this.runShellAsRoot(
-          String(action.args.command ?? ""),
-          action.args.cwd ? String(action.args.cwd) : undefined,
+          scalarActionArgument(action.args.command ?? ""),
+          action.args.cwd ? scalarActionArgument(action.args.cwd) : undefined,
           timeoutSeconds,
         );
       default:

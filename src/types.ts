@@ -214,7 +214,7 @@ export class SSHMCPError extends Error {
 }
 
 // Zod schemas for input validation
-const EnvKeySchema = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/u);
+const EnvKeySchema = z.string().regex(/^[A-Za-z_]\w*$/u);
 const EnvMapSchema = z.record(EnvKeySchema, z.string());
 
 export const ConnectionParamsSchema = z.object({

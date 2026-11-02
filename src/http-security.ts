@@ -56,16 +56,18 @@ export function isLoopbackHost(host: string): boolean {
   );
 }
 
+const DEFAULT_HTTP_SECURITY_CONTEXT: HttpStartupSecurityContext = {
+  toolProfile: "full",
+  allowedHosts: [],
+  hostKeyPolicy: "strict",
+  authMode: "bearer",
+  oauthConfigured: false,
+};
+
 export function validateHttpStartupConfig(
   httpConfig: HttpStartupConfig,
   bearerToken: string | undefined,
-  context: HttpStartupSecurityContext = {
-    toolProfile: "full",
-    allowedHosts: [],
-    hostKeyPolicy: "strict",
-    authMode: "bearer",
-    oauthConfigured: false,
-  },
+  context: HttpStartupSecurityContext = DEFAULT_HTTP_SECURITY_CONTEXT,
 ): void {
   if (httpConfig.bearerTokenFile && bearerToken?.length === 0) {
     throw new Error("Refusing HTTP MCP startup with an empty bearer token file");

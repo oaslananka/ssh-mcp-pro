@@ -129,6 +129,16 @@ export async function readJson(req: IncomingMessage): Promise<Record<string, unk
   return parsed;
 }
 
+function formFieldString(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  throw safeError("INVALID_CLIENT", "Expected a scalar JSON form value", 400);
+}
+
 export async function readJsonOrForm(req: IncomingMessage): Promise<Record<string, string>> {
   const raw = await readBody(req);
   const contentType = req.headers["content-type"] ?? "";
@@ -138,10 +148,7 @@ export async function readJsonOrForm(req: IncomingMessage): Promise<Record<strin
       throw safeError("INTERNAL_ERROR", "Expected JSON object");
     }
     return Object.fromEntries(
-      Object.entries(parsed).map(([key, value]) => [
-        key,
-        typeof value === "string" ? value : String(value ?? ""),
-      ]),
+      Object.entries(parsed).map(([key, value]) => [key, formFieldString(value)]),
     );
   }
   try {

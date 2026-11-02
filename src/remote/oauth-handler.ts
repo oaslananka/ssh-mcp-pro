@@ -382,7 +382,18 @@ export class OAuthHandler {
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/vnd.github+json" },
     });
     const userPayload = (await userResponse.json()) as Record<string, unknown>;
-    return { id: String(userPayload.id ?? ""), login: String(userPayload.login ?? "") };
+    const githubId = userPayload.id;
+    const githubLogin = userPayload.login;
+    if (
+      typeof githubId !== "number" ||
+      !Number.isSafeInteger(githubId) ||
+      githubId <= 0 ||
+      typeof githubLogin !== "string" ||
+      !githubLogin
+    ) {
+      throw safeError("INVALID_TOKEN", "GitHub OAuth user response missing valid identity", 502);
+    }
+    return { id: String(githubId), login: githubLogin };
   }
 
   private testGitHubUser(): GitHubUser | undefined {

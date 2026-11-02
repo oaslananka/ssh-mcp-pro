@@ -59,7 +59,14 @@ function parseJson<T>(value: string): T {
 }
 
 function rowString(row: Record<string, unknown>, key: string): string {
-  return String(row[key] ?? "");
+  const value = row[key];
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value);
+  }
+  throw new TypeError("Unexpected database column type");
 }
 
 function optionalRowString(row: Record<string, unknown>, key: string): string | undefined {
