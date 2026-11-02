@@ -373,7 +373,7 @@ export class AgentExecutor {
       case "get_system_status":
         return this.getSystemStatus(timeoutSeconds);
       case "tail_logs":
-        return this.tailLogs(scalarActionArgument(action.args.unit_or_file ?? ""), timeoutSeconds);
+        return this.tailLogs(scalarActionArgument(action.args.unit_or_file), timeoutSeconds);
       case "restart_service":
         return this.restartService(scalarActionArgument(action.args.service ?? ""), timeoutSeconds);
       case "docker_ps":

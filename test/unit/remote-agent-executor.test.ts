@@ -32,6 +32,17 @@ function action(
 }
 
 describe("remote agent executor", () => {
+  test("preserves missing target behavior for null scalar arguments", async () => {
+    const keyPair = generateEd25519PemKeyPair();
+    const executor = new AgentExecutor(createAgentPolicy("read-only"), keyPair.privateKeyPem);
+    const result = await executor.execute(action("tail_logs", "logs.read", { unit_or_file: null }));
+    expect(result).toMatchObject({
+      status: "error",
+      error_code: "POLICY_DENIED",
+      message: "unit_or_file is required",
+    });
+  });
+
   test.each([
     ["run_shell", "shell.exec", { command: { unexpected: "shell code" } }],
     ["file_write", "files.write", { path: { unexpected: "file path" }, content: "payload" }],
