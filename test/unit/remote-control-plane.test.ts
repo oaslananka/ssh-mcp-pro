@@ -214,6 +214,7 @@ describe("remote control plane remote-agent contracts", () => {
         expect.objectContaining({
           issuer: "http://127.0.0.1:3000",
           token_endpoint: "http://127.0.0.1:3000/oauth/token",
+          authorization_response_iss_parameter_supported: true,
         }),
       );
 
@@ -271,6 +272,7 @@ describe("remote control plane remote-agent contracts", () => {
       const code = redirectLocation.searchParams.get("code") ?? "";
       expect(code).not.toBe("");
       expect(redirectLocation.searchParams.get("state")).toBe("round-trip-state");
+      expect(redirectLocation.searchParams.get("iss")).toBe("http://127.0.0.1:3000");
 
       const tokenBody = new URLSearchParams({
         grant_type: "authorization_code",
@@ -633,6 +635,9 @@ describe("remote control plane remote-agent contracts", () => {
       expect(callback.statusCode).toBe(302);
       expect(String(callback.headers?.Location)).toContain("state=app-state");
       expect(String(callback.headers?.Location)).toContain("code=");
+      expect(new URL(String(callback.headers?.Location)).searchParams.get("iss")).toBe(
+        config.publicBaseUrl,
+      );
     } finally {
       globalThis.fetch = originalFetch;
       controlPlane.close();

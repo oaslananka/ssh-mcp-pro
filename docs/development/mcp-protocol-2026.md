@@ -11,7 +11,7 @@ This repository uses the official TypeScript v2 MCP SDK. The canonical SSH tool 
 
 ## Security and operation
 
-The existing HTTP router enforces authentication, origin policy, request-size limits, and public-boundary controls before dispatching either protocol era. The modern SDK supplies header/body consistency validation, protocol discovery, default private/no-cache hints, and 2026 transport behavior. Do not use user-provided MCP metadata to authorize SSH host access; the existing authenticated identity and host policy remain authoritative.
+The existing HTTP router enforces authentication, origin policy, request-size limits, and public-boundary controls before dispatching either protocol era. The remote authorization server also includes the RFC 9207 issuer parameter on authorization-code redirects and advertises issuer-identification support in OAuth metadata. The modern SDK supplies header/body consistency validation, protocol discovery, default private/no-cache hints, and 2026 transport behavior. Do not use user-provided MCP metadata to authorize SSH host access; the existing authenticated identity and host policy remain authoritative.
 
 Tool output schemas, structured results and annotations are preserved. New Tasks, Skills, interactive elicitation, and custom cache TTLs are not enabled without a concrete use case; protocol support does not require them.
 

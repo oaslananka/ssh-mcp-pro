@@ -236,6 +236,51 @@ describe("real HTTP server boundary", () => {
     }
   });
 
+  test("rejects modern discovery without authorization or with an untrusted Origin", async () => {
+    const harness = await startHarness();
+    const discover = {
+      jsonrpc: "2.0",
+      id: 51,
+      method: "server/discover",
+      params: {
+        _meta: {
+          "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+          "io.modelcontextprotocol/clientInfo": { name: "auth-boundary-test", version: "1.0.0" },
+          "io.modelcontextprotocol/clientCapabilities": {},
+        },
+      },
+    };
+    const body = JSON.stringify(discover);
+    const headers = authorizedHeaders({
+      "MCP-Protocol-Version": "2026-07-28",
+      "Mcp-Method": "server/discover",
+    });
+
+    const noToken = await fetch(harness.baseUrl + "/mcp", {
+      method: "POST",
+      headers: { ...headers, Authorization: "" },
+      body,
+    });
+    expect(noToken.status).toBe(401);
+
+    const forbiddenOrigin = await fetch(harness.baseUrl + "/mcp", {
+      method: "POST",
+      headers: { ...headers, Origin: "https://untrusted.example" },
+      body,
+    });
+    expect(forbiddenOrigin.status).toBe(403);
+
+    const approved = await fetch(harness.baseUrl + "/mcp", {
+      method: "POST",
+      headers,
+      body,
+    });
+    expect(approved.status).toBe(200);
+    const result = (await approved.json()) as { result?: Record<string, unknown>; error?: unknown };
+    expect(result.result).toBeDefined();
+    expect(result.error).toBeUndefined();
+  });
+
   test("rejects inconsistent modern protocol headers without falling back to legacy", async () => {
     const harness = await startHarness();
     const response = await fetch(`${harness.baseUrl}/mcp`, {
