@@ -295,7 +295,7 @@ function parseVersion(version) {
 }
 
 function escapeMarkdown(value) {
-  const slash = String.fromCharCode(92);
+  const slash = String.fromCodePoint(92);
   return String(value)
     .replaceAll(slash, slash.repeat(2))
     .replaceAll("|", String.raw`\|`);
