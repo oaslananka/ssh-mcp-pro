@@ -36,6 +36,7 @@ describe("gated release lifecycle", () => {
     const releaseJob = section(release, "  release:\n", "  release-assets:\n");
     expect(releaseJob).toContain("needs: release-preflight");
     expect(releaseJob).toContain("needs.release-preflight.result == 'success'");
+    expect(releaseJob).toContain("token: ${{ secrets.RELEASE_PLEASE_TOKEN }}");
   });
 
   test("push releases attach only preflight-verified artifacts and trigger Docker", () => {
