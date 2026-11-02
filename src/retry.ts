@@ -101,8 +101,10 @@ export async function withRetry<T>(
 
   const startTime = Date.now();
   let lastError: unknown;
+  let attempts = 0;
 
   for (let attempt = 1; attempt <= opts.maxAttempts; attempt++) {
+    attempts = attempt;
     try {
       const result = await fn();
       return {
@@ -115,11 +117,12 @@ export async function withRetry<T>(
       lastError = error;
 
       // Check if we should retry
-      if (attempt >= opts.maxAttempts || !isRetryable(error)) {
+      const retryable = isRetryable(error);
+      if (attempt >= opts.maxAttempts || !retryable) {
         logger.debug("Retry: giving up", {
           attempt,
           maxAttempts: opts.maxAttempts,
-          retryable: isRetryable(error),
+          retryable,
         });
         break;
       }
@@ -139,7 +142,7 @@ export async function withRetry<T>(
   return {
     success: false,
     error: lastError,
-    attempts: opts.maxAttempts,
+    attempts,
     totalTimeMs: Date.now() - startTime,
   };
 }
