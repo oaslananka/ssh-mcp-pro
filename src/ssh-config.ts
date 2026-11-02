@@ -90,7 +90,7 @@ export class SSHConfigParser {
    */
   private parseContent(content: string): void {
     const lines = content.split("\n");
-    let currentHost: SSHHostConfig | null = null;
+    let currentHosts: SSHHostConfig[] = [];
 
     for (const rawLine of lines) {
       const line = rawLine.trim();
@@ -116,13 +116,17 @@ export class SSHConfigParser {
       if (keyLower === "host") {
         // Start new host block
         const hostPatterns = value.split(/\s+/);
-        for (const pattern of hostPatterns) {
-          currentHost = { host: pattern };
-          this.hosts.set(pattern, currentHost);
+        currentHosts = hostPatterns.map((pattern) => {
+          const config: SSHHostConfig = { host: pattern };
+          this.hosts.set(pattern, config);
+          return config;
+        });
+      } else {
+        // A Host directive may contain multiple aliases and wildcard patterns.
+        // The following options apply to every member of that declaration.
+        for (const host of currentHosts) {
+          this.setHostOption(host, keyLower, value);
         }
-      } else if (currentHost) {
-        // Add option to current host
-        this.setHostOption(currentHost, keyLower, value);
       }
     }
   }
