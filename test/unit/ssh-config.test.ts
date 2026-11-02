@@ -106,6 +106,41 @@ describe("SSH config cache management", () => {
     });
   });
 
+  test("applies Host options to every alias in a multi-pattern declaration", async () => {
+    const configPath = path.join(tempDir, "multi-alias-config");
+    fs.writeFileSync(
+      configPath,
+      [
+        "Host build build-alt *.build.test",
+        "  HostName builder.example.test",
+        "  User builder",
+        "  Port 2201",
+        "  IdentityFile ~/.ssh/build-key",
+        "Host deploy",
+        "  HostName deploy.example.test",
+        "  User deployer",
+      ].join("\n"),
+    );
+    const { SSHConfigParser } = await import("../../src/ssh-config.js");
+    const parser = new SSHConfigParser(configPath);
+    await parser.parse();
+    expect(parser.getAllHosts()).toEqual(["build", "build-alt", "*.build.test", "deploy"]);
+    for (const alias of ["build", "build-alt", "runner.build.test"]) {
+      expect(parser.resolveHost(alias)).toEqual({
+        host: "builder.example.test",
+        username: "builder",
+        port: 2201,
+        privateKeyPath: path.join(os.homedir(), ".ssh", "build-key"),
+      });
+    }
+    expect(parser.getHostConfig("build")?.host).toBe("build");
+    expect(parser.getHostConfig("build-alt")?.host).toBe("build-alt");
+    expect(parser.resolveHost("deploy")).toEqual({
+      host: "deploy.example.test",
+      username: "deployer",
+    });
+  });
+
   test("handles missing config files gracefully", async () => {
     const missingPath = path.join(tempDir, "missing-config");
     const { SSHConfigParser } = await import("../../src/ssh-config.js");
