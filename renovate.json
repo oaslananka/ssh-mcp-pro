@@ -73,6 +73,24 @@
       ]
     },
     {
+      "description": "Delegate stable minor development dependency updates to Mergify after CI.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "devDependencies"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "matchCurrentVersion": "!/^0/",
+      "automerge": false,
+      "addLabels": [
+        "automerge:enabled",
+        "risk:low"
+      ]
+    },
+    {
       "description": "Require explicit approval for major version changes.",
       "matchUpdateTypes": [
         "major"
