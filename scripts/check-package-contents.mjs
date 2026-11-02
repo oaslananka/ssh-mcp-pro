@@ -32,7 +32,7 @@ if (pack.status !== 0) {
 
 const packed = parsePnpmPackOutput(pack.stdout);
 const files = new Set(packed.files.map((file) => file.path));
-for (const file of [...new Set(requiredFiles)]) {
+for (const file of new Set(requiredFiles)) {
   if (!files.has(file)) {
     throw new Error(`Packed artifact is missing ${file}.`);
   }

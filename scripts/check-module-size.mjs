@@ -7,8 +7,7 @@
  * Fails (exit 1) when the "max" threshold is exceeded.
  */
 
-import { readFileSync } from "node:fs";
-import { globSync } from "node:fs";
+import { globSync, readFileSync } from "node:fs";
 
 const WARN_THRESHOLD = 400;
 const MAX_THRESHOLD = 600;

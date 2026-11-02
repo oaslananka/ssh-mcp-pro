@@ -117,8 +117,10 @@ export async function buildReport(options = {}) {
 async function runtimeEntries(packageJson, nodeIndex, nodeSchedule, today) {
   const entries = nodeRuntimeEntries(packageJson, nodeIndex, nodeSchedule, today);
   const packageManager = parsePackageManager(packageJson.packageManager);
-  entries.push(await packageManagerEntry(packageManager));
-  entries.push(...(await localToolchainEntries(nodeIndex, nodeSchedule, today)));
+  entries.push(
+    await packageManagerEntry(packageManager),
+    ...(await localToolchainEntries(nodeIndex, nodeSchedule, today)),
+  );
   return entries;
 }
 
@@ -293,7 +295,10 @@ function parseVersion(version) {
 }
 
 function escapeMarkdown(value) {
-  return String(value).replace(/\\/gu, "\\\\").replace(/\|/gu, "\\|");
+  const slash = String.fromCharCode(92);
+  return String(value)
+    .replaceAll(slash, slash.repeat(2))
+    .replaceAll("|", String.raw`\|`);
 }
 
 function appendReleaseNotes(note, releaseNotesUrl, status) {

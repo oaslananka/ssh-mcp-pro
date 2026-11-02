@@ -219,7 +219,7 @@ function getProjectIssueNumber(value, key) {
 }
 
 function parseIssueNumber(value) {
-  const match = String(value ?? "").match(/(?:\/issues\/|#)(\d+)(?:\b|$)/u);
+  const match = /(?:\/issues\/|#)(\d+)(?:\b|$)/u.exec(String(value ?? ""));
   return match ? Number(match[1]) : null;
 }
 

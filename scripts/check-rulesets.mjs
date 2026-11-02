@@ -65,9 +65,9 @@ function validateMainProtection(path, ruleset, workflowJobNames) {
   ]);
   assertArrayEqual(path, "conditions.ref_name.exclude", ruleset.conditions?.ref_name?.exclude, []);
 
-  const ruleTypes = ruleset.rules.map((rule) => rule.type);
+  const ruleTypes = new Set(ruleset.rules.map((rule) => rule.type));
   for (const type of requiredMainProtectionRules) {
-    if (!ruleTypes.includes(type)) {
+    if (!ruleTypes.has(type)) {
       throw new Error(`${path} is missing required ${type} rule.`);
     }
   }
@@ -223,7 +223,7 @@ function assertEqual(path, field, actual, expected) {
 
 function assertArrayEqual(path, field, actual, expected) {
   if (!Array.isArray(actual)) {
-    throw new Error(`${path} ${field} must be an array.`);
+    throw new TypeError(`${path} ${field} must be an array.`);
   }
 
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
