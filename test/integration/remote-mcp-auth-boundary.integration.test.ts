@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { afterEach, describe, expect, test } from "vitest";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
 import { loadRemoteConfig } from "../../src/remote/config.js";
@@ -150,6 +151,30 @@ describe("remote-agent MCP real HTTP authorization boundary", () => {
     expect(hostsCall.body).toMatchObject({
       result: { structuredContent: { hosts: [] } },
     });
+  });
+
+  test("auto-negotiating SDK clients can use legacy remote MCP without privilege escalation", async () => {
+    const harness = await startHarness();
+    const token = await issueToken(harness, "hosts:read");
+    const transport = new StreamableHTTPClientTransport(new URL(harness.endpoint), {
+      requestInit: { headers: { authorization: "Bearer " + token } },
+    });
+    const client = new Client(
+      { name: "remote-auto-acceptance", version: "1.0.0" },
+      { versionNegotiation: { mode: "auto" } },
+    );
+    try {
+      await client.connect(transport);
+      expect(client.getProtocolEra()).toBe("legacy");
+      const tools = (await client.listTools()).tools.map((tool) => tool.name);
+      expect(tools).toContain("list_hosts");
+      expect(tools).not.toContain("run_shell");
+      const status = await client.callTool({ name: "list_hosts", arguments: {} });
+      expect(status.isError).not.toBe(true);
+      expect(status.structuredContent).toMatchObject({ hosts: [] });
+    } finally {
+      await client.close();
+    }
   });
 
   test("preserves the explicit 2025-era initialization contract", async () => {

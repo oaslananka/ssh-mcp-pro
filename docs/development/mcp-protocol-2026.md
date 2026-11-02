@@ -7,7 +7,7 @@ This repository uses the official TypeScript v2 MCP SDK. The canonical SSH tool 
 - **stdio**: `serveStdio` negotiates the 2026-07-28 era and preserves the 2025 `initialize` handshake for legacy clients.
 - **Standard `/mcp` HTTP**: the SDK's `createMcpHandler` handles modern per-request traffic. The existing session registry and Node Streamable HTTP transport still handle legacy sessionful traffic, selected using the SDK's `isLegacyRequest` classifier.
 - **Legacy SSE**: the optional `/sse` and `/messages` endpoints use the official `server-legacy` compatibility transport. SSE remains disabled by default; do not remove it without a documented client compatibility decision.
-- **Remote-agent control plane**: when its MCP routing is enabled, it remains a distinct authenticated, capability-scoped endpoint with its own request handling. It is **not yet advertised as 2026-07-28-capable**. Its modernization requires separate dual-era acceptance tests, not an authorization bypass to the standard SSH MCP endpoint.
+- **Remote-agent control plane**: when its MCP routing is enabled, it remains a distinct authenticated, capability-scoped endpoint with its own request handling. It is **not yet advertised as 2026-07-28-capable**. An official SDK v2 client using `versionNegotiation: { mode: "auto" }` falls back to the 2025 handshake and can list or call only tools permitted by its JWT scopes; clients pinned to 2026-07-28 cannot connect until this route is modernized. This is exercised over real HTTP in `test/integration/remote-mcp-auth-boundary.integration.test.ts`. Modernization requires its own dual-era acceptance, not an authorization bypass to the standard SSH MCP endpoint.
 
 ## Security and operation
 
