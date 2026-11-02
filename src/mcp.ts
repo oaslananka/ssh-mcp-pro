@@ -1,4 +1,4 @@
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
@@ -64,13 +64,14 @@ function rateLimitErrorResult(
 }
 
 export class SSHMCPServer {
-  private readonly server: Server;
+  private readonly mcpServer: McpServer;
+  private readonly server: McpServer["server"];
   private readonly registry: ReturnType<typeof createToolRegistry>;
   private readonly toolProfile: ToolProfile;
 
   constructor(private readonly container: AppContainer) {
     this.toolProfile = container.config.get("connector").toolProfile;
-    this.server = new Server(
+    this.mcpServer = new McpServer(
       {
         name: SERVER_NAME,
         version: SERVER_VERSION,
@@ -83,6 +84,7 @@ export class SSHMCPServer {
         },
       },
     );
+    this.server = this.mcpServer.server;
     this.registry = createToolRegistry(container);
 
     this.setupHandlers();
@@ -226,7 +228,7 @@ export class SSHMCPServer {
   }
 
   async connect(transport: Transport): Promise<void> {
-    await this.server.connect(transport);
+    await this.mcpServer.connect(transport);
     logger.info("SSH MCP Server started successfully");
   }
 }
