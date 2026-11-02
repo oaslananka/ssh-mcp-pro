@@ -155,11 +155,16 @@ async function packageManagerEntry(packageManager) {
 }
 
 export async function localToolchainEntries(nodeIndex, nodeSchedule, today) {
-  const files = [".node-version", ".nvmrc"];
-  // The files are independent; Promise.all retains their original reporting order.
-  const versions = await Promise.all(files.map((file) => readFile(file, "utf8")));
-  return files.map((file, index) => {
-    const version = versions[index].trim();
+  // Use literal local paths and retain the source order in the report.
+  const [nodeVersion, nvmVersion] = await Promise.all([
+    readFile(".node-version", "utf8"),
+    readFile(".nvmrc", "utf8"),
+  ]);
+  const files = [
+    { file: ".node-version", version: nodeVersion.trim() },
+    { file: ".nvmrc", version: nvmVersion.trim() },
+  ];
+  return files.map(({ file, version }) => {
     const major = parseVersion(version)[0];
     const latest = latestNodeForMajor(nodeIndex, major);
     const lifecycle = lifecycleForNode(nodeSchedule["v" + major], today);
