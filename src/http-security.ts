@@ -135,7 +135,8 @@ export function corsHeaders(
 
   return {
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Headers": "authorization, content-type, mcp-session-id",
+    "Access-Control-Allow-Headers":
+      "authorization, content-type, mcp-session-id, mcp-protocol-version, mcp-method, mcp-name",
     "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
     "Access-Control-Expose-Headers": "mcp-session-id, WWW-Authenticate",
     Vary: "Origin",

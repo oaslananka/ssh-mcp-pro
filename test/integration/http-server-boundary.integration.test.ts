@@ -276,6 +276,8 @@ describe("real HTTP server boundary", () => {
       body,
     });
     expect(approved.status).toBe(200);
+    expect(approved.headers.get("access-control-allow-origin")).toBe(allowedOrigin);
+    expect(approved.headers.get("vary")).toContain("Origin");
     const result = (await approved.json()) as { result?: Record<string, unknown>; error?: unknown };
     expect(result.result).toBeDefined();
     expect(result.error).toBeUndefined();
@@ -371,10 +373,24 @@ describe("real HTTP server boundary", () => {
 
     const allowed = await fetch(`${harness.baseUrl}/mcp`, {
       method: "OPTIONS",
-      headers: { Origin: allowedOrigin },
+      headers: {
+        Origin: allowedOrigin,
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers":
+          "authorization, content-type, mcp-protocol-version, mcp-method, mcp-name",
+      },
     });
     expect(allowed.status).toBe(204);
     expect(allowed.headers.get("access-control-allow-origin")).toBe(allowedOrigin);
+    const allowedHeaders = new Set(
+      (allowed.headers.get("access-control-allow-headers") ?? "")
+        .toLowerCase()
+        .split(",")
+        .map((header) => header.trim()),
+    );
+    for (const header of ["mcp-protocol-version", "mcp-method", "mcp-name"]) {
+      expect(allowedHeaders.has(header)).toBe(true);
+    }
 
     const denied = await fetch(`${harness.baseUrl}/mcp`, {
       method: "OPTIONS",

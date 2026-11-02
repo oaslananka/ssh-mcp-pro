@@ -290,6 +290,13 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
         // Let the official classifier handle malformed modern envelopes and
         // version-header mismatches instead of downgrading them to legacy.
         if (!(await isLegacyRequest(webRequest, parsedBody))) {
+          // Preserve the existing, allowlisted HTTP CORS response policy for
+          // browser-based modern clients as well as legacy MCP connections.
+          for (const [name, value] of Object.entries(
+            corsHeaders(req.headers.origin, httpConfig.allowedOrigins),
+          )) {
+            res.setHeader(name, value);
+          }
           await sendMcpWebResponse(res, await modernMcp.fetch(webRequest));
           return;
         }
