@@ -35,7 +35,7 @@ describe("Renovate and Mergify dependency convergence", () => {
 
   test("keeps runtime, lockfile and vulnerability changes out of automatic merges", () => {
     const sensitive = rule("MCP SDK and SSH/runtime-affecting dependencies require manual review.");
-    for (const dependency of ["@modelcontextprotocol/sdk", "node-ssh", "jose", "ws", "zod"]) {
+    for (const dependency of ["@modelcontextprotocol/server", "node-ssh", "jose", "ws", "zod"]) {
       expect(sensitive.matchPackageNames).toContain(dependency);
     }
     expect(sensitive.addLabels).toContain("runtime-risk");

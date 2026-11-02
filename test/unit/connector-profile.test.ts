@@ -17,7 +17,7 @@ import {
 } from "../../src/connector-profile.js";
 import type { MCPPromptDefinition } from "../../src/prompts.js";
 import type { MCPResource } from "../../src/resources.js";
-import type { Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { Tool } from "@modelcontextprotocol/server";
 
 const remoteConnectorToolNames = [
   "connector_status",

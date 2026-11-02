@@ -136,7 +136,11 @@
     {
       "description": "MCP SDK and SSH/runtime-affecting dependencies require manual review.",
       "matchPackageNames": [
-        "@modelcontextprotocol/sdk",
+        "@modelcontextprotocol/core",
+        "@modelcontextprotocol/server",
+        "@modelcontextprotocol/node",
+        "@modelcontextprotocol/server-legacy",
+        "@modelcontextprotocol/client",
         "ssh2",
         "node-ssh",
         "node-pty",

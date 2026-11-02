@@ -4,7 +4,8 @@ import { createConnection, type AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
+import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/server";
+import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { createContainer, type AppContainer } from "../../src/container.js";
 import { DEFAULT_CONFIG, type ServerConfig } from "../../src/config.js";
 import {
@@ -213,6 +214,55 @@ afterEach(async () => {
 });
 
 describe("real HTTP server boundary", () => {
+  test("serves modern discover and tools on the existing authenticated HTTP endpoint", async () => {
+    const harness = await startHarness();
+    const client = new Client(
+      { name: "modern-http-acceptance", version: "1.0.0" },
+      { versionNegotiation: { mode: "auto" } },
+    );
+    const transport = new StreamableHTTPClientTransport(new URL("/mcp", harness.baseUrl), {
+      requestInit: { headers: authorizedHeaders() },
+    });
+    try {
+      await client.connect(transport);
+      expect(client.getProtocolEra()).toBe("modern");
+      const listed = await client.listTools();
+      expect(listed.tools.map((tool) => tool.name)).toContain("connector_status");
+      const result = await client.callTool({ name: "connector_status", arguments: {} });
+      expect(result.isError).not.toBe(true);
+      expect(result.structuredContent).toBeDefined();
+    } finally {
+      await client.close();
+    }
+  });
+
+  test("rejects inconsistent modern protocol headers without falling back to legacy", async () => {
+    const harness = await startHarness();
+    const response = await fetch(`${harness.baseUrl}/mcp`, {
+      method: "POST",
+      headers: authorizedHeaders({
+        "MCP-Protocol-Version": "2026-07-28",
+        "Mcp-Method": "tools/call",
+      }),
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 29,
+        method: "tools/list",
+        params: {
+          _meta: {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientInfo": { name: "header-test", version: "1.0" },
+            "io.modelcontextprotocol/clientCapabilities": {},
+          },
+        },
+      }),
+    });
+    expect(response.status).toBe(400);
+    expect((await response.json()) as Record<string, unknown>).toMatchObject({
+      error: { code: -32020 },
+    });
+  });
+
   test("enforces bearer authorization and origin allowlists before MCP dispatch", async () => {
     const harness = await startHarness();
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { TextContent, Tool } from "@modelcontextprotocol/sdk/types.js";
+import type { TextContent, Tool } from "@modelcontextprotocol/server";
 import { createTestContainer } from "../helpers.js";
 import { createToolRegistry } from "../../../src/tools/index.js";
 import { ToolRegistry } from "../../../src/tools/registry.js";

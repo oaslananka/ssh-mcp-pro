@@ -1,4 +1,4 @@
-import type { TextContent } from "@modelcontextprotocol/sdk/types.js";
+import type { TextContent } from "@modelcontextprotocol/server";
 import type { ToolCallResult } from "./types.js";
 
 export type StructuredContent = Record<string, unknown>;
