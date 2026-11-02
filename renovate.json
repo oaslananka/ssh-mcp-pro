@@ -43,8 +43,7 @@
     "automerge": false,
     "addLabels": [
       "lockfile",
-      "automerge:enabled",
-      "risk:low"
+      "requires-review"
     ]
   },
   "vulnerabilityAlerts": {

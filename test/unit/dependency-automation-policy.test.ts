@@ -37,7 +37,7 @@ describe("Renovate and Mergify dependency convergence", () => {
     expect(mergify).toContain("branch_protection_injection_mode: queue");
   });
 
-  test("delegates stable minor dev updates and weekly lockfile maintenance to Mergify", () => {
+  test("delegates stable minor dev updates while retaining lockfile review", () => {
     const safeMinor = rule(
       "Delegate stable minor development dependency updates to Mergify after CI.",
     );
@@ -48,9 +48,9 @@ describe("Renovate and Mergify dependency convergence", () => {
     expect(safeMinor.addLabels).toEqual(expect.arrayContaining(["automerge:enabled", "risk:low"]));
     expect(renovate.lockFileMaintenance.automerge).toBe(false);
     expect(renovate.lockFileMaintenance.addLabels).toEqual(
-      expect.arrayContaining(["lockfile", "automerge:enabled", "risk:low"]),
+      expect.arrayContaining(["lockfile", "requires-review"]),
     );
-    expect(renovate.lockFileMaintenance.addLabels).not.toContain("requires-review");
+    expect(renovate.lockFileMaintenance.addLabels).not.toContain("automerge:enabled");
     expect(renovate.automerge).toBe(false);
   });
 
