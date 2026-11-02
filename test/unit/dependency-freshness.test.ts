@@ -108,6 +108,38 @@ describe("dependency freshness helpers", () => {
     });
   });
 
+  test("only treats the approved frozen SSE bridge deprecation as advisory", () => {
+    const notice =
+      "This package is a frozen copy of v1's SSE transport and OAuth Authorization Server helpers for migration purposes only. Use StreamableHTTP from @modelcontextprotocol/server and a dedicated OAuth server in production. Will not receive new features.";
+    expect(
+      freshness.statusForDirectPackage(
+        "@modelcontextprotocol/server-legacy",
+        "2.4.0",
+        "2.4.0",
+        notice,
+      ),
+    ).toMatchObject({ status: "advisory" });
+    expect(
+      freshness.statusForDirectPackage(
+        "@modelcontextprotocol/server-legacy",
+        "2.4.1",
+        "2.4.1",
+        notice,
+      ),
+    ).toMatchObject({ status: "fail" });
+    expect(
+      freshness.statusForDirectPackage(
+        "@modelcontextprotocol/server-legacy",
+        "2.4.0",
+        "2.4.0",
+        "deprecated for an unrelated security concern",
+      ),
+    ).toMatchObject({ status: "fail" });
+    expect(
+      freshness.statusForDirectPackage("@modelcontextprotocol/server", "2.4.0", "2.4.0", notice),
+    ).toMatchObject({ status: "fail" });
+  });
+
   test("classifies Node lifecycle phases against release schedule dates", () => {
     const schedule = {
       start: "2024-01-01",

@@ -54,6 +54,25 @@ export function statusForPackage(current, latest, deprecated) {
   return { status: "pass", note: "current locked version matches or exceeds latest tag" };
 }
 
+// The v2 SDK publishes this frozen v1 SSE bridge explicitly for clients that
+// have not migrated to Streamable HTTP. Our /sse route is opt-in and disabled
+// by default. Keep this exemption exact so all other deprecations still fail.
+export function statusForDirectPackage(name, current, latest, deprecated) {
+  if (
+    name === "@modelcontextprotocol/server-legacy" &&
+    current === "2.4.0" &&
+    typeof deprecated === "string" &&
+    deprecated.includes("frozen copy of v1's SSE transport") &&
+    deprecated.includes("migration purposes only")
+  ) {
+    return {
+      status: "advisory",
+      note: "frozen upstream SSE compatibility bridge (opt-in, disabled by default); migrate old clients to Streamable HTTP",
+    };
+  }
+  return statusForPackage(current, latest, deprecated);
+}
+
 export function lifecycleForNode(schedule, today) {
   if (!schedule?.end) {
     return { phase: "unknown", eol: undefined, status: "fail" };
@@ -220,7 +239,7 @@ function packageFreshnessEntry(name, type, specifier, current, packument) {
   }
   const latest = packument["dist-tags"]?.latest;
   const deprecated = packument.versions?.[current]?.deprecated;
-  const result = statusForPackage(current, latest, deprecated);
+  const result = statusForDirectPackage(name, current, latest, deprecated);
   const releaseNotesUrl = githubReleaseNotesUrl(packument, latest);
   return {
     name,
@@ -243,7 +262,7 @@ function assembleReport(runtime, packages) {
   return {
     generatedAt,
     policy:
-      "Fail on EOL/unsupported Node lines, deprecated direct packages, or missing lockfile pins. Newer upstream versions are advisory.",
+      "Fail on EOL/unsupported Node lines, deprecated direct packages except the pinned opt-in frozen SSE migration bridge, or missing lockfile pins. Newer upstream versions are advisory.",
     summary,
     runtime,
     packages,
