@@ -43,7 +43,8 @@
     "automerge": false,
     "addLabels": [
       "lockfile",
-      "requires-review"
+      "automerge:enabled",
+      "risk:low"
     ]
   },
   "vulnerabilityAlerts": {
@@ -66,6 +67,24 @@
         "digest",
         "pin"
       ],
+      "automerge": false,
+      "addLabels": [
+        "automerge:enabled",
+        "risk:low"
+      ]
+    },
+    {
+      "description": "Delegate stable minor development dependency updates to Mergify after CI.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchDepTypes": [
+        "devDependencies"
+      ],
+      "matchUpdateTypes": [
+        "minor"
+      ],
+      "matchCurrentVersion": "!/^0/",
       "automerge": false,
       "addLabels": [
         "automerge:enabled",

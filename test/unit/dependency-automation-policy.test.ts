@@ -4,11 +4,15 @@ import { describe, expect, test } from "vitest";
 const renovate = JSON.parse(fs.readFileSync("renovate.json", "utf8")) as {
   prConcurrentLimit: number;
   branchConcurrentLimit: number;
-  lockFileMaintenance: { addLabels: string[] };
+  automerge: boolean;
+  lockFileMaintenance: { automerge: boolean; addLabels: string[] };
   vulnerabilityAlerts: { labels: string[] };
   packageRules: Array<{
     description: string;
     matchUpdateTypes?: string[];
+    matchManagers?: string[];
+    matchDepTypes?: string[];
+    matchCurrentVersion?: string;
     matchPackageNames?: string[];
     addLabels?: string[];
   }>;
@@ -33,15 +37,32 @@ describe("Renovate and Mergify dependency convergence", () => {
     expect(mergify).toContain("branch_protection_injection_mode: queue");
   });
 
-  test("keeps runtime, lockfile and vulnerability changes out of automatic merges", () => {
+  test("delegates stable minor dev updates and weekly lockfile maintenance to Mergify", () => {
+    const safeMinor = rule(
+      "Delegate stable minor development dependency updates to Mergify after CI.",
+    );
+    expect(safeMinor.matchManagers).toEqual(["npm"]);
+    expect(safeMinor.matchDepTypes).toEqual(["devDependencies"]);
+    expect(safeMinor.matchUpdateTypes).toEqual(["minor"]);
+    expect(safeMinor.matchCurrentVersion).toBe("!/^0/");
+    expect(safeMinor.addLabels).toEqual(expect.arrayContaining(["automerge:enabled", "risk:low"]));
+    expect(renovate.lockFileMaintenance.automerge).toBe(false);
+    expect(renovate.lockFileMaintenance.addLabels).toEqual(
+      expect.arrayContaining(["lockfile", "automerge:enabled", "risk:low"]),
+    );
+    expect(renovate.lockFileMaintenance.addLabels).not.toContain("requires-review");
+    expect(renovate.automerge).toBe(false);
+  });
+
+  test("keeps runtime, major and vulnerability changes out of automatic merges", () => {
     const sensitive = rule("MCP SDK and SSH/runtime-affecting dependencies require manual review.");
     for (const dependency of ["@modelcontextprotocol/server", "node-ssh", "jose", "ws", "zod"]) {
       expect(sensitive.matchPackageNames).toContain(dependency);
     }
     expect(sensitive.addLabels).toContain("runtime-risk");
     expect(sensitive.addLabels).toContain("requires-review");
-    expect(renovate.lockFileMaintenance.addLabels).toContain("requires-review");
-    expect(renovate.lockFileMaintenance.addLabels).not.toContain("automerge:enabled");
+    const major = rule("Require explicit approval for major version changes.");
+    expect(major.addLabels).toContain("requires-review");
     expect(renovate.vulnerabilityAlerts.labels).toContain("security");
     expect(mergify).toContain("- -label = runtime-risk");
     expect(mergify).toContain("- -label = requires-review");
