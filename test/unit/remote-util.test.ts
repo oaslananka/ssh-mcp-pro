@@ -1,7 +1,31 @@
+import { Readable } from "node:stream";
 import { describe, expect, test, vi } from "vitest";
+import { readJsonOrForm } from "../../src/remote/http-util.js";
 import { formDecode, jsonResponse, parseList, userSafeError } from "../../src/remote/util.js";
 
 describe("remote utility helpers", () => {
+  test("accepts scalar JSON form fields but rejects nested values", async () => {
+    const request = (value: unknown) =>
+      Object.assign(Readable.from([JSON.stringify(value)]), {
+        headers: { "content-type": "application/json" },
+      }) as never;
+    await expect(
+      readJsonOrForm(request({ count: 23, enabled: true, empty: null })),
+    ).resolves.toEqual({
+      count: "23",
+      enabled: "true",
+      empty: "",
+    });
+    await expect(readJsonOrForm(request({ code: { nested: "invalid" } }))).rejects.toMatchObject({
+      code: "INVALID_CLIENT",
+      status: 400,
+    });
+    await expect(readJsonOrForm(request({ code: ["invalid"] }))).rejects.toMatchObject({
+      code: "INVALID_CLIENT",
+      status: 400,
+    });
+  });
+
   test("parses comma and newline separated lists while trimming blanks", () => {
     expect(parseList(undefined)).toEqual([]);
     expect(parseList(" alpha, beta\n\ngamma ,, ")).toEqual(["alpha", "beta", "gamma"]);

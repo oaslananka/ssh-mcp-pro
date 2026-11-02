@@ -70,7 +70,7 @@ export function mergeCustomPolicy(policy: AgentPolicyPatch): AgentPolicy {
     profile: policy.profile ?? "custom",
     capabilities: {
       ...base.capabilities,
-      ...(policy.capabilities ?? {}),
+      ...policy.capabilities,
     },
     allowPaths: policy.allowPaths ?? base.allowPaths,
     denyPaths: policy.denyPaths ?? base.denyPaths,

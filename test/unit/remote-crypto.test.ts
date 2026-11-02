@@ -1,6 +1,7 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { SignJWT } from "jose";
 import { describe, expect, test } from "vitest";
 import {
   canonicalJson,
@@ -125,6 +126,28 @@ describe("remote crypto helpers", () => {
     expect(principal.scopes).toEqual(["hosts:read", "agents:read", "status:read"]);
     expect(principal.capabilities).toEqual(
       expect.arrayContaining(["hosts.read", "agents.read", "system.read"]),
+    );
+  });
+
+  test("rejects non-scalar GitHub identity claims in signed JWTs", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-identity-claims-"));
+    const config = testConfig(dir);
+    const keyPair = await loadJwtKeyPair(config.jwtSigningKeyPath);
+    const token = await new SignJWT({
+      scope: "hosts:read",
+      github_id: { nested: "invalid" },
+      github_login: "valid-login",
+    })
+      .setProtectedHeader({ alg: "EdDSA" })
+      .setIssuer(config.publicBaseUrl)
+      .setAudience(config.mcpResourceUrl)
+      .setSubject("github:123")
+      .setJti("test-claims")
+      .setIssuedAt()
+      .setExpirationTime("5m")
+      .sign(keyPair.privateKey);
+    await expect(verifyRemoteAccessToken("Bearer " + token, config, keyPair)).rejects.toThrow(
+      "Invalid GitHub identity claims",
     );
   });
 

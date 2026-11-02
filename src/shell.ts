@@ -1,6 +1,6 @@
 import { OSInfo } from "./types.js";
 
-export const POSIX_ENV_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/u;
+export const POSIX_ENV_KEY_PATTERN = /^[A-Za-z_]\w*$/u;
 
 function shellQuote(value: string): string {
   const escaped = value.replaceAll("'", "'\"'\"'");

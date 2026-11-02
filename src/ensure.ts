@@ -63,7 +63,7 @@ function describeError(error: unknown): string {
     return error.message;
   }
   const code = (error as { code?: unknown } | undefined)?.code;
-  return code ? String(code) : "unknown error";
+  return typeof code === "string" || typeof code === "number" ? String(code) : "unknown error";
 }
 
 function isPermissionError(error: unknown): boolean {
