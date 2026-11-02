@@ -154,24 +154,29 @@ async function packageManagerEntry(packageManager) {
   };
 }
 
-async function localToolchainEntries(nodeIndex, nodeSchedule, today) {
-  const files = [".node-version", ".nvmrc"];
-  const entries = [];
-  for (const file of files) {
-    const version = (await readFile(file, "utf8")).trim();
+export async function localToolchainEntries(nodeIndex, nodeSchedule, today) {
+  // Use literal local paths and retain the source order in the report.
+  const [nodeVersion, nvmVersion] = await Promise.all([
+    readFile(".node-version", "utf8"),
+    readFile(".nvmrc", "utf8"),
+  ]);
+  const files = [
+    { file: ".node-version", version: nodeVersion.trim() },
+    { file: ".nvmrc", version: nvmVersion.trim() },
+  ];
+  return files.map(({ file, version }) => {
     const major = parseVersion(version)[0];
     const latest = latestNodeForMajor(nodeIndex, major);
-    const lifecycle = lifecycleForNode(nodeSchedule[`v${major}`], today);
+    const lifecycle = lifecycleForNode(nodeSchedule["v" + major], today);
     const newer = latest && compareVersions(version, latest) < 0;
-    entries.push({
+    return {
       component: file,
       current: version,
       latest,
       status: nodeRuntimeStatus(lifecycle, newer),
       note: nodeNote(lifecycle, newer),
-    });
-  }
-  return entries;
+    };
+  });
 }
 
 async function packageEntries(packageJson, lockVersions) {

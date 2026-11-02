@@ -1,9 +1,20 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, test } from "vitest";
 
 const moduleUrl = new URL("../../scripts/check-dependency-freshness.mjs", import.meta.url).href;
 const freshness = await import(moduleUrl);
 
 describe("dependency freshness helpers", () => {
+  test("reads independent Node version files and preserves report order", async () => {
+    const files = [".node-version", ".nvmrc"];
+    const source = await Promise.all(files.map((file) => readFile(file, "utf8")));
+    const entries = await freshness.localToolchainEntries([], {}, "2026-11-02");
+    expect(entries.map((entry: { component: string }) => entry.component)).toEqual(files);
+    expect(entries.map((entry: { current: string }) => entry.current)).toEqual(
+      source.map((value) => value.trim()),
+    );
+  });
+
   test("parses pinned package manager and Node engine floors", () => {
     expect(freshness.parsePackageManager("pnpm@11.0.9")).toEqual({
       name: "pnpm",

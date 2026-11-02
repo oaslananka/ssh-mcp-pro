@@ -56,6 +56,39 @@ describe("withRetry", () => {
 
     expect(result.success).toBe(false);
     expect(calls).toBe(1);
+    expect(result.attempts).toBe(1);
+  });
+
+  test("reports actual failed attempts and calls the retry predicate once per error", async () => {
+    const predicate = vi.fn((error: unknown) => (error as Error).message === "network");
+    const operation = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("network"))
+      .mockRejectedValueOnce(new Error("permission denied"));
+    const result = await withRetry(operation, {
+      maxAttempts: 6,
+      initialDelayMs: 0,
+      maxDelayMs: 0,
+      jitter: false,
+      isRetryable: predicate,
+    });
+    expect(result.success).toBe(false);
+    expect(result.attempts).toBe(2);
+    expect(result.error).toMatchObject({ message: "permission denied" });
+    expect(operation).toHaveBeenCalledTimes(2);
+    expect(predicate).toHaveBeenCalledTimes(2);
+  });
+
+  test("evaluates terminal first failure retry predicate once", async () => {
+    const predicate = vi.fn(() => false);
+    const result = await withRetry(
+      async () => {
+        throw new Error("terminal");
+      },
+      { maxAttempts: 5, isRetryable: predicate },
+    );
+    expect(result.attempts).toBe(1);
+    expect(predicate).toHaveBeenCalledTimes(1);
   });
 
   test.each([
@@ -124,7 +157,7 @@ describe("withRetry", () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe("plain");
-    expect(result.attempts).toBe(2);
+    expect(result.attempts).toBe(1);
   });
 });
 
