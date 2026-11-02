@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.2.3...ssh-mcp-pro-v1.3.0) (2026-11-02)
+
+
+### Features
+
+* **mcp:** support 2026 protocol on standard transports ([#121](https://github.com/oaslananka/ssh-mcp-pro/issues/121)) ([c975504](https://github.com/oaslananka/ssh-mcp-pro/commit/c975504f1b0d0e8ea270be3f87f6191e8bec1fa9))
+
+
+### Bug Fixes
+
+* **docker:** patch Alpine musl CVE-2026-107891 ([#98](https://github.com/oaslananka/ssh-mcp-pro/issues/98)) ([4186138](https://github.com/oaslananka/ssh-mcp-pro/commit/41861382dacfc3b25c6715b303f30d54f3c605bb))
+* **quality:** remove stale lock helper and simplify safe string escaping ([#114](https://github.com/oaslananka/ssh-mcp-pro/issues/114)) ([d8d6c56](https://github.com/oaslananka/ssh-mcp-pro/commit/d8d6c565debc3cfbfb425ba16a71ad29e49c483c))
+* **reliability:** report actual retry attempts and parallelize independent version checks ([#119](https://github.com/oaslananka/ssh-mcp-pro/issues/119)) ([bc64b36](https://github.com/oaslananka/ssh-mcp-pro/commit/bc64b36a33b15aa9a9ee418f4f06ccb4b87f33f0))
+* **security:** reject unsafe Windows shim path characters ([#100](https://github.com/oaslananka/ssh-mcp-pro/issues/100)) ([083e133](https://github.com/oaslananka/ssh-mcp-pro/commit/083e133b81affb79a192ed6859f680ce0f79f478))
+* **ssh:** apply multi-pattern Host options to every alias ([#120](https://github.com/oaslananka/ssh-mcp-pro/issues/120)) ([6d7b9f2](https://github.com/oaslananka/ssh-mcp-pro/commit/6d7b9f2a98712a18c6cb23002ed5a08152c0b02b))
+
 ## [1.2.3](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.2.2...ssh-mcp-pro-v1.2.3) (2026-10-09)
 
 
