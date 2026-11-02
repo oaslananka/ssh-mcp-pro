@@ -93,7 +93,7 @@ export class SSHMCPServer {
     this.server.setRequestHandler(ListResourcesRequestSchema, async () =>
       withSpan(
         "mcp.list_resources",
-        async (span) => {
+        (span) => {
           span.setAttribute("mcp.request.kind", "list_resources");
           span.setAttribute("mcp.tool_profile", this.toolProfile);
           return listResources(this.toolProfile);
@@ -127,7 +127,7 @@ export class SSHMCPServer {
     this.server.setRequestHandler(ListPromptsRequestSchema, async () =>
       withSpan(
         "mcp.list_prompts",
-        async (span) => {
+        (span) => {
           span.setAttribute("mcp.request.kind", "list_prompts");
           span.setAttribute("mcp.tool_profile", this.toolProfile);
           return listMCPPrompts(this.toolProfile);
@@ -143,7 +143,7 @@ export class SSHMCPServer {
     this.server.setRequestHandler(GetPromptRequestSchema, async (request) =>
       withSpan(
         "mcp.get_prompt",
-        async (span) => {
+        (span) => {
           span.setAttribute("mcp.request.kind", "get_prompt");
           span.setAttribute("mcp.prompt.name", request.params.name);
           span.setAttribute("mcp.tool_profile", this.toolProfile);
