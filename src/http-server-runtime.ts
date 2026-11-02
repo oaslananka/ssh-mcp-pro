@@ -461,7 +461,7 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     port: httpConfig.port,
     registerSignalHandlers: options.registerSignalHandlers,
     exitOnSignal: options.exitOnSignal,
-    beforeListen: async () => {
+    beforeListen: () => {
       bearerToken = httpConfig.bearerTokenFile
         ? readFileSync(httpConfig.bearerTokenFile, "utf8").trim()
         : undefined;
