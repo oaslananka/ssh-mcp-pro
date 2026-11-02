@@ -133,7 +133,6 @@
     "pnpm": "^11.28.5"
   },
   "dependencies": {
-    "@modelcontextprotocol/core": "^2.4.0",
     "@modelcontextprotocol/node": "^2.1.2",
     "@modelcontextprotocol/server": "^2.4.0",
     "@modelcontextprotocol/server-legacy": "^2.4.0",
