@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "publishReady": true,
+  "sourceRepository": "https://github.com/oaslananka/ssh-mcp-pro",
+  "automationRepository": "https://github.com/oaslananka/ssh-mcp-pro",
+  "supportUrl": "https://github.com/oaslananka/ssh-mcp-pro/issues",
+  "securityUrl": "https://github.com/oaslananka/ssh-mcp-pro/security/advisories/new",
+  "privacyUrl": "https://github.com/oaslananka/ssh-mcp-pro/blob/main/SECURITY.md",
+  "termsUrl": "https://github.com/oaslananka/ssh-mcp-pro/blob/main/LICENSE",
+  "mcp": {
+    "serverName": "io.github.oaslananka/ssh-mcp-pro",
+    "packageName": "ssh-mcp-pro",
+    "version": "1.3.0",
+    "endpointPath": "/mcp",
+    "transports": [
+      "streamable-http",
+      "stdio"
+    ],
+    "recommendedProductionTransport": "streamable-http"
+  },
+  "app": {
+    "name": "ssh-mcp-pro",
+    "description": "Secure SSH automation and infrastructure inspection for Gemini and Vertex AI agents.",
+    "categories": [
+      "Developer Tools",
+      "Cloud Infrastructure",
+      "DevOps"
+    ],
+    "defaultProfile": "gemini"
+  },
+  "connector": {
+    "name": "ssh-mcp-pro",
+    "runtimeProfile": "gemini",
+    "credentialProviders": [
+      "agent",
+      "oauth-google",
+      "oauth-jwks"
+    ],
+    "protectedResourceMetadata": "/.well-known/oauth-protected-resource",
+    "productionAuth": "oauth-jwks",
+    "developmentAuth": "bearer"
+  },
+  "security": {
+    "readOnlyDefaultProfile": true,
+    "hostAllowlistRequired": true,
+    "strictHostKeyVerificationDefault": true,
+    "credentialEntryInChat": false,
+    "privateKeysInChat": false,
+    "rawCommandExecutionDefault": false,
+    "mutationToolsEnabledByDefault": false,
+    "nonLoopbackHttpRequiresBearerAndOrigins": true,
+    "nonLoopbackHttpRequiresRemoteSafeProfile": true,
+    "nonLoopbackHttpRequiresStrictHostKeyPolicy": true,
+    "redactionRequired": true
+  },
+  "submission": {
+    "publicHttpsMcpEndpoint": "https://ssh-mcp-pro.oaslananka.dev/mcp",
+    "oauthConfigured": true,
+    "allowedOriginsConfigured": true,
+    "privacyPolicyReviewed": true,
+    "supportContactConfigured": true,
+    "reviewTestCasesPrepared": true
+  },
+  "toolProfile": {
+    "name": "gemini",
+    "tools": [
+      "connector_status",
+      "ssh_hosts_list",
+      "ssh_policy_explain",
+      "ssh_host_inspect",
+      "ssh_mutation_plan"
+    ],
+    "hiddenTools": [
+      "ssh_open_session",
+      "proc_exec",
+      "proc_sudo",
+      "fs_write",
+      "fs_rmrf",
+      "file_upload",
+      "file_download",
+      "tunnel_open_local",
+      "tunnel_open_remote"
+    ],
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "openWorldHint": false
+    }
+  }
+}

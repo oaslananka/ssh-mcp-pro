@@ -57,14 +57,14 @@
     "redactionRequired": true
   },
   "submission": {
-    "dashboardConfigured": false,
-    "publicHttpsMcpEndpoint": "https://sshautomator.oaslananka.dev/mcp",
+    "dashboardConfigured": true,
+    "publicHttpsMcpEndpoint": "https://ssh-mcp-pro.oaslananka.dev/mcp",
     "domainVerificationConfigured": false,
-    "componentCspConfigured": false,
-    "privacyPolicyReviewed": false,
+    "componentCspConfigured": true,
+    "privacyPolicyReviewed": true,
     "screenshotsPrepared": false,
-    "reviewTestCasesPrepared": false,
-    "oauthConfigured": false
+    "reviewTestCasesPrepared": true,
+    "oauthConfigured": true
   },
   "toolProfiles": [
     {

@@ -33,6 +33,7 @@ import { parseAgentHostMetadata } from "./schemas.js";
 import { hasCapability } from "./scopes.js";
 import { RemoteStore } from "./store.js";
 import { OAuthHandler, type PendingAuthorize } from "./oauth-handler.js";
+import { WebDashboardHandler } from "./web-dashboard.js";
 import {
   AgentWebSocketHandler,
   type AgentConnection,
@@ -66,6 +67,7 @@ export class RemoteControlPlane {
   private readonly controlPlaneKeyPair: PemKeyPair;
   readonly oauth: OAuthHandler;
   readonly agentHandler: AgentWebSocketHandler;
+  readonly dashboard: WebDashboardHandler;
 
   constructor(config = loadRemoteConfig()) {
     this.config = config;
@@ -86,6 +88,19 @@ export class RemoteControlPlane {
       this.pendingActions,
       (event) => this.audit(event),
     );
+    this.dashboard = new WebDashboardHandler({
+      config: this.config,
+      store: this.store,
+      oauth: this.oauth,
+      agentHandler: this.agentHandler,
+      getJwtKeyPair: () => this.requireJwtKeyPair(),
+      audit: (event) => this.audit(event),
+      createEnrollmentToken: (principal, args) => this.createEnrollmentToken(principal, args),
+      updateAgentPolicy: (principal, agent, policy) =>
+        this.updateAgentPolicy(principal, agent, policy),
+      revokeAgent: (principal, agent) => this.revokeAgent(principal, agent),
+      resolveAgent: (userId, value) => this.resolveAgent(userId, value),
+    });
     this.cleanupInterval = setInterval(() => this.cleanupEphemeralState(), 60_000);
     this.cleanupInterval.unref?.();
   }
@@ -137,6 +152,10 @@ export class RemoteControlPlane {
       await this.oauth.handleGitHubCallback(req, res);
       return true;
     }
+    if (pathname === "/oauth/callback/google" && req.method === "GET") {
+      await this.oauth.handleGoogleCallback(req, res);
+      return true;
+    }
     if (pathname === "/oauth/token" && req.method === "POST") {
       await this.oauth.handleToken(req, res);
       return true;
@@ -183,6 +202,9 @@ export class RemoteControlPlane {
     }
     if (pathname.startsWith("/api/agents") || pathname === "/api/audit") {
       await this.handleApi(req, res, pathname);
+      return true;
+    }
+    if (await this.dashboard.handleHttpRequest(req, res, pathname)) {
       return true;
     }
     return false;

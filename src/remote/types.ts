@@ -67,6 +67,13 @@ export interface GitHubUser {
   login: string;
 }
 
+export interface GoogleUser {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string | undefined;
+}
+
 export interface OAuthClient {
   id: string;
   clientId: string;
@@ -276,6 +283,9 @@ export interface RemotePrincipal {
   userId: string;
   githubId: string;
   githubLogin: string;
+  email?: string | undefined;
+  displayName?: string | undefined;
+  provider?: "github" | "google" | undefined;
   scopes: RemoteScope[];
   capabilities: RemoteCapability[];
   tokenId: string;
@@ -289,9 +299,14 @@ export interface RemoteConfig {
   githubClientId?: string | undefined;
   githubClientSecret?: string | undefined;
   githubCallbackUrl: string;
+  googleClientId?: string | undefined;
+  googleClientSecret?: string | undefined;
+  googleCallbackUrl: string;
   allowAllUsers: boolean;
   allowedGitHubLogins: string[];
   allowedGitHubIds: string[];
+  allowedGoogleEmails: string[];
+  allowedGoogleSubIds: string[];
   accessTokenTtlSeconds: number;
   authCodeTtlSeconds: number;
   enrollmentTokenTtlSeconds: number;

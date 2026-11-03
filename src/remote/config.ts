@@ -78,9 +78,17 @@ export function loadRemoteConfig(): RemoteConfig {
       process.env.GITHUB_CALLBACK_URL ??
       process.env.SSHAUTOMATOR_GITHUB_CALLBACK_URL ??
       `${publicBaseUrl}/oauth/callback/github`,
+    googleClientId: process.env.GOOGLE_CLIENT_ID,
+    googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    googleCallbackUrl:
+      process.env.GOOGLE_CALLBACK_URL ??
+      process.env.SSHAUTOMATOR_GOOGLE_CALLBACK_URL ??
+      `${publicBaseUrl}/oauth/callback/google`,
     allowAllUsers: parseBoolean(process.env.AUTH_ALLOW_ALL_USERS, false),
     allowedGitHubLogins: parseList(process.env.AUTH_ALLOWED_GITHUB_LOGINS),
     allowedGitHubIds: parseList(process.env.AUTH_ALLOWED_GITHUB_IDS),
+    allowedGoogleEmails: parseList(process.env.AUTH_ALLOWED_GOOGLE_EMAILS),
+    allowedGoogleSubIds: parseList(process.env.AUTH_ALLOWED_GOOGLE_SUB_IDS),
     accessTokenTtlSeconds: parseInteger(process.env.ACCESS_TOKEN_TTL_SECONDS, 900),
     authCodeTtlSeconds: parseInteger(process.env.AUTH_CODE_TTL_SECONDS, 300),
     enrollmentTokenTtlSeconds: parseInteger(process.env.ENROLLMENT_TOKEN_TTL_SECONDS, 600),

@@ -1,11 +1,18 @@
 import type { RemoteCapability, RemoteToolName } from "./types.js";
 import { REMOTE_TOOLS, TOOL_CAPABILITY_MAP } from "./types.js";
 
+export interface ToolAnnotations {
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  openWorldHint?: boolean;
+}
+
 interface RemoteToolDescriptor {
   name: RemoteToolName;
   description: string;
   capability: RemoteCapability;
   inputSchema: Record<string, unknown>;
+  annotations?: ToolAnnotations;
 }
 
 const agentSelector = {
@@ -203,6 +210,36 @@ const descriptors: Record<RemoteToolName, Omit<RemoteToolDescriptor, "name" | "c
   },
 };
 
+const READ_ONLY_REMOTE_TOOLS = new Set<RemoteToolName>([
+  "list_hosts",
+  "list_agents",
+  "get_agent_install_command",
+  "get_system_status",
+  "tail_logs",
+  "docker_ps",
+  "docker_logs",
+  "file_read",
+  "get_audit_events",
+]);
+
+const DESTRUCTIVE_REMOTE_TOOLS = new Set<RemoteToolName>([
+  "run_shell_as_root",
+  "revoke_agent",
+  "file_write",
+  "restart_service",
+  "docker_restart",
+]);
+
+export function remoteToolAnnotations(name: RemoteToolName): ToolAnnotations {
+  const isReadOnly = READ_ONLY_REMOTE_TOOLS.has(name);
+  const isDestructive = DESTRUCTIVE_REMOTE_TOOLS.has(name);
+  return {
+    readOnlyHint: isReadOnly,
+    destructiveHint: isDestructive,
+    openWorldHint: !isReadOnly,
+  };
+}
+
 export function listRemoteToolDescriptors(
   capabilities: readonly RemoteCapability[],
 ): RemoteToolDescriptor[] {
@@ -210,6 +247,7 @@ export function listRemoteToolDescriptors(
   return REMOTE_TOOLS.filter((name) => allowed.has(TOOL_CAPABILITY_MAP[name])).map((name) => ({
     name,
     capability: TOOL_CAPABILITY_MAP[name],
+    annotations: remoteToolAnnotations(name),
     ...descriptors[name],
   }));
 }

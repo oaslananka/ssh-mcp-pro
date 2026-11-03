@@ -42,12 +42,12 @@
     "redactionRequired": true
   },
   "submission": {
-    "publicHttpsMcpEndpoint": "https://sshautomator.oaslananka.dev/mcp",
-    "oauthConfigured": false,
-    "allowedOriginsConfigured": false,
-    "privacyPolicyReviewed": false,
-    "supportContactConfigured": false,
-    "reviewTestCasesPrepared": false
+    "publicHttpsMcpEndpoint": "https://ssh-mcp-pro.oaslananka.dev/mcp",
+    "oauthConfigured": true,
+    "allowedOriginsConfigured": true,
+    "privacyPolicyReviewed": true,
+    "supportContactConfigured": true,
+    "reviewTestCasesPrepared": true
   },
   "toolProfile": {
     "name": "claude",
