@@ -141,6 +141,15 @@ export class RemoteStore {
     }
 
     this.db.exec(`
+      CREATE TABLE IF NOT EXISTS dashboard_sessions (
+        token_hash TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      ) STRICT;
+
+      CREATE INDEX IF NOT EXISTS idx_dashboard_sessions_expiry ON dashboard_sessions(expires_at);
+
       CREATE TABLE IF NOT EXISTS oauth_clients (
         id TEXT PRIMARY KEY,
         client_id TEXT UNIQUE NOT NULL,
@@ -219,6 +228,30 @@ export class RemoteStore {
         created_at TEXT NOT NULL
       ) STRICT;
     `);
+  }
+
+  createDashboardSession(
+    tokenHash: string,
+    userId: string,
+    expiresAt: string,
+    createdAt: string,
+  ): void {
+    this.db
+      .prepare(
+        "INSERT INTO dashboard_sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
+      )
+      .run(tokenHash, userId, expiresAt, createdAt);
+  }
+
+  getDashboardSession(tokenHash: string, now: string): { userId: string } | undefined {
+    const row = this.db
+      .prepare("SELECT user_id FROM dashboard_sessions WHERE token_hash = ? AND expires_at > ?")
+      .get(tokenHash, now) as Record<string, unknown> | undefined;
+    return row ? { userId: rowString(row, "user_id") } : undefined;
+  }
+
+  deleteDashboardSession(tokenHash: string): void {
+    this.db.prepare("DELETE FROM dashboard_sessions WHERE token_hash = ?").run(tokenHash);
   }
 
   upsertUser(user: GitHubUser & { internalId: string; now: string }): void {
