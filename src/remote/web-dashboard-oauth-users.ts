@@ -1,8 +1,8 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import { asString, safeError } from "./http-util.js";
+import type { GitHubUser, GoogleUser, RemoteConfig } from "./types.js";
 
 const googleJwks = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
-import type { GitHubUser, GoogleUser, RemoteConfig } from "./types.js";
 
 export async function fetchGitHubUserDirect(
   config: RemoteConfig,
@@ -72,6 +72,10 @@ export async function fetchGoogleUserDirect(
     throw safeError("INVALID_TOKEN", "Google OIDC ID token validation failed", 403);
   }
 
+  return googleIdentityFromVerifiedClaims(claims, nonce);
+}
+
+function googleIdentityFromVerifiedClaims(claims: JWTPayload, nonce: string): GoogleUser {
   if (
     typeof claims.sub !== "string" ||
     !claims.sub ||

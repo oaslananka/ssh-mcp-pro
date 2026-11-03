@@ -23,6 +23,29 @@ describe("gated release lifecycle", () => {
     expect(triggers).not.toContain("feature/**");
   });
 
+  test("keeps Node 24/26 on PRs and verifies Node 22 weekly and before releases", () => {
+    const matrix = section(ci, "  unit:\n", "  node22-compatibility:\n");
+    expect(matrix).toContain("node: 24.15.0");
+    expect(matrix).toContain("node: 26.3.0");
+    expect(matrix).not.toContain("node: 22.22.2");
+    expect(matrix).toContain("pnpm run test:coverage");
+
+    const compatibility = section(ci, "  node22-compatibility:\n", "  integration:\n");
+    expect(compatibility).toContain("github.event_name == 'schedule'");
+    expect(compatibility).toContain("github.event_name == 'workflow_dispatch'");
+    expect(compatibility).toContain("node-version: 22.22.2");
+    expect(compatibility).toContain("pnpm run build");
+    expect(compatibility).toContain("pnpm run test:coverage");
+
+    const preflight = section(release, "  release-preflight:\n", "  release:\n");
+    expect(preflight).toContain("Verify Node 22 release compatibility");
+    expect(preflight).toContain("node-version: 22.22.2");
+    expect(preflight).toContain("Restore Node 26 for release packaging");
+    expect(preflight.indexOf("Verify Node 22 release compatibility")).toBeLessThan(
+      preflight.indexOf("Build package, SBOM and checksums"),
+    );
+  });
+
   test("preflights package, SBOM and provenance before release-please creates a tag", () => {
     const preflight = section(release, "  release-preflight:", "  release:\n");
     expect(preflight).toContain("pnpm run check:freshness");

@@ -1,6 +1,4 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFileSync, existsSync } from "node:fs";
-import path from "node:path";
 import { URL } from "node:url";
 import { hashSecret, id, randomToken, type JwtKeyPair } from "./crypto.js";
 import { capabilitiesFromScopes } from "./scopes.js";
@@ -12,6 +10,7 @@ import type { AuditEvent, RemoteAgentRecord, RemoteConfig, RemotePrincipal } fro
 import { REMOTE_SCOPES } from "./types.js";
 import { jsonResponse } from "./util.js";
 import { renderDashboardHtml } from "./web-dashboard-html.js";
+import { serveAgentScript } from "./web-dashboard-static.js";
 import { createDashboardClientConfigs } from "./web-dashboard-client-config.js";
 import { fetchGitHubUserDirect, fetchGoogleUserDirect } from "./web-dashboard-oauth-users.js";
 
@@ -131,11 +130,11 @@ export class WebDashboardHandler {
   ): Promise<boolean> {
     // 1. Static installation scripts
     if (pathname === "/install-agent.sh" && req.method === "GET") {
-      this.serveScript(res, "scripts/install-agent.sh", "text/x-shellscript; charset=utf-8");
+      serveAgentScript(res, "scripts/install-agent.sh", "text/x-shellscript; charset=utf-8");
       return true;
     }
     if (pathname === "/install-agent.ps1" && req.method === "GET") {
-      this.serveScript(res, "scripts/install-agent.ps1", "text/plain; charset=utf-8");
+      serveAgentScript(res, "scripts/install-agent.ps1", "text/plain; charset=utf-8");
       return true;
     }
 
@@ -193,6 +192,24 @@ export class WebDashboardHandler {
       await this.handleApiMe(req, res);
       return true;
     }
+    if (await this.handleDashboardDeviceRoutes(req, res, pathname)) return true;
+    if (pathname === "/api/dashboard/audit" && req.method === "GET") {
+      await this.handleApiAudit(req, res);
+      return true;
+    }
+    if (pathname === "/api/dashboard/client-configs" && req.method === "GET") {
+      this.handleApiClientConfigs(res);
+      return true;
+    }
+
+    return false;
+  }
+
+  private async handleDashboardDeviceRoutes(
+    req: IncomingMessage,
+    res: ServerResponse,
+    pathname: string,
+  ): Promise<boolean> {
     if (pathname === "/api/dashboard/devices" && req.method === "GET") {
       await this.handleApiDevices(req, res);
       return true;
@@ -209,15 +226,6 @@ export class WebDashboardHandler {
       await this.handleApiRevokeDevice(req, res, pathname);
       return true;
     }
-    if (pathname === "/api/dashboard/audit" && req.method === "GET") {
-      await this.handleApiAudit(req, res);
-      return true;
-    }
-    if (pathname === "/api/dashboard/client-configs" && req.method === "GET") {
-      this.handleApiClientConfigs(res);
-      return true;
-    }
-
     return false;
   }
 
@@ -233,22 +241,6 @@ export class WebDashboardHandler {
     }
 
     return false;
-  }
-
-  private serveScript(res: ServerResponse, relativePath: string, contentType: string): void {
-    const fullPath = path.resolve(relativePath);
-    if (existsSync(fullPath)) {
-      const content = readFileSync(fullPath, "utf8");
-      res.writeHead(200, {
-        "Content-Type": contentType,
-        "Cache-Control": "public, max-age=3600",
-        "X-Content-Type-Options": "nosniff",
-      });
-      res.end(content);
-    } else {
-      res.writeHead(404, { "Content-Type": "text/plain" });
-      res.end("Script file not found on server");
-    }
   }
 
   private async handleDirectLoginGitHub(_req: IncomingMessage, res: ServerResponse): Promise<void> {
