@@ -102,6 +102,11 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
       super("Request body is too large");
     }
   }
+  class InvalidJsonBodyError extends Error {
+    constructor() {
+      super("Invalid JSON body");
+    }
+  }
 
   function sendJson(
     req: IncomingMessage,
@@ -275,7 +280,14 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     }
 
     const raw = Buffer.concat(chunks).toString("utf8");
-    return raw ? JSON.parse(raw) : undefined;
+    if (!raw) {
+      return undefined;
+    }
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch {
+      throw new InvalidJsonBodyError();
+    }
   }
 
   async function handleStreamableRequest(
@@ -430,6 +442,9 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     }
     if (error instanceof RequestBodyTooLargeError) {
       return { statusCode: 413, payload: { error: "Request body is too large" } };
+    }
+    if (error instanceof InvalidJsonBodyError) {
+      return { statusCode: 400, payload: { error: "Invalid JSON body" } };
     }
     return { statusCode: 500, payload: { error: "Internal server error" } };
   }

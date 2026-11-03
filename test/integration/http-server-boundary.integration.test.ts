@@ -628,8 +628,8 @@ describe("real HTTP server boundary", () => {
       headers: { "Content-Type": "application/json" },
       body: "{not-json",
     });
-    expect(malformed.status).toBe(500);
-    await expect(malformed.json()).resolves.toEqual({ error: "Internal server error" });
+    expect(malformed.status).toBe(400);
+    await expect(malformed.json()).resolves.toEqual({ error: "Invalid JSON body" });
   });
 
   test("evicts the oldest live session and closes a replacement session", async () => {
