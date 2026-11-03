@@ -159,10 +159,11 @@ async function pingSession(harness: Harness, sessionId: string): Promise<Respons
   });
 }
 
-async function postLocalMcp(
+async function requestLocalHttp(
   harness: Harness,
   headers: Record<string, string>,
   body: string,
+  options: { method?: "GET" | "POST" | "OPTIONS"; path?: "/mcp" | "/healthz" } = {},
 ): Promise<Response> {
   const address = harness.runtime.server.address();
   if (!address || typeof address === "string") {
@@ -170,7 +171,13 @@ async function postLocalMcp(
   }
   return new Promise((resolve, reject) => {
     const request = httpRequest(
-      { hostname: "127.0.0.1", port: address.port, path: "/mcp", method: "POST", headers },
+      {
+        hostname: "127.0.0.1",
+        port: address.port,
+        path: options.path ?? "/mcp",
+        method: options.method ?? "POST",
+        headers,
+      },
       (response) => {
         const chunks: Buffer[] = [];
         response.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -292,17 +299,17 @@ describe("real HTTP server boundary", () => {
       "Mcp-Method": "server/discover",
     });
 
-    const noToken = await postLocalMcp(harness, { ...headers, Authorization: "" }, body);
+    const noToken = await requestLocalHttp(harness, { ...headers, Authorization: "" }, body);
     expect(noToken.status).toBe(401);
 
-    const forbiddenOrigin = await postLocalMcp(
+    const forbiddenOrigin = await requestLocalHttp(
       harness,
       { ...headers, Origin: "https://untrusted.example" },
       body,
     );
     expect(forbiddenOrigin.status).toBe(403);
 
-    const approved = await postLocalMcp(harness, headers, body);
+    const approved = await requestLocalHttp(harness, headers, body);
     expect(approved.status).toBe(200);
     expect(approved.headers.get("access-control-allow-origin")).toBe(allowedOrigin);
     expect(approved.headers.get("vary")).toContain("Origin");
@@ -371,6 +378,33 @@ describe("real HTTP server boundary", () => {
     await expect(disallowedOrigin.json()).resolves.toMatchObject({
       error: "Origin is not allowed",
     });
+  });
+
+  test("fails closed for browser origins when the loopback allowlist is empty", async () => {
+    const harness = await startHarness({ token: null, http: { allowedOrigins: [] } });
+
+    const preflight = await requestLocalHttp(
+      harness,
+      { Origin: "https://untrusted.example", "Access-Control-Request-Method": "POST" },
+      "",
+      { method: "OPTIONS" },
+    );
+    expect(preflight.status).toBe(403);
+    expect(preflight.headers.get("access-control-allow-origin")).toBeNull();
+
+    const browserRequest = await requestLocalHttp(
+      harness,
+      { "Content-Type": "application/json", Origin: "https://untrusted.example" },
+      "{}",
+    );
+    expect(browserRequest.status).toBe(403);
+    expect(browserRequest.headers.get("access-control-allow-origin")).toBeNull();
+
+    const nativeRequest = await requestLocalHttp(harness, {}, "", {
+      method: "GET",
+      path: "/healthz",
+    });
+    expect(nativeRequest.status).toBe(200);
   });
 
   test("returns OAuth challenges without contacting an external JWKS endpoint", async () => {
@@ -594,8 +628,8 @@ describe("real HTTP server boundary", () => {
       headers: { "Content-Type": "application/json" },
       body: "{not-json",
     });
-    expect(malformed.status).toBe(500);
-    await expect(malformed.json()).resolves.toEqual({ error: "Internal server error" });
+    expect(malformed.status).toBe(400);
+    await expect(malformed.json()).resolves.toEqual({ error: "Invalid JSON body" });
   });
 
   test("evicts the oldest live session and closes a replacement session", async () => {

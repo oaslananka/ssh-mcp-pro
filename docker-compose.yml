@@ -47,13 +47,13 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=UTC
-      - SUDO_ACCESS=true
+      - SUDO_ACCESS=false
       - PASSWORD_ACCESS=true
       - USER_PASSWORD=testpass
       - USER_NAME=testuser
     ports:
-      - "2222:2222"
-    restart: unless-stopped
+      - "127.0.0.1:2222:2222"
+    restart: "no"
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "2222"]
       interval: 5s
