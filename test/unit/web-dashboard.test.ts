@@ -193,7 +193,7 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       );
       expect(listRes.statusCode).toBe(200);
       const listData = JSON.parse(listRes.body);
-      expect(listData.devices.length).toBe(1);
+      expect(listData.devices).toHaveLength(1);
       expect(listData.devices[0].alias).toBe("test-vps");
 
       // 5. Revoke device

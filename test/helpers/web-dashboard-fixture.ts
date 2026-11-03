@@ -1,4 +1,5 @@
 import type { IncomingMessage } from "node:http";
+import { Readable } from "node:stream";
 import path from "node:path";
 import { loadRemoteConfig } from "../../src/remote/config.js";
 import type { RemoteConfig } from "../../src/remote/types.js";
@@ -46,9 +47,7 @@ export function jsonRequest(
     "content-length": String(Buffer.byteLength(payload)),
     ...headers,
   }) as unknown as { [Symbol.asyncIterator](): AsyncIterableIterator<Buffer> };
-  req[Symbol.asyncIterator] = async function* () {
-    yield Buffer.from(payload);
-  };
+  req[Symbol.asyncIterator] = () => Readable.from([Buffer.from(payload)])[Symbol.asyncIterator]();
   return req as unknown as IncomingMessage;
 }
 

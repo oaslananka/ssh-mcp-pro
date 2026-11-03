@@ -1,12 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 
+function assertValid(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
 /** Validate shipped connector metadata against the published package contract. */
 export function validateAppReadiness({ file, displayName, profile, kind }) {
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));
   const readiness = JSON.parse(readFileSync(file, "utf8"));
-  function assertValid(condition, message) {
-    if (!condition) throw new Error(message);
-  }
 
   assertValid(
     readiness.sourceRepository === pkg.repository.url.replace(/^git\+/u, "").replace(/\.git$/u, ""),

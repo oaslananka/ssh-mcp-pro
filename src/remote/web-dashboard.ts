@@ -42,7 +42,7 @@ export class WebDashboardHandler {
 
   constructor(private readonly deps: WebDashboardDependencies) {}
 
-  private sessionCookieName = "ssh_mcp_web_session";
+  private readonly sessionCookieName = "ssh_mcp_web_session";
 
   private sessionCookie(value: string, maxAge = 86_400): string {
     const secure = this.deps.config.publicBaseUrl.startsWith("https://") ? "; Secure" : "";
@@ -87,7 +87,7 @@ export class WebDashboardHandler {
     }
   }
 
-  async getPrincipalFromSession(req: IncomingMessage): Promise<RemotePrincipal | undefined> {
+  getPrincipalFromSession(req: IncomingMessage): RemotePrincipal | undefined {
     const token = this.extractSessionToken(req);
     if (!token) return undefined;
     const tokenHash = hashSecret(token);
@@ -115,7 +115,7 @@ export class WebDashboardHandler {
     res: ServerResponse,
     pathname: string,
   ): Promise<boolean> {
-    if (await this.handleScriptRoutes(req, res, pathname)) return true;
+    if (this.handleScriptRoutes(req, res, pathname)) return true;
     if (await this.handleAuthRoutes(req, res, pathname)) return true;
     if (await this.handleDashboardApiRoutes(req, res, pathname)) return true;
     if (await this.handleDashboardPageRoutes(req, res, pathname)) return true;
@@ -123,11 +123,7 @@ export class WebDashboardHandler {
     return false;
   }
 
-  private async handleScriptRoutes(
-    req: IncomingMessage,
-    res: ServerResponse,
-    pathname: string,
-  ): Promise<boolean> {
+  private handleScriptRoutes(req: IncomingMessage, res: ServerResponse, pathname: string): boolean {
     // 1. Static installation scripts
     if (pathname === "/install-agent.sh" && req.method === "GET") {
       serveAgentScript(res, "scripts/install-agent.sh", "text/x-shellscript; charset=utf-8");
@@ -148,11 +144,11 @@ export class WebDashboardHandler {
   ): Promise<boolean> {
     // 2. Web direct auth endpoints
     if (pathname === "/auth/login/github" && req.method === "GET") {
-      await this.handleDirectLoginGitHub(req, res);
+      this.handleDirectLoginGitHub(req, res);
       return true;
     }
     if (pathname === "/auth/login/google" && req.method === "GET") {
-      await this.handleDirectLoginGoogle(req, res);
+      this.handleDirectLoginGoogle(req, res);
       return true;
     }
     if (pathname === "/auth/callback/github" && req.method === "GET") {
@@ -243,7 +239,7 @@ export class WebDashboardHandler {
     return false;
   }
 
-  private async handleDirectLoginGitHub(_req: IncomingMessage, res: ServerResponse): Promise<void> {
+  private handleDirectLoginGitHub(_req: IncomingMessage, res: ServerResponse): void {
     const testUser = this.deps.oauth.testGitHubUser();
     if (testUser) {
       const user = this.deps.oauth.upsertGitHubUser(testUser);
@@ -279,7 +275,7 @@ export class WebDashboardHandler {
     redirect(res, githubUrl.toString());
   }
 
-  private async handleDirectLoginGoogle(_req: IncomingMessage, res: ServerResponse): Promise<void> {
+  private handleDirectLoginGoogle(_req: IncomingMessage, res: ServerResponse): void {
     const testGoogle = this.deps.oauth.testGoogleUser();
     if (testGoogle) {
       const user = this.deps.oauth.upsertGoogleUser(testGoogle);
@@ -373,7 +369,7 @@ export class WebDashboardHandler {
   }
 
   private async handleApiMe(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const principal = await this.getPrincipalFromSession(req);
+    const principal = this.getPrincipalFromSession(req);
     if (!principal) {
       jsonResponse(res, 200, { authenticated: false }, addNoStore());
       return;
@@ -397,7 +393,7 @@ export class WebDashboardHandler {
   }
 
   private async handleApiDevices(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const principal = await this.getPrincipalFromSession(req);
+    const principal = this.getPrincipalFromSession(req);
     if (!principal) {
       jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
       return;
@@ -416,7 +412,7 @@ export class WebDashboardHandler {
   }
 
   private quotePosixArg(value: string): string {
-    return "'" + value.replaceAll("'", "'\\''") + "'";
+    return "'" + value.replaceAll("'", String.raw`'\''`) + "'";
   }
 
   private quotePowerShellArg(value: string): string {
@@ -424,7 +420,7 @@ export class WebDashboardHandler {
   }
 
   private async handleApiEnrollDevice(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const principal = await this.getPrincipalFromSession(req);
+    const principal = this.getPrincipalFromSession(req);
     if (!principal) {
       jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
       return;
@@ -432,11 +428,14 @@ export class WebDashboardHandler {
     const body = await readJson(req);
     const tokenResult = this.deps.createEnrollmentToken(principal, body);
     const serverUrl = this.deps.config.publicBaseUrl;
-    const alias = String(tokenResult.alias ?? "");
-    const token = String(tokenResult.token ?? "");
+    const alias = typeof tokenResult.alias === "string" ? tokenResult.alias : "";
+    const token = typeof tokenResult.token === "string" ? tokenResult.token : "";
 
-    const curlCommand = `curl -fsSL ${this.quotePosixArg(`${serverUrl}/install-agent.sh`)} | bash -s -- --server ${this.quotePosixArg(serverUrl)} --token ${this.quotePosixArg(token)} --alias ${this.quotePosixArg(alias)}`;
-    const powershellCommand = `& ([scriptblock]::Create((Invoke-RestMethod -Uri ${this.quotePowerShellArg(`${serverUrl}/install-agent.ps1`)}))) -Server ${this.quotePowerShellArg(serverUrl)} -Token ${this.quotePowerShellArg(token)} -Alias ${this.quotePowerShellArg(alias)}`;
+    const posixInstallerUrl = `${serverUrl}/install-agent.sh`;
+    const powerShellInstallerUrl = `${serverUrl}/install-agent.ps1`;
+
+    const curlCommand = `curl -fsSL ${this.quotePosixArg(posixInstallerUrl)} | bash -s -- --server ${this.quotePosixArg(serverUrl)} --token ${this.quotePosixArg(token)} --alias ${this.quotePosixArg(alias)}`;
+    const powershellCommand = `& ([scriptblock]::Create((Invoke-RestMethod -Uri ${this.quotePowerShellArg(powerShellInstallerUrl)}))) -Server ${this.quotePowerShellArg(serverUrl)} -Token ${this.quotePowerShellArg(token)} -Alias ${this.quotePowerShellArg(alias)}`;
     const npmCommand = `npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent enroll --server ${this.quotePosixArg(serverUrl)} --token ${this.quotePosixArg(token)} --alias ${this.quotePosixArg(alias)} && npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent run`;
 
     jsonResponse(
@@ -460,7 +459,7 @@ export class WebDashboardHandler {
     res: ServerResponse,
     pathname: string,
   ): Promise<{ principal: RemotePrincipal; agent: RemoteAgentRecord } | undefined> {
-    const principal = await this.getPrincipalFromSession(req);
+    const principal = this.getPrincipalFromSession(req);
     if (!principal) {
       jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
       return undefined;
@@ -498,7 +497,7 @@ export class WebDashboardHandler {
   }
 
   private async handleApiAudit(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const principal = await this.getPrincipalFromSession(req);
+    const principal = this.getPrincipalFromSession(req);
     if (!principal) {
       jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
       return;
@@ -516,7 +515,7 @@ export class WebDashboardHandler {
   }
 
   private async serveDashboardHtml(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const principal = await this.getPrincipalFromSession(req);
+    const principal = this.getPrincipalFromSession(req);
     const user = principal ? this.deps.store.getUserById(principal.userId) : undefined;
     const initialUserJson = JSON.stringify(
       principal
@@ -531,8 +530,14 @@ export class WebDashboardHandler {
 
     // Base64 keeps untrusted user fields out of executable JavaScript syntax.
     const initialUserBase64 = Buffer.from(initialUserJson, "utf8").toString("base64");
-    const mcpUrlJson = JSON.stringify(this.deps.config.mcpResourceUrl).replaceAll("<", "\\u003c");
-    const publicUrlJson = JSON.stringify(this.deps.config.publicBaseUrl).replaceAll("<", "\\u003c");
+    const mcpUrlJson = JSON.stringify(this.deps.config.mcpResourceUrl).replaceAll(
+      "<",
+      String.raw`\u003c`,
+    );
+    const publicUrlJson = JSON.stringify(this.deps.config.publicBaseUrl).replaceAll(
+      "<",
+      String.raw`\u003c`,
+    );
 
     res.writeHead(200, {
       "Content-Type": "text/html; charset=utf-8",
