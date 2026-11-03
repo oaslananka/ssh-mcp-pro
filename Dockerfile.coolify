@@ -50,6 +50,7 @@ COPY --from=build /app/dist ./dist
 COPY README.md LICENSE SECURITY.md SECURITY_DECISIONS.md ARCHITECTURE.md REGISTRY_SUBMISSION.md ./
 COPY LICENSES ./LICENSES
 COPY docs ./docs
+COPY scripts/install-agent.sh scripts/install-agent.ps1 ./scripts/
 COPY mcp.json server.json ./
 COPY registry ./registry
 
@@ -58,7 +59,7 @@ USER node
 
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:3000/readyz').then(async r => { if(r.status!==200) process.exit(1); const b=await r.json(); process.exit(b.ok===true && b.control_plane===true ? 0 : 1); }).catch(() => process.exit(1))"
 
 ENTRYPOINT ["node", "dist/render-http.js"]
 CMD []
