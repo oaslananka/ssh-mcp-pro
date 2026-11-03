@@ -319,69 +319,57 @@ export class WebDashboardHandler {
     redirect(res, googleUrl.toString());
   }
 
-  private async handleDirectCallbackGitHub(
+  /** Authorization state is one-use even after a rejected callback. */
+  private consumeWebAuthTransaction(
     req: IncomingMessage,
-    res: ServerResponse,
-  ): Promise<void> {
-    const url = new URL(req.url ?? "/auth/callback/github", this.deps.config.publicBaseUrl);
+    provider: "github" | "google",
+  ): { code: string; nonce: string | undefined } {
+    const url = new URL(req.url ?? `/auth/callback/${provider}`, this.deps.config.publicBaseUrl);
     const code = url.searchParams.get("code") ?? "";
     const state = url.searchParams.get("state") ?? "";
-    const tx = this.webAuthTransactions.get(state);
+    const transaction = this.webAuthTransactions.get(state);
     this.webAuthTransactions.delete(state);
-
     if (
       !code ||
-      !tx ||
-      tx.expiresAt < Date.now() ||
-      tx.provider !== "github" ||
+      !transaction ||
+      transaction.expiresAt < Date.now() ||
+      transaction.provider !== provider ||
+      (provider === "google" && !transaction.nonce) ||
       !this.matchingAuthTransaction(req, state)
     ) {
       throw safeError("INVALID_TOKEN", "Web login transaction missing or expired", 403);
     }
+    return { code, nonce: transaction.nonce };
+  }
 
-    const githubUser = await fetchGitHubUserDirect(this.deps.config, code);
-    const user = this.deps.oauth.upsertGitHubUser(githubUser);
-    const webSessionCookie = this.createWebSession(user.id);
-
+  private completeWebAuth(res: ServerResponse, userId: string): void {
     res.writeHead(302, {
       Location: "/dashboard",
-      "Set-Cookie": [webSessionCookie, this.authTransactionCookie("", 0)],
+      "Set-Cookie": [this.createWebSession(userId), this.authTransactionCookie("", 0)],
       "Cache-Control": "no-store",
     });
     res.end();
+  }
+
+  private async handleDirectCallbackGitHub(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    const { code } = this.consumeWebAuthTransaction(req, "github");
+    const githubUser = await fetchGitHubUserDirect(this.deps.config, code);
+    const user = this.deps.oauth.upsertGitHubUser(githubUser);
+    this.completeWebAuth(res, user.id);
   }
 
   private async handleDirectCallbackGoogle(
     req: IncomingMessage,
     res: ServerResponse,
   ): Promise<void> {
-    const url = new URL(req.url ?? "/auth/callback/google", this.deps.config.publicBaseUrl);
-    const code = url.searchParams.get("code") ?? "";
-    const state = url.searchParams.get("state") ?? "";
-    const tx = this.webAuthTransactions.get(state);
-    this.webAuthTransactions.delete(state);
-
-    if (
-      !code ||
-      !tx ||
-      tx.expiresAt < Date.now() ||
-      tx.provider !== "google" ||
-      !tx.nonce ||
-      !this.matchingAuthTransaction(req, state)
-    ) {
-      throw safeError("INVALID_TOKEN", "Web login transaction missing or expired", 403);
-    }
-
-    const googleUser = await fetchGoogleUserDirect(this.deps.config, code, tx.nonce);
+    const { code, nonce } = this.consumeWebAuthTransaction(req, "google");
+    // Nonce is guaranteed by consumeWebAuthTransaction for Google.
+    const googleUser = await fetchGoogleUserDirect(this.deps.config, code, nonce!);
     const user = this.deps.oauth.upsertGoogleUser(googleUser);
-    const webSessionCookie = this.createWebSession(user.id);
-
-    res.writeHead(302, {
-      Location: "/dashboard",
-      "Set-Cookie": [webSessionCookie, this.authTransactionCookie("", 0)],
-      "Cache-Control": "no-store",
-    });
-    res.end();
+    this.completeWebAuth(res, user.id);
   }
 
   private async handleApiMe(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -466,24 +454,35 @@ export class WebDashboardHandler {
     );
   }
 
-  private async handleApiUpdateDevicePolicy(
+  /** Resolve devices only through the authenticated tenant's ownership boundary. */
+  private async findOwnedDashboardDevice(
     req: IncomingMessage,
     res: ServerResponse,
     pathname: string,
-  ): Promise<void> {
+  ): Promise<{ principal: RemotePrincipal; agent: RemoteAgentRecord } | undefined> {
     const principal = await this.getPrincipalFromSession(req);
     if (!principal) {
       jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
-      return;
+      return undefined;
     }
     const agentId = pathname.slice("/api/dashboard/devices/".length);
     const agent = this.deps.resolveAgent(principal.userId, agentId);
     if (!agent) {
       jsonResponse(res, 404, { error: "Device not found" }, addNoStore());
-      return;
+      return undefined;
     }
+    return { principal, agent };
+  }
+
+  private async handleApiUpdateDevicePolicy(
+    req: IncomingMessage,
+    res: ServerResponse,
+    pathname: string,
+  ): Promise<void> {
+    const owned = await this.findOwnedDashboardDevice(req, res, pathname);
+    if (!owned) return;
     const body = await readJson(req);
-    const updated = this.deps.updateAgentPolicy(principal, agent, body.policy);
+    const updated = this.deps.updateAgentPolicy(owned.principal, owned.agent, body.policy);
     jsonResponse(res, 200, { device: sanitizeAgent(updated) }, addNoStore());
   }
 
@@ -492,18 +491,9 @@ export class WebDashboardHandler {
     res: ServerResponse,
     pathname: string,
   ): Promise<void> {
-    const principal = await this.getPrincipalFromSession(req);
-    if (!principal) {
-      jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
-      return;
-    }
-    const agentId = pathname.slice("/api/dashboard/devices/".length);
-    const agent = this.deps.resolveAgent(principal.userId, agentId);
-    if (!agent) {
-      jsonResponse(res, 404, { error: "Device not found" }, addNoStore());
-      return;
-    }
-    const revoked = this.deps.revokeAgent(principal, agent);
+    const owned = await this.findOwnedDashboardDevice(req, res, pathname);
+    if (!owned) return;
+    const revoked = this.deps.revokeAgent(owned.principal, owned.agent);
     jsonResponse(res, 200, { device: sanitizeAgent(revoked) }, addNoStore());
   }
 
