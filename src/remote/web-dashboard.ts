@@ -2,7 +2,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { URL } from "node:url";
-import { id, issueAccessToken, verifyRemoteAccessToken, type JwtKeyPair } from "./crypto.js";
+import { hashSecret, id, randomToken, type JwtKeyPair } from "./crypto.js";
+import { capabilitiesFromScopes } from "./scopes.js";
 import { addNoStore, readJson, redirect, safeError, sanitizeAgent } from "./http-util.js";
 import type { OAuthHandler } from "./oauth-handler.js";
 import type { AgentWebSocketHandler } from "./agent-handler.js";
@@ -37,7 +38,7 @@ export interface WebDashboardDependencies {
 export class WebDashboardHandler {
   private readonly webAuthTransactions = new Map<
     string,
-    { state: string; provider: "github" | "google"; expiresAt: number }
+    { state: string; provider: "github" | "google"; expiresAt: number; nonce?: string }
   >();
 
   constructor(private readonly deps: WebDashboardDependencies) {}
@@ -49,35 +50,64 @@ export class WebDashboardHandler {
     return `${this.sessionCookieName}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
   }
 
+  private authTransactionCookie(state: string, maxAge = 600): string {
+    const secure = this.deps.config.publicBaseUrl.startsWith("https://") ? "; Secure" : "";
+    return `ssh_mcp_web_tx=${state}; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+  }
+
   private extractSessionToken(req: IncomingMessage): string | undefined {
-    const authHeader = req.headers.authorization;
-    if (authHeader?.toLowerCase().startsWith("bearer ")) {
-      return authHeader.slice(7).trim();
+    const cookies = (req.headers.cookie ?? "").split(";").map((part) => part.trim());
+    const entry = cookies.find((part) => part.startsWith(`${this.sessionCookieName}=`));
+    const token = entry?.slice(this.sessionCookieName.length + 1);
+    return token && /^[A-Za-z0-9_-]{43}$/u.test(token) ? token : undefined;
+  }
+
+  private matchingAuthTransaction(req: IncomingMessage, state: string): boolean {
+    return (req.headers.cookie ?? "")
+      .split(";")
+      .some((part) => part.trim() === `ssh_mcp_web_tx=${state}`);
+  }
+
+  private createWebSession(userId: string): string {
+    const token = randomToken(32);
+    const createdAt = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 86_400_000).toISOString();
+    this.deps.store.createDashboardSession(hashSecret(token), userId, expiresAt, createdAt);
+    return this.sessionCookie(token);
+  }
+
+  private assertBrowserMutation(req: IncomingMessage): void {
+    const expectedOrigin = new URL(this.deps.config.publicBaseUrl).origin;
+    const fetchSite = req.headers["sec-fetch-site"];
+    if (
+      req.headers.origin !== expectedOrigin ||
+      req.headers["x-ssh-mcp-dashboard"] !== "1" ||
+      (fetchSite !== undefined && fetchSite !== "same-origin")
+    ) {
+      throw safeError("FORBIDDEN", "Cross-site dashboard mutation is not allowed", 403);
     }
-    const cookieHeader = req.headers.cookie ?? "";
-    const cookies = cookieHeader.split(";").map((part) => part.trim());
-    for (const c of cookies) {
-      if (c.startsWith(`${this.sessionCookieName}=`)) {
-        return decodeURIComponent(c.slice(this.sessionCookieName.length + 1));
-      }
-    }
-    return undefined;
   }
 
   async getPrincipalFromSession(req: IncomingMessage): Promise<RemotePrincipal | undefined> {
     const token = this.extractSessionToken(req);
-    if (!token) {
-      return undefined;
-    }
-    try {
-      return await verifyRemoteAccessToken(
-        `Bearer ${token}`,
-        this.deps.config,
-        this.deps.getJwtKeyPair(),
-      );
-    } catch {
-      return undefined;
-    }
+    if (!token) return undefined;
+    const tokenHash = hashSecret(token);
+    const session = this.deps.store.getDashboardSession(tokenHash, new Date().toISOString());
+    if (!session) return undefined;
+    const user = this.deps.store.getUserById(session.userId);
+    if (!user) return undefined;
+    const scopes = [...REMOTE_SCOPES];
+    return {
+      userId: user.id,
+      githubId: user.githubId ?? user.googleId ?? user.id,
+      githubLogin: user.githubLogin ?? user.displayName,
+      email: user.email,
+      displayName: user.displayName,
+      provider: user.provider,
+      scopes,
+      capabilities: capabilitiesFromScopes(scopes),
+      tokenId: `web_${tokenHash.slice(0,24)}`,
+    };
   }
 
   /** Handle routes for web UI, authentication, dashboard APIs, and agent scripts. */
@@ -134,7 +164,9 @@ export class WebDashboardHandler {
       await this.handleDirectCallbackGoogle(req, res);
       return true;
     }
-    if (pathname === "/auth/logout") {
+    if (pathname === "/auth/logout" && req.method === "GET") {
+      const session = this.extractSessionToken(req);
+      if (session) this.deps.store.deleteDashboardSession(hashSecret(session));
       res.writeHead(302, {
         Location: "/",
         "Set-Cookie": this.sessionCookie("", 0),
@@ -152,6 +184,10 @@ export class WebDashboardHandler {
     res: ServerResponse,
     pathname: string,
   ): Promise<boolean> {
+    // Browser mutations require both exact Origin and a non-simple request header.
+    if (["POST", "PATCH", "DELETE"].includes(req.method ?? "")) {
+      this.assertBrowserMutation(req);
+    }
     // 3. Web Dashboard REST APIs
     if (pathname === "/api/dashboard/me" && req.method === "GET") {
       await this.handleApiMe(req, res);
@@ -219,12 +255,10 @@ export class WebDashboardHandler {
     const testUser = this.deps.oauth.testGitHubUser();
     if (testUser) {
       const user = this.deps.oauth.upsertGitHubUser(testUser);
-      const token = await issueAccessToken(this.deps.config, this.deps.getJwtKeyPair(), user, [
-        ...REMOTE_SCOPES,
-      ]);
+      const webSessionCookie = this.createWebSession(user.id);
       res.writeHead(302, {
         Location: "/dashboard",
-        "Set-Cookie": this.sessionCookie(token.token),
+        "Set-Cookie": webSessionCookie,
         "Cache-Control": "no-store",
       });
       res.end();
@@ -249,6 +283,7 @@ export class WebDashboardHandler {
     githubUrl.searchParams.set("scope", "read:user");
     githubUrl.searchParams.set("state", state);
 
+    res.setHeader("Set-Cookie", this.authTransactionCookie(state));
     redirect(res, githubUrl.toString());
   }
 
@@ -256,12 +291,10 @@ export class WebDashboardHandler {
     const testGoogle = this.deps.oauth.testGoogleUser();
     if (testGoogle) {
       const user = this.deps.oauth.upsertGoogleUser(testGoogle);
-      const token = await issueAccessToken(this.deps.config, this.deps.getJwtKeyPair(), user, [
-        ...REMOTE_SCOPES,
-      ]);
+      const webSessionCookie = this.createWebSession(user.id);
       res.writeHead(302, {
         Location: "/dashboard",
-        "Set-Cookie": this.sessionCookie(token.token),
+        "Set-Cookie": webSessionCookie,
         "Cache-Control": "no-store",
       });
       res.end();
@@ -273,10 +306,12 @@ export class WebDashboardHandler {
     }
 
     const state = id("webauth");
+    const nonce = randomToken(24);
     this.webAuthTransactions.set(state, {
       state,
       provider: "google",
       expiresAt: Date.now() + 600_000,
+      nonce,
     });
 
     const callbackUrl = `${this.deps.config.publicBaseUrl}/auth/callback/google`;
@@ -286,7 +321,9 @@ export class WebDashboardHandler {
     googleUrl.searchParams.set("response_type", "code");
     googleUrl.searchParams.set("scope", "openid email profile");
     googleUrl.searchParams.set("state", state);
+    googleUrl.searchParams.set("nonce", nonce);
 
+    res.setHeader("Set-Cookie", this.authTransactionCookie(state));
     redirect(res, googleUrl.toString());
   }
 
@@ -300,19 +337,17 @@ export class WebDashboardHandler {
     const tx = this.webAuthTransactions.get(state);
     this.webAuthTransactions.delete(state);
 
-    if (!code || !tx || tx.expiresAt < Date.now() || tx.provider !== "github") {
+    if (!code || !tx || tx.expiresAt < Date.now() || tx.provider !== "github" || !this.matchingAuthTransaction(req, state)) {
       throw safeError("INVALID_TOKEN", "Web login transaction missing or expired", 403);
     }
 
     const githubUser = await fetchGitHubUserDirect(this.deps.config, code);
     const user = this.deps.oauth.upsertGitHubUser(githubUser);
-    const token = await issueAccessToken(this.deps.config, this.deps.getJwtKeyPair(), user, [
-      ...REMOTE_SCOPES,
-    ]);
+    const webSessionCookie = this.createWebSession(user.id);
 
     res.writeHead(302, {
       Location: "/dashboard",
-      "Set-Cookie": this.sessionCookie(token.token),
+      "Set-Cookie": [webSessionCookie, this.authTransactionCookie("", 0)],
       "Cache-Control": "no-store",
     });
     res.end();
@@ -328,19 +363,17 @@ export class WebDashboardHandler {
     const tx = this.webAuthTransactions.get(state);
     this.webAuthTransactions.delete(state);
 
-    if (!code || !tx || tx.expiresAt < Date.now() || tx.provider !== "google") {
+    if (!code || !tx || tx.expiresAt < Date.now() || tx.provider !== "google" || !tx.nonce || !this.matchingAuthTransaction(req, state)) {
       throw safeError("INVALID_TOKEN", "Web login transaction missing or expired", 403);
     }
 
-    const googleUser = await fetchGoogleUserDirect(this.deps.config, code);
+    const googleUser = await fetchGoogleUserDirect(this.deps.config, code, tx.nonce);
     const user = this.deps.oauth.upsertGoogleUser(googleUser);
-    const token = await issueAccessToken(this.deps.config, this.deps.getJwtKeyPair(), user, [
-      ...REMOTE_SCOPES,
-    ]);
+    const webSessionCookie = this.createWebSession(user.id);
 
     res.writeHead(302, {
       Location: "/dashboard",
-      "Set-Cookie": this.sessionCookie(token.token),
+      "Set-Cookie": [webSessionCookie, this.authTransactionCookie("", 0)],
       "Cache-Control": "no-store",
     });
     res.end();
