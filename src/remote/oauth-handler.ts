@@ -496,7 +496,22 @@ export class OAuthHandler {
     return { id: googleSub, email, name, picture };
   }
 
+  /** Fixture identities must never bypass provider login on public-facing hosts. */
+  private allowFixtureIdentity(): boolean {
+    if (process.env.NODE_ENV !== "test") return false;
+    try {
+      const baseUrl = new URL(this.config.publicBaseUrl);
+      return (
+        baseUrl.protocol === "http:" &&
+        ["localhost", "127.0.0.1", "[::1]"].includes(baseUrl.hostname)
+      );
+    } catch {
+      return false;
+    }
+  }
+
   testGoogleUser(): GoogleUser | undefined {
+    if (!this.allowFixtureIdentity()) return undefined;
     const idValue = process.env.SSHAUTOMATOR_TEST_GOOGLE_ID;
     const email = process.env.SSHAUTOMATOR_TEST_GOOGLE_EMAIL;
     const name = process.env.SSHAUTOMATOR_TEST_GOOGLE_NAME ?? "Test Google User";
@@ -572,6 +587,7 @@ export class OAuthHandler {
   }
 
   testGitHubUser(): GitHubUser | undefined {
+    if (!this.allowFixtureIdentity()) return undefined;
     const idValue = process.env.SSHAUTOMATOR_TEST_GITHUB_ID;
     const login = process.env.SSHAUTOMATOR_TEST_GITHUB_LOGIN;
     return idValue && login ? { id: idValue, login } : undefined;
