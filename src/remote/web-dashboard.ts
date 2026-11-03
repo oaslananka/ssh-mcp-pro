@@ -422,6 +422,14 @@ export class WebDashboardHandler {
     jsonResponse(res, 200, { devices: enriched }, addNoStore());
   }
 
+  private quotePosixArg(value: string): string {
+    return "'" + value.replaceAll("'", "'\\''") + "'";
+  }
+
+  private quotePowerShellArg(value: string): string {
+    return "'" + value.replaceAll("'", "''") + "'";
+  }
+
   private async handleApiEnrollDevice(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const principal = await this.getPrincipalFromSession(req);
     if (!principal) {
@@ -434,9 +442,9 @@ export class WebDashboardHandler {
     const alias = String(tokenResult.alias ?? "");
     const token = String(tokenResult.token ?? "");
 
-    const curlCommand = `curl -fsSL ${serverUrl}/install-agent.sh | bash -s -- --server ${serverUrl} --token ${token} --alias ${alias}`;
-    const powershellCommand = `irm ${serverUrl}/install-agent.ps1 | iex; install-agent -Server ${serverUrl} -Token ${token} -Alias ${alias}`;
-    const npmCommand = `npx ssh-mcp-pro-agent enroll --server ${serverUrl} --token ${token} --alias ${alias} && npx ssh-mcp-pro-agent run`;
+    const curlCommand = `curl -fsSL ${this.quotePosixArg(`${serverUrl}/install-agent.sh`)} | bash -s -- --server ${this.quotePosixArg(serverUrl)} --token ${this.quotePosixArg(token)} --alias ${this.quotePosixArg(alias)}`;
+    const powershellCommand = `& ([scriptblock]::Create((Invoke-RestMethod -Uri ${this.quotePowerShellArg(`${serverUrl}/install-agent.ps1`)}))) -Server ${this.quotePowerShellArg(serverUrl)} -Token ${this.quotePowerShellArg(token)} -Alias ${this.quotePowerShellArg(alias)}`;
+    const npmCommand = `npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent enroll --server ${this.quotePosixArg(serverUrl)} --token ${this.quotePosixArg(token)} --alias ${this.quotePosixArg(alias)} && npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent run`;
 
     jsonResponse(
       res,
