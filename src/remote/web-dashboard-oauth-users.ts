@@ -1,4 +1,7 @@
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import { asString, safeError } from "./http-util.js";
+
+const googleJwks = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
 import type { GitHubUser, GoogleUser, RemoteConfig } from "./types.js";
 
 export async function fetchGitHubUserDirect(
@@ -36,6 +39,7 @@ export async function fetchGitHubUserDirect(
 export async function fetchGoogleUserDirect(
   config: RemoteConfig,
   code: string,
+  nonce: string,
 ): Promise<GoogleUser> {
   const callbackUrl = `${config.publicBaseUrl}/auth/callback/google`;
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -50,20 +54,35 @@ export async function fetchGoogleUserDirect(
     }).toString(),
   });
   const tokenPayload = (await tokenResponse.json()) as Record<string, unknown>;
-  const accessToken = asString(tokenPayload.access_token);
-  if (!accessToken) {
-    throw safeError("INVALID_TOKEN", "Google OAuth token exchange failed", 502);
+  const idToken = asString(tokenPayload.id_token);
+  const clientId = config.googleClientId;
+  if (!tokenResponse.ok || !idToken || !clientId || !nonce) {
+    throw safeError("INVALID_TOKEN", "Google OIDC token exchange failed", 502);
   }
-  const userResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  const userPayload = (await userResponse.json()) as Record<string, unknown>;
-  const sub = asString(userPayload.sub);
-  const email = asString(userPayload.email);
-  const name = asString(userPayload.name) ?? email ?? "Google User";
-  const picture = asString(userPayload.picture);
-  if (!sub || !email) {
-    throw safeError("INVALID_TOKEN", "Google user response missing identity", 502);
+
+  let claims: Awaited<ReturnType<typeof jwtVerify>>["payload"];
+  try {
+    const verified = await jwtVerify(idToken, googleJwks, {
+      issuer: ["https://accounts.google.com", "accounts.google.com"],
+      audience: clientId,
+      algorithms: ["RS256"],
+    });
+    claims = verified.payload;
+  } catch {
+    throw safeError("INVALID_TOKEN", "Google OIDC ID token validation failed", 403);
   }
-  return { id: sub, email, name, picture };
+
+  if (
+    typeof claims.sub !== "string" ||
+    !claims.sub ||
+    typeof claims.email !== "string" ||
+    !claims.email ||
+    claims.email_verified !== true ||
+    claims.nonce !== nonce
+  ) {
+    throw safeError("INVALID_TOKEN", "Google OIDC identity or nonce mismatch", 403);
+  }
+  const name = typeof claims.name === "string" ? claims.name : claims.email;
+  const picture = typeof claims.picture === "string" ? claims.picture : undefined;
+  return { id: claims.sub, email: claims.email, name, picture };
 }
