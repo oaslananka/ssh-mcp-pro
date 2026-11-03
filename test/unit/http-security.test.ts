@@ -338,6 +338,15 @@ describe("HTTP transport security guards", () => {
     expect(corsHeaders("https://evil.example", origins)).toEqual({});
   });
 
+  test("rejects browser origins when no origins are explicitly allowed", () => {
+    const untrustedOrigin = "https://untrusted.example";
+
+    // Origin-less native clients remain usable on a local-only MCP server.
+    expect(isOriginAllowed(undefined, [])).toBe(true);
+    expect(isOriginAllowed(untrustedOrigin, [])).toBe(false);
+    expect(corsHeaders(untrustedOrigin, [])).toEqual({});
+  });
+
   test("builds OAuth discovery challenge headers for ChatGPT clients", () => {
     const metadataUrl = oauthProtectedResourceMetadataUrl(
       "https://sshautomator.oaslananka.dev/mcp",
