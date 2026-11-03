@@ -145,20 +145,45 @@ export function verifyEnvelope(
   );
 }
 
+export interface TokenUserIdentity {
+  id: string;
+  githubId?: string | undefined;
+  githubLogin?: string | undefined;
+  googleId?: string | undefined;
+  email?: string | undefined;
+  displayName?: string | undefined;
+  provider?: "github" | "google" | undefined;
+}
+
 export async function issueAccessToken(
   config: RemoteConfig,
   keyPair: JwtKeyPair,
-  user: { id: string; githubId: string; githubLogin: string },
+  user: TokenUserIdentity,
   scopes: RemoteScope[],
 ): Promise<{ token: string; tokenId: string; expiresAt: string }> {
   const issuedAt = Math.floor(Date.now() / 1000);
   const expiresAtSeconds = issuedAt + config.accessTokenTtlSeconds;
   const tokenId = id("tok");
-  const token = await new SignJWT({
+  const githubLogin = user.githubLogin ?? user.displayName ?? user.email ?? user.id;
+  const githubId = user.githubId ?? user.googleId ?? user.id;
+  const claims: Record<string, unknown> = {
     scope: scopes.join(" "),
-    github_login: user.githubLogin,
-    github_id: user.githubId,
-  })
+    github_login: githubLogin,
+    github_id: githubId,
+  };
+  if (user.googleId) {
+    claims.google_id = user.googleId;
+  }
+  if (user.email) {
+    claims.email = user.email;
+  }
+  if (user.displayName) {
+    claims.display_name = user.displayName;
+  }
+  if (user.provider) {
+    claims.provider = user.provider;
+  }
+  const token = await new SignJWT(claims)
     .setProtectedHeader({ alg: "EdDSA", kid: keyId(keyPair.publicKeyPem) })
     .setIssuer(config.publicBaseUrl)
     .setSubject(user.id)
@@ -196,15 +221,25 @@ export async function verifyRemoteAccessToken(
 function principalFromPayload(payload: JWTPayload): RemotePrincipal {
   const scopes =
     typeof payload.scope === "string" ? payload.scope.split(/\s+/u).filter(Boolean) : [];
-  if (typeof payload.github_id !== "string" || typeof payload.github_login !== "string") {
+  if (
+    ("github_id" in payload && typeof payload.github_id !== "string") ||
+    ("github_login" in payload && typeof payload.github_login !== "string")
+  ) {
     throw new TypeError("Invalid GitHub identity claims");
   }
-  const githubId = payload.github_id;
-  const githubLogin = payload.github_login;
+  const githubId = typeof payload.github_id === "string" ? payload.github_id : "";
+  const githubLogin = typeof payload.github_login === "string" ? payload.github_login : "";
+  const email = typeof payload.email === "string" ? payload.email : undefined;
+  const displayName = typeof payload.display_name === "string" ? payload.display_name : undefined;
+  const provider =
+    payload.provider === "google" || payload.provider === "github" ? payload.provider : undefined;
   return {
     userId: String(payload.sub),
     githubId,
     githubLogin,
+    email,
+    displayName,
+    provider,
     scopes: scopes as RemoteScope[],
     capabilities: capabilitiesFromScopes(scopes as RemoteScope[]),
     tokenId: String(payload.jti),

@@ -400,6 +400,11 @@ export class AgentWebSocketHandler {
     this.lifecycle.close();
   }
 
+  /** Check if a specific agent has an active authenticated connection. */
+  isAgentOnline(agentId: string): boolean {
+    return this.agentConnections.has(agentId);
+  }
+
   /** Number of currently authenticated agents. */
   get connectedAgentCount(): number {
     return this.agentConnections.size;

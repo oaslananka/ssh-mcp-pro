@@ -6,6 +6,7 @@ import type {
   AgentEnrollmentTokenRecord,
   AuditEvent,
   GitHubUser,
+  GoogleUser,
   OAuthAuthorizationCode,
   OAuthClient,
   RemoteAgentRecord,
@@ -97,14 +98,57 @@ export class RemoteStore {
   }
 
   private migrate(): void {
+    const userColumns = (
+      this.db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>
+    ).map((c) => c.name);
+
+    if (userColumns.length > 0 && !userColumns.includes("google_id")) {
+      this.db.exec(`
+        CREATE TABLE users_migrated (
+          id TEXT PRIMARY KEY,
+          github_id TEXT,
+          github_login TEXT,
+          google_id TEXT,
+          email TEXT,
+          display_name TEXT NOT NULL DEFAULT '',
+          provider TEXT NOT NULL DEFAULT 'github',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        INSERT INTO users_migrated (id, github_id, github_login, display_name, provider, created_at, updated_at)
+          SELECT id, github_id, github_login, github_login, 'github', created_at, updated_at FROM users;
+        DROP TABLE users;
+        ALTER TABLE users_migrated RENAME TO users;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id) WHERE github_id IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL;
+      `);
+    } else if (userColumns.length === 0) {
+      this.db.exec(`
+        CREATE TABLE users (
+          id TEXT PRIMARY KEY,
+          github_id TEXT,
+          github_login TEXT,
+          google_id TEXT,
+          email TEXT,
+          display_name TEXT NOT NULL DEFAULT '',
+          provider TEXT NOT NULL DEFAULT 'github',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id) WHERE github_id IS NOT NULL;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL;
+      `);
+    }
+
     this.db.exec(`
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        github_id TEXT UNIQUE NOT NULL,
-        github_login TEXT UNIQUE NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+      CREATE TABLE IF NOT EXISTS dashboard_sessions (
+        token_hash TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL
       ) STRICT;
+
+      CREATE INDEX IF NOT EXISTS idx_dashboard_sessions_expiry ON dashboard_sessions(expires_at);
 
       CREATE TABLE IF NOT EXISTS oauth_clients (
         id TEXT PRIMARY KEY,
@@ -186,19 +230,59 @@ export class RemoteStore {
     `);
   }
 
+  createDashboardSession(
+    tokenHash: string,
+    userId: string,
+    expiresAt: string,
+    createdAt: string,
+  ): void {
+    this.db
+      .prepare(
+        "INSERT INTO dashboard_sessions (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
+      )
+      .run(tokenHash, userId, expiresAt, createdAt);
+  }
+
+  getDashboardSession(tokenHash: string, now: string): { userId: string } | undefined {
+    const row = this.db
+      .prepare("SELECT user_id FROM dashboard_sessions WHERE token_hash = ? AND expires_at > ?")
+      .get(tokenHash, now) as Record<string, unknown> | undefined;
+    return row ? { userId: rowString(row, "user_id") } : undefined;
+  }
+
+  deleteDashboardSession(tokenHash: string): void {
+    this.db.prepare("DELETE FROM dashboard_sessions WHERE token_hash = ?").run(tokenHash);
+  }
+
   upsertUser(user: GitHubUser & { internalId: string; now: string }): void {
     this.db
       .prepare(
-        `INSERT INTO users (id, github_id, github_login, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(github_id) DO UPDATE SET github_login = excluded.github_login, updated_at = excluded.updated_at`,
+        `INSERT INTO users (id, github_id, github_login, display_name, provider, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'github', ?, ?)
+         ON CONFLICT(id) DO UPDATE SET github_id = excluded.github_id, github_login = excluded.github_login, display_name = excluded.display_name, updated_at = excluded.updated_at`,
       )
-      .run(user.internalId, user.id, user.login, user.now, user.now);
+      .run(user.internalId, user.id, user.login, user.login, user.now, user.now);
   }
 
-  getUserByGitHubId(
-    githubId: string,
-  ): { id: string; githubId: string; githubLogin: string } | undefined {
+  upsertGoogleUser(user: GoogleUser & { internalId: string; now: string }): void {
+    this.db
+      .prepare(
+        `INSERT INTO users (id, google_id, email, display_name, provider, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 'google', ?, ?)
+         ON CONFLICT(id) DO UPDATE SET google_id = excluded.google_id, email = excluded.email, display_name = excluded.display_name, updated_at = excluded.updated_at`,
+      )
+      .run(user.internalId, user.id, user.email, user.name, user.now, user.now);
+  }
+
+  getUserByGitHubId(githubId: string):
+    | {
+        id: string;
+        githubId: string;
+        githubLogin: string;
+        email?: string | undefined;
+        displayName?: string | undefined;
+      }
+    | undefined {
     const row = this.db.prepare("SELECT * FROM users WHERE github_id = ?").get(githubId) as
       Record<string, unknown> | undefined;
     if (!row) {
@@ -208,6 +292,55 @@ export class RemoteStore {
       id: rowString(row, "id"),
       githubId: rowString(row, "github_id"),
       githubLogin: rowString(row, "github_login"),
+      email: optionalRowString(row, "email"),
+      displayName: optionalRowString(row, "display_name") ?? rowString(row, "github_login"),
+    };
+  }
+
+  getUserByGoogleId(
+    googleId: string,
+  ): { id: string; googleId: string; email?: string | undefined; displayName: string } | undefined {
+    const row = this.db.prepare("SELECT * FROM users WHERE google_id = ?").get(googleId) as
+      Record<string, unknown> | undefined;
+    if (!row) {
+      return undefined;
+    }
+    return {
+      id: rowString(row, "id"),
+      googleId: rowString(row, "google_id"),
+      email: optionalRowString(row, "email"),
+      displayName: rowString(row, "display_name"),
+    };
+  }
+
+  getUserById(id: string):
+    | {
+        id: string;
+        githubId?: string | undefined;
+        githubLogin?: string | undefined;
+        googleId?: string | undefined;
+        email?: string | undefined;
+        displayName: string;
+        provider: "github" | "google";
+      }
+    | undefined {
+    const row = this.db.prepare("SELECT * FROM users WHERE id = ?").get(id) as
+      Record<string, unknown> | undefined;
+    if (!row) {
+      return undefined;
+    }
+    return {
+      id: rowString(row, "id"),
+      githubId: optionalRowString(row, "github_id"),
+      githubLogin: optionalRowString(row, "github_login"),
+      googleId: optionalRowString(row, "google_id"),
+      email: optionalRowString(row, "email"),
+      displayName:
+        optionalRowString(row, "display_name") ??
+        optionalRowString(row, "github_login") ??
+        optionalRowString(row, "email") ??
+        "User",
+      provider: optionalRowString(row, "provider") === "google" ? "google" : "github",
     };
   }
 

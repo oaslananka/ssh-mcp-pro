@@ -70,6 +70,25 @@ jobs:
           set -euo pipefail
           pnpm run check:freshness
           pnpm run check
+      # Before producing a public release, verify the oldest supported Node.
+      # Normal PRs run Node 24/26; Node 22 also runs on CI's weekly schedule.
+      - name: Switch to oldest supported Node before publishing
+        if: ${{ steps.detect.outputs.candidate == 'true' }}
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 22.22.2
+          package-manager-cache: false
+      - name: Verify Node 22 release compatibility
+        if: ${{ steps.detect.outputs.candidate == 'true' }}
+        run: |
+          pnpm run build
+          pnpm run test:coverage
+      - name: Restore Node 26 for release packaging
+        if: ${{ steps.detect.outputs.candidate == 'true' }}
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 26.3.0
+          package-manager-cache: false
       - name: Build package, SBOM and checksums before creating the release
         if: ${{ steps.detect.outputs.candidate == 'true' }}
         id: pack
