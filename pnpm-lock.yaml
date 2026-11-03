@@ -69,8 +69,8 @@ importers:
         specifier: 3.0.3
         version: 3.0.3
       jose:
-        specifier: 6.2.3
-        version: 6.2.3
+        specifier: 6.2.13
+        version: 6.2.13
       node-ssh:
         specifier: ^13.2.1
         version: 13.2.1
@@ -3510,10 +3510,10 @@ packages:
       }
     hasBin: true
 
-  jose@6.2.3:
+  jose@6.2.13:
     resolution:
       {
-        integrity: sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw==,
+        integrity: sha512-7TIg10ZE1x82YediN+lcrPNvGMKge9yFHQD+Qho/b8y2adfugU3AsvvHfxV0fzyFllT6l9xCjf4RWY9g/Z9PJQ==,
       }
 
   js-md4@0.3.2:
@@ -5506,7 +5506,7 @@ snapshots:
       cross-spawn: 7.0.6
       eventsource: 3.0.7
       eventsource-parser: 3.1.1
-      jose: 6.2.3
+      jose: 6.2.13
       pkce-challenge: 5.0.1
       zod: 4.6.7
 
@@ -7027,7 +7027,7 @@ snapshots:
 
   jiti@2.7.0: {}
 
-  jose@6.2.3: {}
+  jose@6.2.13: {}
 
   js-md4@0.3.2: {}
 
