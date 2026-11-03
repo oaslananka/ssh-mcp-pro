@@ -199,7 +199,7 @@ export function renderDashboardHtml(
               <h3 style="margin-bottom:12px; color:#fff;">One-Liner Installation Commands:</h3>
 
               <div style="margin-bottom:16px;">
-                <div style="font-weight:600; font-size:13px; color:var(--blue); margin-bottom:4px;">🐧 Linux / macOS (Bash)</div>
+                <div style="font-weight:600; font-size:13px; color:var(--blue); margin-bottom:4px;">🐧 Linux (systemd)</div>
                 <div class="code-box">
                   <button class="copy-btn" onclick="copySnippet('cmdLinux')">Copy</button>
                   <span id="cmdLinux"></span>
@@ -215,7 +215,7 @@ export function renderDashboardHtml(
               </div>
 
               <div>
-                <div style="font-weight:600; font-size:13px; color:var(--blue); margin-bottom:4px;">📦 Standalone NPM (Cross-platform)</div>
+                <div style="font-weight:600; font-size:13px; color:var(--blue); margin-bottom:4px;">📦 Node CLI (Linux/macOS)</div>
                 <div class="code-box">
                   <button class="copy-btn" onclick="copySnippet('cmdNpm')">Copy</button>
                   <span id="cmdNpm"></span>
