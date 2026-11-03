@@ -399,7 +399,7 @@ describe("remote agent CLI", () => {
     } finally {
       socket?.close();
       if (runPromise) {
-        await runPromise;
+        await expect(runPromise).rejects.toThrow("Agent WebSocket connection closed");
       }
       stdout.restore();
     }
@@ -623,7 +623,7 @@ describe("remote agent CLI", () => {
     } finally {
       socket?.close();
       if (runPromise) {
-        await runPromise;
+        await expect(runPromise).rejects.toThrow("Agent WebSocket connection closed");
       }
       stdout.restore();
       stderr.restore();
