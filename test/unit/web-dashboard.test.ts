@@ -1,5 +1,6 @@
+import { spawnSync } from "node:child_process";
 import { describe, expect, test } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import type { ServerResponse } from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -179,6 +180,42 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(enrollRes.statusCode).toBe(201);
       const enrollData = JSON.parse(enrollRes.body);
       expect(enrollData.commands.linux).toContain("install-agent.sh");
+      if (process.platform !== "win32") {
+        // A failed download must fail the copy-paste command, not silently
+        // succeed because the trailing bash process receives empty input.
+        const fakeBin = path.join(dir, "mock-bin");
+        mkdirSync(fakeBin);
+        const fakeCurl = path.join(fakeBin, "curl");
+        writeFileSync(fakeCurl, "#!/bin/sh\nexit 22\n", { mode: 0o755 });
+        chmodSync(fakeCurl, 0o755);
+        const result = spawnSync("bash", ["-c", String(enrollData.commands.linux)], {
+          env: { ...process.env, PATH: `${fakeBin}:${process.env.PATH ?? ""}` },
+          encoding: "utf8",
+          timeout: 3_000,
+        });
+        expect(result.error).toBeUndefined();
+        expect(result.status).toBe(22);
+
+        // The same one-liner must still execute a successfully downloaded
+        // script and preserve enrollment arguments.
+        writeFileSync(
+          fakeCurl,
+          `#!/bin/sh
+cat <<'INSTALLER'
+printf 'agent:%s\n' "$6"
+INSTALLER
+`,
+          { mode: 0o755 },
+        );
+        const successful = spawnSync("bash", ["-c", String(enrollData.commands.linux)], {
+          env: { ...process.env, PATH: `${fakeBin}:${process.env.PATH ?? ""}` },
+          encoding: "utf8",
+          timeout: 3_000,
+        });
+        expect(successful.error).toBeUndefined();
+        expect(successful.status).toBe(0);
+        expect(successful.stdout.trim()).toBe("agent:test-vps");
+      }
       expect(enrollData.commands.windows).toContain("install-agent.ps1");
       expect(enrollData.commands.npm).toContain("ssh-mcp-pro-agent enroll");
       expect(enrollData.commands.npm).toContain("--package ssh-mcp-pro@latest");

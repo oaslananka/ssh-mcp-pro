@@ -434,7 +434,9 @@ export class WebDashboardHandler {
     const posixInstallerUrl = `${serverUrl}/install-agent.sh`;
     const powerShellInstallerUrl = `${serverUrl}/install-agent.ps1`;
 
-    const curlCommand = `curl -fsSL ${this.quotePosixArg(posixInstallerUrl)} | bash -s -- --server ${this.quotePosixArg(serverUrl)} --token ${this.quotePosixArg(token)} --alias ${this.quotePosixArg(alias)}`;
+    // Propagate curl failures instead of reporting success from an empty bash pipeline.
+    const curlScript = 'curl -fsSL "$1" | bash -s -- --server "$2" --token "$3" --alias "$4"';
+    const curlCommand = `bash -o pipefail -c ${this.quotePosixArg(curlScript)} _ ${this.quotePosixArg(posixInstallerUrl)} ${this.quotePosixArg(serverUrl)} ${this.quotePosixArg(token)} ${this.quotePosixArg(alias)}`;
     const powershellCommand = `& ([scriptblock]::Create((Invoke-RestMethod -Uri ${this.quotePowerShellArg(powerShellInstallerUrl)}))) -Server ${this.quotePowerShellArg(serverUrl)} -Token ${this.quotePowerShellArg(token)} -Alias ${this.quotePowerShellArg(alias)}`;
     const npmCommand = `npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent enroll --server ${this.quotePosixArg(serverUrl)} --token ${this.quotePosixArg(token)} --alias ${this.quotePosixArg(alias)} && npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent run`;
 
