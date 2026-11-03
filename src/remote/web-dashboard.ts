@@ -118,7 +118,7 @@ export class WebDashboardHandler {
     if (this.handleScriptRoutes(req, res, pathname)) return true;
     if (await this.handleAuthRoutes(req, res, pathname)) return true;
     if (await this.handleDashboardApiRoutes(req, res, pathname)) return true;
-    if (await this.handleDashboardPageRoutes(req, res, pathname)) return true;
+    if (this.handleDashboardPageRoutes(req, res, pathname)) return true;
 
     return false;
   }
@@ -185,12 +185,12 @@ export class WebDashboardHandler {
     }
     // 3. Web Dashboard REST APIs
     if (pathname === "/api/dashboard/me" && req.method === "GET") {
-      await this.handleApiMe(req, res);
+      this.handleApiMe(req, res);
       return true;
     }
     if (await this.handleDashboardDeviceRoutes(req, res, pathname)) return true;
     if (pathname === "/api/dashboard/audit" && req.method === "GET") {
-      await this.handleApiAudit(req, res);
+      this.handleApiAudit(req, res);
       return true;
     }
     if (pathname === "/api/dashboard/client-configs" && req.method === "GET") {
@@ -207,7 +207,7 @@ export class WebDashboardHandler {
     pathname: string,
   ): Promise<boolean> {
     if (pathname === "/api/dashboard/devices" && req.method === "GET") {
-      await this.handleApiDevices(req, res);
+      this.handleApiDevices(req, res);
       return true;
     }
     if (pathname === "/api/dashboard/devices/enroll" && req.method === "POST") {
@@ -225,14 +225,14 @@ export class WebDashboardHandler {
     return false;
   }
 
-  private async handleDashboardPageRoutes(
+  private handleDashboardPageRoutes(
     req: IncomingMessage,
     res: ServerResponse,
     pathname: string,
-  ): Promise<boolean> {
+  ): boolean {
     // 4. HTML Dashboard & Landing
     if ((pathname === "/" || pathname === "/dashboard") && req.method === "GET") {
-      await this.serveDashboardHtml(req, res);
+      this.serveDashboardHtml(req, res);
       return true;
     }
 
@@ -368,7 +368,7 @@ export class WebDashboardHandler {
     this.completeWebAuth(res, user.id);
   }
 
-  private async handleApiMe(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  private handleApiMe(req: IncomingMessage, res: ServerResponse): void {
     const principal = this.getPrincipalFromSession(req);
     if (!principal) {
       jsonResponse(res, 200, { authenticated: false }, addNoStore());
@@ -392,7 +392,7 @@ export class WebDashboardHandler {
     );
   }
 
-  private async handleApiDevices(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  private handleApiDevices(req: IncomingMessage, res: ServerResponse): void {
     const principal = this.getPrincipalFromSession(req);
     if (!principal) {
       jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
@@ -454,11 +454,11 @@ export class WebDashboardHandler {
   }
 
   /** Resolve devices only through the authenticated tenant's ownership boundary. */
-  private async findOwnedDashboardDevice(
+  private findOwnedDashboardDevice(
     req: IncomingMessage,
     res: ServerResponse,
     pathname: string,
-  ): Promise<{ principal: RemotePrincipal; agent: RemoteAgentRecord } | undefined> {
+  ): { principal: RemotePrincipal; agent: RemoteAgentRecord } | undefined {
     const principal = this.getPrincipalFromSession(req);
     if (!principal) {
       jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
@@ -478,7 +478,7 @@ export class WebDashboardHandler {
     res: ServerResponse,
     pathname: string,
   ): Promise<void> {
-    const owned = await this.findOwnedDashboardDevice(req, res, pathname);
+    const owned = this.findOwnedDashboardDevice(req, res, pathname);
     if (!owned) return;
     const body = await readJson(req);
     const updated = this.deps.updateAgentPolicy(owned.principal, owned.agent, body.policy);
@@ -490,13 +490,13 @@ export class WebDashboardHandler {
     res: ServerResponse,
     pathname: string,
   ): Promise<void> {
-    const owned = await this.findOwnedDashboardDevice(req, res, pathname);
+    const owned = this.findOwnedDashboardDevice(req, res, pathname);
     if (!owned) return;
     const revoked = this.deps.revokeAgent(owned.principal, owned.agent);
     jsonResponse(res, 200, { device: sanitizeAgent(revoked) }, addNoStore());
   }
 
-  private async handleApiAudit(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  private handleApiAudit(req: IncomingMessage, res: ServerResponse): void {
     const principal = this.getPrincipalFromSession(req);
     if (!principal) {
       jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
@@ -514,7 +514,7 @@ export class WebDashboardHandler {
     jsonResponse(res, 200, configs, addNoStore());
   }
 
-  private async serveDashboardHtml(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  private serveDashboardHtml(req: IncomingMessage, res: ServerResponse): void {
     const principal = this.getPrincipalFromSession(req);
     const user = principal ? this.deps.store.getUserById(principal.userId) : undefined;
     const initialUserJson = JSON.stringify(

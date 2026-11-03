@@ -42,13 +42,15 @@ export function jsonRequest(
   headers: Record<string, string> = {},
 ): IncomingMessage {
   const payload = JSON.stringify(body);
-  const req = request(method, url, {
-    "content-type": "application/json",
-    "content-length": String(Buffer.byteLength(payload)),
-    ...headers,
-  }) as unknown as { [Symbol.asyncIterator](): AsyncIterableIterator<Buffer> };
-  req[Symbol.asyncIterator] = () => Readable.from([Buffer.from(payload)])[Symbol.asyncIterator]();
-  return req as unknown as IncomingMessage;
+  // Readable provides async iteration without assigning symbol-keyed properties.
+  return Object.assign(
+    Readable.from([Buffer.from(payload)]),
+    request(method, url, {
+      "content-type": "application/json",
+      "content-length": String(Buffer.byteLength(payload)),
+      ...headers,
+    }),
+  ) as IncomingMessage;
 }
 
 export function captureResponse() {
