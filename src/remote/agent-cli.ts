@@ -301,7 +301,8 @@ async function runAgent(): Promise<void> {
       });
     };
     ws.onerror = (event) => reject(new Error(`WebSocket error: ${String(event)}`));
-    ws.onclose = () => resolve();
+    // A disconnected agent must exit nonzero so Windows Task Scheduler can restart it.
+    ws.onclose = () => reject(new Error("Agent WebSocket connection closed"));
   });
 }
 
