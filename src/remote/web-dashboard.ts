@@ -106,7 +106,7 @@ export class WebDashboardHandler {
       provider: user.provider,
       scopes,
       capabilities: capabilitiesFromScopes(scopes),
-      tokenId: `web_${tokenHash.slice(0,24)}`,
+      tokenId: `web_${tokenHash.slice(0, 24)}`,
     };
   }
 
@@ -337,7 +337,13 @@ export class WebDashboardHandler {
     const tx = this.webAuthTransactions.get(state);
     this.webAuthTransactions.delete(state);
 
-    if (!code || !tx || tx.expiresAt < Date.now() || tx.provider !== "github" || !this.matchingAuthTransaction(req, state)) {
+    if (
+      !code ||
+      !tx ||
+      tx.expiresAt < Date.now() ||
+      tx.provider !== "github" ||
+      !this.matchingAuthTransaction(req, state)
+    ) {
       throw safeError("INVALID_TOKEN", "Web login transaction missing or expired", 403);
     }
 
@@ -363,7 +369,14 @@ export class WebDashboardHandler {
     const tx = this.webAuthTransactions.get(state);
     this.webAuthTransactions.delete(state);
 
-    if (!code || !tx || tx.expiresAt < Date.now() || tx.provider !== "google" || !tx.nonce || !this.matchingAuthTransaction(req, state)) {
+    if (
+      !code ||
+      !tx ||
+      tx.expiresAt < Date.now() ||
+      tx.provider !== "google" ||
+      !tx.nonce ||
+      !this.matchingAuthTransaction(req, state)
+    ) {
       throw safeError("INVALID_TOKEN", "Web login transaction missing or expired", 403);
     }
 

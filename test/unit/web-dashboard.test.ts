@@ -286,7 +286,7 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       // 6. Sign out
       const logoutRes = captureResponse();
       await cp.handleHttp(
-        request("GET", "/auth/logout"),
+        request("GET", "/auth/logout", { cookie: `ssh_mcp_web_session=${token}` }),
         logoutRes as unknown as ServerResponse,
         "/auth/logout",
       );
