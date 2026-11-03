@@ -191,6 +191,7 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       const match = /ssh_mcp_web_session=([^;]+)/.exec(cookie);
       expect(match).not.toBeNull();
       const token = match![1];
+      expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/u); // Opaque session, never an MCP bearer JWT.
 
       // 2. Check /api/dashboard/me with session cookie
       const meRes = captureResponse();
@@ -213,7 +214,11 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
           "POST",
           "/api/dashboard/devices/enroll",
           { alias: "test-vps", requested_profile: "operations" },
-          { cookie: `ssh_mcp_web_session=${token}` },
+          {
+            cookie: `ssh_mcp_web_session=${token}`,
+            origin: "http://127.0.0.1:3000",
+            "x-ssh-mcp-dashboard": "1",
+          },
         ),
         enrollRes as unknown as ServerResponse,
         "/api/dashboard/devices/enroll",
@@ -241,6 +246,8 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       await cp.handleHttp(
         request("DELETE", `/api/dashboard/devices/${listData.devices[0].id}`, {
           cookie: `ssh_mcp_web_session=${token}`,
+          origin: "http://127.0.0.1:3000",
+          "x-ssh-mcp-dashboard": "1",
         }),
         revokeRes as unknown as ServerResponse,
         `/api/dashboard/devices/${listData.devices[0].id}`,
