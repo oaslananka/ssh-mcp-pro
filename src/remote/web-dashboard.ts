@@ -3,21 +3,16 @@ import { readFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { URL } from "node:url";
 import { id, issueAccessToken, verifyRemoteAccessToken, type JwtKeyPair } from "./crypto.js";
-import { addNoStore, asString, readJson, redirect, safeError, sanitizeAgent } from "./http-util.js";
+import { addNoStore, readJson, redirect, safeError, sanitizeAgent } from "./http-util.js";
 import type { OAuthHandler } from "./oauth-handler.js";
 import type { AgentWebSocketHandler } from "./agent-handler.js";
 import { RemoteStore } from "./store.js";
-import type {
-  AuditEvent,
-  GitHubUser,
-  GoogleUser,
-  RemoteAgentRecord,
-  RemoteConfig,
-  RemotePrincipal,
-} from "./types.js";
+import type { AuditEvent, RemoteAgentRecord, RemoteConfig, RemotePrincipal } from "./types.js";
 import { REMOTE_SCOPES } from "./types.js";
 import { jsonResponse } from "./util.js";
 import { renderDashboardHtml } from "./web-dashboard-html.js";
+import { createDashboardClientConfigs } from "./web-dashboard-client-config.js";
+import { fetchGitHubUserDirect, fetchGoogleUserDirect } from "./web-dashboard-oauth-users.js";
 
 export interface WebDashboardDependencies {
   config: RemoteConfig;
@@ -309,7 +304,7 @@ export class WebDashboardHandler {
       throw safeError("INVALID_TOKEN", "Web login transaction missing or expired", 403);
     }
 
-    const githubUser = await this.fetchGitHubUserDirect(code);
+    const githubUser = await fetchGitHubUserDirect(this.deps.config, code);
     const user = this.deps.oauth.upsertGitHubUser(githubUser);
     const token = await issueAccessToken(this.deps.config, this.deps.getJwtKeyPair(), user, [
       ...REMOTE_SCOPES,
@@ -337,7 +332,7 @@ export class WebDashboardHandler {
       throw safeError("INVALID_TOKEN", "Web login transaction missing or expired", 403);
     }
 
-    const googleUser = await this.fetchGoogleUserDirect(code);
+    const googleUser = await fetchGoogleUserDirect(this.deps.config, code);
     const user = this.deps.oauth.upsertGoogleUser(googleUser);
     const token = await issueAccessToken(this.deps.config, this.deps.getJwtKeyPair(), user, [
       ...REMOTE_SCOPES,
@@ -349,67 +344,6 @@ export class WebDashboardHandler {
       "Cache-Control": "no-store",
     });
     res.end();
-  }
-
-  private async fetchGitHubUserDirect(code: string): Promise<GitHubUser> {
-    const callbackUrl = `${this.deps.config.publicBaseUrl}/auth/callback/github`;
-    const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
-      method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_id: this.deps.config.githubClientId,
-        client_secret: this.deps.config.githubClientSecret,
-        code,
-        redirect_uri: callbackUrl,
-      }),
-    });
-    const tokenPayload = (await tokenResponse.json()) as Record<string, unknown>;
-    const accessToken = asString(tokenPayload.access_token);
-    if (!accessToken) {
-      throw safeError("INVALID_TOKEN", "GitHub OAuth token exchange failed", 502);
-    }
-    const userResponse = await fetch("https://api.github.com/user", {
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/vnd.github+json" },
-    });
-    const userPayload = (await userResponse.json()) as Record<string, unknown>;
-    const githubId = userPayload.id;
-    const githubLogin = userPayload.login;
-    if (typeof githubId !== "number" || typeof githubLogin !== "string" || !githubLogin) {
-      throw safeError("INVALID_TOKEN", "GitHub user response missing valid identity", 502);
-    }
-    return { id: String(githubId), login: githubLogin };
-  }
-
-  private async fetchGoogleUserDirect(code: string): Promise<GoogleUser> {
-    const callbackUrl = `${this.deps.config.publicBaseUrl}/auth/callback/google`;
-    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id: this.deps.config.googleClientId ?? "",
-        client_secret: this.deps.config.googleClientSecret ?? "",
-        redirect_uri: callbackUrl,
-        grant_type: "authorization_code",
-      }).toString(),
-    });
-    const tokenPayload = (await tokenResponse.json()) as Record<string, unknown>;
-    const accessToken = asString(tokenPayload.access_token);
-    if (!accessToken) {
-      throw safeError("INVALID_TOKEN", "Google OAuth token exchange failed", 502);
-    }
-    const userResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    const userPayload = (await userResponse.json()) as Record<string, unknown>;
-    const sub = asString(userPayload.sub);
-    const email = asString(userPayload.email);
-    const name = asString(userPayload.name) ?? email ?? "Google User";
-    const picture = asString(userPayload.picture);
-    if (!sub || !email) {
-      throw safeError("INVALID_TOKEN", "Google user response missing identity", 502);
-    }
-    return { id: sub, email, name, picture };
   }
 
   private async handleApiMe(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -538,60 +472,10 @@ export class WebDashboardHandler {
   }
 
   private handleApiClientConfigs(res: ServerResponse): void {
-    const publicUrl = this.deps.config.publicBaseUrl;
-    const mcpUrl = this.deps.config.mcpResourceUrl;
-
-    const configs = {
-      endpoints: {
-        webEndpoint: mcpUrl,
-        publicBaseUrl: publicUrl,
-        transport: "streamable-http",
-        auth: "OAuth 2.1 PKCE (RFC 9728 & RFC 8414)",
-      },
-      clients: {
-        claudeDesktopRemote: {
-          mcpServers: {
-            "ssh-mcp-pro": {
-              url: mcpUrl,
-              transport: "streamable-http",
-            },
-          },
-        },
-        claudeDesktopLocal: {
-          mcpServers: {
-            "ssh-mcp-pro": {
-              command: "ssh-mcp-pro",
-              args: [],
-            },
-          },
-        },
-        chatgptCustomGpt: {
-          actionServerUrl: mcpUrl,
-          authentication: "OAuth 2.0 (Authorization Code + PKCE)",
-          authorizationUrl: `${publicUrl}/oauth/authorize`,
-          tokenUrl: `${publicUrl}/oauth/token`,
-          scope: "hosts:read agents:read status:read logs:read",
-        },
-        geminiExtension: {
-          mcpEndpoint: mcpUrl,
-          transport: "streamable-http",
-          auth: "OAuth 2.1 (RFC 9728 discovery)",
-        },
-        vscodeCursor: {
-          "mcp.servers": {
-            "ssh-mcp-pro-cloud": {
-              type: "streamable-http",
-              url: mcpUrl,
-            },
-            "ssh-mcp-pro-local": {
-              type: "stdio",
-              command: "ssh-mcp-pro",
-              args: [],
-            },
-          },
-        },
-      },
-    };
+    const configs = createDashboardClientConfigs(
+      this.deps.config.publicBaseUrl,
+      this.deps.config.mcpResourceUrl,
+    );
     jsonResponse(res, 200, configs, addNoStore());
   }
 
