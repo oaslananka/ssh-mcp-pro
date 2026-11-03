@@ -28,32 +28,53 @@ token and a chosen capability profile.
 Start with the least privilege a device needs. You can raise the profile
 later (see [Changing a policy later](#changing-a-policy-later)).
 
-## Step 1 — Create an enrollment token (on the control plane side)
+## Step 1 — Create an enrollment token
 
-Tokens are one-time and short-lived. Pick the profile here.
+### Option A: From the web dashboard (recommended)
 
-### Option A: HTTP API
+On a deployed control plane with HTTPS and OAuth configured:
+
+1. Open its HTTPS URL and choose **Sign in with GitHub** or **Sign in with Google**.
+2. Select **Add Device**, enter the device alias, and choose a capability profile.
+   Start with `read-only` unless you need additional permissions.
+3. Choose **Generate Install Command**. The dashboard creates a short-lived,
+   one-time token and displays **Linux**, **Windows**, and **npm** commands.
+4. Copy the command for the target device and run it there. The Linux and
+   Windows installer commands install the agent, enroll it, and configure
+   startup; the npm command only enrolls and starts the process in that shell.
+
+Treat a generated command as a secret: it contains a one-time enrollment
+token. Do not share it in tickets, logs, chat messages, or screenshots. If
+the token expires, generate a new one in the dashboard.
+
+### Option B: From the HTTP API (automation)
+
+For an OAuth access token carrying the `agents:admin` scope:
 
 ```bash
 curl -sS -X POST "https://your-control-plane.example.com/api/agents/enrollment-tokens" \
   -H "Authorization: Bearer <admin-access-token>" \
   -H "Content-Type: application/json" \
-  -d '{"alias":"office-pc","requested_profile":"operations"}'
+  -d '{"alias":"office-pc","requested_profile":"read-only"}'
 ```
 
-The response includes a one-time `enrollment_token` and a ready-to-paste
-install command. The calling identity must have the `agents:admin` scope.
+The response includes `enrollment_token` and `commands.npm` / `commands.run`.
+The npm commands do not install a background service. To install and
+register a persistent service, use the platform installer in Step 2 with
+that one-time token.
 
-### Option B: From ChatGPT
+### Option C: From an authenticated MCP client
 
-If your connector has the `agents:admin` scope, ask it to call the
-`create_enrollment_token` tool with the alias and requested profile. It
-returns the same token and install command.
+If your authenticated connector has the `agents:admin` scope, call
+`create_enrollment_token` with an alias and requested profile. Use the
+returned token with the installer in Step 2 or the returned npm commands.
 
 ## Step 2 — Run the bootstrap on the new device
 
-The bootstrap installs the package, enrolls the machine, and registers a
-service so the agent reconnects on boot. It needs Node 22.22+ or 24+.
+The Linux/Windows bootstrap installs the package, enrolls the machine, and
+registers startup so the agent reconnects after restarts. It needs Node
+22.22+ or 24+. The dashboard-generated command is the shortest path; the
+manual commands below are alternatives if you already have a one-time token.
 
 ### Linux / WSL
 
@@ -88,9 +109,10 @@ On the device:
 ssh-mcp-pro-agent status
 ```
 
-It prints the agent id, alias, server, and active profile. On the control
-plane side the agent shows up as `online` in the fleet list, and the audit
-log records `enrollment_token_created` and `agent_connected`.
+It prints the agent id, alias, server, and active profile. This checks local
+enrollment, **not** live connectivity. In the dashboard, open **Enrolled
+Devices** and verify the device reports **Live Online**. The audit log
+should contain `enrollment_token_created` and `agent_connected`.
 
 ## Changing a policy later
 
@@ -123,5 +145,5 @@ restart is required.
   Windows) and that the device can reach the control plane URL over HTTPS.
 - **Enrollment fails with an expired token**: tokens are single-use and
   short-lived. Create a fresh one and retry.
-- **WebSocket error on start**: the runtime is too old. Install Node 22.22+
-  or 24+.
+- **WebSocket error on start**: confirm Node 22.22+ or 24+, DNS/TLS
+  connectivity to the configured server, and that the agent has not been revoked.
