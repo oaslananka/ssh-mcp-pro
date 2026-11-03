@@ -152,12 +152,12 @@ export function renderDashboardHtml(
                 <div class="device-icon">\${dev.hostMetadata?.platform === 'win32' ? '🪟' : (dev.hostMetadata?.platform === 'darwin' ? '🍎' : '🐧')}</div>
                 <div>
                   <div class="device-name">
-                    \${dev.alias}
-                    <span class="badge \${dev.isLiveConnected ? 'badge-green' : 'badge-gray'}">\${dev.isLiveConnected ? '🟢 Live Online' : dev.status}</span>
-                    <span class="badge badge-blue">\${dev.profile}</span>
+                    \${escapeHtml(dev.alias)}
+                    <span class="badge \${dev.isLiveConnected ? 'badge-green' : 'badge-gray'}">\${escapeHtml(dev.isLiveConnected ? '🟢 Live Online' : dev.status)}</span>
+                    <span class="badge badge-blue">\${escapeHtml(dev.profile)}</span>
                   </div>
                   <div class="device-meta">
-                    Host: \${dev.hostMetadata?.hostname || 'Unknown'} | Arch: \${dev.hostMetadata?.arch || 'Unknown'} | Policy v\${dev.policyVersion}
+                    Host: \${escapeHtml(dev.hostMetadata?.hostname || 'Unknown')} | Arch: \${escapeHtml(dev.hostMetadata?.arch || 'Unknown')} | Policy v\${escapeHtml(dev.policyVersion)}
                   </div>
                 </div>
               </div>
@@ -187,8 +187,8 @@ export function renderDashboardHtml(
               <div style="flex:1; min-width:240px;">
                 <label style="display:block; font-size:13px; font-weight:600; margin-bottom:6px;">Initial Policy Profile</label>
                 <select id="enrollProfile" style="width:100%; padding:10px; border-radius:6px; background:#090d13; border:1px solid var(--card-border); color:#fff; font-size:14px;">
-                  <option value="read-only">Read-Only (Status, Logs, Read Files)</option>
-                  <option value="operations" selected>Operations (Restart Services, Docker, Safe Shell)</option>
+                  <option value="read-only" selected>Read-Only (Status, Logs, Read Files)</option>
+                  <option value="operations">Operations (Restart Services, Docker, Safe Shell)</option>
                   <option value="full-admin">Full Admin (Root sudo, File Write, Service Admin)</option>
                 </select>
               </div>
