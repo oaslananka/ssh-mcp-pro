@@ -406,9 +406,15 @@ export class OAuthHandler {
     return { ...client, redirectUris: updatedUris };
   }
 
-  /** GET /oauth/callback/github */
-  async handleGitHubCallback(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const url = new URL(req.url ?? "/oauth/callback/github", this.config.publicBaseUrl);
+  /** Consume one-use OAuth transaction and preserve the associated PKCE request. */
+  private consumeOAuthCallback(
+    req: IncomingMessage,
+    provider: "github" | "google",
+  ): {
+    code: string;
+    pending: PendingAuthorize;
+  } {
+    const url = new URL(req.url ?? `/oauth/callback/${provider}`, this.config.publicBaseUrl);
     const code = url.searchParams.get("code") ?? "";
     const state = url.searchParams.get("state") ?? "";
     const pending = this.authorizeTransactions.get(state);
@@ -421,45 +427,35 @@ export class OAuthHandler {
     ) {
       throw safeError("INVALID_TOKEN", "OAuth transaction is missing or expired");
     }
-    const githubUser = await this.fetchGitHubUser(code);
-    const user = this.upsertGitHubUser(githubUser);
-    const authCode = this.issueAuthorizationCode(pending, user.id);
+    return { code, pending };
+  }
+
+  private completeOAuthCallback(
+    res: ServerResponse,
+    pending: PendingAuthorize,
+    userId: string,
+  ): void {
+    const authCode = this.issueAuthorizationCode(pending, userId);
     const destination = new URL(pending.redirectUri);
     destination.searchParams.set("code", authCode);
     destination.searchParams.set("iss", this.config.publicBaseUrl);
-    if (pending.state) {
-      destination.searchParams.set("state", pending.state);
-    }
+    if (pending.state) destination.searchParams.set("state", pending.state);
     res.setHeader("Set-Cookie", this.transactionCookie("").replace("Max-Age=300", "Max-Age=0"));
     redirect(res, destination.toString());
   }
 
+  /** GET /oauth/callback/github */
+  async handleGitHubCallback(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const { code, pending } = this.consumeOAuthCallback(req, "github");
+    const user = this.upsertGitHubUser(await this.fetchGitHubUser(code));
+    this.completeOAuthCallback(res, pending, user.id);
+  }
+
   /** GET /oauth/callback/google */
   async handleGoogleCallback(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const url = new URL(req.url ?? "/oauth/callback/google", this.config.publicBaseUrl);
-    const code = url.searchParams.get("code") ?? "";
-    const state = url.searchParams.get("state") ?? "";
-    const pending = this.authorizeTransactions.get(state);
-    this.authorizeTransactions.delete(state);
-    if (
-      !code ||
-      !pending?.approved ||
-      pending.expiresAt < Date.now() ||
-      !this.matchingBrowser(req, state)
-    ) {
-      throw safeError("INVALID_TOKEN", "OAuth transaction is missing or expired");
-    }
-    const googleUser = await this.fetchGoogleUser(code);
-    const user = this.upsertGoogleUser(googleUser);
-    const authCode = this.issueAuthorizationCode(pending, user.id);
-    const destination = new URL(pending.redirectUri);
-    destination.searchParams.set("code", authCode);
-    destination.searchParams.set("iss", this.config.publicBaseUrl);
-    if (pending.state) {
-      destination.searchParams.set("state", pending.state);
-    }
-    res.setHeader("Set-Cookie", this.transactionCookie("").replace("Max-Age=300", "Max-Age=0"));
-    redirect(res, destination.toString());
+    const { code, pending } = this.consumeOAuthCallback(req, "google");
+    const user = this.upsertGoogleUser(await this.fetchGoogleUser(code));
+    this.completeOAuthCallback(res, pending, user.id);
   }
 
   async fetchGoogleUser(code: string): Promise<GoogleUser> {
