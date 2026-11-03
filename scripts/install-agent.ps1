@@ -70,8 +70,14 @@ Write-Host "install-agent: enrolling as alias '$Alias'"
 & $agentBin enroll --server $Server --token $Token --alias $Alias
 if ($LASTEXITCODE -ne 0) { Die "enrollment failed" }
 
-# Register a Scheduled Task that runs the agent at logon and restarts it on failure.
-$action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument "/c `"$agentBin`" run"
+# npm installs distinct PowerShell (.ps1) and CMD (.cmd) wrappers on Windows.
+# Resolve the CMD wrapper explicitly: Task Scheduler invokes cmd.exe, not PowerShell.
+$agentCmd = (Get-Command ssh-mcp-pro-agent.cmd -CommandType Application -ErrorAction SilentlyContinue).Source
+if (-not $agentCmd) { Die "ssh-mcp-pro-agent.cmd not found on PATH after install" }
+
+# /d skips user AutoRun commands; /s ensures a quoted path survives /c.
+$taskArguments = '/d /s /c ""{0}" run"' -f $agentCmd
+$action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument $taskArguments
 $trigger = New-ScheduledTaskTrigger -AtLogOn
 $settings = New-ScheduledTaskSettingsSet `
   -AllowStartIfOnBatteries `
