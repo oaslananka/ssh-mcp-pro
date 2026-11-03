@@ -207,6 +207,33 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(meData.user.displayName).toBe("Osman Aslan");
       expect(meData.user.provider).toBe("google");
 
+      // A dashboard session is opaque and must never authenticate via a bearer header.
+      const bearerRes = captureResponse();
+      await cp.handleHttp(
+        request("GET", "/api/dashboard/me", { authorization: `Bearer ${token}` }),
+        bearerRes as unknown as ServerResponse,
+        "/api/dashboard/me",
+      );
+      expect(JSON.parse(bearerRes.body).authenticated).toBe(false);
+
+      // Mutations without the exact browser origin are rejected.
+      await expect(
+        cp.handleHttp(
+          jsonRequest(
+            "POST",
+            "/api/dashboard/devices/enroll",
+            { alias: "rejected-device" },
+            {
+              cookie: `ssh_mcp_web_session=${token}`,
+              origin: "https://different-origin.example",
+              "x-ssh-mcp-dashboard": "1",
+            },
+          ),
+          captureResponse() as unknown as ServerResponse,
+          "/api/dashboard/devices/enroll",
+        ),
+      ).rejects.toMatchObject({ status: 403 });
+
       // 3. Generate device enrollment command
       const enrollRes = captureResponse();
       await cp.handleHttp(
@@ -227,7 +254,9 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       const enrollData = JSON.parse(enrollRes.body);
       expect(enrollData.commands.linux).toContain("install-agent.sh");
       expect(enrollData.commands.windows).toContain("install-agent.ps1");
-      expect(enrollData.commands.npm).toContain("npx ssh-mcp-pro-agent enroll");
+      expect(enrollData.commands.npm).toContain("ssh-mcp-pro-agent enroll");
+      expect(enrollData.commands.npm).toContain("--package ssh-mcp-pro@latest");
+      expect(enrollData.commands.windows).toContain("[scriptblock]::Create");
 
       // 4. List devices
       const listRes = captureResponse();
@@ -264,6 +293,13 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(logoutRes.statusCode).toBe(302);
       expect(logoutRes.getHeader("location")).toBe("/");
       expect(String(logoutRes.getHeader("set-cookie"))).toContain("Max-Age=0");
+      const signedOutRes = captureResponse();
+      await cp.handleHttp(
+        request("GET", "/api/dashboard/me", { cookie: `ssh_mcp_web_session=${token}` }),
+        signedOutRes as unknown as ServerResponse,
+        "/api/dashboard/me",
+      );
+      expect(JSON.parse(signedOutRes.body).authenticated).toBe(false);
     } finally {
       cp.close();
       rmSync(dir, { recursive: true, force: true });
