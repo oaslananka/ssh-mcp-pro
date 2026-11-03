@@ -18,6 +18,13 @@ function jobBlock(workflow: string, job: string, nextJob: string): string {
 }
 
 describe("fixture-backed CI execution contract", () => {
+  test("limits the password-based SSH fixture to loopback without sudo or automatic restarts", () => {
+    const compose = readText("docker-compose.yml");
+
+    expect(compose).toContain('      - "127.0.0.1:2222:2222"');
+    expect(compose).toContain("      - SUDO_ACCESS=false");
+    expect(compose).toContain('    restart: "no"');
+  });
   test("declares reusable fixture verification and result guard scripts", () => {
     const pkg = JSON.parse(readText("package.json")) as { scripts: Record<string, string> };
 
