@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "publishReady": true,
+  "publishReady": false,
   "sourceRepository": "https://github.com/oaslananka/ssh-mcp-pro",
   "automationRepository": "https://github.com/oaslananka/ssh-mcp-pro",
   "supportUrl": "https://github.com/oaslananka/ssh-mcp-pro/issues",
@@ -55,7 +55,7 @@
   },
   "submission": {
     "publicHttpsMcpEndpoint": "https://ssh-mcp-pro.oaslananka.dev/mcp",
-    "oauthConfigured": true,
+    "oauthConfigured": false,
     "allowedOriginsConfigured": true,
     "privacyPolicyReviewed": true,
     "supportContactConfigured": true,
