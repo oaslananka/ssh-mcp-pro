@@ -340,7 +340,7 @@ export function renderDashboardHtml(
       try {
         const res = await fetch('/api/dashboard/devices/enroll', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-SSH-MCP-Dashboard': '1' },
           body: JSON.stringify({ alias, requested_profile: profile })
         });
         if (res.ok) {
@@ -361,7 +361,7 @@ export function renderDashboardHtml(
       try {
         const res = await fetch('/api/dashboard/devices/' + id + '/policy', {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-SSH-MCP-Dashboard': '1' },
           body: JSON.stringify({ policy: { profile } })
         });
         if (res.ok) {
@@ -378,7 +378,8 @@ export function renderDashboardHtml(
       if (!confirm('Revoke this device? The agent will be disconnected and unable to reconnect.')) return;
       try {
         const res = await fetch('/api/dashboard/devices/' + id, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers: { 'X-SSH-MCP-Dashboard': '1' }
         });
         if (res.ok) {
           loadDevices();
