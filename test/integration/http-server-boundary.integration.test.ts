@@ -373,6 +373,28 @@ describe("real HTTP server boundary", () => {
     });
   });
 
+  test("fails closed for browser origins when the loopback allowlist is empty", async () => {
+    const harness = await startHarness({ token: null, http: { allowedOrigins: [] } });
+
+    const preflight = await fetch(harness.baseUrl + "/mcp", {
+      method: "OPTIONS",
+      headers: { Origin: "https://untrusted.example", "Access-Control-Request-Method": "POST" },
+    });
+    expect(preflight.status).toBe(403);
+    expect(preflight.headers.get("access-control-allow-origin")).toBeNull();
+
+    const browserRequest = await fetch(harness.baseUrl + "/mcp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: "https://untrusted.example" },
+      body: "{}",
+    });
+    expect(browserRequest.status).toBe(403);
+    expect(browserRequest.headers.get("access-control-allow-origin")).toBeNull();
+
+    const nativeRequest = await fetch(harness.baseUrl + "/healthz");
+    expect(nativeRequest.status).toBe(200);
+  });
+
   test("returns OAuth challenges without contacting an external JWKS endpoint", async () => {
     const harness = await startHarness({
       auth: {

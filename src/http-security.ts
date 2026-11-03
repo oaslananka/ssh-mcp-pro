@@ -122,7 +122,7 @@ export function validateHttpStartupConfig(
 }
 
 export function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): boolean {
-  return !origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin);
+  return !origin || allowedOrigins.includes(origin);
 }
 
 export function corsHeaders(
