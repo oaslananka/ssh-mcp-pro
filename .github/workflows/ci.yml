@@ -169,18 +169,6 @@ jobs:
           path: coverage
           if-no-files-found: ignore
 
-      - name: Fetch secrets from Doppler
-        if: >-
-          ${{
-            secrets.DOPPLER_TOKEN != '' &&
-            matrix.node_major == 26 &&
-            (github.event_name == 'push' ||
-              (github.event_name == 'pull_request' && !github.event.pull_request.head.repo.fork))
-          }}
-        uses: dopplerhq/secrets-fetch-action@6f470bbb4b6a3e200e9e411a0642ad7b12c09324 # v1.3.1
-        with:
-          doppler-token: ${{ secrets.DOPPLER_TOKEN }}
-
       # Root maintenance CLIs are tested through their commands, not instrumented
       # by Vitest. Keep Sonar issue analysis active, but align coverage to LCOV.
       - name: SonarQube Cloud analysis (reuse existing Node 26 LCOV)
@@ -200,7 +188,7 @@ jobs:
             -Dsonar.coverage.exclusions=scripts/*.mjs,scripts/lib/conventional-title.mjs
             -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
         env:
-          SONAR_TOKEN: ${{ env.SONAR_TOKEN || secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
 
   integration:
