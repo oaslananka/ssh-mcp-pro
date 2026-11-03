@@ -46,6 +46,17 @@ describe("gated release lifecycle", () => {
     );
   });
 
+  test("gets SonarCloud credentials from Doppler without exposing every secret to later steps", () => {
+    const matrix = section(ci, "  unit:\n", "  node22-compatibility:\n");
+    expect(matrix).toContain("id: doppler_sonar");
+    expect(matrix).toContain("dopplerhq/secrets-fetch-action@");
+    expect(matrix).toContain("doppler-token: ${{ secrets.DOPPLER_TOKEN }}");
+    expect(matrix).toContain("steps.doppler_sonar.outputs.SONAR_TOKEN");
+    expect(matrix).not.toContain("inject-env-vars: true");
+    expect(matrix).not.toContain("secrets.DOPPLER_TOKEN !=");
+    expect(matrix).not.toContain("secrets.SONAR_TOKEN");
+  });
+
   test("preflights package, SBOM and provenance before release-please creates a tag", () => {
     const preflight = section(release, "  release-preflight:", "  release:\n");
     expect(preflight).toContain("pnpm run check:freshness");
