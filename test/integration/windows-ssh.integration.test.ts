@@ -1,5 +1,5 @@
-import { exec } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { exec, spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { capture } from "../../scripts/lib/command.mjs";
@@ -97,6 +97,144 @@ function createWindowsEnsureService(packageManager: PackageManager) {
 }
 
 windowsDescribe("Windows SSH integration coverage", () => {
+  test("runs the PowerShell agent installer through enrollment and Scheduled Task setup", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ssh mcp windows installer "));
+    const shim = join(dir, "fake agent.cmd");
+    const log = join(dir, "agent-invocation.txt");
+    const harness = join(dir, "bootstrap-test.ps1");
+    try {
+      // The native installer runs, but npm, enrollment and Scheduled Task
+      // side effects are all replaced by local disposable fixtures.
+      writeFileSync(shim, '@echo off\r\n>> "%SSH_MCP_TEST_AGENT_ARGS%" echo %*\r\nexit /b 0\r\n');
+      writeFileSync(
+        harness,
+        String.raw`param([string]$Installer, [string]$AgentShim)
+$ErrorActionPreference = 'Stop'
+$global:sshMcpSmokeAgentShim = $AgentShim
+$global:sshMcpSmokeNpmArgs = @()
+$global:sshMcpSmokeRegistered = $null
+$global:sshMcpSmokeStarted = $null
+
+function npm {
+  $global:sshMcpSmokeNpmArgs = @($args)
+  $global:LASTEXITCODE = 0
+}
+function Get-Command {
+  [CmdletBinding()]
+  param([string]$Name, [string]$CommandType)
+  if ($Name -in @('ssh-mcp-pro-agent', 'ssh-mcp-pro-agent.cmd')) {
+    return [pscustomobject]@{ Source = $global:sshMcpSmokeAgentShim }
+  }
+  Microsoft.PowerShell.Core\Get-Command -Name $Name -ErrorAction SilentlyContinue
+}
+function New-ScheduledTaskAction {
+  param([string]$Execute, [string]$Argument)
+  [pscustomobject]@{ Execute = $Execute; Argument = $Argument }
+}
+function New-ScheduledTaskTrigger {
+  param([switch]$AtLogOn)
+  [pscustomobject]@{ AtLogOn = $AtLogOn.IsPresent }
+}
+function New-ScheduledTaskSettingsSet {
+  param(
+    [switch]$AllowStartIfOnBatteries,
+    [switch]$DontStopIfGoingOnBatteries,
+    [int]$RestartCount,
+    [timespan]$RestartInterval,
+    [switch]$StartWhenAvailable
+  )
+  [pscustomobject]@{
+    RestartCount = $RestartCount
+    RestartInterval = $RestartInterval
+  }
+}
+function Register-ScheduledTask {
+  param(
+    [string]$TaskName,
+    [object]$Action,
+    [object]$Trigger,
+    [object]$Settings,
+    [string]$Description,
+    [switch]$Force
+  )
+  $global:sshMcpSmokeRegistered = [pscustomobject]@{
+    TaskName = $TaskName
+    Action = $Action
+    Trigger = $Trigger
+    Settings = $Settings
+  }
+}
+function Start-ScheduledTask {
+  param([string]$TaskName)
+  $global:sshMcpSmokeStarted = $TaskName
+}
+
+& $Installer -Server 'https://fixture.invalid' -Token 'fixture-only-token' -Alias 'fixture-windows' -Version '1.3.0' -TaskName 'ssh-mcp-pro-fixture'
+if ($null -eq $global:sshMcpSmokeRegistered -or $null -eq $global:sshMcpSmokeStarted) {
+  throw 'Installer did not register and start a task'
+}
+[pscustomobject]@{
+  NpmArguments = @($global:sshMcpSmokeNpmArgs)
+  Execute = $global:sshMcpSmokeRegistered.Action.Execute
+  Arguments = $global:sshMcpSmokeRegistered.Action.Argument
+  TaskName = $global:sshMcpSmokeRegistered.TaskName
+  AtLogOn = $global:sshMcpSmokeRegistered.Trigger.AtLogOn
+  RestartCount = $global:sshMcpSmokeRegistered.Settings.RestartCount
+  RestartMinutes = $global:sshMcpSmokeRegistered.Settings.RestartInterval.TotalMinutes
+  Started = $global:sshMcpSmokeStarted
+} | ConvertTo-Json -Compress -Depth 5 | ForEach-Object { 'BOOTSTRAP_SUMMARY=' + $_ }
+`,
+      );
+      const proc = spawnSync(
+        "pwsh",
+        [
+          "-NoProfile",
+          "-NonInteractive",
+          "-File",
+          harness,
+          join(process.cwd(), "scripts", "install-agent.ps1"),
+          shim,
+        ],
+        {
+          encoding: "utf8",
+          windowsHide: true,
+          timeout: 25_000,
+          env: { ...process.env, SSH_MCP_TEST_AGENT_ARGS: log },
+        },
+      );
+      expect(proc.error).toBeUndefined();
+      expect(proc.status, proc.stderr || proc.stdout).toBe(0);
+      const line = proc.stdout
+        .split(/\r?\n/u)
+        .find((item) => item.startsWith("BOOTSTRAP_SUMMARY="));
+      expect(line).toBeDefined();
+      const summary = JSON.parse(line!.slice("BOOTSTRAP_SUMMARY=".length)) as {
+        NpmArguments: string[];
+        Execute: string;
+        Arguments: string;
+        TaskName: string;
+        AtLogOn: boolean;
+        RestartCount: number;
+        RestartMinutes: number;
+        Started: string;
+      };
+      expect(summary.NpmArguments).toEqual(["install", "-g", "ssh-mcp-pro@1.3.0"]);
+      expect(summary.Execute).toBe("cmd.exe");
+      expect(summary.Arguments).toContain('/d /s /c ""');
+      expect(summary.Arguments).toContain(`"${shim}" run"`);
+      expect(summary.TaskName).toBe("ssh-mcp-pro-fixture");
+      expect(summary.AtLogOn).toBe(true);
+      expect(summary.RestartCount).toBe(999);
+      expect(summary.RestartMinutes).toBe(1);
+      expect(summary.Started).toBe(summary.TaskName);
+      const invocation = readFileSync(log, "utf8").trim();
+      expect(invocation).toContain("enroll --server https://fixture.invalid");
+      expect(invocation).toContain("--token fixture-only-token --alias fixture-windows");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   test("invokes bundled npm and npx CLIs without PATH-selected cmd shims", () => {
     const tempDir = mkdtempSync(join(tmpdir(), "ssh-mcp-windows-path-"));
     const priorPath = process.env.PATH;
