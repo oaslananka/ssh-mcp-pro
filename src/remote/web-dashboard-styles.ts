@@ -99,8 +99,12 @@ export const DASHBOARD_STYLES = `
     .auth-btn-github { background: #24292f; color: #ffffff; border-color: #30363d; }
 
     /* Tab nav */
-    .tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--card-border); margin-bottom: 24px; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid var(--card-border); margin-bottom: 24px; }
     .tab-item {
+      background: transparent;
+      border: 0;
+      font-family: inherit;
+      text-align: left;
       padding: 12px 20px;
       cursor: pointer;
       font-weight: 600;
@@ -110,6 +114,7 @@ export const DASHBOARD_STYLES = `
       transition: color 0.15s ease;
     }
     .tab-item.active { color: var(--blue); border-bottom-color: var(--blue); }
+    .tab-item:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
     .tab-pane { display: none; }
     .tab-pane.active { display: block; }
 

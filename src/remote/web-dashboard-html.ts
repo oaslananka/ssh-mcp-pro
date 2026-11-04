@@ -79,12 +79,12 @@ export function renderDashboardHtml(
           </div>
         </div>
 
-        <div class="tabs">
-          <div class="tab-item \${activeTab === 'devices' ? 'active' : ''}" onclick="switchTab('devices')">🖥️ Enrolled Devices</div>
-          <div class="tab-item \${activeTab === 'add-device' ? 'active' : ''}" onclick="switchTab('add-device')">➕ Add Device</div>
-          <div class="tab-item \${activeTab === 'clients' ? 'active' : ''}" onclick="switchTab('clients')">🤖 AI Integrations</div>
-          <div class="tab-item \${activeTab === 'audit' ? 'active' : ''}" onclick="switchTab('audit')">📜 Audit Log</div>
-        </div>
+        <nav class="tabs" aria-label="Dashboard sections">
+          <button type="button" data-dashboard-tab="devices" aria-pressed="\${activeTab === 'devices'}" class="tab-item \${activeTab === 'devices' ? 'active' : ''}" onclick="switchTab('devices')">🖥️ Enrolled Devices</button>
+          <button type="button" data-dashboard-tab="add-device" aria-pressed="\${activeTab === 'add-device'}" class="tab-item \${activeTab === 'add-device' ? 'active' : ''}" onclick="switchTab('add-device')">➕ Add Device</button>
+          <button type="button" data-dashboard-tab="clients" aria-pressed="\${activeTab === 'clients'}" class="tab-item \${activeTab === 'clients' ? 'active' : ''}" onclick="switchTab('clients')">🤖 AI Integrations</button>
+          <button type="button" data-dashboard-tab="audit" aria-pressed="\${activeTab === 'audit'}" class="tab-item \${activeTab === 'audit' ? 'active' : ''}" onclick="switchTab('audit')">📜 Audit Log</button>
+        </nav>
 
         <div id="tabContent">
           \${renderTabContent()}
@@ -98,6 +98,7 @@ export function renderDashboardHtml(
     function switchTab(tab) {
       activeTab = tab;
       renderApp();
+      document.querySelector('[data-dashboard-tab="' + tab + '"]')?.focus({ preventScroll: true });
     }
 
     function renderLanding() {
@@ -162,7 +163,7 @@ export function renderDashboardHtml(
                 </div>
               </div>
               <div style="display:flex; gap:8px; align-items:center;">
-                <select class="btn btn-outline btn-sm" onchange="changePolicy('\${dev.id}', this.value)">
+                <select aria-label="Policy for \${escapeHtml(dev.alias)}" class="btn btn-outline btn-sm" onchange="changePolicy('\${dev.id}', this.value)">
                   <option value="read-only" \${dev.profile === 'read-only' ? 'selected' : ''}>Profile: Read-Only</option>
                   <option value="operations" \${dev.profile === 'operations' ? 'selected' : ''}>Profile: Operations</option>
                   <option value="full-admin" \${dev.profile === 'full-admin' ? 'selected' : ''}>Profile: Full Admin</option>
@@ -181,11 +182,11 @@ export function renderDashboardHtml(
             <p style="color:var(--text-muted); font-size:14px; margin-bottom:24px;">Generate an enrollment token and install the outbound agent on your target server.</p>
             <div style="display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap;">
               <div style="flex:1; min-width:240px;">
-                <label style="display:block; font-size:13px; font-weight:600; margin-bottom:6px;">Device Alias</label>
+                <label for="enrollAlias" style="display:block; font-size:13px; font-weight:600; margin-bottom:6px;">Device Alias</label>
                 <input id="enrollAlias" type="text" placeholder="e.g. production-bastion, home-server" style="width:100%; padding:10px; border-radius:6px; background:#090d13; border:1px solid var(--card-border); color:#fff; font-size:14px;">
               </div>
               <div style="flex:1; min-width:240px;">
-                <label style="display:block; font-size:13px; font-weight:600; margin-bottom:6px;">Initial Policy Profile</label>
+                <label for="enrollProfile" style="display:block; font-size:13px; font-weight:600; margin-bottom:6px;">Initial Policy Profile</label>
                 <select id="enrollProfile" style="width:100%; padding:10px; border-radius:6px; background:#090d13; border:1px solid var(--card-border); color:#fff; font-size:14px;">
                   <option value="read-only" selected>Read-Only (Status, Logs, Read Files)</option>
                   <option value="operations">Operations (Restart Services, Docker, Safe Shell)</option>

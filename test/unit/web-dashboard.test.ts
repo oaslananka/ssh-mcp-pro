@@ -41,6 +41,15 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
         expect(res.body).toContain('id="' + snippetId + '"');
       }
       expect(res.body).not.toContain('"mcp.servers"');
+      expect(res.body).toContain('aria-label="Dashboard sections"');
+      for (const tab of ["devices", "add-device", "clients", "audit"]) {
+        expect(res.body).toContain('data-dashboard-tab="' + tab + '"');
+      }
+      expect(res.body).not.toContain('<div class="tab-item');
+      expect(res.body).toContain("aria-pressed=");
+      expect(res.body).toContain('for="enrollAlias"');
+      expect(res.body).toContain('for="enrollProfile"');
+      expect(res.body).toContain('aria-label="Policy for');
     } finally {
       cp.close();
       rmSync(dir, { recursive: true, force: true });
