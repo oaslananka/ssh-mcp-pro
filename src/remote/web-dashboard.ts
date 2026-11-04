@@ -219,7 +219,7 @@ export class WebDashboardHandler {
       return true;
     }
     if (pathname.startsWith("/api/dashboard/devices/") && req.method === "DELETE") {
-      await this.handleApiRevokeDevice(req, res, pathname);
+      await this.handleApiRemoveDevice(req, res, pathname);
       return true;
     }
     return false;
@@ -487,15 +487,26 @@ export class WebDashboardHandler {
     jsonResponse(res, 200, { device: sanitizeAgent(updated) }, addNoStore());
   }
 
-  private async handleApiRevokeDevice(
+  private async handleApiRemoveDevice(
     req: IncomingMessage,
     res: ServerResponse,
     pathname: string,
   ): Promise<void> {
     const owned = this.findOwnedDashboardDevice(req, res, pathname);
     if (!owned) return;
+    // Revoke and disconnect before destroying the agent record or token hashes.
     const revoked = this.deps.revokeAgent(owned.principal, owned.agent);
-    jsonResponse(res, 200, { device: sanitizeAgent(revoked) }, addNoStore());
+    if (!this.deps.store.removeRevokedAgent(owned.principal.userId, revoked.id)) {
+      throw safeError("AGENT_NOT_FOUND", "Device not found", 404);
+    }
+    this.deps.audit({
+      userId: owned.principal.userId,
+      agentId: revoked.id,
+      eventType: "agent_removed",
+      severity: "warn",
+      metadata: {},
+    });
+    jsonResponse(res, 200, { removed: true, agent_id: revoked.id }, addNoStore());
   }
 
   private handleApiAudit(req: IncomingMessage, res: ServerResponse): void {
