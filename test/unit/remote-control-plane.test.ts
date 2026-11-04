@@ -323,6 +323,80 @@ describe("remote control plane remote-agent contracts", () => {
     }
   });
 
+  test("allows configured Google and GitHub OAuth form redirects in Chromium CSP", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "oauth-form-csp-"));
+    const config = {
+      ...testConfig(dir),
+      githubClientId: "test-github-client",
+      githubClientSecret: "test-github-secret",
+      googleClientId: "test-google-client",
+      googleClientSecret: "test-google-secret",
+    };
+    const controlPlane = new RemoteControlPlane(config);
+    await controlPlane.initialize();
+    try {
+      const registration = captureResponse();
+      await controlPlane.handleHttp(
+        jsonRequest("POST", "/oauth/register", {
+          client_name: "Gemini CSP regression",
+          redirect_uris: ["https://oauth-redirect.googleusercontent.com/callback"],
+        }),
+        registration as ServerResponse,
+        "/oauth/register",
+      );
+      expect(registration.statusCode).toBe(201);
+      const clientId = String(responseBody(registration).client_id);
+
+      for (const [provider, expectedOrigin] of [
+        ["google", "https://accounts.google.com"],
+        ["github", "https://github.com"],
+      ] as const) {
+        const params = new URLSearchParams({
+          response_type: "code",
+          client_id: clientId,
+          redirect_uri: "https://oauth-redirect.googleusercontent.com/callback",
+          code_challenge: sha256Base64Url("verifier".repeat(10)),
+          code_challenge_method: "S256",
+          resource: config.mcpResourceUrl,
+          scope: "hosts:read",
+          state: "csp-test",
+        });
+        const page = captureResponse();
+        await controlPlane.handleHttp(
+          request("GET", "/oauth/authorize?" + params),
+          page as ServerResponse,
+          "/oauth/authorize",
+        );
+        expect(page.statusCode).toBe(200);
+        const csp = String(page.headers?.["Content-Security-Policy"]);
+        expect(csp).toContain("form-action 'self' https://accounts.google.com https://github.com;");
+        expect(csp).not.toContain("oauth-redirect.googleusercontent.com");
+        expect(csp).toContain("default-src 'none'");
+        expect(page.body).toContain('action="/oauth/approve"');
+
+        const transaction = /name="transaction" value="([^"]+)"/u.exec(page.body)?.[1];
+        expect(transaction).toBeTruthy();
+        const cookie = String(page.headers?.["Set-Cookie"]).split(";")[0];
+        const approval = captureResponse();
+        await controlPlane.handleHttp(
+          request(
+            "POST",
+            "/oauth/approve",
+            new URLSearchParams({ transaction: transaction!, provider }).toString(),
+            { cookie, "content-type": "application/x-www-form-urlencoded" },
+          ),
+          approval as ServerResponse,
+          "/oauth/approve",
+        );
+        expect(approval.statusCode).toBe(302);
+        expect(new URL(String(approval.headers?.Location)).origin).toBe(expectedOrigin);
+      }
+    } finally {
+      controlPlane.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("rejects invalid OAuth requests and exchanges GitHub callbacks", async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-control-plane-"));
     const originalFetch = globalThis.fetch;
@@ -540,6 +614,9 @@ describe("remote control plane remote-agent contracts", () => {
       );
       expect(githubRedirect.statusCode).toBe(200);
       expect(githubRedirect.body).toContain("Continue with GitHub");
+      const githubOnlyCsp = String(githubRedirect.headers?.["Content-Security-Policy"]);
+      expect(githubOnlyCsp).toContain("form-action 'self' https://github.com;");
+      expect(githubOnlyCsp).not.toContain("https://accounts.google.com");
       const cookie = String(githubRedirect.headers?.["Set-Cookie"]).split(";")[0] ?? "";
       const transaction =
         /name="transaction" value="([^"]+)"/u.exec(githubRedirect.body)?.[1] ?? "";
