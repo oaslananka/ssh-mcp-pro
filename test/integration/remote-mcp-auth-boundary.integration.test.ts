@@ -7,7 +7,9 @@ import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/cli
 import { afterEach, describe, expect, test } from "vitest";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
 import { loadRemoteConfig } from "../../src/remote/config.js";
-import { issueAccessToken, loadJwtKeyPair } from "../../src/remote/crypto.js";
+import { issueAccessToken, loadJwtKeyPair, nowIso } from "../../src/remote/crypto.js";
+import { createAgentPolicy } from "../../src/remote/policy.js";
+import type { RemoteScope } from "../../src/remote/types.js";
 
 type Harness = {
   endpoint: string;
@@ -95,6 +97,21 @@ async function issueToken(harness: Harness, scope: "hosts:read" | "shell:exec") 
   return result.token;
 }
 
+async function issueOwnerToken(
+  harness: Harness,
+  githubId: string,
+  scopes: RemoteScope[],
+): Promise<string> {
+  const keyPair = await loadJwtKeyPair(harness.config.jwtSigningKeyPath);
+  const result = await issueAccessToken(
+    harness.config,
+    keyPair,
+    { id: "github:" + githubId, githubId, githubLogin: "owner-" + githubId },
+    scopes,
+  );
+  return result.token;
+}
+
 async function invoke(
   harness: Harness,
   method: string,
@@ -178,6 +195,95 @@ describe("remote-agent MCP real HTTP authorization boundary", () => {
     expect(hostsCall.body).toMatchObject({
       result: { structuredContent: { hosts: [] } },
     });
+  });
+
+  test("isolates two bearer-token tenants across MCP lists, agent management and audits", async () => {
+    const harness = await startHarness();
+    const policy = createAgentPolicy("read-only");
+    const createdAt = nowIso();
+    const owners = [
+      { githubId: "101", userId: "github:101", agentId: "agt_first", eventId: "aud_first" },
+      { githubId: "202", userId: "github:202", agentId: "agt_second", eventId: "aud_second" },
+    ];
+
+    for (const owner of owners) {
+      harness.controlPlane.store.insertAgent({
+        id: owner.agentId,
+        userId: owner.userId,
+        alias: "same-alias",
+        status: "offline",
+        profile: policy.profile,
+        policy,
+        policyVersion: policy.version,
+        createdAt,
+        updatedAt: createdAt,
+      });
+      harness.controlPlane.store.insertAudit({
+        id: owner.eventId,
+        userId: owner.userId,
+        agentId: owner.agentId,
+        eventType: "tenant_test",
+        severity: "info",
+        metadata: { tenant: owner.githubId },
+        createdAt,
+      });
+    }
+
+    const scopes: RemoteScope[] = ["hosts:read", "agents:read", "agents:admin"];
+    const tokens = await Promise.all(
+      owners.map((owner) => issueOwnerToken(harness, owner.githubId, scopes)),
+    );
+
+    for (const [index, owner] of owners.entries()) {
+      const token = tokens[index]!;
+      const other = owners[1 - index]!;
+
+      for (const [tool, key] of [
+        ["list_hosts", "hosts"],
+        ["list_agents", "agents"],
+      ] as const) {
+        const response = await invoke(harness, "tools/call", { name: tool, arguments: {} }, token);
+        expect(response.status).toBe(200);
+        const data = (response.body.result as { structuredContent: Record<string, unknown> })
+          .structuredContent;
+        const devices = data[key] as Array<{ id: string; alias: string }>;
+        expect(devices).toHaveLength(1);
+        expect(devices[0]).toMatchObject({ id: owner.agentId, alias: "same-alias" });
+        expect(JSON.stringify(devices)).not.toContain(other.agentId);
+      }
+
+      const audit = await invoke(
+        harness,
+        "tools/call",
+        { name: "get_audit_events", arguments: {} },
+        token,
+      );
+      expect(audit.status).toBe(200);
+      const events = (audit.body.result as { structuredContent: { events: Array<{ id: string }> } })
+        .structuredContent.events;
+      expect(events.map((event) => event.id)).toContain(owner.eventId);
+      expect(events.map((event) => event.id)).not.toContain(other.eventId);
+
+      for (const tool of ["get_agent_install_command", "update_agent_policy", "revoke_agent"]) {
+        const foreign = await invoke(
+          harness,
+          "tools/call",
+          {
+            name: tool,
+            arguments: {
+              agent_id_or_alias: other.agentId,
+              ...(tool === "update_agent_policy" ? { policy: { profile: "full-admin" } } : {}),
+            },
+          },
+          token,
+        );
+        expect(foreign.status).toBe(200);
+        expect(foreign.body.error).toMatchObject({
+          data: { code: "AGENT_NOT_FOUND" },
+        });
+      }
+      expect(harness.controlPlane.store.getAgent(other.agentId)?.status).toBe("offline");
+    }
   });
 
   test("auto-negotiating SDK clients can use legacy remote MCP without privilege escalation", async () => {
