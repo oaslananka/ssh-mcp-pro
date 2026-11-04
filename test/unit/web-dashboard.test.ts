@@ -30,6 +30,12 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(res.body).toContain("ssh-mcp-pro");
       expect(res.body).toContain("Sign in with Google");
       expect(res.body).toContain("Sign in with GitHub");
+      for (const snippetId of ["cfgClaudeRemote", "cfgClaudeCode", "cfgChatGptMcp"]) {
+        expect(res.body).toContain('id="' + snippetId + '"');
+      }
+      expect(res.body).toContain("Add custom connector");
+      expect(res.body).toContain("Add custom MCP server");
+      expect(res.body).not.toContain("ChatGPT Actions / MCP Connector");
       for (const snippetId of ["cfgVsCode", "cfgCursor", "cfgWindsurf"]) {
         expect(res.body).toContain('id="' + snippetId + '"');
       }
@@ -84,9 +90,12 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(handled).toBe(true);
       expect(res.statusCode).toBe(200);
       const parsed = JSON.parse(res.body);
-      expect(parsed.clients.claudeDesktopRemote.mcpServers["ssh-mcp-pro"].transport).toBe(
-        "streamable-http",
+      expect(parsed.clients.claudeRemoteConnector.serverUrl).toBe("http://127.0.0.1:3000/mcp");
+      expect(parsed.clients.claudeCodeRemote.command).toBe(
+        "claude mcp add --transport http ssh-mcp-pro http://127.0.0.1:3000/mcp",
       );
+      expect(parsed.clients.chatgptMcpPlugin.serverUrl).toBe("http://127.0.0.1:3000/mcp");
+      expect(parsed.clients).not.toHaveProperty("chatgptCustomGpt");
       expect(parsed.clients.claudeDesktopLocal.mcpServers["ssh-mcp-pro"].command).toBe(
         "ssh-mcp-pro",
       );
