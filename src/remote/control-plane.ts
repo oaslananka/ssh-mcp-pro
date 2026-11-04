@@ -129,6 +129,14 @@ export class RemoteControlPlane {
   private cleanupEphemeralState(now = Date.now()): void {
     this.oauth.cleanupExpired(now);
     this.agentHandler.cleanupEphemeralState(now);
+    try {
+      // Reuse the existing minute timer, avoiding another background worker.
+      this.store.pruneExpiredTransientRecords(new Date(now).toISOString());
+    } catch {
+      // A storage maintenance failure must not terminate the live MCP server.
+      // The following cleanup tick retries without logging sensitive data.
+      console.error("Remote transient credential cleanup failed; will retry");
+    }
   }
 
   private async handleOAuthRequest(

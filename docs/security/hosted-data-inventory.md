@@ -27,13 +27,15 @@ in the action table.
 ## Expiration and erasure: observed behavior
 
 - Dashboard cookies and session records are valid for 24 hours. Logout
-  deletes the current database session; expiry checks reject older records,
-  but **do not automatically remove expired SQLite rows**.
+  deletes the current session, while periodic maintenance also deletes
+  session rows whose expiration time has passed.
 - OAuth authorization codes and device enrollment tokens expire logically
-  and can be used only once; this does **not** demonstrate that expired
-  database rows are purged.
-- The existing periodic cleanup clears certain **in-memory** OAuth and
-  connection state, not the database's entire user/action/audit history.
+  and can be used only once. The existing minute maintenance tick also
+  removes physically expired code/token rows. Non-expired rows are retained
+  even if already used.
+- The periodic cleanup also clears in-memory OAuth and connection state.
+  It does **not** impose automatic retention/deletion on users, OAuth
+  clients, devices, action history, audit events or infrastructure logs.
 - Dashboard **Remove device** revokes/disconnects that device, then deletes
   the device row, associated enrollment token records and its action rows.
   **Audit events remain** for security review. **Revoke** by itself
