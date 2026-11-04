@@ -121,7 +121,7 @@ export function renderDashboardHtml(
         <div class="grid-2">
           <div class="card">
             <h3 style="margin-bottom:8px; color:var(--blue);">🌐 Remote Streamable HTTP (OAuth 2.1)</h3>
-            <p style="font-size:14px; color:var(--text-muted); margin-bottom:12px;">Connect AI clients (ChatGPT Actions, Claude Desktop, Gemini) through a single HTTPS endpoint with cryptographic policy enforcement.</p>
+            <p style="font-size:14px; color:var(--text-muted); margin-bottom:12px;">Connect supported MCP clients (ChatGPT plugins, Claude connectors, Gemini) through the HTTPS endpoint with OAuth policy enforcement.</p>
             <div class="code-box">\${MCP_URL}</div>
           </div>
           <div class="card">
@@ -234,20 +234,22 @@ export function renderDashboardHtml(
                 <span style="font-size:24px;">🤖</span>
                 <h3>Claude Desktop & Claude Code</h3>
               </div>
-              <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Add this server to your <code>claude_desktop_config.json</code>:</p>
-              <div style="font-size:12px; font-weight:700; color:var(--blue);">Remote Streamable HTTP (OAuth 2.1):</div>
-              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgClaudeRemote')">Copy</button><span id="cfgClaudeRemote">{\\n  "mcpServers": {\\n    "ssh-mcp-pro": {\\n      "url": "\${MCP_URL}",\\n      "transport": "streamable-http"\\n    }\\n  }\\n}</span></div>
-              <div style="font-size:12px; font-weight:700; color:#7ee787; margin-top:12px;">Local Stdio (Unrestricted):</div>
+              <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">For remote access in Claude or Claude Desktop: <strong>Customize &gt; Connectors &gt; Add custom connector</strong>, enter this URL, then sign in. Local Desktop servers still use <code>claude_desktop_config.json</code>.</p>
+              <div style="font-size:12px; font-weight:700; color:var(--blue);">Claude remote custom connector URL:</div>
+              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgClaudeRemote')">Copy</button><span id="cfgClaudeRemote">\${MCP_URL}</span></div>
+              <div style="font-size:12px; font-weight:700; color:var(--blue); margin-top:12px;">Claude Code remote (run in a terminal):</div>
+              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgClaudeCode')">Copy</button><span id="cfgClaudeCode">claude mcp add --transport http ssh-mcp-pro \${MCP_URL}</span></div>
+              <div style="font-size:12px; font-weight:700; color:#7ee787; margin-top:12px;">Claude Desktop local stdio:</div>
               <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgClaudeLocal')">Copy</button><span id="cfgClaudeLocal">{\\n  "mcpServers": {\\n    "ssh-mcp-pro": {\\n      "command": "ssh-mcp-pro",\\n      "args": []\\n    }\\n  }\\n}</span></div>
             </div>
 
             <div class="card">
               <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
                 <span style="font-size:24px;">💬</span>
-                <h3>ChatGPT Actions / MCP Connector</h3>
+                <h3>ChatGPT MCP Plugin</h3>
               </div>
-              <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Connect in ChatGPT Custom GPTs or Connected Apps using the OAuth 2.1 Authorization Code flow:</p>
-              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgChatGpt')">Copy</button><span id="cfgChatGpt">Server URL: \${MCP_URL}\\nAuthorization URL: \${PUBLIC_URL}/oauth/authorize\\nToken URL: \${PUBLIC_URL}/oauth/token\\nScope: hosts:read agents:read status:read logs:read</span></div>
+              <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">In supported ChatGPT workspaces, open <strong>Plugins &gt; Add custom MCP server</strong>, paste the URL below and configure OAuth. Custom GPT Actions are a separate OpenAPI-based feature.</p>
+              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgChatGptMcp')">Copy</button><span id="cfgChatGptMcp">\${MCP_URL}</span></div>
             </div>
 
             <div class="card">

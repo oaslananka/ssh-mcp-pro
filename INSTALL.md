@@ -291,10 +291,29 @@ The `codex mcp add` commands in the Codex Setup section remain correct for
 Codex-based workspace agents and intentionally keep the existing `ssh-mcp`
 Codex alias. For GitHub Copilot CLI, use `copilot mcp add`.
 
-## Claude Desktop, Antigravity, and Other MCP Clients
+## Claude, ChatGPT, and Other MCP Clients
 
-For any MCP client that supports launching a stdio server, register `ssh-mcp-pro`
-as the command.
+For **remote Claude or Claude Desktop**, open **Customize > Connectors > Add
+custom connector** and enter your public HTTPS MCP endpoint (for example,
+`https://ssh-mcp-pro.oaslananka.dev/mcp`). Complete OAuth sign-in when prompted.
+Unlike a local Desktop server, a remote connector is configured in the Claude
+account, **not** in `claude_desktop_config.json`.
+
+For **Claude Code** with remote Streamable HTTP, run:
+
+```bash
+claude mcp add --transport http ssh-mcp-pro https://ssh-mcp-pro.oaslananka.dev/mcp
+```
+
+Then use `/mcp` in Claude Code to authenticate and check server status.
+
+For **ChatGPT**, supported workspaces can open **Plugins > Add custom MCP server**
+and enter the HTTPS endpoint with OAuth. Do **not** use the Custom GPT Actions
+editor for an MCP server URL: GPT Actions require an OpenAPI specification.
+
+For **local stdio** in Claude Desktop, Antigravity, or other compatible clients,
+register `ssh-mcp-pro` as the command. Pick the configuration schema required
+by that specific client.
 
 Example `servers` schema:
 

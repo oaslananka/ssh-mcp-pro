@@ -7,13 +7,13 @@ export function createDashboardClientConfigs(publicUrl: string, mcpUrl: string) 
       auth: "OAuth 2.1 PKCE (RFC 9728 & RFC 8414)",
     },
     clients: {
-      claudeDesktopRemote: {
-        mcpServers: {
-          "ssh-mcp-pro": {
-            url: mcpUrl,
-            transport: "streamable-http",
-          },
-        },
+      claudeRemoteConnector: {
+        serverUrl: mcpUrl,
+        setup: "Claude > Customize > Connectors > Add custom connector",
+        authentication: "OAuth via server metadata discovery",
+      },
+      claudeCodeRemote: {
+        command: `claude mcp add --transport http ssh-mcp-pro ${mcpUrl}`,
       },
       claudeDesktopLocal: {
         mcpServers: {
@@ -23,12 +23,10 @@ export function createDashboardClientConfigs(publicUrl: string, mcpUrl: string) 
           },
         },
       },
-      chatgptCustomGpt: {
-        actionServerUrl: mcpUrl,
-        authentication: "OAuth 2.0 (Authorization Code + PKCE)",
-        authorizationUrl: `${publicUrl}/oauth/authorize`,
-        tokenUrl: `${publicUrl}/oauth/token`,
-        scope: "hosts:read agents:read status:read logs:read",
+      chatgptMcpPlugin: {
+        serverUrl: mcpUrl,
+        setup: "ChatGPT > Plugins > Add custom MCP server",
+        authentication: "OAuth via server metadata discovery",
       },
       geminiExtension: {
         mcpEndpoint: mcpUrl,
