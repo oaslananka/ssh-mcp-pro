@@ -69,7 +69,8 @@ function captureResponse(): CapturedResponse {
     body: "",
     writeHead(status: number, headers: Record<string, string> = {}) {
       this.statusCode = status;
-      this.headers = headers;
+      // Node merges earlier setHeader() calls with writeHead() headers.
+      this.headers = { ...this.headers, ...headers };
     },
     setHeader(name: string, value: string) {
       this.headers = { ...this.headers, [name]: value };
@@ -319,6 +320,42 @@ describe("remote control plane remote-agent contracts", () => {
         delete process.env.SSHAUTOMATOR_TEST_GITHUB_LOGIN;
       } else {
         process.env.SSHAUTOMATOR_TEST_GITHUB_LOGIN = savedTestLogin;
+      }
+    }
+  });
+
+  test("advertises HSTS for HTTPS deployments, not HTTP-only development", async () => {
+    for (const protocol of ["http", "https"] as const) {
+      const dir = mkdtempSync(path.join(os.tmpdir(), "ssh-mcp-hsts-"));
+      const base = protocol + "://mcp.example.test";
+      const controlPlane = new RemoteControlPlane({
+        ...testConfig(dir),
+        publicBaseUrl: base,
+        mcpResourceUrl: base + "/mcp",
+        githubCallbackUrl: base + "/oauth/callback/github",
+      });
+      await controlPlane.initialize();
+      try {
+        for (const endpoint of ["/readyz", "/.well-known/oauth-protected-resource", "/"]) {
+          const response = captureResponse();
+          expect(
+            await controlPlane.handleHttp(
+              request("GET", endpoint),
+              response as ServerResponse,
+              endpoint,
+            ),
+          ).toBe(true);
+          expect(response.statusCode).toBe(200);
+          const hsts = response.headers?.["Strict-Transport-Security"];
+          if (protocol === "https") {
+            expect(hsts).toBe("max-age=31536000");
+          } else {
+            expect(hsts).toBeUndefined();
+          }
+        }
+      } finally {
+        controlPlane.close();
+        rmSync(dir, { recursive: true, force: true });
       }
     }
   });
