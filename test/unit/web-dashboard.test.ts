@@ -48,10 +48,14 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(res.body).toContain("the URL alone does not authenticate");
       expect(res.body).toContain("Copilot portable");
       const parseSetupSnippet = (id: string) => {
-        const match = new RegExp('<span id="' + id + '">([\\s\\S]*?)</span>', "u").exec(res.body);
-        expect(match).not.toBeNull();
+        const marker = '<span id="' + id + '">';
+        const start = res.body.indexOf(marker);
+        expect(start).toBeGreaterThanOrEqual(0);
+        const end = res.body.indexOf("</span>", start + marker.length);
+        expect(end).toBeGreaterThan(start);
         return JSON.parse(
-          match![1]
+          res.body
+            .slice(start + marker.length, end)
             .replace(/\\n/gu, "\n")
             .replaceAll("$" + "{MCP_URL}", "http://127.0.0.1:3000/mcp"),
         );
