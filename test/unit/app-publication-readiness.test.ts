@@ -66,6 +66,14 @@ function runValidation(
   }
 }
 
+function markLegalDocsReviewed(readiness: Readiness) {
+  readiness.submission.privacyPolicyReviewed = true;
+  (readiness as Readiness & { privacyUrl: string; termsUrl: string }).privacyUrl =
+    "https://example.org/privacy";
+  (readiness as Readiness & { privacyUrl: string; termsUrl: string }).termsUrl =
+    "https://example.org/terms";
+}
+
 describe("app publication readiness guard", () => {
   test.each(fixtures)("$name: unpublished metadata still validates", (fixture) => {
     const result = runValidation(fixture);
@@ -80,9 +88,39 @@ describe("app publication readiness guard", () => {
     expect(result.stderr).toContain("publishReady must be an explicit boolean");
   });
 
+  test.each(fixtures)("$name: inaccurate policy links fail publication", (fixture) => {
+    const result = runValidation(fixture, (r) => {
+      r.publishReady = true;
+      r.submission.privacyPolicyReviewed = true;
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("privacyUrl must link to a dedicated HTTPS policy document");
+  });
+
+  test("a security advisory page cannot replace a privacy notice", () => {
+    const result = runValidation(fixtures[0], (r) => {
+      r.publishReady = true;
+      markLegalDocsReviewed(r);
+      (r as Readiness & { privacyUrl: string }).privacyUrl = "https://example.org/SECURITY.md";
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("privacyUrl must link to a dedicated HTTPS policy document");
+  });
+
+  test("an open-source license cannot replace hosted-service terms", () => {
+    const result = runValidation(fixtures[1], (r) => {
+      r.publishReady = true;
+      markLegalDocsReviewed(r);
+      (r as Readiness & { termsUrl: string }).termsUrl = "https://example.org/LICENSE";
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("termsUrl must link to a dedicated HTTPS policy document");
+  });
+
   test("ChatGPT: unpublished domain verification is a blocker", () => {
     const result = runValidation(fixtures[0], (r) => {
       r.publishReady = true;
+      markLegalDocsReviewed(r);
     });
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("submission.domainVerificationConfigured");
@@ -91,6 +129,7 @@ describe("app publication readiness guard", () => {
   test("ChatGPT: screenshots are independently required", () => {
     const result = runValidation(fixtures[0], (r) => {
       r.publishReady = true;
+      markLegalDocsReviewed(r);
       r.submission.domainVerificationConfigured = true;
     });
     expect(result.status).not.toBe(0);
@@ -100,6 +139,7 @@ describe("app publication readiness guard", () => {
   test("Gemini: incomplete OAuth blocks a publication-ready claim", () => {
     const result = runValidation(fixtures[2], (r) => {
       r.publishReady = true;
+      markLegalDocsReviewed(r);
     });
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("submission.oauthConfigured");
@@ -108,6 +148,7 @@ describe("app publication readiness guard", () => {
   test("an insecure HTTP MCP endpoint cannot be declared publication-ready", () => {
     const result = runValidation(fixtures[1], (r) => {
       r.publishReady = true;
+      markLegalDocsReviewed(r);
       r.submission.publicHttpsMcpEndpoint = "http://localhost:3000/mcp";
     });
     expect(result.status).not.toBe(0);
@@ -117,6 +158,7 @@ describe("app publication readiness guard", () => {
   test("an explicitly completed checklist passes metadata validation", () => {
     const result = runValidation(fixtures[0], (r) => {
       r.publishReady = true;
+      markLegalDocsReviewed(r);
       r.submission.domainVerificationConfigured = true;
       r.submission.screenshotsPrepared = true;
     });

@@ -5,8 +5,8 @@
   "automationRepository": "https://github.com/oaslananka/ssh-mcp-pro",
   "supportUrl": "https://github.com/oaslananka/ssh-mcp-pro/issues",
   "securityUrl": "https://github.com/oaslananka/ssh-mcp-pro/security/advisories/new",
-  "privacyUrl": "https://github.com/oaslananka/ssh-mcp-pro/blob/main/SECURITY.md",
-  "termsUrl": "https://github.com/oaslananka/ssh-mcp-pro/blob/main/LICENSE",
+  "privacyUrl": "",
+  "termsUrl": "",
   "mcp": {
     "serverName": "io.github.oaslananka/ssh-mcp-pro",
     "packageName": "ssh-mcp-pro",
@@ -45,7 +45,7 @@
     "publicHttpsMcpEndpoint": "https://ssh-mcp-pro.oaslananka.dev/mcp",
     "oauthConfigured": true,
     "allowedOriginsConfigured": true,
-    "privacyPolicyReviewed": true,
+    "privacyPolicyReviewed": false,
     "supportContactConfigured": true,
     "reviewTestCasesPrepared": true
   },
