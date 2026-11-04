@@ -501,6 +501,34 @@ export class RemoteStore {
     return row ? this.agentFromRow(row) : undefined;
   }
 
+  /**
+   * Discard a revoked device and enrollment/action data, while preserving
+   * independent audit events for security review.
+   */
+  removeRevokedAgent(userId: string, agentId: string): boolean {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const removed = this.db
+        .prepare("DELETE FROM agents WHERE id = ? AND user_id = ? AND status = 'revoked'")
+        .run(agentId, userId);
+      if (Number(removed.changes) !== 1) {
+        this.db.exec("ROLLBACK");
+        return false;
+      }
+      this.db
+        .prepare("DELETE FROM agent_enrollment_tokens WHERE user_id = ? AND agent_id = ?")
+        .run(userId, agentId);
+      this.db
+        .prepare("DELETE FROM actions WHERE user_id = ? AND agent_id = ?")
+        .run(userId, agentId);
+      this.db.exec("COMMIT");
+      return true;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   getAgentByAlias(userId: string, alias: string): RemoteAgentRecord | undefined {
     const row = this.db
       .prepare("SELECT * FROM agents WHERE user_id = ? AND alias = ?")

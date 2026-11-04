@@ -5,6 +5,7 @@ import type { ServerResponse } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
+import { hashSecret } from "../../src/remote/crypto.js";
 import {
   captureResponse,
   jsonRequest,
@@ -260,7 +261,9 @@ INSTALLER
       expect(listData.devices).toHaveLength(1);
       expect(listData.devices[0].alias).toBe("test-vps");
 
-      // 5. Revoke device
+      // 5. Remove device: revoke access and discard stored inventory/credentials.
+      const originalEnrollmentHash = hashSecret(enrollData.enrollment_token);
+      expect(cp.store.getEnrollmentTokenByHash(originalEnrollmentHash)).toBeDefined();
       const revokeRes = captureResponse();
       await cp.handleHttp(
         request("DELETE", `/api/dashboard/devices/${listData.devices[0].id}`, {
@@ -272,6 +275,40 @@ INSTALLER
         `/api/dashboard/devices/${listData.devices[0].id}`,
       );
       expect(revokeRes.statusCode).toBe(200);
+      expect(JSON.parse(revokeRes.body)).toMatchObject({
+        removed: true,
+        agent_id: listData.devices[0].id,
+      });
+      expect(cp.store.getAgent(listData.devices[0].id)).toBeUndefined();
+      expect(cp.store.getEnrollmentTokenByHash(originalEnrollmentHash)).toBeUndefined();
+      const listedAgain = captureResponse();
+      await cp.handleHttp(
+        request("GET", "/api/dashboard/devices", { cookie: `ssh_mcp_web_session=${token}` }),
+        listedAgain as unknown as ServerResponse,
+        "/api/dashboard/devices",
+      );
+      expect(JSON.parse(listedAgain.body).devices).toEqual([]);
+      expect(
+        cp.store.listAudit(meData.user.id, undefined, 20).map((event) => event.eventType),
+      ).toEqual(expect.arrayContaining(["agent_revoked", "agent_removed"]));
+
+      const reenroll = captureResponse();
+      await cp.handleHttp(
+        jsonRequest(
+          "POST",
+          "/api/dashboard/devices/enroll",
+          { alias: "test-vps", requested_profile: "read-only" },
+          {
+            cookie: `ssh_mcp_web_session=${token}`,
+            origin: "http://127.0.0.1:3000",
+            "x-ssh-mcp-dashboard": "1",
+          },
+        ),
+        reenroll as unknown as ServerResponse,
+        "/api/dashboard/devices/enroll",
+      );
+      expect(reenroll.statusCode).toBe(201);
+      expect(JSON.parse(reenroll.body).agent_id).not.toBe(listData.devices[0].id);
 
       // 6. Sign out
       const logoutRes = captureResponse();

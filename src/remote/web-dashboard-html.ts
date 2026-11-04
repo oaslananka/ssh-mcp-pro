@@ -167,7 +167,7 @@ export function renderDashboardHtml(
                   <option value="operations" \${dev.profile === 'operations' ? 'selected' : ''}>Profile: Operations</option>
                   <option value="full-admin" \${dev.profile === 'full-admin' ? 'selected' : ''}>Profile: Full Admin</option>
                 </select>
-                <button class="btn btn-danger btn-sm" onclick="revokeDevice('\${dev.id}')">Revoke</button>
+                <button class="btn btn-danger btn-sm" onclick="removeDevice('\${dev.id}')">Remove device</button>
               </div>
             </div>
           </div>
@@ -381,8 +381,8 @@ export function renderDashboardHtml(
       }
     }
 
-    async function revokeDevice(id) {
-      if (!confirm('Revoke this device? The agent will be disconnected and unable to reconnect.')) return;
+    async function removeDevice(id) {
+      if (!confirm('Remove this device? Access will be revoked and its device record permanently deleted. Audit history is retained.')) return;
       try {
         const res = await fetch('/api/dashboard/devices/' + id, {
           method: 'DELETE',
@@ -391,7 +391,7 @@ export function renderDashboardHtml(
         if (res.ok) {
           loadDevices();
         } else {
-          alert('Failed to revoke device');
+          alert('Failed to remove device');
         }
       } catch (e) {
         alert('Error: ' + e.message);
