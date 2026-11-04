@@ -109,7 +109,7 @@
         "npm"
       ],
       "minimumReleaseAge": "7 days",
-      "prCreation": "not-pending",
+      "prCreation": "immediate",
       "internalChecksFilter": "strict",
       "addLabels": [
         "javascript"
@@ -121,7 +121,7 @@
         "github-actions"
       ],
       "minimumReleaseAge": "7 days",
-      "prCreation": "not-pending",
+      "prCreation": "immediate",
       "internalChecksFilter": "strict",
       "pinDigests": true,
       "groupName": "GitHub Actions",

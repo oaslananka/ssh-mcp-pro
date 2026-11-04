@@ -15,6 +15,9 @@ const renovate = JSON.parse(fs.readFileSync("renovate.json", "utf8")) as {
     matchCurrentVersion?: string;
     matchPackageNames?: string[];
     addLabels?: string[];
+    minimumReleaseAge?: string;
+    internalChecksFilter?: string;
+    prCreation?: string;
   }>;
 };
 const mergify = fs.readFileSync(".mergify.yml", "utf8");
@@ -52,6 +55,20 @@ describe("Renovate and Mergify dependency convergence", () => {
     );
     expect(renovate.lockFileMaintenance.addLabels).not.toContain("automerge:enabled");
     expect(renovate.automerge).toBe(false);
+  });
+
+  test("creates eligible bot PRs when CI runs only on pull requests", () => {
+    for (const description of [
+      "Apply npm release-age guard to reduce supply-chain churn.",
+      "Pin and group non-major GitHub Actions updates.",
+    ]) {
+      const guarded = rule(description);
+      // PR-triggered CI has no branch checks: not-pending can defer PRs indefinitely.
+      expect(guarded.prCreation).toBe("immediate");
+      expect(guarded.internalChecksFilter).toBe("strict");
+      expect(guarded.minimumReleaseAge).toBe("7 days");
+    }
+    expect(renovate.prConcurrentLimit).toBeLessThanOrEqual(3);
   });
 
   test("keeps runtime, major and vulnerability changes out of automatic merges", () => {
