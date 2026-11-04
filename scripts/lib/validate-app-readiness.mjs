@@ -24,6 +24,42 @@ export function validateAppReadiness({ file, displayName, profile, kind }) {
     );
   }
 
+  assertValid(
+    typeof readiness.publishReady === "boolean",
+    displayName + " publishReady must be an explicit boolean.",
+  );
+
+  // The metadata validator must accept intentional pre-release drafts, but
+  // a positive publication claim needs every existing project attestation.
+  if (readiness.publishReady) {
+    const submission = readiness.submission;
+    assertValid(
+      submission && typeof submission === "object",
+      displayName + " submission checklist is required for publishReady.",
+    );
+    const shared = ["oauthConfigured", "privacyPolicyReviewed", "reviewTestCasesPrepared"];
+    const specific =
+      kind === "app"
+        ? [
+            "dashboardConfigured",
+            "domainVerificationConfigured",
+            "componentCspConfigured",
+            "screenshotsPrepared",
+          ]
+        : ["allowedOriginsConfigured", "supportContactConfigured"];
+    for (const field of [...shared, ...specific]) {
+      assertValid(
+        submission[field] === true,
+        displayName + " submission." + field + " must be true before publication.",
+      );
+    }
+    assertValid(
+      typeof submission.publicHttpsMcpEndpoint === "string" &&
+        /^https:\/\/[^\s/]+\/mcp$/u.test(submission.publicHttpsMcpEndpoint),
+      displayName + " submission.publicHttpsMcpEndpoint must be an HTTPS MCP URL.",
+    );
+  }
+
   if (kind === "app") {
     assertValid(
       readiness.app?.defaultProfile === profile,
