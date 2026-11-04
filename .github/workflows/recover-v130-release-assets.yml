@@ -27,7 +27,7 @@ jobs:
       RECOVERY_TAG_SHA: a7929197bcc367a9d47cd728b0d0c051a74ec097
       RECOVERY_SOURCE_SHA: f262e93c10465a96a002ee27c8dd77e69ad62dcb
       RECOVERY_RUN_ID: "41403107666"
-      PNPM_VERSION: 11.28.5
+      PNPM_VERSION: 11.28.9
     steps:
       - name: Checkout current main history
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
