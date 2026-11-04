@@ -9,6 +9,7 @@
 </p>
 
 [![GitGem](https://gitgem.org/api/badge/github/oaslananka/ssh-mcp-pro.svg)](https://gitgem.org/github/oaslananka/ssh-mcp-pro)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/oaslananka/ssh-mcp-pro)
 
 <p align="center">
   <a href="https://www.buymeacoffee.com/oaslananka">
