@@ -1,6 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { describe, expect, test } from "vitest";
 import { createAgentPolicy } from "../../src/remote/policy.js";
 import { RemoteStore } from "../../src/remote/store.js";
@@ -27,6 +28,98 @@ describe("remote durable store", () => {
           loadSqlite: () => ({ DatabaseSync: undefined }),
         }),
     ).toThrow("See ARCHITECTURE.md for the better-sqlite3 fallback path.");
+  });
+
+  test("physically prunes only expired session, auth-code and enrollment rows", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "ssh-mcp-expiry-"));
+    const databasePath = path.join(dir, "expiry.db");
+    const store = new RemoteStore("file:" + databasePath);
+    const before = "2026-01-01T00:04:59.999Z";
+    const cutoff = "2026-01-01T00:05:00.000Z";
+    const after = "2026-01-01T00:05:00.001Z";
+    try {
+      store.upsertUser({ internalId: "usr_expiry", id: "provider_expiry", login: "tester", now });
+      store.insertAudit({
+        id: "aud_expiry",
+        userId: "usr_expiry",
+        eventType: "agent_enrolled",
+        severity: "info",
+        metadata: { test: true },
+        createdAt: before,
+      });
+      store.insertClient({
+        id: "client_row",
+        clientId: "client_expiry",
+        clientName: "Test Client",
+        redirectUris: ["https://example.org/callback"],
+        grantTypes: ["authorization_code"],
+        responseTypes: ["code"],
+        tokenEndpointAuthMethod: "none",
+        createdAt: before,
+      });
+
+      for (const [suffix, expiresAt] of [
+        ["old", before],
+        ["edge", cutoff],
+        ["live", after],
+      ]) {
+        store.createDashboardSession("session_" + suffix, "usr_expiry", expiresAt, before);
+        store.insertAuthorizationCode({
+          id: "code_" + suffix,
+          codeHash: "codehash_" + suffix,
+          clientId: "client_expiry",
+          userId: "usr_expiry",
+          redirectUri: "https://example.org/callback",
+          codeChallenge: "pkce",
+          codeChallengeMethod: "S256",
+          resource: "https://example.org/mcp",
+          scope: "hosts:read",
+          expiresAt,
+          createdAt: before,
+        });
+        store.insertEnrollmentToken({
+          id: "enroll_" + suffix,
+          agentId: "device_expiry",
+          userId: "usr_expiry",
+          tokenHash: "enrollhash_" + suffix,
+          expiresAt,
+          createdAt: before,
+        });
+      }
+      // Even a consumed token is not deleted early solely because it was used.
+      store.markAuthorizationCodeUsed("codehash_live", before);
+      store.markEnrollmentTokenUsed("enrollhash_live", before);
+
+      store.pruneExpiredTransientRecords(cutoff);
+      store.pruneExpiredTransientRecords(cutoff); // safe to retry
+
+      const database = new DatabaseSync(databasePath);
+      try {
+        for (const [table, prefix] of [
+          ["dashboard_sessions", "session_"],
+          ["oauth_authorization_codes", "code_"],
+          ["agent_enrollment_tokens", "enroll_"],
+        ]) {
+          const column = table === "dashboard_sessions" ? "token_hash" : "id";
+          const rows = database.prepare("SELECT " + column + " FROM " + table).all();
+          expect(rows.map((row) => row[column])).toEqual([prefix + "live"]);
+        }
+      } finally {
+        database.close();
+      }
+
+      expect(store.getDashboardSession("session_live", cutoff)).toEqual({
+        userId: "usr_expiry",
+      });
+      expect(store.getAuthorizationCodeByHash("codehash_live")?.usedAt).toBe(before);
+      expect(store.getEnrollmentTokenByHash("enrollhash_live")?.usedAt).toBe(before);
+      expect(store.getUserByGitHubId("provider_expiry")?.id).toBe("usr_expiry");
+      expect(store.getClient("client_expiry")?.clientName).toBe("Test Client");
+      expect(store.listAudit("usr_expiry", undefined, 10)).toHaveLength(1);
+    } finally {
+      store.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test("enforces single-use authorization codes atomically", () => {

@@ -1890,9 +1890,7 @@ describe("remote control plane remote-agent contracts", () => {
           string,
           { agent: RemoteAgentRecord; connection: unknown; seenNonces: Map<string, number> }
         >;
-        agentHandler: {
-          cleanupEphemeralState(now?: number): void;
-        };
+        cleanupEphemeralState(now: number): void;
       };
 
       harness.agentConnections.set(agent.id, {
@@ -1901,8 +1899,11 @@ describe("remote control plane remote-agent contracts", () => {
         seenNonces,
       });
 
-      harness.agentHandler.cleanupEphemeralState(Date.now());
+      const prune = vi.spyOn(controlPlane.store, "pruneExpiredTransientRecords");
+      const cleanupTime = Date.now();
+      harness.cleanupEphemeralState(cleanupTime);
 
+      expect(prune).toHaveBeenCalledWith(new Date(cleanupTime).toISOString());
       expect(seenNonces.has("expired-nonce")).toBe(false);
       expect(seenNonces.has("fresh-nonce")).toBe(true);
     } finally {

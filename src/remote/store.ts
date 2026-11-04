@@ -97,6 +97,17 @@ export class RemoteStore {
     this.db.close();
   }
 
+  /**
+   * Reclaim only records whose time-limited credentials have expired.
+   * Device, account, action and security audit history is intentionally
+   * outside this cleanup policy.
+   */
+  pruneExpiredTransientRecords(now: string): void {
+    this.db.prepare("DELETE FROM dashboard_sessions WHERE expires_at <= ?").run(now);
+    this.db.prepare("DELETE FROM oauth_authorization_codes WHERE expires_at <= ?").run(now);
+    this.db.prepare("DELETE FROM agent_enrollment_tokens WHERE expires_at <= ?").run(now);
+  }
+
   private migrate(): void {
     const userColumns = (
       this.db.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>
