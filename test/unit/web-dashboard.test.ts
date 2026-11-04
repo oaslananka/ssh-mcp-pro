@@ -37,10 +37,36 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(res.body).toContain("Add custom connector");
       expect(res.body).toContain("Add custom MCP server");
       expect(res.body).not.toContain("ChatGPT Actions / MCP Connector");
-      for (const snippetId of ["cfgVsCode", "cfgCursor", "cfgWindsurf"]) {
+      for (const snippetId of ["cfgVsCode", "cfgVsCodePortable", "cfgCursor", "cfgWindsurf"]) {
         expect(res.body).toContain('id="' + snippetId + '"');
       }
       expect(res.body).not.toContain('"mcp.servers"');
+      expect(res.body).toContain("Gemini API (Interactions)");
+      expect(res.body).toContain('"type": "mcp_server"');
+      expect(res.body).toContain('"name": "ssh_mcp_pro"');
+      expect(res.body).not.toContain('"endpoint":');
+      expect(res.body).toContain("the URL alone does not authenticate");
+      expect(res.body).toContain("Copilot portable");
+      const parseSetupSnippet = (id: string) => {
+        const match = new RegExp('<span id="' + id + '">([\\s\\S]*?)</span>', "u").exec(res.body);
+        expect(match).not.toBeNull();
+        return JSON.parse(
+          match![1]
+            .replace(/\\n/gu, "\n")
+            .replaceAll("$" + "{MCP_URL}", "http://127.0.0.1:3000/mcp"),
+        );
+      };
+      expect(parseSetupSnippet("cfgGemini")).toEqual({
+        type: "mcp_server",
+        name: "ssh_mcp_pro",
+        url: "http://127.0.0.1:3000/mcp",
+      });
+      expect(parseSetupSnippet("cfgVsCodePortable")).toEqual({
+        mcpServers: {
+          "ssh-mcp-pro": { type: "http", url: "http://127.0.0.1:3000/mcp" },
+        },
+      });
+      expect(res.body).toContain(".mcp.json");
       expect(res.body).toContain('aria-label="Dashboard sections"');
       for (const tab of ["devices", "add-device", "clients", "audit"]) {
         expect(res.body).toContain('data-dashboard-tab="' + tab + '"');
@@ -110,6 +136,15 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
         "ssh-mcp-pro",
       );
       expect(parsed.clients.geminiExtension.mcpEndpoint).toBe("http://127.0.0.1:3000/mcp");
+      expect(parsed.clients.geminiInteractions).toEqual({
+        type: "mcp_server",
+        name: "ssh_mcp_pro",
+        url: "http://127.0.0.1:3000/mcp",
+      });
+      expect(parsed.clients.vscodePortable.mcpServers["ssh-mcp-pro"]).toEqual({
+        type: "http",
+        url: "http://127.0.0.1:3000/mcp",
+      });
       expect(parsed.clients.vscodeCursor.servers["ssh-mcp-pro-cloud"]).toEqual({
         type: "http",
         url: "http://127.0.0.1:3000/mcp",

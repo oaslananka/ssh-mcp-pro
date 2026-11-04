@@ -28,10 +28,24 @@ export function createDashboardClientConfigs(publicUrl: string, mcpUrl: string) 
         setup: "ChatGPT > Plugins > Add custom MCP server",
         authentication: "OAuth via server metadata discovery",
       },
+      // Retain the legacy metadata fields for existing API consumers.
       geminiExtension: {
         mcpEndpoint: mcpUrl,
         transport: "streamable-http",
-        auth: "OAuth 2.1 (RFC 9728 discovery)",
+        auth: "OAuth bearer credential required; this is not a Gemini API tool definition",
+      },
+      geminiInteractions: {
+        type: "mcp_server",
+        name: "ssh_mcp_pro",
+        url: mcpUrl,
+      },
+      vscodePortable: {
+        mcpServers: {
+          "ssh-mcp-pro": {
+            type: "http",
+            url: mcpUrl,
+          },
+        },
       },
       vscodeCursor: {
         servers: {

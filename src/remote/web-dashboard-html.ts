@@ -256,10 +256,10 @@ export function renderDashboardHtml(
             <div class="card">
               <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
                 <span style="font-size:24px;">✨</span>
-                <h3>Google Gemini / Vertex AI</h3>
+                <h3>Gemini API (Interactions)</h3>
               </div>
-              <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Add as an external MCP tool in Gemini API or Extensions:</p>
-              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgGemini')">Copy</button><span id="cfgGemini">{\\n  "name": "ssh-mcp-pro",\\n  "endpoint": "\${MCP_URL}",\\n  "protocol": "streamable-http",\\n  "auth": "oauth2"\\n}</span></div>
+              <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Use this Remote MCP tool definition with the Gemini API Interactions endpoint. Configure a valid OAuth bearer credential separately (for example via managed agent credentials); the URL alone does not authenticate. This is not a Gemini web-extension manifest. <a href="https://ai.google.dev/gemini-api/docs/function-calling" target="_blank" rel="noopener noreferrer">Gemini Remote MCP docs</a>.</p>
+              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgGemini')">Copy</button><span id="cfgGemini">{\\n  "type": "mcp_server",\\n  "name": "ssh_mcp_pro",\\n  "url": "\${MCP_URL}"\\n}</span></div>
             </div>
 
             <div class="card">
@@ -267,8 +267,10 @@ export function renderDashboardHtml(
                 <span style="font-size:24px;">💻</span>
                 <h3>VS Code / Cursor / Windsurf</h3>
               </div>
-              <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Use each client&#39;s configuration format; the remote endpoint supports OAuth.</p>
-              <div style="font-size:12px; font-weight:700; color:var(--blue); margin-top:12px;">VS Code — <code>.vscode/mcp.json</code></div>
+              <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Copy the configuration for your chosen client. VS Code/Copilot portable files use <code>mcpServers</code>; the VS Code workspace format uses <code>servers</code>. Sign in through your client&#39;s OAuth flow.</p>
+              <div style="font-size:12px; font-weight:700; color:var(--blue); margin-top:12px;">Copilot portable — <code>.mcp.json</code></div>
+              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgVsCodePortable')">Copy</button><span id="cfgVsCodePortable">{\\n  "mcpServers": {\\n    "ssh-mcp-pro": {\\n      "type": "http",\\n      "url": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
+              <div style="font-size:12px; font-weight:700; color:var(--blue); margin-top:12px;">VS Code workspace (compatible) — <code>.vscode/mcp.json</code></div>
               <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgVsCode')">Copy</button><span id="cfgVsCode">{\\n  "servers": {\\n    "ssh-mcp-pro": {\\n      "type": "http",\\n      "url": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
               <div style="font-size:12px; font-weight:700; color:var(--blue); margin-top:12px;">Cursor — <code>.cursor/mcp.json</code></div>
               <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgCursor')">Copy</button><span id="cfgCursor">{\\n  "mcpServers": {\\n    "ssh-mcp-pro": {\\n      "url": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
