@@ -70,11 +70,11 @@ Generic stdio MCP config:
 }
 ```
 
-VS Code settings style:
+VS Code workspace `.vscode/mcp.json` configuration:
 
 ```json
 {
-  "mcp.servers": {
+  "servers": {
     "ssh-mcp-pro": {
       "type": "stdio",
       "command": "ssh-mcp-pro",
