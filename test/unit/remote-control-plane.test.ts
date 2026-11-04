@@ -1862,23 +1862,6 @@ describe("remote control plane remote-agent contracts", () => {
     }
   });
 
-  test("invokes transient row pruning through the existing cleanup tick", async () => {
-    const dir = mkdtempSync(path.join(os.tmpdir(), "ssh-mcp-cleanup-tick-"));
-    const controlPlane = new RemoteControlPlane(testConfig(dir));
-    try {
-      const prune = vi.spyOn(controlPlane.store, "pruneExpiredTransientRecords");
-      const cutoff = "2026-01-01T00:05:00.000Z";
-      const cleanup = controlPlane as unknown as {
-        cleanupEphemeralState(now: number): void;
-      };
-      cleanup.cleanupEphemeralState(Date.parse(cutoff));
-      expect(prune).toHaveBeenCalledWith(cutoff);
-    } finally {
-      controlPlane.close();
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
   test("prunes expired action result nonces from live connections", async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-control-plane-"));
     const controlPlane = new RemoteControlPlane(testConfig(dir));
@@ -1907,9 +1890,7 @@ describe("remote control plane remote-agent contracts", () => {
           string,
           { agent: RemoteAgentRecord; connection: unknown; seenNonces: Map<string, number> }
         >;
-        agentHandler: {
-          cleanupEphemeralState(now?: number): void;
-        };
+        cleanupEphemeralState(now: number): void;
       };
 
       harness.agentConnections.set(agent.id, {
@@ -1918,8 +1899,11 @@ describe("remote control plane remote-agent contracts", () => {
         seenNonces,
       });
 
-      harness.agentHandler.cleanupEphemeralState(Date.now());
+      const prune = vi.spyOn(controlPlane.store, "pruneExpiredTransientRecords");
+      const cleanupTime = Date.now();
+      harness.cleanupEphemeralState(cleanupTime);
 
+      expect(prune).toHaveBeenCalledWith(new Date(cleanupTime).toISOString());
       expect(seenNonces.has("expired-nonce")).toBe(false);
       expect(seenNonces.has("fresh-nonce")).toBe(true);
     } finally {
