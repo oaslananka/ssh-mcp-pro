@@ -28,7 +28,7 @@ overrides:
   ip-address: ^10.7.5
   linkify-it: ^5.0.2
   markdown-it: ^14.3.3
-  minimatch: ^11.0.1
+  minimatch: ^11.0.2
   nanoid: ^3.3.18
   postcss: ^8.5.23
   proxy-addr: ^2.0.8
