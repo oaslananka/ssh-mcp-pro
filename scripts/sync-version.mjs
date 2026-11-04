@@ -11,6 +11,7 @@ const jsonTargets = [
   ["registry/ssh-mcp-pro/mcp.json", ["version"]],
   ["apps/chatgpt/app-readiness.json", ["mcp", "version"]],
   ["apps/claude/connector-readiness.json", ["mcp", "version"]],
+  ["apps/google/gemini-app-readiness.json", ["mcp", "version"]],
 ];
 
 const textTargets = [{ file: "src/mcp.ts", pattern: /export const SERVER_VERSION = "([^"]+)";/u }];

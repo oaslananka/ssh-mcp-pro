@@ -44,6 +44,11 @@
           "jsonpath": "$.mcp.version"
         },
         {
+          "type": "json",
+          "path": "apps/google/gemini-app-readiness.json",
+          "jsonpath": "$.mcp.version"
+        },
+        {
           "type": "generic",
           "path": "src/mcp.ts"
         }

@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
@@ -20,6 +21,23 @@ describe("release scripts", () => {
     expect(result.stderr).toBe("");
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("release configuration is ready");
+  });
+
+  it("tracks Gemini version metadata in both release and manual sync contracts", () => {
+    const config = JSON.parse(fs.readFileSync("release-please-config.json", "utf8")) as {
+      packages: Record<
+        string,
+        { "extra-files": Array<{ type: string; path: string; jsonpath?: string }> }
+      >;
+    };
+    expect(config.packages["."]["extra-files"]).toContainEqual({
+      type: "json",
+      path: "apps/google/gemini-app-readiness.json",
+      jsonpath: "$.mcp.version",
+    });
+
+    const syncScript = fs.readFileSync("scripts/sync-version.mjs", "utf8");
+    expect(syncScript).toContain('["apps/google/gemini-app-readiness.json", ["mcp", "version"]]');
   });
 
   it("reports offline release state as JSON", () => {
