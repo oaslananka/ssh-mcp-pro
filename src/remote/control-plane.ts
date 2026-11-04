@@ -168,6 +168,11 @@ export class RemoteControlPlane {
   }
 
   async handleHttp(req: IncomingMessage, res: ServerResponse, pathname: string): Promise<boolean> {
+    // Browsers only honor HSTS on authenticated HTTPS responses. Do not
+    // impose HTTPS on intentionally HTTP-only localhost development servers.
+    if (new URL(this.config.publicBaseUrl).protocol === "https:") {
+      res.setHeader("Strict-Transport-Security", "max-age=31536000");
+    }
     if (pathname === "/.well-known/oauth-protected-resource" && req.method === "GET") {
       jsonResponse(res, 200, this.oauth.protectedResourceMetadata(), addNoStore());
       return true;
