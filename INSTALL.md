@@ -180,15 +180,14 @@ Make sure you have the GitHub Copilot extension installed in VS Code.
 
 Create or edit your MCP configuration file. You can do this in two ways:
 
-#### Option A: VS Code Settings
+#### Option A: VS Code workspace configuration
 
-1. Open VS Code Settings (`Ctrl+,` or `Cmd+,`)
-2. Search for "MCP"
-3. Add the following configuration:
+Create `.vscode/mcp.json` in your workspace (or use `MCP: Open User Configuration`
+from the command palette for a personal configuration):
 
 ```json
 {
-  "mcp.servers": {
+  "servers": {
     "ssh-mcp-pro": {
       "type": "stdio",
       "command": "ssh-mcp-pro",
@@ -198,19 +197,16 @@ Create or edit your MCP configuration file. You can do this in two ways:
 }
 ```
 
-#### Option B: MCP Configuration File
+#### Option B: Portable GitHub Copilot configuration
 
-Create a `mcp.json` file in your workspace or user settings directory:
+Create `.mcp.json` at the workspace root (portable Copilot format):
 
 ```json
 {
   "mcpServers": {
     "ssh-mcp-pro": {
       "command": "ssh-mcp-pro",
-      "args": [],
-      "transport": {
-        "type": "stdio"
-      }
+      "args": []
     }
   }
 }

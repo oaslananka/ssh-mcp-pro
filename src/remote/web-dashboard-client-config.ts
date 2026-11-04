@@ -36,15 +36,29 @@ export function createDashboardClientConfigs(publicUrl: string, mcpUrl: string) 
         auth: "OAuth 2.1 (RFC 9728 discovery)",
       },
       vscodeCursor: {
-        "mcp.servers": {
+        servers: {
           "ssh-mcp-pro-cloud": {
-            type: "streamable-http",
+            type: "http",
             url: mcpUrl,
           },
           "ssh-mcp-pro-local": {
             type: "stdio",
             command: "ssh-mcp-pro",
             args: [],
+          },
+        },
+      },
+      cursor: {
+        mcpServers: {
+          "ssh-mcp-pro": {
+            url: mcpUrl,
+          },
+        },
+      },
+      windsurf: {
+        mcpServers: {
+          "ssh-mcp-pro": {
+            serverUrl: mcpUrl,
           },
         },
       },

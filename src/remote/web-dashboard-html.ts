@@ -264,8 +264,13 @@ export function renderDashboardHtml(
                 <span style="font-size:24px;">💻</span>
                 <h3>VS Code / Cursor / Windsurf</h3>
               </div>
-              <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Add to your workspace <code>.vscode/mcp.json</code>:</p>
-              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgVsCode')">Copy</button><span id="cfgVsCode">{\\n  "mcp.servers": {\\n    "ssh-mcp-pro": {\\n      "type": "streamable-http",\\n      "url": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
+              <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Use each client&#39;s configuration format; the remote endpoint supports OAuth.</p>
+              <div style="font-size:12px; font-weight:700; color:var(--blue); margin-top:12px;">VS Code — <code>.vscode/mcp.json</code></div>
+              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgVsCode')">Copy</button><span id="cfgVsCode">{\\n  "servers": {\\n    "ssh-mcp-pro": {\\n      "type": "http",\\n      "url": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
+              <div style="font-size:12px; font-weight:700; color:var(--blue); margin-top:12px;">Cursor — <code>.cursor/mcp.json</code></div>
+              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgCursor')">Copy</button><span id="cfgCursor">{\\n  "mcpServers": {\\n    "ssh-mcp-pro": {\\n      "url": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
+              <div style="font-size:12px; font-weight:700; color:var(--blue); margin-top:12px;">Windsurf — <code>mcp_config.json</code></div>
+              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgWindsurf')">Copy</button><span id="cfgWindsurf">{\\n  "mcpServers": {\\n    "ssh-mcp-pro": {\\n      "serverUrl": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
             </div>
           </div>
         \`;

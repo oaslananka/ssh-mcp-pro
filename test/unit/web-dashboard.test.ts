@@ -30,6 +30,10 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(res.body).toContain("ssh-mcp-pro");
       expect(res.body).toContain("Sign in with Google");
       expect(res.body).toContain("Sign in with GitHub");
+      for (const snippetId of ["cfgVsCode", "cfgCursor", "cfgWindsurf"]) {
+        expect(res.body).toContain('id="' + snippetId + '"');
+      }
+      expect(res.body).not.toContain('"mcp.servers"');
     } finally {
       cp.close();
       rmSync(dir, { recursive: true, force: true });
@@ -87,6 +91,20 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
         "ssh-mcp-pro",
       );
       expect(parsed.clients.geminiExtension.mcpEndpoint).toBe("http://127.0.0.1:3000/mcp");
+      expect(parsed.clients.vscodeCursor.servers["ssh-mcp-pro-cloud"]).toEqual({
+        type: "http",
+        url: "http://127.0.0.1:3000/mcp",
+      });
+      expect(parsed.clients.vscodeCursor.servers["ssh-mcp-pro-local"]).toMatchObject({
+        type: "stdio",
+        command: "ssh-mcp-pro",
+      });
+      expect(parsed.clients.cursor.mcpServers["ssh-mcp-pro"]).toEqual({
+        url: "http://127.0.0.1:3000/mcp",
+      });
+      expect(parsed.clients.windsurf.mcpServers["ssh-mcp-pro"]).toEqual({
+        serverUrl: "http://127.0.0.1:3000/mcp",
+      });
     } finally {
       cp.close();
       rmSync(dir, { recursive: true, force: true });
