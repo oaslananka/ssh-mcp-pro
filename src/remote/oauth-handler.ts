@@ -223,11 +223,17 @@ export class OAuthHandler {
     const transactionId = id("code");
     this.authorizeTransactions.set(transactionId, pending);
     const hostname = escapeHtml(new URL(redirectUri).hostname);
+    // Chromium also checks form-action on the redirect after POST /oauth/approve.
+    // Permit only the configured identity providers, not arbitrary OAuth clients.
+    const formActions = [
+      "'self'",
+      ...(hasGoogle ? ["https://accounts.google.com"] : []),
+      ...(hasGitHub ? ["https://github.com"] : []),
+    ].join(" ");
     res.writeHead(200, {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
-      "Content-Security-Policy":
-        "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+      "Content-Security-Policy": `default-src 'none'; style-src 'unsafe-inline'; form-action ${formActions}; frame-ancestors 'none'; base-uri 'none'`,
       "X-Content-Type-Options": "nosniff",
       "Set-Cookie": this.transactionCookie(transactionId),
     });
