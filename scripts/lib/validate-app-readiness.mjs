@@ -37,6 +37,25 @@ export function validateAppReadiness({ file, displayName, profile, kind }) {
       submission && typeof submission === "object",
       displayName + " submission checklist is required for publishReady.",
     );
+    // Security disclosure instructions and an open-source license are not
+    // a privacy notice or hosted-service terms. Do not attest publication
+    // readiness until distinct, reviewed documents have been published.
+    for (const field of ["privacyUrl", "termsUrl"]) {
+      const value = readiness[field];
+      let url;
+      try {
+        url = typeof value === "string" ? new URL(value) : undefined;
+      } catch {
+        // Fall through to the deterministic validation error below.
+      }
+      assertValid(
+        url?.protocol === "https:" &&
+          url.hostname !== "" &&
+          !/\/(?:SECURITY\.md|LICENSE)(?:$|\/)/iu.test(url.pathname),
+        displayName + " " + field + " must link to a dedicated HTTPS policy document.",
+      );
+    }
+
     const shared = ["oauthConfigured", "privacyPolicyReviewed", "reviewTestCasesPrepared"];
     const specific =
       kind === "app"
