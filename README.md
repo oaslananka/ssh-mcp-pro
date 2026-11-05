@@ -1,5 +1,7 @@
 <h1 align="center">ssh-mcp-pro</h1>
 
+<p align="center"><strong>Policy-controlled SSH automation for MCP clients</strong></p>
+
 <p align="center">
   <a href="https://www.npmjs.com/package/ssh-mcp-pro"><img alt="npm version" src="https://img.shields.io/npm/v/ssh-mcp-pro.svg" /></a>
   <a href="https://www.npmjs.com/package/ssh-mcp-pro"><img alt="npm downloads" src="https://img.shields.io/npm/dt/ssh-mcp-pro.svg" /></a>
@@ -8,7 +10,11 @@
   <a href="https://oaslananka.github.io/ssh-mcp-pro/"><img alt="API Docs" src="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/docs.yml/badge.svg" /></a>
 </p>
 
-[![GitGem](https://gitgem.org/api/badge/github/oaslananka/ssh-mcp-pro.svg)](https://gitgem.org/github/oaslananka/ssh-mcp-pro) · [DeepWiki source explorer](https://deepwiki.com/oaslananka/ssh-mcp-pro)
+<p align="center">
+  <a href="https://gitgem.org/github/oaslananka/ssh-mcp-pro"><img alt="GitGem" src="https://gitgem.org/api/badge/github/oaslananka/ssh-mcp-pro.svg" /></a>
+  &nbsp;&nbsp;&middot;&nbsp;&nbsp;
+  <a href="https://deepwiki.com/oaslananka/ssh-mcp-pro">Explore source on DeepWiki</a>
+</p>
 
 <p align="center">
   <a href="https://www.buymeacoffee.com/oaslananka">
