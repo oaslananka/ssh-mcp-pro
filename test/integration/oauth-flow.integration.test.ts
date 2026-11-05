@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
 import { randomToken } from "../../src/remote/crypto.js";
 import type { RemoteConfig } from "../../src/remote/types.js";
+import { writeTestHttpError } from "../helpers/http-error.js";
 
 interface Harness {
   baseUrl: string;
@@ -80,18 +81,7 @@ function attachControlPlane(
         if (res.headersSent) {
           return;
         }
-        const status =
-          error && typeof error === "object" && "status" in error ? Number(error.status) : 500;
-        const message =
-          error && typeof error === "object" && "message" in error
-            ? String(error.message)
-            : error instanceof Error
-              ? error.message
-              : String(error);
-        const code =
-          error && typeof error === "object" && "code" in error ? String(error.code) : undefined;
-        res.writeHead(status, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: message, code }));
+        writeTestHttpError(res, error);
       });
   });
 }
@@ -306,7 +296,7 @@ describe("OAuth PKCE HTTP flow", () => {
       expect(tokenBody).toEqual(
         expect.objectContaining({
           code: "PKCE_VALIDATION_FAILED",
-          error: "Invalid PKCE code_verifier",
+          error: "Request rejected",
         }),
       );
     } finally {
