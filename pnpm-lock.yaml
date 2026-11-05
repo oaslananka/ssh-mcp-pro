@@ -131,7 +131,7 @@ importers:
         specifier: ^4.10.2
         version: 4.10.2
       knip:
-        specifier: ^6.43.0
+        specifier: ^6.44.0
         version: 6.44.1
       prettier:
         specifier: ^3.9.9
