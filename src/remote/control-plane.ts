@@ -139,6 +139,15 @@ export class RemoteControlPlane {
     }
   }
 
+  private async handleGoogleOAuthCallback(
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> {
+    // Both OAuth flows use the registered Google URI, but isolated state/cookies.
+    if (await this.dashboard.handleSharedGoogleCallback(req, res)) return;
+    await this.oauth.handleGoogleCallback(req, res);
+  }
+
   private async handleOAuthRequest(
     req: IncomingMessage,
     res: ServerResponse,
@@ -161,11 +170,7 @@ export class RemoteControlPlane {
       return true;
     }
     if (pathname === "/oauth/callback/google" && req.method === "GET") {
-      // Browser dashboard and MCP PKCE share the registered Google redirect URI.
-      // Dispatch by their distinct, one-use state identifiers; both validate cookies.
-      if (!(await this.dashboard.handleSharedGoogleCallback(req, res))) {
-        await this.oauth.handleGoogleCallback(req, res);
-      }
+      await this.handleGoogleOAuthCallback(req, res);
       return true;
     }
     if (pathname === "/oauth/token" && req.method === "POST") {
