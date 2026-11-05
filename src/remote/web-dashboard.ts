@@ -49,9 +49,13 @@ export class WebDashboardHandler {
     return `${this.sessionCookieName}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
   }
 
-  private authTransactionCookie(state: string, maxAge = 600): string {
+  private authTransactionCookie(
+    state: string,
+    maxAge = 600,
+    path: "/auth" | "/oauth" = "/auth",
+  ): string {
     const secure = this.deps.config.publicBaseUrl.startsWith("https://") ? "; Secure" : "";
-    return `ssh_mcp_web_tx=${state}; Path=/auth; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+    return `ssh_mcp_web_tx=${state}; Path=${path}; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
   }
 
   private extractSessionToken(req: IncomingMessage): string | undefined {
@@ -302,7 +306,7 @@ export class WebDashboardHandler {
       nonce,
     });
 
-    const callbackUrl = `${this.deps.config.publicBaseUrl}/auth/callback/google`;
+    const callbackUrl = this.deps.config.googleCallbackUrl;
     const googleUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     googleUrl.searchParams.set("client_id", this.deps.config.googleClientId);
     googleUrl.searchParams.set("redirect_uri", callbackUrl);
@@ -311,7 +315,7 @@ export class WebDashboardHandler {
     googleUrl.searchParams.set("state", state);
     googleUrl.searchParams.set("nonce", nonce);
 
-    res.setHeader("Set-Cookie", this.authTransactionCookie(state));
+    res.setHeader("Set-Cookie", this.authTransactionCookie(state, 600, "/oauth"));
     redirect(res, googleUrl.toString());
   }
 
@@ -338,10 +342,17 @@ export class WebDashboardHandler {
     return { code, nonce: transaction.nonce };
   }
 
-  private completeWebAuth(res: ServerResponse, userId: string): void {
+  private completeWebAuth(
+    res: ServerResponse,
+    userId: string,
+    transactionPath: "/auth" | "/oauth" = "/auth",
+  ): void {
     res.writeHead(302, {
       Location: "/dashboard",
-      "Set-Cookie": [this.createWebSession(userId), this.authTransactionCookie("", 0)],
+      "Set-Cookie": [
+        this.createWebSession(userId),
+        this.authTransactionCookie("", 0, transactionPath),
+      ],
       "Cache-Control": "no-store",
     });
     res.end();
@@ -357,6 +368,15 @@ export class WebDashboardHandler {
     this.completeWebAuth(res, user.id);
   }
 
+  /** A dashboard Google login shares the registered MCP Google callback URL. */
+  async handleSharedGoogleCallback(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+    const state = new URL(req.url ?? "", this.deps.config.publicBaseUrl).searchParams.get("state");
+    // The other flow issues code_<uuid> transactions; never consume those here.
+    if (!state || !/^webauth_[0-9a-f]{32}$/u.test(state)) return false;
+    await this.handleDirectCallbackGoogle(req, res);
+    return true;
+  }
+
   private async handleDirectCallbackGoogle(
     req: IncomingMessage,
     res: ServerResponse,
@@ -365,7 +385,7 @@ export class WebDashboardHandler {
     // Nonce is guaranteed by consumeWebAuthTransaction for Google.
     const googleUser = await fetchGoogleUserDirect(this.deps.config, code, nonce!);
     const user = this.deps.oauth.upsertGoogleUser(googleUser);
-    this.completeWebAuth(res, user.id);
+    this.completeWebAuth(res, user.id, "/oauth");
   }
 
   private handleApiMe(req: IncomingMessage, res: ServerResponse): void {

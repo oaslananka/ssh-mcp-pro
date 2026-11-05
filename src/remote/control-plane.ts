@@ -161,7 +161,11 @@ export class RemoteControlPlane {
       return true;
     }
     if (pathname === "/oauth/callback/google" && req.method === "GET") {
-      await this.oauth.handleGoogleCallback(req, res);
+      // Browser dashboard and MCP PKCE share the registered Google redirect URI.
+      // Dispatch by their distinct, one-use state identifiers; both validate cookies.
+      if (!(await this.dashboard.handleSharedGoogleCallback(req, res))) {
+        await this.oauth.handleGoogleCallback(req, res);
+      }
       return true;
     }
     if (pathname === "/oauth/token" && req.method === "POST") {
