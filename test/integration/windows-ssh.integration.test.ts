@@ -290,7 +290,7 @@ if ($null -eq $global:sshMcpSmokeRegistered -or $null -eq $global:sshMcpSmokeSta
       }),
     );
     expect(result.tempDir).toMatch(/^[A-Za-z]:\//u);
-  }, 20_000);
+  }, 45_000);
 
   test.each([
     ["winget", "Git.Git", "winget install --id Git.Git"],

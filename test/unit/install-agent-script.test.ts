@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
@@ -53,3 +54,226 @@ describe("Windows agent Scheduled Task launcher", () => {
     expect(content).toContain('""{0}" run"');
   });
 });
+
+describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
+  "Linux npm global bin regression",
+  () => {
+    function stubFile(filename: string, body: string) {
+      writeFileSync(filename, "#!/usr/bin/env bash\nset -euo pipefail\n" + body + "\n", {
+        mode: 0o755,
+      });
+    }
+
+    function setupInstaller(installAgent: boolean) {
+      const root = mkdtempSync(path.join(os.tmpdir(), "ssh-mcp-pro-bootstrap-"));
+      const shimDir = path.join(root, "shims");
+      const home = path.join(root, "home");
+      const prefix = path.join(root, "npm-global");
+      const globalBin = path.join(prefix, "bin");
+      const enrollLog = path.join(root, "enrollment.log");
+      const installLog = path.join(root, "install.log");
+      const serviceLog = path.join(root, "service.log");
+      mkdirSync(shimDir);
+      mkdirSync(home);
+      mkdirSync(globalBin, { recursive: true });
+
+      stubFile(
+        path.join(shimDir, "npm"),
+        [
+          'case "$1" in',
+          '  prefix) [[ "${2:-}" == "-g" ]] || exit 11; printf "%s\\n" "$MOCK_NPM_PREFIX" ;;',
+          '  install) [[ "${2:-}" == "-g" ]] || exit 12; printf "installed\\n" >> "$MOCK_INSTALL_LOG" ;;',
+          "  *) exit 13 ;;",
+          "esac",
+        ].join("\n"),
+      );
+      stubFile(path.join(shimDir, "systemctl"), 'printf "%s\\n" "$*" >> "$MOCK_SERVICE_LOG"');
+      stubFile(path.join(shimDir, "loginctl"), "exit 0");
+
+      const agentBin = path.join(globalBin, "ssh-mcp-pro-agent");
+      if (installAgent) {
+        stubFile(agentBin, 'printf "%s|%s\\n" "$(id -u)" "$*" >> "$MOCK_ENROLL_LOG"');
+      }
+
+      const env = {
+        ...process.env,
+        PATH: [shimDir, path.dirname(process.execPath), process.env.PATH ?? "/usr/bin:/bin"].join(
+          path.delimiter,
+        ),
+        HOME: home,
+        USER: process.env.USER ?? "test-user",
+        MOCK_NPM_PREFIX: prefix,
+        MOCK_ENROLL_LOG: enrollLog,
+        MOCK_INSTALL_LOG: installLog,
+        MOCK_SERVICE_LOG: serviceLog,
+      };
+
+      const run = (...args: string[]) =>
+        spawnSync(
+          "bash",
+          [
+            script,
+            "--server",
+            "https://example.invalid",
+            "--token",
+            "placeholder",
+            "--alias",
+            "linux-test",
+            ...args,
+          ],
+          { encoding: "utf8", env, timeout: 5_000 },
+        );
+
+      return {
+        root,
+        home,
+        globalBin,
+        agentBin,
+        enrollLog,
+        installLog,
+        serviceLog,
+        env,
+        run,
+        cleanup: () => rmSync(root, { recursive: true, force: true }),
+      };
+    }
+
+    test("uses npm's global prefix/bin even when absent from PATH", () => {
+      const mock = setupInstaller(true);
+      try {
+        expect(mock.env.PATH.split(path.delimiter)).not.toContain(mock.globalBin);
+        const result = mock.run();
+        expect(result.status).toBe(0);
+        expect(readFileSync(mock.installLog, "utf8")).toContain("installed");
+        const expectedEnrollmentArgs = [
+          "enroll",
+          "--server",
+          "https://example.invalid",
+          "--token",
+          "placeholder",
+          "--alias",
+          "linux-test",
+        ].join(" ");
+        expect(readFileSync(mock.enrollLog, "utf8")).toContain(
+          `${process.getuid?.()}|${expectedEnrollmentArgs}`,
+        );
+        const unit = readFileSync(
+          path.join(mock.home, ".config/systemd/user/ssh-mcp-pro-agent.service"),
+          "utf8",
+        );
+        expect(unit).toContain('ExecStart="' + process.execPath + '" "' + mock.agentBin + '" run');
+        expect(unit).toContain(path.dirname(mock.agentBin));
+        expect(readFileSync(mock.serviceLog, "utf8")).toContain("--user enable --now");
+      } finally {
+        mock.cleanup();
+      }
+    });
+
+    test("rejects a missing npm global binary before enrollment or systemd", () => {
+      const mock = setupInstaller(false);
+      try {
+        const result = mock.run();
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain("missing or not executable");
+        expect(readFileSync(mock.installLog, "utf8")).toContain("installed");
+        expect(() => readFileSync(mock.enrollLog, "utf8")).toThrow();
+        expect(() => readFileSync(mock.serviceLog, "utf8")).toThrow();
+      } finally {
+        mock.cleanup();
+      }
+    });
+
+    test("--system refuses non-root callers before npm install", () => {
+      const mock = setupInstaller(true);
+      try {
+        const result = mock.run("--system");
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain("--system requires root");
+        expect(() => readFileSync(mock.installLog, "utf8")).toThrow();
+      } finally {
+        mock.cleanup();
+      }
+    });
+
+    test("does not trust user-managed npm prefixes for system installs", () => {
+      const mock = setupInstaller(true);
+      try {
+        const source = readFileSync(script, "utf8");
+        const start = source.indexOf("trusted_system_path() {");
+        const end = source.indexOf('\n\nif [[ "$SCOPE" == "$SYSTEM_SCOPE" ]]; then', start);
+        expect(start).toBeGreaterThanOrEqual(0);
+        expect(end).toBeGreaterThan(start);
+        const functionSource = source.slice(start, end);
+        const result = spawnSync(
+          "bash",
+          ["-c", functionSource + '\ntrusted_system_path "$1"', "test", mock.root],
+          { encoding: "utf8", timeout: 5_000 },
+        );
+        expect(result.status).toBe(1);
+        const trusted = spawnSync(
+          "bash",
+          ["-c", functionSource + '\ntrusted_system_path "$1"', "test", "/usr/bin"],
+          { encoding: "utf8", timeout: 5_000 },
+        );
+        expect(trusted.status).toBe(0);
+        expect(source).toContain('trusted_system_path "$NODE_BIN"');
+        expect(source).toContain('trusted_system_path "$NPM_BIN"');
+        expect(source).toContain('trusted_system_path "$NPM_GLOBAL_PREFIX"');
+      } finally {
+        mock.cleanup();
+      }
+    });
+
+    test("--system rejects a user-local runtime before any package installation", () => {
+      const mock = setupInstaller(true);
+      try {
+        // Only Bash command lookup and id -u are stubbed; no real root process
+        // and no npm install, enrollment, or systemd operation is performed.
+        const isolatedProbe = path.join(mock.root, "preflight-probe.sh");
+        stubFile(
+          isolatedProbe,
+          [
+            'id() { if [[ "${1:-}" == "-u" ]]; then printf "0\\n"; else /usr/bin/id "$@"; fi; }',
+            'command() { if [[ "${1:-}" == "-v" && "${2:-}" == "node" ]]; then printf "%s\\n" "$MOCK_NODE"; else builtin command "$@"; fi; }',
+            "export -f id command",
+            'exec /usr/bin/bash "$@"',
+          ].join("\n"),
+        );
+        const result = spawnSync(
+          "/usr/bin/bash",
+          [
+            isolatedProbe,
+            script,
+            "--server",
+            "https://example.invalid",
+            "--token",
+            "placeholder",
+            "--alias",
+            "linux-test",
+            "--system",
+          ],
+          {
+            encoding: "utf8",
+            timeout: 5_000,
+            env: { ...mock.env, SUDO_USER: "root", MOCK_NODE: path.join(mock.root, "user-node") },
+          },
+        );
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain("--system needs root-owned system Node.js");
+        expect(() => readFileSync(mock.installLog, "utf8")).toThrow();
+        expect(() => readFileSync(mock.enrollLog, "utf8")).toThrow();
+        expect(() => readFileSync(mock.serviceLog, "utf8")).toThrow();
+      } finally {
+        mock.cleanup();
+      }
+    });
+
+    test("enrollment and systemd use the same system service identity", () => {
+      const source = readFileSync(script, "utf8");
+      expect(source).toContain('RUN_USER="${SUDO_USER:-root}"');
+      expect(source).toContain('/usr/sbin/runuser -u "$RUN_USER"');
+      expect(source).toContain('echo "User=${RUN_USER}"');
+      expect(source).toContain("user service must not be installed as root");
+    });
+  },
+);
