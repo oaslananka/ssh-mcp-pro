@@ -41,7 +41,7 @@ overrides:
   vitest: ^4.1.12
   form-data@>=4.0.0: ^4.0.6
   esbuild@>=0.24.0: ^0.28.2
-  browserslist: ^4.28.7
+  browserslist: ^4.29.5
   smol-toml: ^1.9.1
 
 patchedDependencies:
