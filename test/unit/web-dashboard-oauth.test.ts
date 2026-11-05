@@ -167,12 +167,14 @@ describe("Hosted OAuth providers and tenant isolation", () => {
     const jwk = { ...(await exportJWK(publicKey)), kid: "oidc-test-key", alg: "RS256", use: "sig" };
     let responseIdToken = "";
     let status = 200;
-    const mockFetch = vi.fn(async (input: string | URL | Request) => {
+    const mockFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = String(input);
       if (url === "https://www.googleapis.com/oauth2/v3/certs") {
         return Response.json({ keys: [jwk] });
       }
       if (url === "https://oauth2.googleapis.com/token") {
+        const body = new URLSearchParams(String(init?.body ?? ""));
+        expect(body.get("redirect_uri")).toBe(testConfig(dir).googleCallbackUrl);
         return Response.json({ id_token: responseIdToken }, { status });
       }
       throw new Error(`Unexpected outbound Google request: ${url}`);
@@ -192,9 +194,11 @@ describe("Hosted OAuth providers and tenant isolation", () => {
         const target = new URL(String(response.getHeader("location")));
         expect(target.origin).toBe("https://accounts.google.com");
         expect(target.searchParams.get("scope")).toContain("openid");
+        expect(target.searchParams.get("redirect_uri")).toBe(testConfig(dir).googleCallbackUrl);
         const state = target.searchParams.get("state")!;
         const nonce = target.searchParams.get("nonce")!;
         expect(nonce.length).toBeGreaterThan(20);
+        expect(response.getHeader("set-cookie")).toContain("Path=/oauth;");
         return { state, nonce, cookie: String(response.getHeader("set-cookie")).split(";")[0] };
       }
       async function createToken(nonce: string, overrides: Record<string, unknown> = {}) {
@@ -214,12 +218,12 @@ describe("Hosted OAuth providers and tenant isolation", () => {
           .sign(privateKey);
       }
       async function callback(tx: { state: string; cookie: string }) {
-        const endpoint = `/auth/callback/google?state=${encodeURIComponent(tx.state)}&code=oidc-test-code`;
+        const endpoint = `/oauth/callback/google?state=${encodeURIComponent(tx.state)}&code=oidc-test-code`;
         const result = captureResponse();
         await cp.handleHttp(
           request("GET", endpoint, { cookie: tx.cookie }),
           result as unknown as ServerResponse,
-          "/auth/callback/google",
+          "/oauth/callback/google",
         );
         return result;
       }
@@ -240,6 +244,19 @@ describe("Hosted OAuth providers and tenant isolation", () => {
       expect(JSON.parse(currentUser.body).user.email).toBe("signed-in@example.com");
       expect(JSON.parse(currentUser.body).user.provider).toBe("google");
       expect(mockFetch).toHaveBeenCalled();
+
+      // The shared MCP callback must reject dashboard transactions without their
+      // matching browser cookie, not fall through to a different OAuth flow.
+      const noCookie = await authorize();
+      responseIdToken = await createToken(noCookie.nonce);
+      const callbackUrl = `/oauth/callback/google?state=${encodeURIComponent(noCookie.state)}&code=oidc-test-code`;
+      await expect(
+        cp.handleHttp(
+          request("GET", callbackUrl),
+          captureResponse() as unknown as ServerResponse,
+          "/oauth/callback/google",
+        ),
+      ).rejects.toMatchObject({ status: 403 });
 
       // A valid signature alone is insufficient: the nonce and identity must match.
       for (const invalidClaims of [

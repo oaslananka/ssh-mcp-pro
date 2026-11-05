@@ -41,7 +41,7 @@ export async function fetchGoogleUserDirect(
   code: string,
   nonce: string,
 ): Promise<GoogleUser> {
-  const callbackUrl = `${config.publicBaseUrl}/auth/callback/google`;
+  const callbackUrl = config.googleCallbackUrl;
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
