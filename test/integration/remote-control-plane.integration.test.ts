@@ -16,6 +16,7 @@ import {
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
 import { parseControlPlaneEnvelope } from "../../src/remote/schemas.js";
 import type { AgentHelloEnvelope, AgentPolicy, RemoteConfig } from "../../src/remote/types.js";
+import { writeTestHttpError } from "../helpers/http-error.js";
 
 interface RuntimeWebSocket {
   onopen: (() => void) | null;
@@ -117,18 +118,7 @@ async function startHarness(overrides: Partial<RemoteConfig> = {}): Promise<{
     void controlPlane
       .handleHttp(req, res, new URL(req.url ?? "/", baseUrl).pathname)
       .catch((error) => {
-        const status =
-          error && typeof error === "object" && "status" in error ? Number(error.status) : 500;
-        const message =
-          error && typeof error === "object" && "message" in error
-            ? String(error.message)
-            : error instanceof Error
-              ? error.message
-              : String(error);
-        const code =
-          error && typeof error === "object" && "code" in error ? String(error.code) : undefined;
-        res.writeHead(status, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: message, code }));
+        writeTestHttpError(res, error);
       });
   });
   server.on("upgrade", (req, socket, head) => {
@@ -261,18 +251,7 @@ describe("remote control plane and outbound agent flow", () => {
       void controlPlane
         .handleHttp(req, res, new URL(req.url ?? "/", baseUrl).pathname)
         .catch((error) => {
-          const status =
-            error && typeof error === "object" && "status" in error ? Number(error.status) : 500;
-          const message =
-            error && typeof error === "object" && "message" in error
-              ? String(error.message)
-              : error instanceof Error
-                ? error.message
-                : String(error);
-          const code =
-            error && typeof error === "object" && "code" in error ? String(error.code) : undefined;
-          res.writeHead(status, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ error: message, code }));
+          writeTestHttpError(res, error);
         });
     });
     server.on("upgrade", (req, socket, head) => {
