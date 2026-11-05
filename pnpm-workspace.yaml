@@ -42,7 +42,7 @@ overrides:
   form-data@>=4.0.0: ^4.0.6
   esbuild@>=0.24.0: ^0.28.2
   browserslist: ^4.28.7
-  smol-toml: ^1.8.1
+  smol-toml: ^1.9.1
 
 patchedDependencies:
   typedoc@0.28.20: patches/typedoc@0.28.20.patch
