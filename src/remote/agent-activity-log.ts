@@ -1,13 +1,15 @@
 import {
-  appendFileSync,
-  existsSync,
   lstatSync,
   mkdirSync,
   readFileSync,
   renameSync,
   rmSync,
-  statSync,
   watchFile,
+  closeSync,
+  constants,
+  fstatSync,
+  openSync,
+  writeSync,
 } from "node:fs";
 import path from "node:path";
 
@@ -108,22 +110,67 @@ export class AgentActivityLog {
     const dir = path.dirname(this.file);
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     if (lstatSync(dir).isSymbolicLink()) return;
-    if (existsSync(this.file) && lstatSync(this.file).isSymbolicLink()) return;
+
+    // O_NOFOLLOW and the open descriptor avoid the check-then-append race.
+    // Windows supports the same path with its platform-specific open flags.
+    const flags =
+      constants.O_WRONLY | constants.O_CREAT | constants.O_APPEND | (constants.O_NOFOLLOW ?? 0);
     const row = JSON.stringify(entry) + "\n";
-    const maxBytes = this.options.maxBytes ?? MAX_LOG_BYTES;
-    if (
-      existsSync(this.file) &&
-      statSync(this.file).size + Buffer.byteLength(row, "utf8") > maxBytes
-    ) {
-      const archives = this.options.maxArchives ?? MAX_ARCHIVES;
-      for (let n = archives; n >= 1; n--) {
-        const target = this.file + "." + n;
-        const source = n === 1 ? this.file : this.file + "." + (n - 1);
-        if (existsSync(target)) rmSync(target);
-        if (existsSync(source)) renameSync(source, target);
+    let descriptor: number | undefined = openSync(this.file, flags, 0o600);
+    try {
+      const maxBytes = this.options.maxBytes ?? MAX_LOG_BYTES;
+      if (fstatSync(descriptor).size + Buffer.byteLength(row, "utf8") > maxBytes) {
+        closeSync(descriptor);
+        descriptor = undefined;
+        this.rotate();
+        descriptor = openSync(this.file, flags, 0o600);
+      }
+      writeSync(descriptor, row);
+    } finally {
+      if (descriptor !== undefined) closeSync(descriptor);
+    }
+  }
+
+  private rotate(): void {
+    const archives = this.options.maxArchives ?? MAX_ARCHIVES;
+    for (let n = archives; n >= 1; n--) {
+      const target = this.file + "." + n;
+      const source = n === 1 ? this.file : this.file + "." + (n - 1);
+      rmSync(target, { force: true });
+      try {
+        renameSync(source, target);
+      } catch (error) {
+        if (!isMissingFile(error)) throw error;
       }
     }
-    appendFileSync(this.file, row, { encoding: "utf8", mode: 0o600 });
+  }
+}
+
+function isMissingFile(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
+}
+
+function parseActivityEntry(line: string): AgentActivityEntry | undefined {
+  if (!line) return undefined;
+  try {
+    const entry = JSON.parse(line) as Partial<AgentActivityEntry>;
+    if (
+      typeof entry.timestamp !== "string" ||
+      typeof entry.event !== "string" ||
+      typeof entry.message !== "string"
+    )
+      return undefined;
+    if (
+      entry.level !== "info" &&
+      entry.level !== "ok" &&
+      entry.level !== "warn" &&
+      entry.level !== "error"
+    )
+      return undefined;
+    return entry as AgentActivityEntry;
+  } catch {
+    // Ignore partial lines during rotation or concurrent append.
+    return undefined;
   }
 }
 
@@ -132,27 +179,23 @@ export function readAgentActivity(configFile: string, tail = DEFAULT_TAIL): Agen
     throw new Error("--tail must be an integer from 1 to 200");
   }
   const file = agentActivityLogPath(configFile);
-  if (!existsSync(file)) return [];
+  let data: string;
+  let descriptor: number;
+  try {
+    descriptor = openSync(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  } catch (error) {
+    if (isMissingFile(error)) return [];
+    throw error;
+  }
+  try {
+    data = readFileSync(descriptor, "utf8").slice(-(MAX_LOG_BYTES + 2048));
+  } finally {
+    closeSync(descriptor);
+  }
   const entries: AgentActivityEntry[] = [];
-  const data = readFileSync(file, "utf8").slice(-(MAX_LOG_BYTES + 2048));
   for (const line of data.split("\n")) {
-    if (!line) continue;
-    try {
-      const entry = JSON.parse(line) as Partial<AgentActivityEntry>;
-      if (
-        typeof entry.timestamp === "string" &&
-        typeof entry.event === "string" &&
-        typeof entry.message === "string" &&
-        (entry.level === "info" ||
-          entry.level === "ok" ||
-          entry.level === "warn" ||
-          entry.level === "error")
-      ) {
-        entries.push(entry as AgentActivityEntry);
-      }
-    } catch {
-      // Ignore partial lines during rotation or concurrent append.
-    }
+    const entry = parseActivityEntry(line);
+    if (entry) entries.push(entry);
   }
   return entries.slice(-tail);
 }

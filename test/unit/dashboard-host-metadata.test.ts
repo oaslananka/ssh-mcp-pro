@@ -31,8 +31,12 @@ describe("dashboard device host metadata", () => {
       JSON.stringify("https://mcp.example.invalid/mcp"),
       JSON.stringify("https://mcp.example.invalid"),
     );
-    const clientScript = markup.match(/<script>([\s\S]*?)<\/script>/u)?.[1];
-    expect(clientScript).toBeTruthy();
+    // This fixture is the app's own constant HTML, not input to an HTML sanitizer.
+    const start = markup.indexOf("<script>");
+    const end = markup.indexOf("</script>", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const clientScript = markup.slice(start + "<script>".length, end);
     const nodes: Record<string, { innerHTML: string }> = {};
     const document = {
       getElementById: (id: string) => {
@@ -41,7 +45,7 @@ describe("dashboard device host metadata", () => {
       },
     };
     const context = vm.createContext({ atob, document });
-    vm.runInContext(clientScript!, context, { timeout: 800 });
+    vm.runInContext(clientScript, context, { timeout: 800 });
     vm.runInContext(
       "devicesList = [" +
         JSON.stringify(response) +
