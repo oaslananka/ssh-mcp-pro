@@ -64,13 +64,13 @@ describe("outbound agent activity diagnostics", () => {
       activity.event("info", "cycle", "Cycle " + i + " completed without request arguments");
     }
     const file = agentActivityLogPath(config);
-    expect(statSync(file).size).toBeLessThanOrEqual(240);
-    expect(existsSync(file + ".1")).toBe(true);
-    expect(existsSync(file + ".2")).toBe(true);
+    const previous = readFileSync(file + ".1", "utf8");
+    const older = readFileSync(file + ".2", "utf8");
+    expect(previous.length).toBeGreaterThan(0);
+    expect(previous.length).toBeLessThan(512);
+    expect(older.length).toBeGreaterThan(0);
     expect(readAgentActivity(config, 3).at(-1)?.message).toContain("Cycle 34");
-    for (const fileName of [file, file + ".1", file + ".2"]) {
-      expect(readFileSync(fileName, "utf8")).not.toContain("password");
-    }
+    expect(previous + older).not.toContain("password");
   });
 
   test("rejects excessive history requests and treats missing log as empty", () => {

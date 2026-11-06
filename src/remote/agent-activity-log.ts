@@ -116,19 +116,17 @@ export class AgentActivityLog {
     const flags =
       constants.O_WRONLY | constants.O_CREAT | constants.O_APPEND | (constants.O_NOFOLLOW ?? 0);
     const row = JSON.stringify(entry) + "\n";
-    let descriptor: number | undefined = openSync(this.file, flags, 0o600);
+    const descriptor = openSync(this.file, flags, 0o600);
+    let rotate = false;
     try {
-      const maxBytes = this.options.maxBytes ?? MAX_LOG_BYTES;
-      if (fstatSync(descriptor).size + Buffer.byteLength(row, "utf8") > maxBytes) {
-        closeSync(descriptor);
-        descriptor = undefined;
-        this.rotate();
-        descriptor = openSync(this.file, flags, 0o600);
-      }
       writeSync(descriptor, row);
+      rotate = fstatSync(descriptor).size > (this.options.maxBytes ?? MAX_LOG_BYTES);
     } finally {
-      if (descriptor !== undefined) closeSync(descriptor);
+      closeSync(descriptor);
     }
+    // Rotate only after closing the descriptor. Never check one file and reopen
+    // it to write, which would introduce a symlink/TOCTOU window.
+    if (rotate) this.rotate();
   }
 
   private rotate(): void {
@@ -179,13 +177,21 @@ export function readAgentActivity(configFile: string, tail = DEFAULT_TAIL): Agen
     throw new Error("--tail must be an integer from 1 to 200");
   }
   const file = agentActivityLogPath(configFile);
+  const flags = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0);
   let data: string;
   let descriptor: number;
   try {
-    descriptor = openSync(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    descriptor = openSync(file, flags);
   } catch (error) {
-    if (isMissingFile(error)) return [];
-    throw error;
+    if (!isMissingFile(error)) throw error;
+    // A completed rotation temporarily has no active file. The latest
+    // archived file still contains the most recent event until the next write.
+    try {
+      descriptor = openSync(file + ".1", flags);
+    } catch (archiveError) {
+      if (isMissingFile(archiveError)) return [];
+      throw archiveError;
+    }
   }
   try {
     data = readFileSync(descriptor, "utf8").slice(-(MAX_LOG_BYTES + 2048));
