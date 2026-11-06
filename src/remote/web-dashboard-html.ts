@@ -150,7 +150,7 @@ export function renderDashboardHtml(
           <div class="card">
             <div class="device-row">
               <div class="device-info">
-                <div class="device-icon">\${dev.hostMetadata?.platform === 'win32' ? '🪟' : (dev.hostMetadata?.platform === 'darwin' ? '🍎' : '🐧')}</div>
+                <div class="device-icon">\${dev.host_metadata?.platform === 'win32' ? '🪟' : (dev.host_metadata?.platform === 'darwin' ? '🍎' : '🐧')}</div>
                 <div>
                   <div class="device-name">
                     \${escapeHtml(dev.alias)}
@@ -158,16 +158,17 @@ export function renderDashboardHtml(
                     <span class="badge badge-blue">\${escapeHtml(dev.profile)}</span>
                   </div>
                   <div class="device-meta">
-                    Host: \${escapeHtml(dev.hostMetadata?.hostname || 'Unknown')} | Arch: \${escapeHtml(dev.hostMetadata?.arch || 'Unknown')} | Policy v\${escapeHtml(dev.policyVersion)}
+                    Host: \${escapeHtml(dev.host_metadata?.hostname || 'Not reported')} | OS: \${escapeHtml(dev.host_metadata?.os || 'Not reported')} | Arch: \${escapeHtml(dev.host_metadata?.arch || 'Not reported')} | Policy v\${escapeHtml(dev.policy_version ?? '—')}
                   </div>
                 </div>
               </div>
               <div style="display:flex; gap:8px; align-items:center;">
-                <select aria-label="Policy for \${escapeHtml(dev.alias)}" class="btn btn-outline btn-sm" onchange="changePolicy('\${dev.id}', this.value)">
+                <select aria-label="Policy for \${escapeHtml(dev.alias)}" class="btn btn-outline btn-sm" onchange="changePolicy('\${dev.id}', this.value)" \${dev.status === 'revoked' ? 'disabled' : ''}>
                   <option value="read-only" \${dev.profile === 'read-only' ? 'selected' : ''}>Profile: Read-Only</option>
                   <option value="operations" \${dev.profile === 'operations' ? 'selected' : ''}>Profile: Operations</option>
                   <option value="full-admin" \${dev.profile === 'full-admin' ? 'selected' : ''}>Profile: Full Admin</option>
                 </select>
+                <button class="btn btn-outline btn-sm" onclick="revokeDevice('\${dev.id}')" \${dev.status === 'revoked' ? 'disabled' : ''}>\${dev.status === 'revoked' ? 'Revoked' : 'Revoke access'}</button>
                 <button class="btn btn-danger btn-sm" onclick="removeDevice('\${dev.id}')">Remove device</button>
               </div>
             </div>
@@ -369,7 +370,7 @@ export function renderDashboardHtml(
 
     async function changePolicy(id, profile) {
       try {
-        const res = await fetch('/api/dashboard/devices/' + id + '/policy', {
+        const res = await fetch('/api/dashboard/devices/' + encodeURIComponent(id), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', 'X-SSH-MCP-Dashboard': '1' },
           body: JSON.stringify({ policy: { profile } })
@@ -384,17 +385,36 @@ export function renderDashboardHtml(
       }
     }
 
+    async function revokeDevice(id) {
+      if (!confirm('Revoke access for this device? The agent will disconnect, but its record will remain until removed.')) return;
+      try {
+        const res = await fetch('/api/dashboard/devices/' + encodeURIComponent(id) + '/revoke', {
+          method: 'POST',
+          headers: { 'X-SSH-MCP-Dashboard': '1' }
+        });
+        if (res.ok) {
+          await loadDevices();
+        } else {
+          const detail = await res.json().catch(() => ({}));
+          alert(detail.error || 'Failed to revoke device');
+        }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
     async function removeDevice(id) {
       if (!confirm('Remove this device? Access will be revoked and its device record permanently deleted. Audit history is retained.')) return;
       try {
-        const res = await fetch('/api/dashboard/devices/' + id, {
+        const res = await fetch('/api/dashboard/devices/' + encodeURIComponent(id), {
           method: 'DELETE',
           headers: { 'X-SSH-MCP-Dashboard': '1' }
         });
         if (res.ok) {
           loadDevices();
         } else {
-          alert('Failed to remove device');
+          const detail = await res.json().catch(() => ({}));
+          alert(detail.error || 'Failed to remove device');
         }
       } catch (e) {
         alert('Error: ' + e.message);
