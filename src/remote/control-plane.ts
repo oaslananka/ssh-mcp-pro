@@ -1,6 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 import { URL } from "node:url";
+import { createMcpHandler, isLegacyRequest, McpServer } from "@modelcontextprotocol/server";
+import { toMcpWebRequest, sendMcpWebResponse } from "../mcp-http-web.js";
 import {
   ensurePemKeyPair,
   hashSecret,
@@ -254,6 +256,23 @@ export class RemoteControlPlane {
       return;
     }
     const body = await readJson(req);
+    const request = toMcpWebRequest(req, body);
+    // The official SDK validates the modern request envelope, mirrored HTTP
+    // headers, protocol version and output shape. Legacy clients retain their
+    // existing authenticated 2025-era behavior.
+    // Preserve the previous error response for an unclaimed 2025-era
+    // tools/call with malformed params. The SDK rightly classifies this
+    // malformed message as invalid; no modern version/header may downgrade.
+    const malformedLegacyCall =
+      body.method === "tools/call" &&
+      !isRecord(body.params) &&
+      req.headers["mcp-protocol-version"] === undefined &&
+      req.headers["mcp-method"] === undefined &&
+      !("_meta" in body);
+    if (!malformedLegacyCall && !(await isLegacyRequest(request, body))) {
+      await this.handleModernMcp(request, res, principal);
+      return;
+    }
     const method = asString(body.method) ?? "";
     const rpcId = body.id ?? null;
     if (method === "initialize") {
@@ -285,6 +304,57 @@ export class RemoteControlPlane {
       id: rpcId,
       error: { code: -32601, message: "Method not found" },
     });
+  }
+
+  /**
+   * Instantiate the SDK handler only after validating this request's bearer
+   * token. No session-wide principal or global tool registry is shared between
+   * callers, so concurrent requests cannot inherit one another's scopes.
+   */
+  private async handleModernMcp(
+    request: Request,
+    response: ServerResponse,
+    principal: RemotePrincipal,
+  ): Promise<void> {
+    const handler = createMcpHandler(
+      () => {
+        const server = new McpServer(
+          { name: "sshautomator-remote-agent", version: SERVER_VERSION },
+          { capabilities: { tools: {} } },
+        );
+        server.server.setRequestHandler("tools/list", async () => ({
+          tools: listRemoteToolDescriptors(principal.capabilities).map(
+            ({ capability: _capability, ...tool }) => ({
+              ...tool,
+              inputSchema: { ...tool.inputSchema, type: "object" as const },
+            }),
+          ),
+        }));
+        server.server.setRequestHandler("tools/call", async (rpc) => {
+          const name = rpc.params.name;
+          if (!Object.prototype.hasOwnProperty.call(TOOL_CAPABILITY_MAP, name)) {
+            throw safeError("INVALID_SCOPE", "Unknown tool", 400);
+          }
+          const result = await this.callRemoteTool(
+            principal,
+            name as RemoteToolName,
+            rpc.params.arguments ?? {},
+          );
+          return {
+            content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+            structuredContent: result,
+          };
+        });
+        return server;
+      },
+      { legacy: "reject" },
+    );
+
+    try {
+      await sendMcpWebResponse(response, await handler.fetch(request));
+    } finally {
+      await handler.close();
+    }
   }
 
   private async handleMcpToolCall(

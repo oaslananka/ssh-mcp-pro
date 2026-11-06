@@ -7,7 +7,7 @@ This repository uses the official TypeScript v2 MCP SDK. The canonical SSH tool 
 - **stdio**: `serveStdio` negotiates the 2026-07-28 era and preserves the 2025 `initialize` handshake for legacy clients.
 - **Standard `/mcp` HTTP**: the SDK's `createMcpHandler` handles modern per-request traffic. The existing session registry and Node Streamable HTTP transport still handle legacy sessionful traffic, selected using the SDK's `isLegacyRequest` classifier.
 - **Legacy SSE**: the optional `/sse` and `/messages` endpoints use the official `server-legacy` compatibility transport. SSE remains disabled by default; do not remove it without a documented client compatibility decision.
-- **Remote-agent control plane**: when its MCP routing is enabled, it remains a distinct authenticated, capability-scoped endpoint with its own request handling. It is **not yet advertised as 2026-07-28-capable**. An official SDK v2 client using `versionNegotiation: { mode: "auto" }` falls back to the 2025 handshake and can list or call only tools permitted by its JWT scopes; clients pinned to 2026-07-28 cannot connect until this route is modernized. This is exercised over real HTTP in `test/integration/remote-mcp-auth-boundary.integration.test.ts`. Modernization requires its own dual-era acceptance, not an authorization bypass to the standard SSH MCP endpoint.
+- **Remote-agent control plane**: when its MCP routing is enabled, the distinct authenticated endpoint now serves the 2026-07-28 protocol through the official `createMcpHandler` and preserves its earlier 2025 `initialize` contract for legacy clients. Every incoming request must pass JWT validation before either era is routed; the per-request modern handler is created only with that principal's capability-filtered tool descriptors. This endpoint never falls back to the standard SSH MCP tool registry or another user's agent inventory. Official SDK clients with `versionNegotiation: { mode: "auto" }` select modern, pinned 2026 clients succeed, and explicitly legacy clients continue to work. See `test/integration/remote-mcp-auth-boundary.integration.test.ts` for real HTTP acceptance.
 
 ## Security and operation
 
@@ -22,8 +22,9 @@ Tool output schemas, structured results and annotations are preserved. New Tasks
 - `pnpm run check:package`
 - `pnpm exec vitest run --project integration test/integration/http-server-boundary.integration.test.ts`
 - `pnpm exec vitest run --project unit test/unit/mcp-v2-transport.test.ts`
+- `pnpm exec vitest run --project integration test/integration/remote-mcp-auth-boundary.integration.test.ts`
 
-The HTTP boundary tests exercise modern SDK client discovery/tool calls, malformed modern header rejection, existing legacy session lifecycle, bearer/OAuth rejection and opt-in SSE routing. The stdio-era tests exercise both modern and legacy clients against the same tool contract. The remote-agent MCP path remains outside modern-era acceptance until explicitly implemented and tested.
+The standard HTTP boundary tests exercise modern SDK client discovery/tool calls, malformed modern header rejection, existing legacy session lifecycle, bearer/OAuth rejection and opt-in SSE routing. The stdio-era tests exercise both modern and legacy clients against the same tool contract. The remote-agent acceptance test separately covers JWT-scoped modern discovery and calls, a pinned 2026 client, explicit legacy initialization, forged version headers, unauthenticated rejection and cross-tenant tool isolation.
 
 Official migration references:
 

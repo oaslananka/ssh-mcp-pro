@@ -286,7 +286,7 @@ describe("remote-agent MCP real HTTP authorization boundary", () => {
     }
   });
 
-  test("auto-negotiating SDK clients can use legacy remote MCP without privilege escalation", async () => {
+  test("auto-negotiating SDK clients discover modern remote MCP without privilege escalation", async () => {
     const harness = await startHarness();
     const token = await issueToken(harness, "hosts:read");
     const transport = new StreamableHTTPClientTransport(new URL(harness.endpoint), {
@@ -298,13 +298,146 @@ describe("remote-agent MCP real HTTP authorization boundary", () => {
     );
     try {
       await client.connect(transport);
-      expect(client.getProtocolEra()).toBe("legacy");
+      expect(client.getProtocolEra()).toBe("modern");
       const tools = (await client.listTools()).tools.map((tool) => tool.name);
       expect(tools).toContain("list_hosts");
       expect(tools).not.toContain("run_shell");
       const status = await client.callTool({ name: "list_hosts", arguments: {} });
       expect(status.isError).not.toBe(true);
       expect(status.structuredContent).toMatchObject({ hosts: [] });
+    } finally {
+      await client.close();
+    }
+  });
+
+  test("pinned 2026-07-28 and explicitly legacy clients share scoped tool behavior", async () => {
+    const harness = await startHarness();
+    const token = await issueToken(harness, "hosts:read");
+    for (const [name, mode, expected] of [
+      ["remote-modern-pinned", { pin: "2026-07-28" as const }, "modern"],
+      ["remote-legacy-explicit", "legacy" as const, "legacy"],
+    ] as const) {
+      const client = new Client({ name, version: "1.0.0" }, { versionNegotiation: { mode } });
+      const transport = new StreamableHTTPClientTransport(new URL(harness.endpoint), {
+        requestInit: { headers: { authorization: "Bearer " + token } },
+      });
+      try {
+        await client.connect(transport);
+        expect(client.getProtocolEra()).toBe(expected);
+        const listed = (await client.listTools()).tools.map((tool) => tool.name);
+        expect(listed).toContain("list_hosts");
+        expect(listed).not.toContain("run_shell");
+        const result = await client.callTool({ name: "list_hosts", arguments: {} });
+        expect(result.isError).not.toBe(true);
+        expect(result.structuredContent).toMatchObject({ hosts: [] });
+      } finally {
+        await client.close();
+      }
+    }
+  });
+
+  test("modern SDK clients cannot read or revoke another owner's agents", async () => {
+    const harness = await startHarness();
+    const policy = createAgentPolicy("read-only");
+    const createdAt = nowIso();
+    const agents = [
+      { id: "agt_modern_first", userId: "github:301" },
+      { id: "agt_modern_second", userId: "github:302" },
+    ] as const;
+    for (const agent of agents) {
+      harness.controlPlane.store.insertAgent({
+        id: agent.id,
+        userId: agent.userId,
+        alias: "shared-alias",
+        status: "offline",
+        profile: policy.profile,
+        policy,
+        policyVersion: policy.version,
+        createdAt,
+        updatedAt: createdAt,
+      });
+    }
+    for (const [index, agent] of agents.entries()) {
+      const other = agents[1 - index]!;
+      const token = await issueOwnerToken(harness, agent.userId.slice("github:".length), [
+        "hosts:read",
+        "agents:read",
+        "agents:admin",
+      ]);
+      const client = new Client(
+        { name: "modern-tenant-" + index, version: "1.0.0" },
+        { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+      );
+      const transport = new StreamableHTTPClientTransport(new URL(harness.endpoint), {
+        requestInit: { headers: { authorization: "Bearer " + token } },
+      });
+      try {
+        await client.connect(transport);
+        expect(client.getProtocolEra()).toBe("modern");
+        const names = (await client.listTools()).tools.map((tool) => tool.name);
+        expect(names).toContain("list_agents");
+        expect(names).toContain("revoke_agent");
+        expect(names).not.toContain("run_shell");
+        const own = await client.callTool({ name: "list_agents", arguments: {} });
+        expect(own.structuredContent).toMatchObject({
+          agents: [{ id: agent.id, alias: "shared-alias" }],
+        });
+        expect(JSON.stringify(own.structuredContent)).not.toContain(other.id);
+
+        const denied = await client
+          .callTool({ name: "revoke_agent", arguments: { agent_id_or_alias: other.id } })
+          .then(
+            (result) => result.isError === true,
+            () => true,
+          );
+        expect(denied).toBe(true);
+        expect(harness.controlPlane.store.getAgent(other.id)?.status).toBe("offline");
+      } finally {
+        await client.close();
+      }
+    }
+  });
+
+  test("rejects forged modern per-request protocol headers instead of silently downgrading", async () => {
+    const harness = await startHarness();
+    const token = await issueToken(harness, "hosts:read");
+    let corrupted = false;
+    const transport = new StreamableHTTPClientTransport(new URL(harness.endpoint), {
+      requestInit: { headers: { authorization: "Bearer " + token } },
+      fetch: (input, init) => {
+        const request = new Request(input, init);
+        if (request.method === "POST" && request.headers.get("mcp-method") === "tools/list") {
+          // The body still carries the SDK's authenticated modern version.
+          // A forged 2025 header must fail rather than falling back to initialize.
+          request.headers.set("mcp-protocol-version", "2025-11-25");
+          corrupted = true;
+        }
+        return fetch(request);
+      },
+    });
+    const client = new Client(
+      { name: "remote-header-mismatch", version: "1.0.0" },
+      { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+    );
+    try {
+      await client.connect(transport);
+      expect(client.getProtocolEra()).toBe("modern");
+      await expect(client.listTools()).rejects.toThrow();
+      expect(corrupted).toBe(true);
+    } finally {
+      await client.close();
+    }
+  });
+
+  test("never downgrades an unauthenticated modern discovery request to legacy", async () => {
+    const harness = await startHarness();
+    const client = new Client(
+      { name: "remote-unauthorized-modern", version: "1.0.0" },
+      { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+    );
+    const transport = new StreamableHTTPClientTransport(new URL(harness.endpoint));
+    try {
+      await expect(client.connect(transport)).rejects.toThrow();
     } finally {
       await client.close();
     }
