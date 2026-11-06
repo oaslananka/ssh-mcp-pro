@@ -256,6 +256,11 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(enrollRes.statusCode).toBe(201);
       const enrollData = JSON.parse(enrollRes.body);
       expect(enrollData.commands.linux).toContain("install-agent.sh");
+      expect(enrollData.enrollment_token).toMatch(/^[A-Za-z0-9_-]{30,}$/u);
+      for (const platform of ["linux", "windows", "npm"] as const) {
+        expect(enrollData.commands[platform]).toContain(enrollData.enrollment_token);
+        expect(enrollData.commands[platform]).not.toMatch(/--[Tt]oken\s+''/u);
+      }
       if (process.platform !== "win32") {
         // A failed download must fail the copy-paste command, not silently
         // succeed because the trailing bash process receives empty input.
@@ -309,7 +314,49 @@ INSTALLER
       expect(listData.devices).toHaveLength(1);
       expect(listData.devices[0].alias).toBe("test-vps");
 
-      // 5. Remove device: revoke access and discard stored inventory/credentials.
+      // 5. The browser's profile API and explicit revoke operation are distinct.
+      const deviceEndpoint = `/api/dashboard/devices/${listData.devices[0].id}`;
+      const ownerHeaders = {
+        cookie: `ssh_mcp_web_session=${token}`,
+        origin: "http://127.0.0.1:3000",
+        "x-ssh-mcp-dashboard": "1",
+      };
+      const policyResponse = captureResponse();
+      await cp.handleHttp(
+        jsonRequest("PATCH", deviceEndpoint, { policy: { profile: "operations" } }, ownerHeaders),
+        policyResponse as unknown as ServerResponse,
+        deviceEndpoint,
+      );
+      expect(policyResponse.statusCode).toBe(200);
+      expect(JSON.parse(policyResponse.body).device.profile).toBe("operations");
+
+      const revokeEndpoint = deviceEndpoint + "/revoke";
+      const onlyRevokeResponse = captureResponse();
+      await cp.handleHttp(
+        request("POST", revokeEndpoint, ownerHeaders),
+        onlyRevokeResponse as unknown as ServerResponse,
+        revokeEndpoint,
+      );
+      expect(onlyRevokeResponse.statusCode).toBe(200);
+      expect(JSON.parse(onlyRevokeResponse.body).device.status).toBe("revoked");
+      expect(cp.store.getAgent(listData.devices[0].id)?.status).toBe("revoked");
+      const revokedEventCount = cp.store
+        .listAudit(meData.user.id, undefined, 20)
+        .filter((event) => event.eventType === "agent_revoked").length;
+      const repeatedRevokeResponse = captureResponse();
+      await cp.handleHttp(
+        request("POST", revokeEndpoint, ownerHeaders),
+        repeatedRevokeResponse as unknown as ServerResponse,
+        revokeEndpoint,
+      );
+      expect(repeatedRevokeResponse.statusCode).toBe(200);
+      expect(
+        cp.store
+          .listAudit(meData.user.id, undefined, 20)
+          .filter((event) => event.eventType === "agent_revoked"),
+      ).toHaveLength(revokedEventCount);
+
+      // 6. Remove device: permanently discard inventory and enrollment data.
       const originalEnrollmentHash = hashSecret(enrollData.enrollment_token);
       expect(cp.store.getEnrollmentTokenByHash(originalEnrollmentHash)).toBeDefined();
       const revokeRes = captureResponse();
@@ -403,6 +450,7 @@ INSTALLER
         ["POST", "/api/dashboard/devices/enroll"],
         ["PATCH", "/api/dashboard/devices/example"],
         ["DELETE", "/api/dashboard/devices/example"],
+        ["POST", "/api/dashboard/devices/example/revoke"],
       ] as const;
       for (const [method, endpoint] of protectedEndpoints) {
         for (const headers of [

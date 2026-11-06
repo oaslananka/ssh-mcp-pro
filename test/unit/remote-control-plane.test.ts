@@ -425,8 +425,20 @@ describe("remote control plane remote-agent contracts", () => {
           approval as ServerResponse,
           "/oauth/approve",
         );
-        expect(approval.statusCode).toBe(302);
-        expect(new URL(String(approval.headers?.Location)).origin).toBe(expectedOrigin);
+        if (provider === "github") {
+          // A same-origin HTML handoff avoids CSP form-action applying to the
+          // later GitHub -> MCP client redirect chain (ChatGPT/Gemini).
+          expect(approval.statusCode).toBe(200);
+          expect(approval.headers?.Location).toBeUndefined();
+          expect(approval.headers?.["Content-Security-Policy"]).toContain("form-action 'none'");
+          expect(approval.headers?.["Referrer-Policy"]).toBe("no-referrer");
+          expect(approval.body).toContain('<meta http-equiv="refresh"');
+          expect(approval.body).toContain('<a href="https://github.com/login/oauth/authorize?');
+          expect(approval.body).not.toContain("oauth-redirect.googleusercontent.com");
+        } else {
+          expect(approval.statusCode).toBe(302);
+          expect(new URL(String(approval.headers?.Location)).origin).toBe(expectedOrigin);
+        }
       }
     } finally {
       controlPlane.close();
@@ -675,10 +687,11 @@ describe("remote control plane remote-agent contracts", () => {
         approval as ServerResponse,
         "/oauth/approve",
       );
-      expect(approval.statusCode).toBe(302);
-      expect(String(approval.headers?.Location)).toContain(
-        "https://github.com/login/oauth/authorize",
-      );
+      expect(approval.statusCode).toBe(200);
+      expect(approval.headers?.Location).toBeUndefined();
+      expect(approval.body).toContain("https://github.com/login/oauth/authorize");
+      expect(approval.body).toContain('http-equiv="refresh"');
+      expect(approval.headers?.["Content-Security-Policy"]).toContain("form-action 'none'");
 
       await expect(
         controlPlane.handleHttp(

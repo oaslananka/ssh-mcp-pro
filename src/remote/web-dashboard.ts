@@ -218,6 +218,14 @@ export class WebDashboardHandler {
       await this.handleApiEnrollDevice(req, res);
       return true;
     }
+    if (
+      pathname.startsWith("/api/dashboard/devices/") &&
+      pathname.endsWith("/revoke") &&
+      req.method === "POST"
+    ) {
+      this.handleApiRevokeDevice(req, res, pathname.slice(0, -"/revoke".length));
+      return true;
+    }
     if (pathname.startsWith("/api/dashboard/devices/") && req.method === "PATCH") {
       await this.handleApiUpdateDevicePolicy(req, res, pathname);
       return true;
@@ -449,7 +457,10 @@ export class WebDashboardHandler {
     const tokenResult = this.deps.createEnrollmentToken(principal, body);
     const serverUrl = this.deps.config.publicBaseUrl;
     const alias = typeof tokenResult.alias === "string" ? tokenResult.alias : "";
-    const token = typeof tokenResult.token === "string" ? tokenResult.token : "";
+    const token = tokenResult.enrollment_token;
+    if (typeof token !== "string" || !token) {
+      throw safeError("INVALID_TOKEN", "Enrollment token was not generated", 500);
+    }
 
     const posixInstallerUrl = `${serverUrl}/install-agent.sh`;
     const powerShellInstallerUrl = `${serverUrl}/install-agent.ps1`;
@@ -507,6 +518,18 @@ export class WebDashboardHandler {
     jsonResponse(res, 200, { device: sanitizeAgent(updated) }, addNoStore());
   }
 
+  /** Revoke access without deleting the inventory or the retained audit trail. */
+  private handleApiRevokeDevice(req: IncomingMessage, res: ServerResponse, pathname: string): void {
+    const owned = this.findOwnedDashboardDevice(req, res, pathname);
+    if (!owned) return;
+    // Repeated revoke requests should not duplicate audit events.
+    const revoked =
+      owned.agent.status === "revoked"
+        ? owned.agent
+        : this.deps.revokeAgent(owned.principal, owned.agent);
+    jsonResponse(res, 200, { device: sanitizeAgent(revoked) }, addNoStore());
+  }
+
   private async handleApiRemoveDevice(
     req: IncomingMessage,
     res: ServerResponse,
@@ -515,7 +538,10 @@ export class WebDashboardHandler {
     const owned = this.findOwnedDashboardDevice(req, res, pathname);
     if (!owned) return;
     // Revoke and disconnect before destroying the agent record or token hashes.
-    const revoked = this.deps.revokeAgent(owned.principal, owned.agent);
+    const revoked =
+      owned.agent.status === "revoked"
+        ? owned.agent
+        : this.deps.revokeAgent(owned.principal, owned.agent);
     if (!this.deps.store.removeRevokedAgent(owned.principal.userId, revoked.id)) {
       throw safeError("AGENT_NOT_FOUND", "Device not found", 404);
     }

@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, vi, test } from "vitest";
 import { runAgentCli } from "../../src/remote/agent-cli.js";
+import { AgentActivityLog, readAgentActivity } from "../../src/remote/agent-activity-log.js";
 import {
   generateEd25519PemKeyPair,
   nowIso,
@@ -297,6 +298,22 @@ describe("remote agent CLI", () => {
     }
   });
 
+  test("logs subcommand shows local history without a running agent", async () => {
+    const config = agentConfigPath();
+    const activity = new AgentActivityLog(config);
+    const stdout = captureStdout();
+    try {
+      activity.event("ok", "agent_ready", "Identity confirmed. Agent ready for requests.");
+      await runAgentCli(["logs", "--tail", "1"]);
+    } finally {
+      stdout.restore();
+    }
+    expect(stdout.read()).toContain("Agent activity");
+    expect(stdout.read()).toContain("Identity confirmed");
+    expect(stdout.read()).toContain("agent-activity.jsonl");
+    expect(stdout.read()).not.toContain("PRIVATE KEY");
+  });
+
   test("fails clearly when the runtime WebSocket implementation is unavailable", async () => {
     const configPath = agentConfigPath();
     writeAgentConfig(configPath, {});
@@ -360,6 +377,16 @@ describe("remote agent CLI", () => {
         capabilities: expect.arrayContaining(["shell.exec", "system.read"]),
       });
       expect(verifyEnvelope(hello, agentKeys.publicKeyPem)).toBe(true);
+      // Socket-open is not authenticated. Only the server ready message may
+      // turn the activity panel green / announce a successful connection.
+      expect(stdout.read()).not.toContain("Agent connected: agt_online");
+      expect(stdout.read()).toContain("Validating agent identity");
+      socket?.onmessage?.({ data: JSON.stringify({ type: "agent.ready", agent_id: "unknown" }) });
+      expect(stdout.read()).not.toContain("Agent connected: agt_online");
+      socket?.onmessage?.({
+        data: JSON.stringify({ type: "agent.ready", agent_id: "agt_online" }),
+      });
+      await waitFor(() => stdout.read().includes("Agent connected: agt_online"));
 
       const action: ActionRequestEnvelope = {
         type: "action.request",
@@ -404,6 +431,21 @@ describe("remote agent CLI", () => {
       stdout.restore();
     }
     expect(stdout.read()).toContain("Agent connected: agt_online");
+    expect(stdout.read()).toContain("Request received: run_shell");
+    expect(stdout.read()).toContain("Request run_shell completed: ok");
+    const events = readAgentActivity(configPath, 20);
+    expect(events.map((item) => item.event)).toEqual(
+      expect.arrayContaining([
+        "agent_starting",
+        "transport_open",
+        "agent_ready",
+        "action_started",
+        "action_finished",
+        "disconnected",
+      ]),
+    );
+    expect(JSON.stringify(events)).not.toContain("agent-ok");
+    expect(JSON.stringify(events)).not.toContain("process.stdout.write");
   });
 
   test("run ignores invalid control-plane messages and applies signed policy updates", async () => {

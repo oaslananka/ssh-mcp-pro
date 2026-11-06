@@ -3,6 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { AgentExecutor, defaultHostMetadata } from "./agent-executor.js";
 import {
+  AgentActivityLog,
+  agentActivityLogPath,
+  showAgentActivityLogs,
+} from "./agent-activity-log.js";
+import {
   ensurePemKeyPair,
   nowIso,
   randomToken,
@@ -16,7 +21,13 @@ import {
   type PolicyUpdateRejectionReason,
 } from "./policy-update-guard.js";
 import { parseControlPlaneEnvelope, parseAgentPolicy } from "./schemas.js";
-import type { AgentHelloEnvelope, AgentHostMetadata, AgentPolicy } from "./types.js";
+import type {
+  ActionRequestEnvelope,
+  AgentHelloEnvelope,
+  AgentHostMetadata,
+  AgentPolicy,
+  PolicyUpdateEnvelope,
+} from "./types.js";
 
 interface AgentConfigFile {
   server: string;
@@ -182,10 +193,81 @@ async function enroll(argv: string[]): Promise<void> {
   output(`Config: ${configPath()}`);
 }
 
+/** A server-side ready acknowledgement is distinct from an open WebSocket. */
+function handleAgentControlMessage(
+  payload: Record<string, unknown>,
+  config: AgentConfigFile,
+  activity: AgentActivityLog,
+): boolean {
+  if (payload.type === "agent.ready") {
+    if (payload.agent_id === config.agentId) {
+      activity.event("ok", "agent_ready", "Identity confirmed. Agent ready for requests.");
+      output(`Agent connected: ${config.agentId}`);
+    }
+    return true;
+  }
+  if (payload.type === "error") {
+    activity.event("error", "control_plane_error", "Server rejected an agent message.");
+    return true;
+  }
+  return false;
+}
+
+function applyAgentPolicyUpdate(
+  update: PolicyUpdateEnvelope,
+  config: AgentConfigFile,
+  executor: AgentExecutor,
+  activity: AgentActivityLog,
+  seenPolicyUpdateNonces: Map<string, number>,
+): void {
+  const validation = validatePolicyUpdate(update, config.policy.version, seenPolicyUpdateNonces);
+  if (!validation.accepted) {
+    recordPolicyUpdateRejection(validation.reason);
+    activity.event("warn", "policy_rejected", "Policy update rejected: " + validation.reason);
+    return;
+  }
+  saveConfig({ ...config, policy: update.policy });
+  rememberAcceptedPolicyUpdate(seenPolicyUpdateNonces, update.nonce);
+  config.policy = update.policy;
+  executor.updatePolicy(update.policy);
+  activity.event(
+    "ok",
+    "policy_updated",
+    "Policy updated: " + update.policy.profile + " v" + update.policy.version,
+  );
+}
+
+function acceptAgentAction(
+  action: ActionRequestEnvelope,
+  config: AgentConfigFile,
+  activity: AgentActivityLog,
+  seenActions: Map<string, number>,
+): boolean {
+  if (seenActions.has(action.action_id)) {
+    activity.event("warn", "action_replay", "Duplicate action ignored.");
+    return false;
+  }
+  if (new Date(action.deadline).getTime() < Date.now()) {
+    activity.event("warn", "action_expired", "Expired action ignored.");
+    return false;
+  }
+  if (
+    action.policy_version !== config.policy.version &&
+    action.policy_version !== config.policy.version + 1
+  ) {
+    activity.event("warn", "policy_mismatch", "Action policy version mismatch.");
+    return false;
+  }
+  return true;
+}
+
 async function runAgent(): Promise<void> {
   const config = requireConfig();
   const WebSocketCtor = runtimeWebSocket();
   const executor = new AgentExecutor(config.policy, config.privateKeyPem);
+  const activity = new AgentActivityLog(configPath());
+  activity.banner(config.alias, config.policy.profile, config.policy.version);
+  activity.event("info", "agent_starting", "Agent starting. Preparing outbound connection.");
   const seenActions = new Map<string, number>();
   const seenPolicyUpdateNonces = new Map<string, number>();
 
@@ -230,7 +312,8 @@ async function runAgent(): Promise<void> {
         config.privateKeyPem,
       );
       ws.send(JSON.stringify(hello));
-      output(`Agent connected: ${config.agentId}`);
+      activity.event("info", "transport_open", "Transport open. Validating agent identity.");
+      // An open socket is not an authenticated agent; wait for agent.ready.
     };
     ws.onmessage = (event) => {
       void (async () => {
@@ -240,12 +323,17 @@ async function runAgent(): Promise<void> {
             : Buffer.from(event.data as ArrayBuffer).toString("utf8");
         const payload = JSON.parse(raw) as unknown;
         if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+          activity.event("warn", "message_rejected", "Malformed control-plane message ignored.");
+          return;
+        }
+        if (handleAgentControlMessage(payload as Record<string, unknown>, config, activity)) {
           return;
         }
         let envelope: ReturnType<typeof parseControlPlaneEnvelope>;
         try {
           envelope = parseControlPlaneEnvelope(payload);
         } catch {
+          activity.event("warn", "message_rejected", "Invalid control-plane envelope ignored.");
           return;
         }
         if (envelope.agent_id !== config.agentId) {
@@ -257,52 +345,47 @@ async function runAgent(): Promise<void> {
             config.controlPlanePublicKeyPem,
           )
         ) {
+          activity.event("warn", "signature_rejected", "Unverified control-plane message ignored.");
           return;
         }
         if (envelope.type === "policy.update") {
-          const update = envelope;
-          const validation = validatePolicyUpdate(
-            update,
-            config.policy.version,
-            seenPolicyUpdateNonces,
-          );
-          if (!validation.accepted) {
-            recordPolicyUpdateRejection(validation.reason);
-            return;
-          }
-
-          const nextConfig: AgentConfigFile = { ...config, policy: update.policy };
-          saveConfig(nextConfig);
-          rememberAcceptedPolicyUpdate(seenPolicyUpdateNonces, update.nonce);
-          config.policy = update.policy;
-          executor.updatePolicy(update.policy);
+          applyAgentPolicyUpdate(envelope, config, executor, activity, seenPolicyUpdateNonces);
           return;
         }
         const action = envelope;
-        if (seenActions.has(action.action_id)) {
-          return;
-        }
-        if (new Date(action.deadline).getTime() < Date.now()) {
-          return;
-        }
-        if (
-          action.policy_version !== config.policy.version &&
-          action.policy_version !== config.policy.version + 1
-        ) {
+        if (!acceptAgentAction(action, config, activity, seenActions)) {
           return;
         }
         rememberAction(action.action_id, action.deadline);
+        const startedAt = Date.now();
+        activity.event("info", "action_started", "Request received: " + action.tool);
         const result = await executor.execute(action);
         ws.send(JSON.stringify(result));
-      })().catch((error) => {
-        process.stderr.write(
-          `Agent action failed: ${error instanceof Error ? error.message : String(error)}\n`,
+        activity.event(
+          result.status === "ok" ? "ok" : "warn",
+          "action_finished",
+          "Request " +
+            action.tool +
+            " completed: " +
+            result.status +
+            " (" +
+            (Date.now() - startedAt) +
+            " ms)",
         );
+      })().catch(() => {
+        // Never print command/output/provider error text: it can contain credentials.
+        activity.event("error", "action_failed", "Action processing failed; details withheld.");
       });
     };
-    ws.onerror = (event) => reject(new Error(`WebSocket error: ${String(event)}`));
-    // A disconnected agent must exit nonzero so Windows Task Scheduler can restart it.
-    ws.onclose = () => reject(new Error("Agent WebSocket connection closed"));
+    ws.onerror = () => {
+      activity.event("error", "socket_error", "Connection error. Service restart may be required.");
+      reject(new Error("WebSocket transport error"));
+    };
+    // A disconnected agent must exit nonzero so its service supervisor can restart it.
+    ws.onclose = () => {
+      activity.event("warn", "disconnected", "Connection closed. Awaiting service restart.");
+      reject(new Error("Agent WebSocket connection closed"));
+    };
   });
 }
 
@@ -317,6 +400,7 @@ function status(): void {
   output(`Server: ${config.server}`);
   output(`Profile: ${config.policy.profile}`);
   output(`Config: ${configPath()}`);
+  output(`Activity log: ${agentActivityLogPath(configPath())}`);
 }
 
 function installService(): void {
@@ -364,6 +448,9 @@ export async function runAgentCli(argv: string[]): Promise<void> {
     case "status":
       status();
       break;
+    case "logs":
+      await showAgentActivityLogs(configPath(), argv.slice(1));
+      break;
     case "install-service":
       installService();
       break;
@@ -375,6 +462,7 @@ export async function runAgentCli(argv: string[]): Promise<void> {
       output("  ssh-mcp-pro-agent enroll --server <url> --token <token> --alias <alias>");
       output("  ssh-mcp-pro-agent run");
       output("  ssh-mcp-pro-agent status");
+      output("  ssh-mcp-pro-agent logs [--tail 60] [--follow]");
       output("  ssh-mcp-pro-agent install-service");
       output("  ssh-mcp-pro-agent uninstall-service");
   }
