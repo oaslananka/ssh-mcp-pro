@@ -21,7 +21,13 @@ import {
   type PolicyUpdateRejectionReason,
 } from "./policy-update-guard.js";
 import { parseControlPlaneEnvelope, parseAgentPolicy } from "./schemas.js";
-import type { AgentHelloEnvelope, AgentHostMetadata, AgentPolicy } from "./types.js";
+import type {
+  ActionRequestEnvelope,
+  AgentHelloEnvelope,
+  AgentHostMetadata,
+  AgentPolicy,
+  PolicyUpdateEnvelope,
+} from "./types.js";
 
 interface AgentConfigFile {
   server: string;
@@ -187,6 +193,74 @@ async function enroll(argv: string[]): Promise<void> {
   output(`Config: ${configPath()}`);
 }
 
+/** A server-side ready acknowledgement is distinct from an open WebSocket. */
+function handleAgentControlMessage(
+  payload: Record<string, unknown>,
+  config: AgentConfigFile,
+  activity: AgentActivityLog,
+): boolean {
+  if (payload.type === "agent.ready") {
+    if (payload.agent_id === config.agentId) {
+      activity.event("ok", "agent_ready", "Identity confirmed. Agent ready for requests.");
+      output(`Agent connected: ${config.agentId}`);
+    }
+    return true;
+  }
+  if (payload.type === "error") {
+    activity.event("error", "control_plane_error", "Server rejected an agent message.");
+    return true;
+  }
+  return false;
+}
+
+function applyAgentPolicyUpdate(
+  update: PolicyUpdateEnvelope,
+  config: AgentConfigFile,
+  executor: AgentExecutor,
+  activity: AgentActivityLog,
+  seenPolicyUpdateNonces: Map<string, number>,
+): void {
+  const validation = validatePolicyUpdate(update, config.policy.version, seenPolicyUpdateNonces);
+  if (!validation.accepted) {
+    recordPolicyUpdateRejection(validation.reason);
+    activity.event("warn", "policy_rejected", "Policy update rejected: " + validation.reason);
+    return;
+  }
+  saveConfig({ ...config, policy: update.policy });
+  rememberAcceptedPolicyUpdate(seenPolicyUpdateNonces, update.nonce);
+  config.policy = update.policy;
+  executor.updatePolicy(update.policy);
+  activity.event(
+    "ok",
+    "policy_updated",
+    "Policy updated: " + update.policy.profile + " v" + update.policy.version,
+  );
+}
+
+function acceptAgentAction(
+  action: ActionRequestEnvelope,
+  config: AgentConfigFile,
+  activity: AgentActivityLog,
+  seenActions: Map<string, number>,
+): boolean {
+  if (seenActions.has(action.action_id)) {
+    activity.event("warn", "action_replay", "Duplicate action ignored.");
+    return false;
+  }
+  if (new Date(action.deadline).getTime() < Date.now()) {
+    activity.event("warn", "action_expired", "Expired action ignored.");
+    return false;
+  }
+  if (
+    action.policy_version !== config.policy.version &&
+    action.policy_version !== config.policy.version + 1
+  ) {
+    activity.event("warn", "policy_mismatch", "Action policy version mismatch.");
+    return false;
+  }
+  return true;
+}
+
 async function runAgent(): Promise<void> {
   const config = requireConfig();
   const WebSocketCtor = runtimeWebSocket();
@@ -252,15 +326,7 @@ async function runAgent(): Promise<void> {
           activity.event("warn", "message_rejected", "Malformed control-plane message ignored.");
           return;
         }
-        if ("type" in payload && payload.type === "agent.ready") {
-          if ("agent_id" in payload && payload.agent_id === config.agentId) {
-            activity.event("ok", "agent_ready", "Identity confirmed. Agent ready for requests.");
-            output(`Agent connected: ${config.agentId}`);
-          }
-          return;
-        }
-        if ("type" in payload && payload.type === "error") {
-          activity.event("error", "control_plane_error", "Server rejected an agent message.");
+        if (handleAgentControlMessage(payload as Record<string, unknown>, config, activity)) {
           return;
         }
         let envelope: ReturnType<typeof parseControlPlaneEnvelope>;
@@ -283,48 +349,11 @@ async function runAgent(): Promise<void> {
           return;
         }
         if (envelope.type === "policy.update") {
-          const update = envelope;
-          const validation = validatePolicyUpdate(
-            update,
-            config.policy.version,
-            seenPolicyUpdateNonces,
-          );
-          if (!validation.accepted) {
-            recordPolicyUpdateRejection(validation.reason);
-            activity.event(
-              "warn",
-              "policy_rejected",
-              "Policy update rejected: " + validation.reason,
-            );
-            return;
-          }
-
-          const nextConfig: AgentConfigFile = { ...config, policy: update.policy };
-          saveConfig(nextConfig);
-          rememberAcceptedPolicyUpdate(seenPolicyUpdateNonces, update.nonce);
-          config.policy = update.policy;
-          executor.updatePolicy(update.policy);
-          activity.event(
-            "ok",
-            "policy_updated",
-            "Policy updated: " + update.policy.profile + " v" + update.policy.version,
-          );
+          applyAgentPolicyUpdate(envelope, config, executor, activity, seenPolicyUpdateNonces);
           return;
         }
         const action = envelope;
-        if (seenActions.has(action.action_id)) {
-          activity.event("warn", "action_replay", "Duplicate action ignored.");
-          return;
-        }
-        if (new Date(action.deadline).getTime() < Date.now()) {
-          activity.event("warn", "action_expired", "Expired action ignored.");
-          return;
-        }
-        if (
-          action.policy_version !== config.policy.version &&
-          action.policy_version !== config.policy.version + 1
-        ) {
-          activity.event("warn", "policy_mismatch", "Action policy version mismatch.");
+        if (!acceptAgentAction(action, config, activity, seenActions)) {
           return;
         }
         rememberAction(action.action_id, action.deadline);
