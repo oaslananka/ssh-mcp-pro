@@ -285,6 +285,39 @@ export class OAuthHandler {
     );
   }
 
+  /**
+   * Avoid chaining browser form submissions through third-party OAuth redirects
+   * and then back to the MCP client. Chromium applies form-action to redirects;
+   * the final client callback is deliberately not a permitted form destination.
+   * A new document starts an ordinary navigation instead.
+   */
+  private continueToGitHub(res: ServerResponse, githubUrl: URL): void {
+    const href = escapeHtml(githubUrl.toString());
+    res.writeHead(200, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "Referrer-Policy": "no-referrer",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy":
+        "default-src 'none'; style-src 'unsafe-inline'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'",
+    });
+    res.end(
+      [
+        '<!doctype html><html lang="en"><head><meta charset="utf-8">',
+        '<meta name="viewport" content="width=device-width, initial-scale=1">',
+        "<title>Continue with GitHub — SSH MCP Pro</title>",
+        '<meta http-equiv="refresh" content="0;url=',
+        href,
+        '">',
+        "</head><body>",
+        '<p>Continue to GitHub to sign in.</p><a href="',
+        href,
+        '">Continue with GitHub</a>',
+        "</body></html>",
+      ].join(""),
+    );
+  }
+
   /** Explicit browser approval binds this client to the current login transaction. */
   async handleApprove(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const form = await readJsonOrForm(req);
@@ -319,7 +352,7 @@ export class OAuthHandler {
     githubUrl.searchParams.set("redirect_uri", this.config.githubCallbackUrl);
     githubUrl.searchParams.set("scope", "read:user");
     githubUrl.searchParams.set("state", transactionId);
-    redirect(res, githubUrl.toString());
+    this.continueToGitHub(res, githubUrl);
   }
 
   private validateAuthorizeParams(

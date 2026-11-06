@@ -256,6 +256,11 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(enrollRes.statusCode).toBe(201);
       const enrollData = JSON.parse(enrollRes.body);
       expect(enrollData.commands.linux).toContain("install-agent.sh");
+      expect(enrollData.enrollment_token).toMatch(/^[A-Za-z0-9_-]{30,}$/u);
+      for (const platform of ["linux", "windows", "npm"] as const) {
+        expect(enrollData.commands[platform]).toContain(enrollData.enrollment_token);
+        expect(enrollData.commands[platform]).not.toMatch(/--[Tt]oken\s+''/u);
+      }
       if (process.platform !== "win32") {
         // A failed download must fail the copy-paste command, not silently
         // succeed because the trailing bash process receives empty input.

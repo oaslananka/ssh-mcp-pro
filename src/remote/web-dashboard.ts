@@ -449,7 +449,10 @@ export class WebDashboardHandler {
     const tokenResult = this.deps.createEnrollmentToken(principal, body);
     const serverUrl = this.deps.config.publicBaseUrl;
     const alias = typeof tokenResult.alias === "string" ? tokenResult.alias : "";
-    const token = typeof tokenResult.token === "string" ? tokenResult.token : "";
+    const token = tokenResult.enrollment_token;
+    if (typeof token !== "string" || !token) {
+      throw safeError("INVALID_TOKEN", "Enrollment token was not generated", 500);
+    }
 
     const posixInstallerUrl = `${serverUrl}/install-agent.sh`;
     const powerShellInstallerUrl = `${serverUrl}/install-agent.ps1`;
