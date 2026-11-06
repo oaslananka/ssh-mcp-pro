@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.3.0...ssh-mcp-pro-v1.4.0) (2026-11-06)
+
+
+### Features
+
+* **mcp:** support 2026 protocol on authenticated remote-agent endpoint ([#181](https://github.com/oaslananka/ssh-mcp-pro/issues/181)) ([8f5df37](https://github.com/oaslananka/ssh-mcp-pro/commit/8f5df3700657118d26743eebf314bdb3850cceb7))
+* **remote:** add hosted dashboard and Coolify deployment support ([#127](https://github.com/oaslananka/ssh-mcp-pro/issues/127)) ([7a4ba63](https://github.com/oaslananka/ssh-mcp-pro/commit/7a4ba63cc8d2a3ec8080ecdddf57e854d08e1de2))
+
+
+### Bug Fixes
+
+* **agent:** launch Windows scheduled task with npm CMD shim ([#130](https://github.com/oaslananka/ssh-mcp-pro/issues/130)) ([cf6fdb5](https://github.com/oaslananka/ssh-mcp-pro/commit/cf6fdb511af552d0538659a8fa7420bb586cfb69))
+* **agent:** resolve Linux npm CLI discovery and system runtime identity ([#176](https://github.com/oaslananka/ssh-mcp-pro/issues/176)) ([16b7ce3](https://github.com/oaslananka/ssh-mcp-pro/commit/16b7ce3ea57931482e46af539223e2e481d47c35))
+* **agent:** restart service after enrollment identity changes ([#180](https://github.com/oaslananka/ssh-mcp-pro/issues/180)) ([d770763](https://github.com/oaslananka/ssh-mcp-pro/commit/d770763936a5e1c7f0c40e87414a8917f1c21b7a))
+* **agent:** restart Windows agent after WebSocket disconnect ([#129](https://github.com/oaslananka/ssh-mcp-pro/issues/129)) ([8df07ee](https://github.com/oaslananka/ssh-mcp-pro/commit/8df07ee08a55eb665679dffc33d8701b4e063ca9))
+* **agent:** surface Linux installer download failures ([#132](https://github.com/oaslananka/ssh-mcp-pro/issues/132)) ([79f166d](https://github.com/oaslananka/ssh-mcp-pro/commit/79f166d50ffd52d0b9253b318703486fd5a72e8a))
+* **apps:** correct publication legal-document attestations ([#157](https://github.com/oaslananka/ssh-mcp-pro/issues/157)) ([7e8b42d](https://github.com/oaslananka/ssh-mcp-pro/commit/7e8b42d9e5032c657fd65920c004bafc3d41abf6))
+* **auth:** restrict fixture identities to loopback test mode ([#128](https://github.com/oaslananka/ssh-mcp-pro/issues/128)) ([a0a1d19](https://github.com/oaslananka/ssh-mcp-pro/commit/a0a1d1991dc665db3be2a017ddea039d4b642803))
+* **automation:** avoid stalled dependency PR creation ([#153](https://github.com/oaslananka/ssh-mcp-pro/issues/153)) ([209c084](https://github.com/oaslananka/ssh-mcp-pro/commit/209c084294188a46baf878bfc326676b25e49781))
+* **dashboard:** correct Gemini and Copilot setup examples ([#161](https://github.com/oaslananka/ssh-mcp-pro/issues/161)) ([be00c8c](https://github.com/oaslananka/ssh-mcp-pro/commit/be00c8c0f77c38d08b6b68f78e6fe2118c1bfeb2))
+* **dashboard:** correct MCP client setup examples ([#146](https://github.com/oaslananka/ssh-mcp-pro/issues/146)) ([71ed56a](https://github.com/oaslananka/ssh-mcp-pro/commit/71ed56a45f024812cf15d89f4de861cf631a65bd))
+* **dashboard:** display host metadata and stream agent activity logs ([#183](https://github.com/oaslananka/ssh-mcp-pro/issues/183)) ([30d294a](https://github.com/oaslananka/ssh-mcp-pro/commit/30d294acb367ae06d25ec1caff9f68bad113ea2d))
+* **dashboard:** distinguish remote MCP connector setup ([#147](https://github.com/oaslananka/ssh-mcp-pro/issues/147)) ([621948d](https://github.com/oaslananka/ssh-mcp-pro/commit/621948d03bffe62282daa96dbb41d741aca83311))
+* **dashboard:** make navigation keyboard accessible ([#160](https://github.com/oaslananka/ssh-mcp-pro/issues/160)) ([6261f7f](https://github.com/oaslananka/ssh-mcp-pro/commit/6261f7f3b92a53b7f9e474e6159aa36c468a6ed3))
+* **dashboard:** remove revoked devices from inventory ([#149](https://github.com/oaslananka/ssh-mcp-pro/issues/149)) ([715edb8](https://github.com/oaslananka/ssh-mcp-pro/commit/715edb8511f908d70bb2400767942cd17e3bbe21))
+* **dashboard:** separate device revoke and remove actions ([#182](https://github.com/oaslananka/ssh-mcp-pro/issues/182)) ([1e78176](https://github.com/oaslananka/ssh-mcp-pro/commit/1e7817642ebead581435fc169d9a46eed74fa6f6))
+* **docs:** mark Google cloud connector as not publish-ready ([#134](https://github.com/oaslananka/ssh-mcp-pro/issues/134)) ([c3889af](https://github.com/oaslananka/ssh-mcp-pro/commit/c3889afda29889dfa3cbd96b55c28fe852fc9dc6))
+* **http:** classify invalid JSON requests as bad input ([#136](https://github.com/oaslananka/ssh-mcp-pro/issues/136)) ([7fbbee2](https://github.com/oaslananka/ssh-mcp-pro/commit/7fbbee20f8ea141b36230dd8336d16172da525da))
+* **http:** deny browser origins with no explicit allowlist ([#135](https://github.com/oaslananka/ssh-mcp-pro/issues/135)) ([ac3bf2c](https://github.com/oaslananka/ssh-mcp-pro/commit/ac3bf2cbdd6a63d92812b07b194b0b35269a040f))
+* **oauth:** allow configured identity provider form redirects ([#150](https://github.com/oaslananka/ssh-mcp-pro/issues/150)) ([d78c067](https://github.com/oaslananka/ssh-mcp-pro/commit/d78c0676df29066e903bc53d2244944e6d82f819))
+* **oauth:** prevent Chromium form redirects and restore enrollment tokens ([#179](https://github.com/oaslananka/ssh-mcp-pro/issues/179)) ([19f337c](https://github.com/oaslananka/ssh-mcp-pro/commit/19f337c9161e5496313349c66317586676cbb910))
+* **oauth:** use registered Google callback for dashboard and MCP ([#178](https://github.com/oaslananka/ssh-mcp-pro/issues/178)) ([638d3f5](https://github.com/oaslananka/ssh-mcp-pro/commit/638d3f55ba4bb462c518a3fa8af3a4262c294414))
+* **release:** add provenance-verified v1.3.0 asset recovery ([#126](https://github.com/oaslananka/ssh-mcp-pro/issues/126)) ([42254ec](https://github.com/oaslananka/ssh-mcp-pro/commit/42254ec23e50afa75cbd0fd467898fc93ab403f8))
+* **release:** classify pinned legacy SSE migration bridge as advisory ([#123](https://github.com/oaslananka/ssh-mcp-pro/issues/123)) ([f262e93](https://github.com/oaslananka/ssh-mcp-pro/commit/f262e93c10465a96a002ee27c8dd77e69ad62dcb))
+* **release:** sync Gemini connector version metadata ([#141](https://github.com/oaslananka/ssh-mcp-pro/issues/141)) ([feada05](https://github.com/oaslananka/ssh-mcp-pro/commit/feada051b38b7825a2142a0c8c78eae1b37e17f1))
+* **remote:** advertise HSTS for HTTPS endpoints ([#155](https://github.com/oaslananka/ssh-mcp-pro/issues/155)) ([1c8baac](https://github.com/oaslananka/ssh-mcp-pro/commit/1c8baacb813a1dcb441a587c7b316999517fdddb))
+* **remote:** prune expired transient credential records ([#159](https://github.com/oaslananka/ssh-mcp-pro/issues/159)) ([a8b0dfc](https://github.com/oaslananka/ssh-mcp-pro/commit/a8b0dfc9023f7e6d31b43d1004857b6b3b4e9c44))
+* **test:** bind SSH fixture to loopback without sudo ([#133](https://github.com/oaslananka/ssh-mcp-pro/issues/133)) ([3c0a80f](https://github.com/oaslananka/ssh-mcp-pro/commit/3c0a80ffad507ab167a5ad7bc37a0ca513b478e6))
+
 ## [1.3.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.2.3...ssh-mcp-pro-v1.3.0) (2026-11-02)
 
 
