@@ -353,8 +353,8 @@ INSTALLER
       expect(
         cp.store
           .listAudit(meData.user.id, undefined, 20)
-          .filter((event) => event.eventType === "agent_revoked").length,
-      ).toBe(revokedEventCount);
+          .filter((event) => event.eventType === "agent_revoked"),
+      ).toHaveLength(revokedEventCount);
 
       // 6. Remove device: permanently discard inventory and enrollment data.
       const originalEnrollmentHash = hashSecret(enrollData.enrollment_token);
