@@ -33,6 +33,8 @@ ssh-mcp-pro is a secure Model Context Protocol (MCP) server for SSH automation. 
 
 ## Installation
 
+For Windows/Linux outbound agent connection status, rotating diagnostics and a live PowerShell log view, see [Agent Activity Monitor](docs/agent-activity-monitor.md).
+
 Install globally with pnpm:
 
 ```bash

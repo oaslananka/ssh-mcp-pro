@@ -150,7 +150,7 @@ export function renderDashboardHtml(
           <div class="card">
             <div class="device-row">
               <div class="device-info">
-                <div class="device-icon">\${dev.hostMetadata?.platform === 'win32' ? '🪟' : (dev.hostMetadata?.platform === 'darwin' ? '🍎' : '🐧')}</div>
+                <div class="device-icon">\${dev.host_metadata?.platform === 'win32' ? '🪟' : (dev.host_metadata?.platform === 'darwin' ? '🍎' : '🐧')}</div>
                 <div>
                   <div class="device-name">
                     \${escapeHtml(dev.alias)}
@@ -158,7 +158,7 @@ export function renderDashboardHtml(
                     <span class="badge badge-blue">\${escapeHtml(dev.profile)}</span>
                   </div>
                   <div class="device-meta">
-                    Host: \${escapeHtml(dev.hostMetadata?.hostname || 'Unknown')} | Arch: \${escapeHtml(dev.hostMetadata?.arch || 'Unknown')} | Policy v\${escapeHtml(dev.policyVersion)}
+                    Host: \${escapeHtml(dev.host_metadata?.hostname || 'Not reported')} | OS: \${escapeHtml(dev.host_metadata?.os || 'Not reported')} | Arch: \${escapeHtml(dev.host_metadata?.arch || 'Not reported')} | Policy v\${escapeHtml(dev.policy_version ?? '—')}
                   </div>
                 </div>
               </div>
