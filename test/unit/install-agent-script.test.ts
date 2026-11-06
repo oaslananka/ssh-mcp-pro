@@ -73,6 +73,7 @@ describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
       const enrollLog = path.join(root, "enrollment.log");
       const installLog = path.join(root, "install.log");
       const serviceLog = path.join(root, "service.log");
+      const serviceState = path.join(root, "service.state");
       mkdirSync(shimDir);
       mkdirSync(home);
       mkdirSync(globalBin, { recursive: true });
@@ -87,7 +88,15 @@ describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
           "esac",
         ].join("\n"),
       );
-      stubFile(path.join(shimDir, "systemctl"), 'printf "%s\\n" "$*" >> "$MOCK_SERVICE_LOG"');
+      stubFile(
+        path.join(shimDir, "systemctl"),
+        [
+          'printf "%s\\n" "$*" >> "$MOCK_SERVICE_LOG"',
+          'case "$*" in',
+          '  "--user restart ssh-mcp-pro-agent.service") printf "restarted\\n" > "$MOCK_SERVICE_STATE" ;;',
+          "esac",
+        ].join("\n"),
+      );
       stubFile(path.join(shimDir, "loginctl"), "exit 0");
 
       const agentBin = path.join(globalBin, "ssh-mcp-pro-agent");
@@ -106,6 +115,7 @@ describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
         MOCK_ENROLL_LOG: enrollLog,
         MOCK_INSTALL_LOG: installLog,
         MOCK_SERVICE_LOG: serviceLog,
+        MOCK_SERVICE_STATE: serviceState,
       };
 
       const run = (...args: string[]) =>
@@ -132,6 +142,7 @@ describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
         enrollLog,
         installLog,
         serviceLog,
+        serviceState,
         env,
         run,
         cleanup: () => rmSync(root, { recursive: true, force: true }),
@@ -163,7 +174,29 @@ describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
         );
         expect(unit).toContain('ExecStart="' + process.execPath + '" "' + mock.agentBin + '" run');
         expect(unit).toContain(path.dirname(mock.agentBin));
-        expect(readFileSync(mock.serviceLog, "utf8")).toContain("--user enable --now");
+        expect(readFileSync(mock.serviceLog, "utf8")).toBe(
+          "--user daemon-reload\n--user enable ssh-mcp-pro-agent.service\n--user restart ssh-mcp-pro-agent.service\n",
+        );
+        expect(readFileSync(mock.serviceState, "utf8")).toBe("restarted\n");
+      } finally {
+        mock.cleanup();
+      }
+    });
+
+    test("restarts a previously running user service after re-enrollment", () => {
+      const mock = setupInstaller(true);
+      try {
+        writeFileSync(mock.serviceState, "running\n");
+        const result = mock.run();
+        expect(result.status).toBe(0);
+        expect(readFileSync(mock.serviceState, "utf8")).toBe("restarted\n");
+        const commands = readFileSync(mock.serviceLog, "utf8").trim().split("\n");
+        expect(commands).toEqual([
+          "--user daemon-reload",
+          "--user enable ssh-mcp-pro-agent.service",
+          "--user restart ssh-mcp-pro-agent.service",
+        ]);
+        expect(readFileSync(mock.enrollLog, "utf8")).toContain("enroll --server");
       } finally {
         mock.cleanup();
       }
@@ -273,6 +306,8 @@ describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
       expect(source).toContain('RUN_USER="${SUDO_USER:-root}"');
       expect(source).toContain('/usr/sbin/runuser -u "$RUN_USER"');
       expect(source).toContain('echo "User=${RUN_USER}"');
+      expect(source).toContain("systemctl enable ssh-mcp-pro-agent.service");
+      expect(source).toContain("systemctl restart ssh-mcp-pro-agent.service");
       expect(source).toContain("user service must not be installed as root");
     });
   },

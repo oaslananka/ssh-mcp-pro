@@ -184,7 +184,10 @@ if [[ "$SCOPE" == "$SYSTEM_SCOPE" ]]; then
     echo "WantedBy=multi-user.target"
   } >"$UNIT"
   systemctl daemon-reload
-  systemctl enable --now ssh-mcp-pro-agent.service
+  # `enable --now` does not restart an already active agent after re-enrollment.
+  # `restart` starts an inactive service and reloads new credentials when active.
+  systemctl enable ssh-mcp-pro-agent.service
+  systemctl restart ssh-mcp-pro-agent.service
   echo "install-agent: system service started — check 'systemctl status ssh-mcp-pro-agent'"
 else
   UNIT_DIR="${HOME}/.config/systemd/user"
@@ -197,7 +200,9 @@ else
     echo "WantedBy=default.target"
   } >"${UNIT_DIR}/ssh-mcp-pro-agent.service"
   systemctl --user daemon-reload
-  systemctl --user enable --now ssh-mcp-pro-agent.service
+  # Ensure an existing agent process reloads the newly enrolled agent identity.
+  systemctl --user enable ssh-mcp-pro-agent.service
+  systemctl --user restart ssh-mcp-pro-agent.service
   # Allow the user service to keep running after logout / start on boot.
   loginctl enable-linger "$USER" >/dev/null 2>&1 || true
   echo "install-agent: user service started — check 'systemctl --user status ssh-mcp-pro-agent'"
