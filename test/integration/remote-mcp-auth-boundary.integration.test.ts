@@ -405,7 +405,13 @@ describe("remote-agent MCP real HTTP authorization boundary", () => {
     const transport = new StreamableHTTPClientTransport(new URL(harness.endpoint), {
       requestInit: { headers: { authorization: "Bearer " + token } },
       fetch: (input, init) => {
-        const request = new Request(input, init);
+        // This test transport only makes requests to its own disposable
+        // loopback server. Never forward an arbitrary SDK-supplied URL.
+        const source = input instanceof Request ? input.url : String(input);
+        if (source !== harness.endpoint) {
+          throw new Error("Unexpected transport URL in local MCP boundary test");
+        }
+        const request = new Request(harness.endpoint, input instanceof Request ? input : init);
         if (request.method === "POST" && request.headers.get("mcp-method") === "tools/list") {
           // The body still carries the SDK's authenticated modern version.
           // A forged 2025 header must fail rather than falling back to initialize.

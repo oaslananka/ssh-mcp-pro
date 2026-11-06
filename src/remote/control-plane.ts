@@ -322,7 +322,7 @@ export class RemoteControlPlane {
           { name: "sshautomator-remote-agent", version: SERVER_VERSION },
           { capabilities: { tools: {} } },
         );
-        server.server.setRequestHandler("tools/list", async () => ({
+        server.server.setRequestHandler("tools/list", () => ({
           tools: listRemoteToolDescriptors(principal.capabilities).map(
             ({ capability: _capability, ...tool }) => ({
               ...tool,
@@ -332,7 +332,7 @@ export class RemoteControlPlane {
         }));
         server.server.setRequestHandler("tools/call", async (rpc) => {
           const name = rpc.params.name;
-          if (!Object.prototype.hasOwnProperty.call(TOOL_CAPABILITY_MAP, name)) {
+          if (!Object.hasOwn(TOOL_CAPABILITY_MAP, name)) {
             throw safeError("INVALID_SCOPE", "Unknown tool", 400);
           }
           const result = await this.callRemoteTool(
