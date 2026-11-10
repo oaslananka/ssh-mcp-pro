@@ -238,13 +238,12 @@ async function refreshTokenRequest(
     client_id: clientId,
   });
   body.set("refresh_token", token);
-  return fetch(
-    loopbackOAuthRequest(baseUrl, "/oauth/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-    }),
-  );
+  const request = loopbackOAuthRequest(baseUrl, "/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  return fetch(request);
 }
 
 async function issueAccessToken(baseUrl: string): Promise<string> {
@@ -338,11 +337,11 @@ describe("OAuth PKCE HTTP flow", () => {
     vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
     const harness = await startHarness({ accessTokenTtlSeconds: 1 });
     try {
-      const metadata = await readJson(
-        await fetch(
-          loopbackOAuthRequest(harness.baseUrl, "/.well-known/oauth-authorization-server"),
-        ),
+      const discoveryRequest = loopbackOAuthRequest(
+        harness.baseUrl,
+        "/.well-known/oauth-authorization-server",
       );
+      const metadata = await readJson(await fetch(discoveryRequest));
       expect(metadata.grant_types_supported).toContain("refresh_token");
       const redirectUri = harness.baseUrl + "/callback-" + randomToken(6);
       const clientId = await registerClient(harness.baseUrl, redirectUri);
@@ -447,13 +446,12 @@ describe("OAuth PKCE HTTP flow", () => {
           token_type_hint: "refresh_token",
         });
         body.set("token", String(first.refresh_token));
-        return fetch(
-          loopbackOAuthRequest(harness.baseUrl, "/oauth/revoke", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body,
-          }),
-        );
+        const request = loopbackOAuthRequest(harness.baseUrl, "/oauth/revoke", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body,
+        });
+        return fetch(request);
       };
       expect((await revoke(other)).status).toBe(200);
       const current = await refreshTokenRequest(
