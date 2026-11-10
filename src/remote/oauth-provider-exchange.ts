@@ -9,18 +9,7 @@ export async function exchangeGoogleIdentity(
   if (!config.googleClientId || !config.googleClientSecret) {
     throw safeError("FORBIDDEN", "Google OAuth is not configured", 503);
   }
-  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id: config.googleClientId,
-      client_secret: config.googleClientSecret,
-      redirect_uri: config.googleCallbackUrl,
-      grant_type: "authorization_code",
-    }).toString(),
-  });
-  const tokenPayload = (await tokenResponse.json()) as Record<string, unknown>;
+  const { tokenPayload } = await requestGoogleOAuthToken(config, code, config.googleCallbackUrl);
   const accessToken = asString(tokenPayload.access_token);
   if (!accessToken) {
     throw safeError("INVALID_TOKEN", "Google OAuth token exchange failed", 502);
@@ -43,6 +32,7 @@ export async function exchangeGoogleIdentity(
 export async function exchangeGitHubIdentity(
   config: RemoteConfig,
   code: string,
+  callbackUrl: string = config.githubCallbackUrl,
 ): Promise<GitHubUser> {
   const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
     method: "POST",
@@ -51,7 +41,7 @@ export async function exchangeGitHubIdentity(
       client_id: config.githubClientId,
       client_secret: config.githubClientSecret,
       code,
-      redirect_uri: config.githubCallbackUrl,
+      redirect_uri: callbackUrl,
     }),
   });
   const tokenPayload = (await tokenResponse.json()) as Record<string, unknown>;
@@ -75,4 +65,25 @@ export async function exchangeGitHubIdentity(
     throw safeError("INVALID_TOKEN", "GitHub OAuth user response missing valid identity", 502);
   }
   return { id: String(githubId), login: githubLogin };
+}
+
+/** Shared Google token request for MCP userinfo and dashboard OIDC response paths. */
+export async function requestGoogleOAuthToken(
+  config: RemoteConfig,
+  code: string,
+  callbackUrl: string,
+): Promise<{ tokenPayload: Record<string, unknown>; responseOk: boolean }> {
+  const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: config.googleClientId ?? "",
+      client_secret: config.googleClientSecret ?? "",
+      redirect_uri: callbackUrl,
+      grant_type: "authorization_code",
+    }).toString(),
+  });
+  const tokenPayload = (await tokenResponse.json()) as Record<string, unknown>;
+  return { tokenPayload, responseOk: tokenResponse.ok };
 }

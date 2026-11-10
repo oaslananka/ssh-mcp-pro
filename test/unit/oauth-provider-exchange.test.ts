@@ -2,7 +2,9 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import {
   exchangeGitHubIdentity,
   exchangeGoogleIdentity,
+  requestGoogleOAuthToken,
 } from "../../src/remote/oauth-provider-exchange.js";
+import { fetchGitHubUserDirect } from "../../src/remote/web-dashboard-oauth-users.js";
 import type { RemoteConfig } from "../../src/remote/types.js";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -81,6 +83,43 @@ describe("provider authorization-code identity exchange", () => {
     expect(mock.mock.calls[1]?.[1]?.headers.Authorization).toBe("Bearer provider-token");
   });
 
+  test("web dashboard GitHub sign-in uses its own registered callback URL", async () => {
+    const mock = vi
+      .fn()
+      .mockResolvedValueOnce({ json: async () => ({ access_token: "dashboard-token" }) })
+      .mockResolvedValueOnce({ json: async () => ({ id: 987, login: "dashboard-user" }) });
+    vi.stubGlobal("fetch", mock);
+    await expect(
+      fetchGitHubUserDirect(
+        { ...githubConfig, publicBaseUrl: "https://dashboard.example.test" },
+        "dashboard-code",
+      ),
+    ).resolves.toEqual({ id: "987", login: "dashboard-user" });
+    const requestBody = JSON.parse(mock.mock.calls[0]?.[1]?.body as string);
+    expect(requestBody.redirect_uri).toBe("https://dashboard.example.test/auth/callback/github");
+    expect(requestBody.code).toBe("dashboard-code");
+  });
+
+  test("shared Google exchange preserves the caller's callback and response status", async () => {
+    const mock = vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ id_token: "provider-test-token" }),
+    });
+    vi.stubGlobal("fetch", mock);
+    await expect(
+      requestGoogleOAuthToken(
+        googleConfig,
+        "dashboard-code",
+        "https://dashboard.example.test/auth/callback/google",
+      ),
+    ).resolves.toEqual({
+      responseOk: false,
+      tokenPayload: { id_token: "provider-test-token" },
+    });
+    const body = new URLSearchParams(mock.mock.calls[0]?.[1]?.body as string);
+    expect(body.get("redirect_uri")).toBe("https://dashboard.example.test/auth/callback/google");
+    expect(body.get("grant_type")).toBe("authorization_code");
+  });
   test("rejects a Google token response without an access token", async () => {
     const mock = vi.fn().mockResolvedValue({ json: async () => ({ error: "invalid_grant" }) });
     vi.stubGlobal("fetch", mock);
