@@ -25,6 +25,27 @@ describe("supply-chain policy", () => {
     )?.[1];
     expect(pinnedVersion).toBeDefined();
     expect(packageJson.engines.pnpm).toBe(`^${pinnedVersion}`);
+    // All active build/user-entrypoint pins must match the package manifest.
+    // The immutable v1.3.0 release-recovery workflow intentionally retains
+    // its historical toolchain and is not part of the current-build list.
+    for (const file of [
+      "Dockerfile",
+      "Dockerfile.coolify",
+      "Dockerfile.test",
+      "CONTRIBUTING.md",
+      "README.md",
+      "MIGRATION.md",
+      "docs/reference/compatibility.md",
+      "docs/development/local-setup.md",
+      "docs/tutorials/getting-started.md",
+      ".github/workflows/ci.yml",
+      ".github/workflows/docs.yml",
+      ".github/workflows/mcp-registry.yml",
+      ".github/workflows/release.yml",
+    ]) {
+      expect(readText(file), `Current pnpm pin in ${file}`).toContain(pinnedVersion);
+    }
+
     const dockerfile = readText("Dockerfile");
     const supportedVersionDocs = [
       readText("CONTRIBUTING.md"),

@@ -27,7 +27,7 @@ ssh-mcp-pro is a secure Model Context Protocol (MCP) server for SSH automation. 
 ## Prerequisites
 
 - Node.js `>=22.22.2` or `>=24.15.0` or `>=26.3.0`
-- pnpm `>=11.0.9`
+- pnpm `^11.28.10` (use Corepack for development)
 - SSH access to the target hosts
 - Docker, only for local integration tests and container image builds
 
