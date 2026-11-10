@@ -16,7 +16,36 @@ describe("supply-chain policy", () => {
   });
 
   test("uses the package-manager pin consistently and strips build tooling from runtime images", () => {
-    const packageJson = JSON.parse(readText("package.json")) as { packageManager: string };
+    const packageJson = JSON.parse(readText("package.json")) as {
+      packageManager: string;
+      engines: { pnpm: string };
+    };
+    const pinnedVersion = packageJson.packageManager.match(
+      /^pnpm@(11\.\d+\.\d+)\+sha512\.[a-f\d]+$/u,
+    )?.[1];
+    expect(pinnedVersion).toBeDefined();
+    expect(packageJson.engines.pnpm).toBe(`^${pinnedVersion}`);
+    // All active build/user-entrypoint pins must match the package manifest.
+    // The immutable v1.3.0 release-recovery workflow intentionally retains
+    // its historical toolchain and is not part of the current-build list.
+    for (const file of [
+      "Dockerfile",
+      "Dockerfile.coolify",
+      "Dockerfile.test",
+      "CONTRIBUTING.md",
+      "README.md",
+      "MIGRATION.md",
+      "docs/reference/compatibility.md",
+      "docs/development/local-setup.md",
+      "docs/tutorials/getting-started.md",
+      ".github/workflows/ci.yml",
+      ".github/workflows/docs.yml",
+      ".github/workflows/mcp-registry.yml",
+      ".github/workflows/release.yml",
+    ]) {
+      expect(readText(file), `Current pnpm pin in ${file}`).toContain(pinnedVersion);
+    }
+
     const dockerfile = readText("Dockerfile");
     const supportedVersionDocs = [
       readText("CONTRIBUTING.md"),
@@ -29,7 +58,6 @@ describe("supply-chain policy", () => {
       .map((name) => readText(path.join(".github/workflows", name)))
       .join("\n");
 
-    expect(packageJson.packageManager).toMatch(/^pnpm@11\.28\.9/u);
     expect(dockerfile).not.toContain("pnpm@11.5.1");
     expect(workflows).not.toContain("pnpm@11.5.1");
     expect(workflows).not.toContain("PNPM_VERSION: 11.5.1");
@@ -44,8 +72,8 @@ describe("supply-chain policy", () => {
     expect(dockerfile).not.toContain(
       "sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd",
     );
-    expect(dockerfile).toContain("pnpm@11.28.9");
-    expect(supportedVersionDocs).toContain("pnpm 11.28.9");
+    expect(dockerfile).toContain(`pnpm@${pinnedVersion}`);
+    expect(supportedVersionDocs).toContain(`pnpm ${pinnedVersion}`);
     expect(supportedVersionDocs).not.toMatch(/pnpm (?:11\.0\.9|`?\^11\.5\.1)/u);
     expect(dockerfile).toContain("rm -rf /usr/local/lib/node_modules/npm");
     expect(dockerfile).toContain("rm -rf /usr/local/lib/node_modules/corepack");

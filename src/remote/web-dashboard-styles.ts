@@ -27,6 +27,8 @@ export const DASHBOARD_STYLES = `
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
       position: sticky;
       top: 0;
       z-index: 100;
@@ -35,7 +37,7 @@ export const DASHBOARD_STYLES = `
     .logo-icon { font-size: 24px; }
     .brand-title { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
     .brand-sub { font-size: 12px; color: var(--text-muted); }
-    .user-area { display: flex; align-items: center; gap: 16px; }
+    .user-area { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; min-width: 0; }
     .badge {
       display: inline-block;
       padding: 2px 8px;
@@ -45,7 +47,7 @@ export const DASHBOARD_STYLES = `
       text-transform: uppercase;
     }
     .badge-green { background: #238636; color: #fff; }
-    .badge-gray { background: #30363d; color: #8b949e; }
+    .badge-gray { background: #30363d; color: #c9d1d9; }
     .badge-blue { background: var(--blue-bg); color: var(--blue); border: 1px solid rgba(56,139,253,0.3); }
     .btn {
       display: inline-flex;
@@ -133,7 +135,8 @@ export const DASHBOARD_STYLES = `
       flex-wrap: wrap;
       gap: 16px;
     }
-    .device-info { display: flex; align-items: center; gap: 16px; }
+    .device-info { display: flex; align-items: center; flex: 1 1 260px; min-width: 0; gap: 16px; }
+    .device-info > div:last-child { min-width: 0; }
     .device-icon {
       font-size: 28px;
       width: 48px;
@@ -144,8 +147,9 @@ export const DASHBOARD_STYLES = `
       align-items: center;
       justify-content: center;
     }
-    .device-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
-    .device-meta { font-size: 13px; color: var(--text-muted); font-family: var(--font-mono); }
+    .device-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; flex-wrap: wrap; overflow-wrap: anywhere; gap: 8px; }
+    .device-meta { font-size: 13px; color: var(--text-muted); font-family: var(--font-mono); overflow-wrap: anywhere; }
+    .device-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 
     /* Code block */
     .code-box {
@@ -160,6 +164,13 @@ export const DASHBOARD_STYLES = `
       margin: 12px 0;
       position: relative;
     }
+    .code-box > span {
+      display: block;
+      padding-right: 52px;
+      overflow-wrap: anywhere;
+    }
+    .card a { color: var(--blue); text-underline-offset: 2px; }
+    .card a:hover { color: #b0d4ff; }
     .copy-btn {
       position: absolute;
       top: 8px;
@@ -173,9 +184,17 @@ export const DASHBOARD_STYLES = `
       cursor: pointer;
     }
     .copy-btn:hover { background: #30363d; color: #fff; }
+    .copy-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
     /* Config guide cards */
-    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 20px; }
+    @media (max-width: 480px) {
+      .container { margin: 20px auto; padding: 0 12px; }
+      .hero { padding: 28px 18px; }
+      .hero h1 { font-size: 26px; }
+      .device-actions { width: 100%; }
+      .device-actions select { width: 100%; min-width: 0; }
+    }
 
     /* Empty state */
     .empty-box {

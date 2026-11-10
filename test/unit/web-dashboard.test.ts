@@ -80,6 +80,17 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(res.body).toContain('for="enrollAlias"');
       expect(res.body).toContain('for="enrollProfile"');
       expect(res.body).toContain('aria-label="Policy for');
+      expect(res.body).toContain("minmax(min(100%, 320px), 1fr)");
+      expect(res.body).toContain('class="device-actions"');
+      expect(res.body).toContain("Local Stdio Mode (Policy-Controlled)");
+      expect(res.body).toContain(".code-box > span");
+      expect(res.body).toContain(".card a { color: var(--blue);");
+      expect(res.body).toContain(".badge-gray { background: #30363d; color: #c9d1d9; }");
+      expect(res.body).toContain('aria-label="Copy ChatGPT MCP URL"');
+      expect(res.body).toContain('aria-live="polite"');
+      expect(res.body).toContain("feedback('Copy failed')");
+      expect(res.body).not.toContain("alert('Copied to clipboard!')");
+      expect(res.body).not.toContain("Local Stdio Mode (Unrestricted)");
     } finally {
       cp.close();
       rmSync(dir, { recursive: true, force: true });

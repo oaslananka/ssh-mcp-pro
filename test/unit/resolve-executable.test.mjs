@@ -35,12 +35,20 @@ describe("resolve the two trusted maintenance CLIs", () => {
     expect(resolveExecutableOnPath("gh", ["", "relative", sub].join(delimiter))).toBe(bin);
   });
 
-  test("does not return non-executable candidates", () => {
+  // Windows access(X_OK) does not model POSIX executable permission bits.
+  test.skipIf(process.platform === "win32")("does not return non-executable candidates", () => {
     const dir = fixture();
     const bin = join(dir, "gh");
     writeFileSync(bin, "#!/bin/sh\\nexit 0\\n");
     chmodSync(bin, 0o644);
     expect(resolveExecutableOnPath("gh", dir)).toBeNull();
+  });
+
+  test.runIf(process.platform === "win32")("prefers a Windows .exe candidate", () => {
+    const dir = fixture();
+    const exe = executable(dir, "gh.exe");
+    executable(dir, "gh");
+    expect(resolveExecutableOnPath("gh", dir)).toBe(exe);
   });
 
   test.skipIf(process.platform === "win32")("skips world-writable PATH entries", () => {

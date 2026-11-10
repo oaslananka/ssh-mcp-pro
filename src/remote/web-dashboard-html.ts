@@ -72,7 +72,7 @@ export function renderDashboardHtml(
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
             <div>
               <div style="font-size:12px; text-transform:uppercase; font-weight:700; color:var(--blue); margin-bottom:4px;">Remote MCP Endpoint</div>
-              <div style="font-family:var(--font-mono); font-size:15px; color:#fff; font-weight:600;">\${MCP_URL}</div>
+              <div style="font-family:var(--font-mono); font-size:15px; color:#fff; font-weight:600; overflow-wrap:anywhere;">\${MCP_URL}</div>
               <div style="font-size:13px; color:var(--text-muted); margin-top:4px;">Transport: Streamable HTTP • Auth: OAuth 2.1 PKCE (RFC 9728 & RFC 8414)</div>
             </div>
             <button class="btn btn-primary" onclick="switchTab('add-device')">➕ Add New Device</button>
@@ -106,7 +106,7 @@ export function renderDashboardHtml(
         <div class="hero">
           <div style="font-size: 48px; margin-bottom: 12px;">🛡️⚡</div>
           <h1>ssh-mcp-pro Gateway</h1>
-          <p>Zero-Trust Model Context Protocol SSH Gateway with policy controls, biometric & OAuth 2.1 authentication, and dual local/remote agent support.</p>
+          <p>Zero-Trust Model Context Protocol SSH Gateway with policy controls, OAuth 2.1 authentication, and dual local/remote agent support.</p>
           <div class="auth-buttons">
             <a href="/auth/login/google" class="auth-btn auth-btn-google">
               <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.7 0 3 .7 3.9 1.5l2.9-2.9C17 2 14.7 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2c0 2.8.7 5.5 1.9 7.8l3.7-2.9z"/><path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.5C3.7 20.3 7.5 23.5 12 23.5z"/></svg>
@@ -126,8 +126,8 @@ export function renderDashboardHtml(
             <div class="code-box">\${MCP_URL}</div>
           </div>
           <div class="card">
-            <h3 style="margin-bottom:8px; color:#7ee787;">💻 Local Stdio Mode (Unrestricted)</h3>
-            <p style="font-size:14px; color:var(--text-muted); margin-bottom:12px;">No cloud dependencies, zero limits. Run ssh-mcp-pro locally with your own OpenSSH keys and config.</p>
+            <h3 style="margin-bottom:8px; color:#7ee787;">💻 Local Stdio Mode (Policy-Controlled)</h3>
+            <p style="font-size:14px; color:var(--text-muted); margin-bottom:12px;">Run ssh-mcp-pro locally with your own OpenSSH keys and host policy. No cloud account required.</p>
             <div class="code-box">npx ssh-mcp-pro</div>
           </div>
         </div>
@@ -162,7 +162,7 @@ export function renderDashboardHtml(
                   </div>
                 </div>
               </div>
-              <div style="display:flex; gap:8px; align-items:center;">
+              <div class="device-actions">
                 <select aria-label="Policy for \${escapeHtml(dev.alias)}" class="btn btn-outline btn-sm" onchange="changePolicy('\${dev.id}', this.value)" \${dev.status === 'revoked' ? 'disabled' : ''}>
                   <option value="read-only" \${dev.profile === 'read-only' ? 'selected' : ''}>Profile: Read-Only</option>
                   <option value="operations" \${dev.profile === 'operations' ? 'selected' : ''}>Profile: Operations</option>
@@ -203,7 +203,7 @@ export function renderDashboardHtml(
               <div style="margin-bottom:16px;">
                 <div style="font-weight:600; font-size:13px; color:var(--blue); margin-bottom:4px;">🐧 Linux (systemd)</div>
                 <div class="code-box">
-                  <button class="copy-btn" onclick="copySnippet('cmdLinux')">Copy</button>
+                  <button type="button" class="copy-btn" aria-live="polite" aria-label="Copy Linux install command" onclick="copySnippet('cmdLinux')">Copy</button>
                   <span id="cmdLinux"></span>
                 </div>
               </div>
@@ -211,7 +211,7 @@ export function renderDashboardHtml(
               <div style="margin-bottom:16px;">
                 <div style="font-weight:600; font-size:13px; color:var(--blue); margin-bottom:4px;">🪟 Windows (PowerShell)</div>
                 <div class="code-box">
-                  <button class="copy-btn" onclick="copySnippet('cmdWindows')">Copy</button>
+                  <button type="button" class="copy-btn" aria-live="polite" aria-label="Copy Windows install command" onclick="copySnippet('cmdWindows')">Copy</button>
                   <span id="cmdWindows"></span>
                 </div>
               </div>
@@ -219,7 +219,7 @@ export function renderDashboardHtml(
               <div>
                 <div style="font-weight:600; font-size:13px; color:var(--blue); margin-bottom:4px;">📦 Node CLI (Linux/macOS)</div>
                 <div class="code-box">
-                  <button class="copy-btn" onclick="copySnippet('cmdNpm')">Copy</button>
+                  <button type="button" class="copy-btn" aria-live="polite" aria-label="Copy Node install command" onclick="copySnippet('cmdNpm')">Copy</button>
                   <span id="cmdNpm"></span>
                 </div>
               </div>
@@ -238,11 +238,11 @@ export function renderDashboardHtml(
               </div>
               <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">For remote access in Claude or Claude Desktop: <strong>Customize &gt; Connectors &gt; Add custom connector</strong>, enter this URL, then sign in. Local Desktop servers still use <code>claude_desktop_config.json</code>.</p>
               <div style="font-size:12px; font-weight:700; color:var(--blue);">Claude remote custom connector URL:</div>
-              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgClaudeRemote')">Copy</button><span id="cfgClaudeRemote">\${MCP_URL}</span></div>
+              <div class="code-box"><button type="button" class="copy-btn" aria-live="polite" aria-label="Copy Claude remote MCP URL" onclick="copySnippet('cfgClaudeRemote')">Copy</button><span id="cfgClaudeRemote">\${MCP_URL}</span></div>
               <div style="font-size:12px; font-weight:700; color:var(--blue); margin-top:12px;">Claude Code remote (run in a terminal):</div>
-              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgClaudeCode')">Copy</button><span id="cfgClaudeCode">claude mcp add --transport http ssh-mcp-pro \${MCP_URL}</span></div>
+              <div class="code-box"><button type="button" class="copy-btn" aria-live="polite" aria-label="Copy Claude Code command" onclick="copySnippet('cfgClaudeCode')">Copy</button><span id="cfgClaudeCode">claude mcp add --transport http ssh-mcp-pro \${MCP_URL}</span></div>
               <div style="font-size:12px; font-weight:700; color:#7ee787; margin-top:12px;">Claude Desktop local stdio:</div>
-              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgClaudeLocal')">Copy</button><span id="cfgClaudeLocal">{\\n  "mcpServers": {\\n    "ssh-mcp-pro": {\\n      "command": "ssh-mcp-pro",\\n      "args": []\\n    }\\n  }\\n}</span></div>
+              <div class="code-box"><button type="button" class="copy-btn" aria-live="polite" aria-label="Copy Claude Desktop config" onclick="copySnippet('cfgClaudeLocal')">Copy</button><span id="cfgClaudeLocal">{\\n  "mcpServers": {\\n    "ssh-mcp-pro": {\\n      "command": "ssh-mcp-pro",\\n      "args": []\\n    }\\n  }\\n}</span></div>
             </div>
 
             <div class="card">
@@ -251,7 +251,7 @@ export function renderDashboardHtml(
                 <h3>ChatGPT MCP Plugin</h3>
               </div>
               <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">In supported ChatGPT workspaces, open <strong>Plugins &gt; Add custom MCP server</strong>, paste the URL below and configure OAuth. Custom GPT Actions are a separate OpenAPI-based feature.</p>
-              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgChatGptMcp')">Copy</button><span id="cfgChatGptMcp">\${MCP_URL}</span></div>
+              <div class="code-box"><button type="button" class="copy-btn" aria-live="polite" aria-label="Copy ChatGPT MCP URL" onclick="copySnippet('cfgChatGptMcp')">Copy</button><span id="cfgChatGptMcp">\${MCP_URL}</span></div>
             </div>
 
             <div class="card">
@@ -260,7 +260,7 @@ export function renderDashboardHtml(
                 <h3>Gemini API (Interactions)</h3>
               </div>
               <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Use this Remote MCP tool definition with the Gemini API Interactions endpoint. Configure a valid OAuth bearer credential separately (for example via managed agent credentials); the URL alone does not authenticate. This is not a Gemini web-extension manifest. <a href="https://ai.google.dev/gemini-api/docs/function-calling" target="_blank" rel="noopener noreferrer">Gemini Remote MCP docs</a>.</p>
-              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgGemini')">Copy</button><span id="cfgGemini">{\\n  "type": "mcp_server",\\n  "name": "ssh_mcp_pro",\\n  "url": "\${MCP_URL}"\\n}</span></div>
+              <div class="code-box"><button type="button" class="copy-btn" aria-live="polite" aria-label="Copy Gemini MCP config" onclick="copySnippet('cfgGemini')">Copy</button><span id="cfgGemini">{\\n  "type": "mcp_server",\\n  "name": "ssh_mcp_pro",\\n  "url": "\${MCP_URL}"\\n}</span></div>
             </div>
 
             <div class="card">
@@ -270,13 +270,13 @@ export function renderDashboardHtml(
               </div>
               <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Copy the configuration for your chosen client. VS Code/Copilot portable files use <code>mcpServers</code>; the VS Code workspace format uses <code>servers</code>. Sign in through your client&#39;s OAuth flow.</p>
               <div style="font-size:12px; font-weight:700; color:var(--blue); margin-top:12px;">Copilot portable — <code>.mcp.json</code></div>
-              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgVsCodePortable')">Copy</button><span id="cfgVsCodePortable">{\\n  "mcpServers": {\\n    "ssh-mcp-pro": {\\n      "type": "http",\\n      "url": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
+              <div class="code-box"><button type="button" class="copy-btn" aria-live="polite" aria-label="Copy VS Code portable config" onclick="copySnippet('cfgVsCodePortable')">Copy</button><span id="cfgVsCodePortable">{\\n  "mcpServers": {\\n    "ssh-mcp-pro": {\\n      "type": "http",\\n      "url": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
               <div style="font-size:12px; font-weight:700; color:var(--blue); margin-top:12px;">VS Code workspace (compatible) — <code>.vscode/mcp.json</code></div>
-              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgVsCode')">Copy</button><span id="cfgVsCode">{\\n  "servers": {\\n    "ssh-mcp-pro": {\\n      "type": "http",\\n      "url": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
+              <div class="code-box"><button type="button" class="copy-btn" aria-live="polite" aria-label="Copy VS Code workspace config" onclick="copySnippet('cfgVsCode')">Copy</button><span id="cfgVsCode">{\\n  "servers": {\\n    "ssh-mcp-pro": {\\n      "type": "http",\\n      "url": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
               <div style="font-size:12px; font-weight:700; color:var(--blue); margin-top:12px;">Cursor — <code>.cursor/mcp.json</code></div>
-              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgCursor')">Copy</button><span id="cfgCursor">{\\n  "mcpServers": {\\n    "ssh-mcp-pro": {\\n      "url": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
+              <div class="code-box"><button type="button" class="copy-btn" aria-live="polite" aria-label="Copy Cursor MCP config" onclick="copySnippet('cfgCursor')">Copy</button><span id="cfgCursor">{\\n  "mcpServers": {\\n    "ssh-mcp-pro": {\\n      "url": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
               <div style="font-size:12px; font-weight:700; color:var(--blue); margin-top:12px;">Windsurf — <code>mcp_config.json</code></div>
-              <div class="code-box"><button class="copy-btn" onclick="copySnippet('cfgWindsurf')">Copy</button><span id="cfgWindsurf">{\\n  "mcpServers": {\\n    "ssh-mcp-pro": {\\n      "serverUrl": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
+              <div class="code-box"><button type="button" class="copy-btn" aria-live="polite" aria-label="Copy Windsurf MCP config" onclick="copySnippet('cfgWindsurf')">Copy</button><span id="cfgWindsurf">{\\n  "mcpServers": {\\n    "ssh-mcp-pro": {\\n      "serverUrl": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
             </div>
           </div>
         \`;
@@ -422,10 +422,28 @@ export function renderDashboardHtml(
     }
 
     function copySnippet(id) {
-      const text = document.getElementById(id).textContent;
-      navigator.clipboard.writeText(text).then(() => {
-        alert('Copied to clipboard!');
-      });
+      const source = document.getElementById(id);
+      const button = source?.parentElement?.querySelector('.copy-btn');
+      if (!source || !button) return;
+      const originalLabel = button.dataset.copyLabel || button.getAttribute('aria-label') || 'Copy snippet';
+      button.dataset.copyLabel = originalLabel;
+      function feedback(label) {
+        button.textContent = label;
+        button.setAttribute('aria-label', originalLabel + ': ' + label);
+        clearTimeout(button.copyResetTimer);
+        button.copyResetTimer = setTimeout(() => {
+          if (!button.isConnected) return;
+          button.textContent = 'Copy';
+          button.setAttribute('aria-label', originalLabel);
+        }, 1800);
+      }
+      if (!navigator.clipboard?.writeText) {
+        feedback('Unavailable');
+        return;
+      }
+      navigator.clipboard.writeText(source.textContent || '')
+        .then(() => feedback('Copied'))
+        .catch(() => feedback('Copy failed'));
     }
 
     renderHeader();
