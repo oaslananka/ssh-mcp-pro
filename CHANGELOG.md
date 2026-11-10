@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.4.1...ssh-mcp-pro-v1.4.2) (2026-11-10)
+
+
+### Bug Fixes
+
+* **cli:** validate agent commands and break config import cycle ([e216b93](https://github.com/oaslananka/ssh-mcp-pro/commit/e216b9347805579918b928a43c654fc5dce48197))
+
 ## [1.4.1](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.4.0...ssh-mcp-pro-v1.4.1) (2026-11-10)
 
 
