@@ -30,6 +30,55 @@ describe("remote durable store", () => {
     ).toThrow("See ARCHITECTURE.md for the better-sqlite3 fallback path.");
   });
 
+  test("migrates a legacy GitHub-only user table without losing account identity", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "ssh-mcp-legacy-schema-"));
+    const databasePath = path.join(dir, "legacy.db");
+    const legacy = new DatabaseSync(databasePath);
+    try {
+      legacy.exec(`
+        CREATE TABLE users (
+          id TEXT PRIMARY KEY,
+          github_id TEXT,
+          github_login TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        INSERT INTO users VALUES (
+          'legacy_user', 'legacy_gh_id', 'prior-login',
+          '2025-12-01T00:00:00.000Z', '2025-12-01T00:00:00.000Z'
+        );
+      `);
+    } finally {
+      legacy.close();
+    }
+
+    let store: RemoteStore | undefined;
+    try {
+      store = new RemoteStore(databasePath);
+      expect(store.getUserByGitHubId("legacy_gh_id")).toMatchObject({
+        id: "legacy_user",
+        githubId: "legacy_gh_id",
+      });
+      store.close();
+      store = undefined;
+
+      const migrated = new DatabaseSync(databasePath, { readOnly: true });
+      try {
+        const columns = migrated.prepare("PRAGMA table_info(users)").all();
+        expect(columns.some((column) => column.name === "google_id")).toBe(true);
+        const identity = migrated.prepare("SELECT github_id, github_login FROM users").get();
+        expect(identity).toMatchObject({
+          github_id: "legacy_gh_id",
+          github_login: "prior-login",
+        });
+      } finally {
+        migrated.close();
+      }
+    } finally {
+      store?.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
   test("physically prunes only expired session, auth-code and enrollment rows", () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "ssh-mcp-expiry-"));
     const databasePath = path.join(dir, "expiry.db");
