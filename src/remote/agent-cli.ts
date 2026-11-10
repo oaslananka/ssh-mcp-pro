@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { AgentExecutor, defaultHostMetadata } from "./agent-executor.js";
 import {
   AgentActivityLog,
@@ -474,6 +475,31 @@ function uninstallService(): void {
   output("Disable and remove the systemd service that runs ssh-mcp-pro-agent run.");
 }
 
+function printAgentUsage(): void {
+  output("Usage:");
+  output("  ssh-mcp-pro-agent enroll --server <url> --token <token> --alias <alias>");
+  output("  ssh-mcp-pro-agent run");
+  output("  ssh-mcp-pro-agent status");
+  output("  ssh-mcp-pro-agent logs [--tail 60] [--follow]");
+  output("  ssh-mcp-pro-agent install-service");
+  output("  ssh-mcp-pro-agent uninstall-service");
+  output("  ssh-mcp-pro-agent --version");
+}
+
+function printAgentVersion(): void {
+  const packagePath = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "..",
+    "package.json",
+  );
+  const pkg = JSON.parse(readFileSync(packagePath, "utf8")) as { version?: string };
+  if (!pkg.version) {
+    throw new Error("Agent package version is unavailable");
+  }
+  output(pkg.version);
+}
+
 export async function runAgentCli(argv: string[]): Promise<void> {
   const command = argv[0] ?? "help";
   switch (command) {
@@ -495,13 +521,16 @@ export async function runAgentCli(argv: string[]): Promise<void> {
     case "uninstall-service":
       uninstallService();
       break;
+    case "help":
+    case "--help":
+    case "-h":
+      printAgentUsage();
+      break;
+    case "--version":
+    case "-v":
+      printAgentVersion();
+      break;
     default:
-      output("Usage:");
-      output("  ssh-mcp-pro-agent enroll --server <url> --token <token> --alias <alias>");
-      output("  ssh-mcp-pro-agent run");
-      output("  ssh-mcp-pro-agent status");
-      output("  ssh-mcp-pro-agent logs [--tail 60] [--follow]");
-      output("  ssh-mcp-pro-agent install-service");
-      output("  ssh-mcp-pro-agent uninstall-service");
+      throw new Error("Unknown agent command. Run ssh-mcp-pro-agent --help for usage.");
   }
 }

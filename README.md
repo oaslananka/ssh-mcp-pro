@@ -68,7 +68,7 @@ pnpm dlx ssh-mcp-pro
 Container images are published to GitHub Container Registry for release tags:
 
 ```bash
-docker run --rm ghcr.io/oaslananka/ssh-mcp-pro:1.0.0 --version
+docker run --rm ghcr.io/oaslananka/ssh-mcp-pro:1.4.1 --version
 ```
 
 Images are published for `linux/amd64` and `linux/arm64` with exact semver and

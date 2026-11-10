@@ -1,4 +1,4 @@
-import type { ServerConfig } from "./config.js";
+import type { ServerConfig } from "./config-types.js";
 import type { PolicyConfig } from "./policy.js";
 import { loadPolicyFile, parseBoolean, parseHostKeyPolicy, parseList } from "./config-parsers.js";
 

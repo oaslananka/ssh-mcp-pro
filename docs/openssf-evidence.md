@@ -1,7 +1,7 @@
 # OpenSSF Best Practices — Evidence
 
 Self-assessment against the [OpenSSF Best Practices Passing criteria](https://www.bestpractices.dev/en/criteria/0),
-current as of 2026-07-03. This is a repo-side evidence log, not an official OpenSSF
+originally assessed 2026-07-03; published release notes independently rechecked 2026-11-10. This is a repo-side evidence log, not an official OpenSSF
 artifact — the actual badge is issued by submitting these answers at
 [bestpractices.dev](https://www.bestpractices.dev/). See `.bestpractices.json` for the
 same answers in a structured tracking form used to prepare that submission.
@@ -19,7 +19,7 @@ vocabulary.
 | License is OSI-approved | Met | MIT |
 | Documentation: basic description of purpose | Met | README.md intro |
 | Documentation: how to obtain/provide feedback and contribute | Met | CONTRIBUTING.md, SUPPORT.md |
-| Interim versions/releases are identifiable | Met | Conventional Commits + release-please tagging (pending first tag — see gap analysis) |
+| Interim versions/releases are identifiable | Met | Conventional Commits + release-please tagging (GitHub releases v1.4.0 and v1.4.1 verified 2026-11-10) |
 
 ## Change control
 
@@ -68,8 +68,12 @@ vocabulary.
 
 ## Bottom line
 
-As of 2026-07-03, the CodeQL blocker has been resolved. The remaining blocker is
-"cut a first release," already tracked in [ROADMAP.md](../ROADMAP.md), plus triaging
-the new Trivy container-image findings noted above. Nothing in this evidence log claims
-Silver or Gold; see [docs/openssf-gap-analysis.md](openssf-gap-analysis.md) for why
-those are out of reach right now.
+As of 2026-11-10 the historical first-release blocker is resolved:
+GitHub Releases v1.4.0 and v1.4.1 are published with notes. npm
+`latest` remains v1.4.0 due to the intentionally separate manual registry
+publication. Do not equate release notes with an npm publication or hosted deployment.
+
+Historical 2026-07-03 image-scanning findings below are not a current scan.
+Do not claim a current container CVE count without a new scan.
+This internal self-assessment is still not submitted to Best Practices;
+no Passing, Silver or Gold badge is claimed.

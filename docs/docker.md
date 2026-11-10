@@ -3,15 +3,15 @@
 Published release images are available from GitHub Container Registry:
 
 ```bash
-docker pull ghcr.io/oaslananka/ssh-mcp-pro:1.0.0
-docker run --rm ghcr.io/oaslananka/ssh-mcp-pro:1.0.0 --version
+docker pull ghcr.io/oaslananka/ssh-mcp-pro:1.4.1
+docker run --rm ghcr.io/oaslananka/ssh-mcp-pro:1.4.1 --version
 ```
 
 Each release publishes a multi-platform OCI image for `linux/amd64` and
 `linux/arm64`. The release workflow publishes two exact tags:
 
-- `ghcr.io/oaslananka/ssh-mcp-pro:<semver>` such as `1.0.0`
-- `ghcr.io/oaslananka/ssh-mcp-pro:<git-tag>` such as `v1.0.0`
+- `ghcr.io/oaslananka/ssh-mcp-pro:<semver>` such as `1.4.1`
+- `ghcr.io/oaslananka/ssh-mcp-pro:<git-tag>` such as `ssh-mcp-pro-v1.4.1`
 
 The project does not publish a mutable `latest` tag. Prefer digest-pinned
 references in production so container deployments match the npm package,

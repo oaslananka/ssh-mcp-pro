@@ -11,10 +11,10 @@ See [docs/openssf-evidence.md](openssf-evidence.md) for the full criterion table
 ~~Seven open CodeQL alerts (one High) with no fully-current documented disposition.~~
 **Resolved 2026-07-03** — see `SECURITY_DECISIONS.md`.
 
-The remaining concrete blocker: no release has been cut yet, so "release notes exist
-for each release" is unverified in practice even though the mechanism (release-please +
-CHANGELOG) is implemented. Tracked in [ROADMAP.md](../ROADMAP.md) and as a recommended
-issue in [docs/repo-maturity-report.md](repo-maturity-report.md).
+**2026-11-10 update:** The first-release blocker is resolved: GitHub Releases
+v1.4.0 and v1.4.1 contain release notes. npm `latest` remains
+v1.4.0 under a separate manual publishing workflow. This does not imply
+an official Best Practices submission or a completed hosted deployment.
 
 A new, unrelated item surfaced the same day: Trivy container-image scanning (added
 after this document was first written) found 50+ open findings against the built
@@ -57,7 +57,6 @@ preconditions are absent — and they are absent here:
 | High test coverage sustained over time | Coverage thresholds exist (85–90%) but "sustained over time" needs release/version history that doesn't exist yet (repo is 5 days old) |
 | Repeatable/reproducible release process | Implemented (SBOM, checksums, provenance) but never executed — zero releases published |
 
-**This is a gap list, not a target with a date.** None of these should be worked toward
-by editing files; they require either time (release/contribution history accruing
-naturally) or a maintainer decision (branch protection, recruiting a co-maintainer).
-Revisit this analysis after the "Silver" preconditions above are met.
+**This is a dated internal self-assessment, not an official badge.**
+Do not require a second human maintainer solely for a score. Re-evaluate
+criteria using current evidence before making an external submission.
