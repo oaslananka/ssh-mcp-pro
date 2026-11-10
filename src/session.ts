@@ -1,4 +1,5 @@
 import { NodeSSH } from "node-ssh";
+import { buildSessionAuthConfig } from "./session-auth-config.js";
 import type { SFTPWrapper } from "ssh2";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -7,12 +8,8 @@ import {
   normalizeSha256Fingerprint,
   knownHostKeyFingerprints,
   generateSessionId,
-  buildAgentAuth,
-  loadPrivateKeyFromPath,
-  discoverPrivateKeys,
   parseKnownHostLine,
   knownHostPatternMatches,
-  type SSHAuthConfig,
   type SSHConnectConfig,
 } from "./session-auth.js";
 import {
@@ -222,7 +219,7 @@ export class SessionManager {
       reserved = true;
 
       const ssh = new NodeSSH();
-      const authConfig = await this.buildAuthConfig(params);
+      const authConfig = await buildSessionAuthConfig(params);
 
       const knownHostsPath = params.knownHostsPath ?? this.security.knownHostsPath;
 
@@ -393,78 +390,6 @@ export class SessionManager {
 
     session.info.lastUsed = Date.now();
     return session;
-  }
-
-  /**
-   * Builds authentication configuration based on the auth strategy
-   */
-  private async buildAuthConfig(params: ConnectionParams): Promise<SSHAuthConfig> {
-    const authStrategy = params.auth ?? "auto";
-
-    logger.debug("Building auth config", { strategy: authStrategy });
-
-    switch (authStrategy) {
-      case "password":
-        if (!params.password) {
-          throw createAuthError("Password required for password authentication");
-        }
-        return { password: params.password };
-      case "key":
-        return await this.buildKeyAuth(params);
-      case "agent":
-        return buildAgentAuth();
-      case "auto":
-      default:
-        return await this.buildAutoAuth(params);
-    }
-  }
-
-  /**
-   * Builds key-based authentication
-   */
-  private async buildKeyAuth(params: ConnectionParams): Promise<SSHAuthConfig> {
-    if (params.privateKey) {
-      logger.debug("Using inline private key");
-      return {
-        privateKey: params.privateKey,
-        ...(params.passphrase !== undefined ? { passphrase: params.passphrase } : {}),
-      };
-    }
-
-    if (params.privateKeyPath) {
-      logger.debug("Using private key from path", {
-        path: params.privateKeyPath,
-      });
-      return await loadPrivateKeyFromPath(params.privateKeyPath, params.passphrase);
-    }
-
-    return await discoverPrivateKeys(params.passphrase, logger);
-  }
-
-  /**
-   * Builds automatic authentication (tries password, then key, then agent)
-   */
-  private async buildAutoAuth(params: ConnectionParams): Promise<SSHAuthConfig> {
-    if (params.password) {
-      logger.debug("Auto auth: trying password");
-      return { password: params.password };
-    }
-
-    try {
-      logger.debug("Auto auth: trying key authentication");
-      return await this.buildKeyAuth(params);
-    } catch {
-      logger.debug("Auto auth: key authentication failed, trying agent");
-    }
-
-    try {
-      return buildAgentAuth();
-    } catch {
-      throw createAuthError(
-        "No suitable authentication method found",
-        "Provide a password, private key, or ensure SSH agent is running",
-      );
-    }
   }
 
   private async notifySessionClose(sessionId: string): Promise<void> {
