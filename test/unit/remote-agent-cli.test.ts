@@ -117,6 +117,32 @@ async function waitFor(predicate: () => boolean): Promise<void> {
 }
 
 describe("remote agent CLI", () => {
+  test("agent help and version are usable without enrollment", async () => {
+    const stdout = captureStdout();
+    try {
+      await runAgentCli(["--help"]);
+      expect(stdout.read()).toContain("ssh-mcp-pro-agent install-service");
+      expect(stdout.read()).toContain("ssh-mcp-pro-agent --version");
+    } finally {
+      stdout.restore();
+    }
+    const version = JSON.parse(
+      readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+    ) as { version: string };
+    const output = captureStdout();
+    try {
+      await runAgentCli(["--version"]);
+      expect(output.read().trim()).toBe(version.version);
+    } finally {
+      output.restore();
+    }
+  });
+
+  test("unknown agent command fails instead of reporting success", async () => {
+    await expect(runAgentCli(["unsupported-agent-command"])).rejects.toThrow(
+      "Unknown agent command",
+    );
+  });
   test("enroll persists agent config without leaking the one-time token", async () => {
     const configPath = agentConfigPath();
     const controlPlaneKeys = generateEd25519PemKeyPair();

@@ -49,7 +49,11 @@ describe("Docker release workflow", () => {
     const readme = readText("README.md");
     const dockerDocs = readText("docs/docker.md");
 
-    expect(readme).toContain("ghcr.io/oaslananka/ssh-mcp-pro:1.0.0");
+    const releaseImage = readme.match(
+      /ghcr\.io\/oaslananka\/ssh-mcp-pro:(\d+\.\d+\.\d+) --version/u,
+    );
+    expect(releaseImage).not.toBeNull();
+    expect(dockerDocs).toContain("ghcr.io/oaslananka/ssh-mcp-pro:" + releaseImage?.[1]);
     expect(readme).toContain("digest-pinned");
     expect(dockerDocs).toContain("linux/amd64");
     expect(dockerDocs).toContain("linux/arm64");

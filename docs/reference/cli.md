@@ -33,9 +33,20 @@ with extra arguments don't break the server.
 
 ## `ssh-mcp-pro-agent`
 
-Delegates directly to `src/remote/agent-cli.ts` via `argv` passthrough. See
-[docs/remote-mcp-hardening.md](../remote-mcp-hardening.md) and
-[docs/adding-a-device.md](../adding-a-device.md) for the documented agent workflows —
-this reference intentionally doesn't restate flags that aren't yet enumerated in one
-place in the source, to avoid documenting something that could drift silently from the
-implementation.
+Source of truth: [src/remote/agent-cli.ts](../../src/remote/agent-cli.ts).
+
+| Command | Effect |
+| --- | --- |
+| (no args), `help`, `--help`, `-h` | Print usage and exit successfully |
+| `--version`, `-v` | Print the installed package version and exit |
+| `enroll --server <url> --token <token> [--alias <alias>]` | Exchange a one-time enrollment token and save agent credentials |
+| `run` | Connect the enrolled outbound agent to its control plane |
+| `status` | Show local enrollment and current policy, not live connectivity |
+| `logs [--tail 60] [--follow]` | Read agent activity logs; `--follow` streams updates |
+| `install-service` | Print platform service setup guidance; does not install anything |
+| `uninstall-service` | Print platform service removal guidance; does not remove anything |
+
+Unknown commands fail with a nonzero exit code. For a persistent service, use the
+[platform bootstrap installer](../adding-a-device.md#step-2--run-the-bootstrap-on-the-new-device).
+The `install-service` and `uninstall-service` commands are advisory, not installers.
+Treat enrollment tokens as secrets and never paste them into issues or logs.
