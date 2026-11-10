@@ -46,7 +46,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+  :root:not([data-theme="light"], [data-theme="dark"]) {
     --docs-surface: #121d30;
     --docs-surface-alt: #17243a;
     --docs-elevated: #17253b;

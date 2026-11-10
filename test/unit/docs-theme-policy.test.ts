@@ -9,9 +9,9 @@ const options = JSON.parse(fs.readFileSync("typedoc.json", "utf8")) as {
   navigationLinks: Record<string, string>;
 };
 const docsWorkflow = fs.readFileSync(".github/workflows/docs.yml", "utf8");
-const css = fs.readFileSync(options.customCss, "utf8");
-const js = fs.readFileSync(options.customJs, "utf8");
-const overview = fs.readFileSync(options.readme, "utf8");
+const css = fs.readFileSync("docs/theme/ssh-docs.css", "utf8");
+const js = fs.readFileSync("docs/theme/ssh-docs.js", "utf8");
+const overview = fs.readFileSync("docs/api-overview.md", "utf8");
 
 describe("API documentation theme and publish contract", () => {
   test("uses a focused landing page, custom theme and original TypeDoc renderer", () => {
@@ -19,7 +19,7 @@ describe("API documentation theme and publish contract", () => {
     expect(options.customCss).toBe("docs/theme/ssh-docs.css");
     expect(options.customJs).toBe("docs/theme/ssh-docs.js");
     expect(options.favicon).toBe("docs/theme/favicon.svg");
-    expect(fs.existsSync(options.favicon)).toBe(true);
+    expect(fs.existsSync("docs/theme/favicon.svg")).toBe(true);
     expect(options.navigationLinks.GitHub).toBe("https://github.com/oaslananka/ssh-mcp-pro");
     expect(overview).toContain('class="docs-hero"');
     expect(overview).toContain("## Quickstart");
