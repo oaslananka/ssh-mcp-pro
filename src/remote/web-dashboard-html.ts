@@ -72,7 +72,7 @@ export function renderDashboardHtml(
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
             <div>
               <div style="font-size:12px; text-transform:uppercase; font-weight:700; color:var(--blue); margin-bottom:4px;">Remote MCP Endpoint</div>
-              <div style="font-family:var(--font-mono); font-size:15px; color:#fff; font-weight:600;">\${MCP_URL}</div>
+              <div style="font-family:var(--font-mono); font-size:15px; color:#fff; font-weight:600; overflow-wrap:anywhere;">\${MCP_URL}</div>
               <div style="font-size:13px; color:var(--text-muted); margin-top:4px;">Transport: Streamable HTTP • Auth: OAuth 2.1 PKCE (RFC 9728 & RFC 8414)</div>
             </div>
             <button class="btn btn-primary" onclick="switchTab('add-device')">➕ Add New Device</button>
@@ -106,7 +106,7 @@ export function renderDashboardHtml(
         <div class="hero">
           <div style="font-size: 48px; margin-bottom: 12px;">🛡️⚡</div>
           <h1>ssh-mcp-pro Gateway</h1>
-          <p>Zero-Trust Model Context Protocol SSH Gateway with policy controls, biometric & OAuth 2.1 authentication, and dual local/remote agent support.</p>
+          <p>Zero-Trust Model Context Protocol SSH Gateway with policy controls, OAuth 2.1 authentication, and dual local/remote agent support.</p>
           <div class="auth-buttons">
             <a href="/auth/login/google" class="auth-btn auth-btn-google">
               <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.7 0 3 .7 3.9 1.5l2.9-2.9C17 2 14.7 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2c0 2.8.7 5.5 1.9 7.8l3.7-2.9z"/><path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.5C3.7 20.3 7.5 23.5 12 23.5z"/></svg>
@@ -126,8 +126,8 @@ export function renderDashboardHtml(
             <div class="code-box">\${MCP_URL}</div>
           </div>
           <div class="card">
-            <h3 style="margin-bottom:8px; color:#7ee787;">💻 Local Stdio Mode (Unrestricted)</h3>
-            <p style="font-size:14px; color:var(--text-muted); margin-bottom:12px;">No cloud dependencies, zero limits. Run ssh-mcp-pro locally with your own OpenSSH keys and config.</p>
+            <h3 style="margin-bottom:8px; color:#7ee787;">💻 Local Stdio Mode (Policy-Controlled)</h3>
+            <p style="font-size:14px; color:var(--text-muted); margin-bottom:12px;">Run ssh-mcp-pro locally with your own OpenSSH keys and host policy. No cloud account required.</p>
             <div class="code-box">npx ssh-mcp-pro</div>
           </div>
         </div>
@@ -162,7 +162,7 @@ export function renderDashboardHtml(
                   </div>
                 </div>
               </div>
-              <div style="display:flex; gap:8px; align-items:center;">
+              <div class="device-actions">
                 <select aria-label="Policy for \${escapeHtml(dev.alias)}" class="btn btn-outline btn-sm" onchange="changePolicy('\${dev.id}', this.value)" \${dev.status === 'revoked' ? 'disabled' : ''}>
                   <option value="read-only" \${dev.profile === 'read-only' ? 'selected' : ''}>Profile: Read-Only</option>
                   <option value="operations" \${dev.profile === 'operations' ? 'selected' : ''}>Profile: Operations</option>

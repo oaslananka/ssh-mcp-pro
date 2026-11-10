@@ -80,6 +80,10 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(res.body).toContain('for="enrollAlias"');
       expect(res.body).toContain('for="enrollProfile"');
       expect(res.body).toContain('aria-label="Policy for');
+      expect(res.body).toContain("minmax(min(100%, 320px), 1fr)");
+      expect(res.body).toContain('class="device-actions"');
+      expect(res.body).toContain("Local Stdio Mode (Policy-Controlled)");
+      expect(res.body).not.toContain("Local Stdio Mode (Unrestricted)");
     } finally {
       cp.close();
       rmSync(dir, { recursive: true, force: true });

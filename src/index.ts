@@ -75,7 +75,9 @@ async function main() {
   const opts = parseArgs(argv);
 
   if (opts.unsupportedNoStdio) {
-    process.stderr.write("Error: --no-stdio is not supported. This server only runs over stdio.\n");
+    process.stderr.write(
+      "Error: --no-stdio is not supported. To use HTTP, run ssh-mcp-pro http or --transport=http.\n",
+    );
     process.exit(2);
   }
 
