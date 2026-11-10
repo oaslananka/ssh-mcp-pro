@@ -3,23 +3,34 @@
 <p align="center"><strong>Policy-controlled SSH automation for MCP clients</strong></p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/ssh-mcp-pro"><img alt="npm version" src="https://img.shields.io/npm/v/ssh-mcp-pro.svg" /></a>
-  <a href="https://www.npmjs.com/package/ssh-mcp-pro"><img alt="npm downloads" src="https://img.shields.io/npm/dt/ssh-mcp-pro.svg" /></a>
-  <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
-  <a href="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml/badge.svg" /></a>
-  <a href="https://oaslananka.github.io/ssh-mcp-pro/"><img alt="API Docs" src="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/docs.yml/badge.svg" /></a>
+  <a href="INSTALL.md">Installation</a> ·
+  <a href="#quickstart">Quickstart</a> ·
+  <a href="https://oaslananka.github.io/ssh-mcp-pro/">API Docs</a> ·
+  <a href="https://deepwiki.com/oaslananka/ssh-mcp-pro">DeepWiki</a>
 </p>
 
 <p align="center">
-  <a href="https://gitgem.org/github/oaslananka/ssh-mcp-pro"><img alt="GitGem" src="https://gitgem.org/api/badge/github/oaslananka/ssh-mcp-pro.svg" /></a>
-  &nbsp;&nbsp;&middot;&nbsp;&nbsp;
-  <a href="https://deepwiki.com/oaslananka/ssh-mcp-pro">Explore source on DeepWiki</a>
+  <a href="https://www.npmjs.com/package/ssh-mcp-pro"><img alt="npm published version" src="https://img.shields.io/npm/v/ssh-mcp-pro?style=flat&amp;logo=npm" /></a>
+  <a href="https://github.com/oaslananka/ssh-mcp-pro/releases/latest"><img alt="GitHub release version" src="https://img.shields.io/github/v/release/oaslananka/ssh-mcp-pro?style=flat&amp;label=GitHub%20Release" /></a>
+  <a href="#prerequisites"><img alt="Node.js supported major versions: 22, 24, 26" src="https://img.shields.io/badge/Node.js-22%20%7C%2024%20%7C%2026-43853d?style=flat&amp;logo=nodedotjs&amp;logoColor=white" /></a>
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/License-MIT-ffcf33?style=flat" /></a>
+  <a href="https://oaslananka.github.io/ssh-mcp-pro/"><img alt="API documentation" src="https://img.shields.io/badge/Docs-API-2980b9?style=flat" /></a>
 </p>
 
 <p align="center">
-  <a href="https://www.buymeacoffee.com/oaslananka">
-    <img src="https://img.buymeacoffee.com/button-api/?text=Buy%20me%20a%20coffee&emoji=%E2%98%95&slug=oaslananka&button_colour=FFDD00&font_colour=000000&font_family=Arial&outline_colour=000000&coffee_colour=ffffff" alt="Buy me a coffee" />
-  </a>
+  <a href="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml"><img alt="Main CI workflow status" src="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml/badge.svg?branch=main" /></a>
+  <a href="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/codeql.yml"><img alt="CodeQL analysis workflow status" src="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/codeql.yml/badge.svg?branch=main" /></a>
+</p>
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/ssh-mcp-pro"><img alt="All-time npm downloads (not unique users)" src="https://img.shields.io/npm/dt/ssh-mcp-pro?style=flat&amp;label=npm%20downloads" /></a>
+  <a href="https://gitgem.org/github/oaslananka/ssh-mcp-pro"><img alt="GitGem project listing" src="https://gitgem.org/api/badge/github/oaslananka/ssh-mcp-pro.svg" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/sponsors/oaslananka"><img alt="Sponsor through GitHub Sponsors" src="https://img.shields.io/badge/GitHub-Sponsors-ea4aaa?style=flat&amp;logo=githubsponsors" /></a>
+  <a href="https://www.buymeacoffee.com/oaslananka"><img alt="Support through Buy Me a Coffee" src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-Support-ffdd00?style=flat&amp;logo=buymeacoffee&amp;logoColor=000000" /></a>
+  <a href="https://github.com/oaslananka/ssh-mcp-pro"><img alt="Stars: live GitHub repository star count; visit repository to star" src="https://img.shields.io/github/stars/oaslananka/ssh-mcp-pro?style=flat&amp;label=Stars&amp;color=8e65d3" /></a>
 </p>
 
 ssh-mcp-pro is a secure Model Context Protocol (MCP) server for SSH automation. It lets MCP-capable clients open SSH sessions, inspect hosts, run guarded commands, manage files, transfer artifacts, create tunnels, and perform idempotent package or service work through policy-controlled tools.
@@ -229,7 +240,7 @@ ssh-mcp-pro starts with strict SSH host-key verification, denies root login, den
   task (tutorial, how-to, reference, explanation).
 - [docs/troubleshooting.md](docs/troubleshooting.md) covers common failure modes.
 
-## Project Health & Governance
+## Project Health &amp; Governance
 
 - [GOVERNANCE.md](GOVERNANCE.md) describes how decisions are made today.
 - [MAINTAINERS.md](MAINTAINERS.md) lists current maintainers.
