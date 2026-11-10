@@ -1698,13 +1698,15 @@ describe("remote control plane remote-agent contracts", () => {
         scopes: ["agents:admin"],
       };
       const harness = controlPlane as unknown as {
-        createEnrollmentToken(
-          principal: RemotePrincipal,
-          args: Record<string, unknown>,
-        ): Record<string, unknown>;
+        enrollment: {
+          createEnrollmentToken(
+            principal: RemotePrincipal,
+            args: Record<string, unknown>,
+          ): Record<string, unknown>;
+        };
       };
 
-      const result = harness.createEnrollmentToken(principal, {
+      const result = harness.enrollment.createEnrollmentToken(principal, {
         alias: "prod one",
         requested_profile: "operations",
       });
@@ -1744,13 +1746,15 @@ describe("remote control plane remote-agent contracts", () => {
         updatedAt: now,
       };
       const harness = controlPlane as unknown as {
-        installCommand(
-          agent: RemoteAgentRecord,
-          token: string | undefined,
-        ): Record<string, unknown>;
+        enrollment: {
+          installCommand(
+            agent: RemoteAgentRecord,
+            token: string | undefined,
+          ): Record<string, unknown>;
+        };
       };
 
-      const result = harness.installCommand(agent, undefined);
+      const result = harness.enrollment.installCommand(agent, undefined);
       const commands = result.commands as Record<string, string>;
       const serialized = JSON.stringify(result);
 

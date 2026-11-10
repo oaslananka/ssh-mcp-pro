@@ -21,8 +21,6 @@ import {
   isRecord,
   asString,
   negotiateMcpProtocolVersion,
-  quotePosixArg,
-  quotePowerShellArg,
   addNoStore,
   safeError,
   isValidEd25519PublicKey,
@@ -30,12 +28,13 @@ import {
   sanitizeAgent,
 } from "./http-util.js";
 import { listRemoteToolDescriptors } from "./mcp-tools.js";
-import { createAgentPolicy, mergeCustomPolicy } from "./policy.js";
+import { mergeCustomPolicy } from "./policy.js";
 import { parseAgentHostMetadata } from "./schemas.js";
 import { hasCapability } from "./scopes.js";
 import { RemoteStore } from "./store.js";
 import { OAuthHandler, type PendingAuthorize } from "./oauth-handler.js";
 import { WebDashboardHandler } from "./web-dashboard.js";
+import { AgentEnrollmentService } from "./agent-enrollment.js";
 import {
   AgentWebSocketHandler,
   type AgentConnection,
@@ -70,6 +69,7 @@ export class RemoteControlPlane {
   readonly oauth: OAuthHandler;
   readonly agentHandler: AgentWebSocketHandler;
   readonly dashboard: WebDashboardHandler;
+  private readonly enrollment: AgentEnrollmentService;
 
   constructor(config = loadRemoteConfig()) {
     this.config = config;
@@ -90,6 +90,9 @@ export class RemoteControlPlane {
       this.pendingActions,
       (event) => this.audit(event),
     );
+    this.enrollment = new AgentEnrollmentService(this.config, this.store, (event) =>
+      this.audit(event),
+    );
     this.dashboard = new WebDashboardHandler({
       config: this.config,
       store: this.store,
@@ -97,7 +100,8 @@ export class RemoteControlPlane {
       agentHandler: this.agentHandler,
       getJwtKeyPair: () => this.requireJwtKeyPair(),
       audit: (event) => this.audit(event),
-      createEnrollmentToken: (principal, args) => this.createEnrollmentToken(principal, args),
+      createEnrollmentToken: (principal, args) =>
+        this.enrollment.createEnrollmentToken(principal, args),
       updateAgentPolicy: (principal, agent, policy) =>
         this.updateAgentPolicy(principal, agent, policy),
       revokeAgent: (principal, agent) => this.revokeAgent(principal, agent),
@@ -421,7 +425,7 @@ export class RemoteControlPlane {
     const principal = await this.authenticate(req);
     if (pathname === "/api/agents/enrollment-tokens" && req.method === "POST") {
       const body = await readJson(req);
-      const result = this.createEnrollmentToken(principal, body);
+      const result = this.enrollment.createEnrollmentToken(principal, body);
       jsonResponse(res, 201, result, addNoStore());
       return;
     }
@@ -589,11 +593,11 @@ export class RemoteControlPlane {
       return { agents: this.store.listAgents(principal.userId).map(sanitizeAgent) };
     }
     if (tool === "create_enrollment_token") {
-      return this.createEnrollmentToken(principal, args);
+      return this.enrollment.createEnrollmentToken(principal, args);
     }
     if (tool === "get_agent_install_command") {
       const agent = this.requireAgent(principal.userId, args);
-      return this.installCommand(agent, undefined);
+      return this.enrollment.installCommand(agent, undefined);
     }
     if (tool === "update_agent_policy") {
       const agent = this.requireAgent(principal.userId, args);
@@ -623,87 +627,6 @@ export class RemoteControlPlane {
     }
     const actionResult = await this.dispatchAction(principal, agent, tool, capability, args);
     return { action: actionResult };
-  }
-
-  private createEnrollmentToken(
-    principal: RemotePrincipal,
-    args: Record<string, unknown>,
-  ): Record<string, unknown> {
-    if (!hasCapability(principal.capabilities, "agents.admin")) {
-      throw safeError("INVALID_SCOPE", "agents:admin scope is required", 403);
-    }
-    const alias = asString(args.alias)?.trim();
-    if (!alias) {
-      throw safeError("FORBIDDEN", "alias is required");
-    }
-    const profile = asString(args.requested_profile) ?? "read-only";
-    const policy = createAgentPolicy(
-      profile === "operations" || profile === "full-admin" ? profile : "read-only",
-    );
-    const now = nowIso();
-    const existing = this.store.getAgentByAlias(principal.userId, alias);
-    if (existing && existing.status !== "revoked") {
-      throw safeError("FORBIDDEN", "Agent alias already exists");
-    }
-    const agent: RemoteAgentRecord = {
-      id: id("agt"),
-      userId: principal.userId,
-      alias,
-      status: "pending",
-      profile: policy.profile,
-      policy,
-      policyVersion: policy.version,
-      createdAt: now,
-      updatedAt: now,
-    };
-    const token = randomToken(32);
-    this.store.insertAgent(agent);
-    this.store.insertEnrollmentToken({
-      id: id("enr"),
-      agentId: agent.id,
-      userId: principal.userId,
-      tokenHash: hashSecret(token),
-      expiresAt: new Date(Date.now() + this.config.enrollmentTokenTtlSeconds * 1000).toISOString(),
-      createdAt: now,
-    });
-    this.audit({
-      userId: principal.userId,
-      agentId: agent.id,
-      eventType: "enrollment_token_created",
-      severity: "info",
-      metadata: { alias, profile: policy.profile },
-    });
-    return { ...this.installCommand(agent, token), enrollment_token: token };
-  }
-
-  private installCommand(
-    agent: RemoteAgentRecord,
-    token: string | undefined,
-  ): Record<string, unknown> {
-    const tokenArgument = token ?? "<create-a-new-enrollment-token>";
-    const posixBase = [
-      "npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent enroll",
-      `--server ${quotePosixArg(this.config.publicBaseUrl)}`,
-      `--token ${quotePosixArg(tokenArgument)}`,
-      `--alias ${quotePosixArg(agent.alias)}`,
-    ].join(" ");
-    const powershellBase = [
-      "npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent enroll",
-      `--server ${quotePowerShellArg(this.config.publicBaseUrl)}`,
-      `--token ${quotePowerShellArg(tokenArgument)}`,
-      `--alias ${quotePowerShellArg(agent.alias)}`,
-    ].join(" ");
-    return {
-      agent_id: agent.id,
-      alias: agent.alias,
-      token_recoverable: Boolean(token),
-      commands: {
-        npm: posixBase,
-        run: "npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent run",
-        windows: powershellBase,
-      },
-      expires_in_seconds: token ? this.config.enrollmentTokenTtlSeconds : undefined,
-    };
   }
 
   private updateAgentPolicy(
