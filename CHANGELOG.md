@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.4.2...ssh-mcp-pro-v1.4.3) (2026-11-10)
+
+
+### Bug Fixes
+
+* **release:** tolerate npm registry post-publish processing ([#200](https://github.com/oaslananka/ssh-mcp-pro/issues/200)) ([6a8b4eb](https://github.com/oaslananka/ssh-mcp-pro/commit/6a8b4ebc976f902cd96a96dec89156947151f205))
+
 ## [1.4.2](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.4.1...ssh-mcp-pro-v1.4.2) (2026-11-10)
 
 
