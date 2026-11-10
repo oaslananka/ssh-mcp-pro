@@ -1,0 +1,670 @@
+/* SSH MCP Pro documentation skin — TypeDoc 0.28 default theme.
+   Keep the upstream renderer/search/navigation and adjust presentation only. */
+
+:root {
+  --light-color-background: #f5f7fb;
+  --light-color-background-secondary: #edf1f8;
+  --light-color-background-active: #e0eafe;
+  --light-color-accent: #dbe3ef;
+  --light-color-text: #18243a;
+  --light-color-text-aside: #53627b;
+  --light-color-link: #235fd0;
+  --light-color-focus-outline: #3d78e6;
+  --dark-color-background: #0b1222;
+  --dark-color-background-secondary: #121e32;
+  --dark-color-background-active: #223656;
+  --dark-color-accent: #283b57;
+  --dark-color-text: #e9f0fc;
+  --dark-color-text-aside: #a4b6d1;
+  --dark-color-link: #92bbff;
+  --dark-color-focus-outline: #96bdff;
+  --docs-surface: #ffffff;
+  --docs-surface-alt: #f3f6fc;
+  --docs-elevated: #ffffff;
+  --docs-line: #dce4f1;
+  --docs-ink: #16233b;
+  --docs-muted: #53647e;
+  --docs-brand: #2a64da;
+  --docs-brand-strong: #174cba;
+  --docs-brand-tint: #e9f1ff;
+  --docs-shadow: 0 14px 45px rgb(32 52 94 / 6%);
+  --docs-hero-gradient: linear-gradient(125deg, #0d2150 0%, #174bb4 64%, #326fe1 100%);
+}
+
+:root[data-theme="dark"] {
+  --docs-surface: #121d30;
+  --docs-surface-alt: #17243a;
+  --docs-elevated: #17253b;
+  --docs-line: #2b405d;
+  --docs-ink: #eff5ff;
+  --docs-muted: #afc0d9;
+  --docs-brand: #9bbdff;
+  --docs-brand-strong: #bbd2ff;
+  --docs-brand-tint: #1d3150;
+  --docs-shadow: 0 16px 50px rgb(0 0 0 / 16%);
+  --docs-hero-gradient: linear-gradient(125deg, #112b60 0%, #203f83 63%, #214ea2 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"], [data-theme="dark"]) {
+    --docs-surface: #121d30;
+    --docs-surface-alt: #17243a;
+    --docs-elevated: #17253b;
+    --docs-line: #2b405d;
+    --docs-ink: #eff5ff;
+    --docs-muted: #afc0d9;
+    --docs-brand: #9bbdff;
+    --docs-brand-strong: #bbd2ff;
+    --docs-brand-tint: #1d3150;
+    --docs-shadow: 0 16px 50px rgb(0 0 0 / 16%);
+    --docs-hero-gradient: linear-gradient(125deg, #112b60 0%, #203f83 63%, #214ea2 100%);
+  }
+}
+
+html {
+  scroll-padding-top: 6rem;
+}
+body {
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+::selection {
+  background: #92b5fa90;
+}
+:focus-visible {
+  outline: 3px solid var(--docs-brand) !important;
+  outline-offset: 3px;
+}
+
+.container {
+  max-width: 1780px;
+  padding-inline: clamp(18px, 2.25vw, 38px);
+}
+
+/* Branded but unobtrusive global navigation. */
+.tsd-page-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1050;
+  background: color-mix(in srgb, var(--docs-surface) 93%, transparent);
+  border-bottom: 1px solid var(--docs-line);
+  backdrop-filter: saturate(150%) blur(15px);
+  -webkit-backdrop-filter: saturate(150%) blur(15px);
+}
+.tsd-toolbar-contents {
+  min-height: 64px;
+  gap: 14px;
+}
+.tsd-toolbar-contents .title {
+  font-size: 1.04rem;
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  text-decoration: none;
+  color: var(--docs-ink);
+  min-width: 0;
+}
+.tsd-toolbar-contents .title:hover {
+  color: var(--docs-brand-strong);
+}
+#tsd-toolbar-links {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  align-items: center;
+}
+#tsd-toolbar-links a {
+  font-size: 0.84rem;
+  font-weight: 650;
+  padding: 8px 11px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--docs-muted);
+  white-space: nowrap;
+}
+#tsd-toolbar-links a:hover {
+  color: var(--docs-brand-strong);
+  background: var(--docs-brand-tint);
+}
+#tsd-search-trigger,
+.docs-theme-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 39px;
+  min-width: 39px;
+  height: 39px;
+  padding: 0;
+  border-radius: 11px;
+  border: 1px solid var(--docs-line);
+  background: var(--docs-surface);
+  color: var(--docs-ink);
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    transform 0.16s ease;
+}
+#tsd-search-trigger:hover,
+.docs-theme-switch:hover {
+  border-color: var(--docs-brand);
+  background: var(--docs-brand-tint);
+}
+.docs-theme-switch .docs-theme-icon {
+  font-size: 19px;
+  line-height: 1;
+}
+.tsd-toolbar-contents .menu {
+  border-radius: 10px;
+}
+#tsd-search {
+  border-radius: 16px;
+  border: 1px solid var(--docs-line);
+  box-shadow: var(--docs-shadow);
+}
+
+/* A stable three-column grid. The old fractional layout let long tables
+   overflow the content track and visually cover the TOC. */
+.container-main {
+  min-width: 0;
+  margin-block: 30px 64px;
+}
+.col-content {
+  min-width: 0;
+  max-width: 100%;
+}
+.col-content > * {
+  min-width: 0;
+}
+.tsd-page-title {
+  padding: 4px 0 15px;
+}
+.tsd-page-title h1 {
+  font-size: clamp(1.6rem, 2vw, 2.25rem);
+  font-weight: 770;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
+}
+.tsd-breadcrumb {
+  font-size: 0.87rem;
+}
+.tsd-breadcrumb a {
+  text-decoration: none;
+}
+.tsd-breadcrumb a:hover {
+  color: var(--docs-brand-strong);
+  text-decoration: underline;
+}
+
+@media (min-width: 770px) {
+  .container-main {
+    gap: clamp(16px, 2vw, 30px);
+  }
+  .col-content {
+    padding: 0;
+  }
+}
+@media (min-width: 1200px) {
+  .container-main {
+    grid-template-columns: minmax(215px, 252px) minmax(0, 1fr) minmax(195px, 230px);
+    grid-template-areas: "sidebar content toc";
+    align-items: start;
+  }
+  .col-sidebar {
+    display: contents;
+  }
+  .col-content {
+    grid-area: content;
+  }
+  .site-menu {
+    grid-area: sidebar;
+  }
+  .page-menu {
+    grid-area: toc;
+    padding: 0;
+  }
+  .page-menu,
+  .site-menu {
+    top: 82px;
+    max-height: calc(100dvh - 102px);
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+}
+@media (min-width: 770px) and (max-width: 1199px) {
+  .container-main {
+    grid-template-columns: minmax(195px, 235px) minmax(0, 1fr);
+  }
+  .col-sidebar {
+    max-height: calc(100dvh - 100px);
+    top: 82px;
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+}
+@media (min-width: 770px) {
+  .site-menu,
+  .page-menu {
+    background: var(--docs-surface);
+    border: 1px solid var(--docs-line);
+    border-radius: 16px;
+    padding: 14px 10px;
+    box-shadow: var(--docs-shadow);
+  }
+  .site-menu {
+    margin-top: 0;
+  }
+}
+.tsd-navigation a,
+.tsd-page-navigation a,
+.tsd-navigation .tsd-accordion-summary {
+  border-radius: 9px;
+  font-size: 0.89rem;
+  line-height: 1.4;
+  padding: 7px 9px;
+  overflow-wrap: anywhere;
+}
+.tsd-navigation a:hover,
+.tsd-page-navigation a:hover {
+  background: var(--docs-brand-tint);
+  color: var(--docs-brand-strong);
+  text-decoration: none;
+}
+.tsd-navigation a.current,
+.tsd-page-navigation a.current {
+  background: var(--docs-brand-tint);
+  color: var(--docs-brand-strong);
+  font-weight: 650;
+}
+.tsd-page-navigation .tsd-accordion-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tsd-navigation h3,
+.tsd-page-navigation h3 {
+  font-size: 0.89rem;
+  font-weight: 730;
+  letter-spacing: -0.015em;
+}
+.tsd-navigation.settings {
+  margin-bottom: 8px;
+}
+.tsd-filter-visibility,
+.tsd-theme-toggle {
+  font-size: 0.85rem;
+}
+
+/* Surfaces and readable API signatures. */
+.tsd-panel,
+.tsd-signature,
+.tsd-index-panel {
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tsd-panel.tsd-typography {
+  background: var(--docs-surface);
+  border: 1px solid var(--docs-line);
+  border-radius: 18px;
+  box-shadow: var(--docs-shadow);
+  padding: clamp(17px, 2.5vw, 34px);
+}
+.tsd-panel.tsd-typography > :first-child {
+  margin-top: 0;
+}
+.tsd-panel.tsd-typography > :last-child {
+  margin-bottom: 0;
+}
+.tsd-typography {
+  font-size: 0.965rem;
+  color: var(--docs-ink);
+}
+.tsd-typography p,
+.tsd-typography li {
+  line-height: 1.72;
+}
+.tsd-typography h2,
+.tsd-typography h3 {
+  letter-spacing: -0.025em;
+}
+.tsd-typography h2 {
+  font-size: 1.45rem;
+  margin-top: 1.9em;
+}
+.tsd-typography a {
+  color: var(--docs-brand-strong);
+  text-underline-offset: 3px;
+}
+.tsd-signature {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.tsd-signatures,
+.tsd-member,
+.tsd-index-panel {
+  min-width: 0;
+}
+.tsd-member .tsd-signature {
+  line-height: 1.65;
+}
+.tsd-panel-group {
+  min-width: 0;
+}
+.tsd-panel-group h2 {
+  letter-spacing: -0.035em;
+}
+
+/* Long API property/configuration tables never enter the TOC column. */
+.tsd-typography table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid var(--docs-line);
+  border-radius: 12px;
+  scrollbar-width: thin;
+  background: var(--docs-surface);
+  margin: 1.3rem 0 1.6rem;
+}
+.tsd-typography th,
+.tsd-typography td {
+  padding: 11px 15px;
+  border: 0;
+  border-bottom: 1px solid var(--docs-line);
+  vertical-align: top;
+  min-width: 110px;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  font-size: 0.875rem;
+}
+.tsd-typography th {
+  text-align: left;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  font-weight: 750;
+  color: var(--docs-muted);
+}
+.tsd-typography tbody tr:last-child td {
+  border-bottom: 0;
+}
+.tsd-typography thead,
+.tsd-typography tbody tr:nth-child(even) {
+  background: var(--docs-surface-alt);
+}
+.tsd-typography tbody tr:hover {
+  background: var(--docs-brand-tint);
+}
+.tsd-typography table code,
+.tsd-typography td code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.tsd-typography pre {
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 13px;
+  border: 1px solid var(--docs-line);
+  background: var(--docs-surface-alt);
+  padding: 15px;
+  scrollbar-width: thin;
+}
+.tsd-typography code:not(pre code) {
+  background: var(--docs-surface-alt);
+  border: 1px solid var(--docs-line);
+  padding: 0.1em 0.35em;
+  border-radius: 6px;
+  font-size: 0.87em;
+}
+.tsd-typography pre code {
+  overflow-wrap: normal;
+}
+.tsd-typography img {
+  max-width: 100%;
+  height: auto;
+}
+.tsd-typography blockquote {
+  border-left: 3px solid var(--docs-brand);
+  background: var(--docs-surface-alt);
+  margin-left: 0;
+  padding: 13px 18px;
+  border-radius: 0 12px 12px 0;
+}
+footer {
+  border-top: 1px solid var(--docs-line);
+  color: var(--docs-muted);
+  font-size: 0.8rem;
+}
+
+/* A focused, action-first overview for humans arriving at the API root. */
+.docs-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  background: var(--docs-hero-gradient);
+  padding: clamp(24px, 4vw, 52px);
+  color: #fff;
+  margin-bottom: 20px;
+}
+.docs-hero::after {
+  content: "";
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  right: -125px;
+  top: -200px;
+  background: rgb(255 255 255 / 8%);
+  pointer-events: none;
+}
+.docs-hero h2 {
+  color: #fff;
+  font-weight: 790;
+  font-size: clamp(2rem, 3.3vw, 3.1rem);
+  line-height: 1.12;
+  max-width: 17ch;
+  margin: 17px 0 16px;
+  letter-spacing: -0.055em;
+}
+.docs-hero p {
+  font-size: clamp(1rem, 1.3vw, 1.1rem);
+  color: #dce8ff;
+  max-width: 54ch;
+  margin: 0;
+}
+.docs-kicker {
+  display: inline-block;
+  border: 1px solid rgb(255 255 255 / 25%);
+  border-radius: 100px;
+  background: rgb(255 255 255 / 11%);
+  color: #eaf1ff;
+  padding: 6px 12px;
+  font-size: 0.72rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  font-weight: 760;
+}
+.docs-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 28px;
+}
+.docs-hero-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 11px;
+  padding: 10px 18px;
+  background: #fff;
+  color: #153f93 !important;
+  font-weight: 750;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.docs-hero-actions a:hover {
+  background: #eaf2ff;
+}
+.docs-hero-actions a.docs-action-quiet {
+  background: rgb(255 255 255 / 10%);
+  border: 1px solid rgb(255 255 255 / 30%);
+  color: #fff !important;
+}
+.docs-hero-actions a.docs-action-quiet:hover {
+  background: rgb(255 255 255 / 20%);
+}
+.docs-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0 26px;
+}
+.docs-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid var(--docs-line);
+  background: var(--docs-surface);
+  text-decoration: none !important;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.docs-tile:hover {
+  border-color: var(--docs-brand);
+  box-shadow: var(--docs-shadow);
+  transform: translateY(-2px);
+}
+.docs-tile-title {
+  color: var(--docs-ink);
+  font-weight: 760;
+  font-size: 0.99rem;
+  line-height: 1.3;
+}
+.docs-tile-desc {
+  color: var(--docs-muted);
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+.docs-pill {
+  display: inline-block;
+  background: var(--docs-brand-tint);
+  color: var(--docs-brand-strong);
+  font-size: 0.68rem;
+  font-weight: 760;
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+  border-radius: 7px;
+  padding: 3px 8px;
+  width: max-content;
+}
+
+@media (max-width: 769px) {
+  .container {
+    padding-inline: 16px;
+  }
+  .container-main {
+    margin-block: 20px 40px;
+  }
+  .tsd-toolbar-contents {
+    min-height: 58px;
+    gap: 7px;
+  }
+  .tsd-toolbar-contents .title {
+    font-size: 0.88rem;
+  }
+  #tsd-toolbar-links {
+    display: none;
+  }
+  .docs-theme-switch,
+  #tsd-search-trigger {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+  }
+  .tsd-page-title {
+    padding-top: 10px;
+  }
+  .tsd-panel.tsd-typography {
+    padding: 18px 15px;
+  }
+  .docs-hero {
+    padding: 24px 18px;
+  }
+  .docs-hero h2 {
+    font-size: 2rem;
+  }
+  .docs-hero-actions a {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .docs-tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tsd-typography th,
+  .tsd-typography td {
+    padding: 8px 11px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .docs-tile,
+  .docs-theme-switch,
+  #tsd-search-trigger {
+    transition: none !important;
+  }
+}
+
+/* Module-level groups need the same visual hierarchy as the overview. */
+.col-content > .tsd-panel-group {
+  padding: 14px clamp(16px, 2vw, 26px);
+  margin-bottom: 18px;
+  border: 1px solid var(--docs-line);
+  border-radius: 16px;
+  background: var(--docs-surface);
+  box-shadow: var(--docs-shadow);
+}
+.col-content > .tsd-panel-group > summary {
+  padding: 3px 0;
+}
+.tsd-member-summaries {
+  margin-bottom: 0;
+}
+.tsd-member-summary {
+  padding: 8px 4px;
+}
+.tsd-member-summary + .tsd-member-summary {
+  border-top: 1px solid var(--docs-line);
+}
+.tsd-signature,
+.tsd-signatures {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 769px) {
+  .col-content > .tsd-panel-group {
+    padding: 12px 14px;
+  }
+}
+
+/* Long TypeScript symbol names must wrap at narrow widths, not widen the viewport. */
+.tsd-member-summary-name {
+  display: inline-flex;
+  align-items: flex-start;
+  max-width: 100%;
+  min-width: 0;
+}
+.tsd-member-summary-name a {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.tsd-member-summary-name .tsd-kind-icon {
+  flex-shrink: 0;
+}
