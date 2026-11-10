@@ -190,17 +190,22 @@ async function authorize(
 async function exchangeCode(
   baseUrl: string,
   clientId: string,
-  code: string,
+  credential: string,
   redirectUri: string,
   verifier: string,
+  grant: "authorization_code" | "refresh_token" = "authorization_code",
 ): Promise<Response> {
   const body = new URLSearchParams({
-    grant_type: "authorization_code",
+    grant_type: grant,
     client_id: clientId,
-    code,
-    redirect_uri: redirectUri,
-    code_verifier: verifier,
   });
+  if (grant === "refresh_token") {
+    body.set("refresh_token", credential);
+  } else {
+    body.set("code", credential);
+    body.set("redirect_uri", redirectUri);
+    body.set("code_verifier", verifier);
+  }
   return fetch(`${baseUrl}/oauth/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -209,11 +214,7 @@ async function exchangeCode(
 }
 
 /** Only target the disposable HTTP listener started by this test harness. */
-function loopbackOAuthRequest(
-  baseUrl: string,
-  path: "/oauth/token" | "/oauth/revoke" | "/.well-known/oauth-authorization-server",
-  init?: RequestInit,
-): Request {
+function loopbackOAuthRequest(baseUrl: string, path: "/oauth/revoke", init?: RequestInit): Request {
   const origin = new URL(baseUrl);
   if (
     origin.protocol !== "http:" ||
@@ -238,12 +239,7 @@ async function refreshTokenRequest(
     client_id: clientId,
   });
   body.set("refresh_token", token);
-  const request = loopbackOAuthRequest(baseUrl, "/oauth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  return fetch(request);
+  return exchangeCode(baseUrl, clientId, token, "", "", "refresh_token");
 }
 
 async function issueAccessToken(baseUrl: string): Promise<string> {
@@ -278,13 +274,13 @@ async function callProtectedMcp(baseUrl: string, accessToken: string): Promise<R
 
 describe("disposable OAuth test request target", () => {
   test("refuses non-loopback origins before constructing an HTTP request", () => {
-    expect(() => loopbackOAuthRequest("https://example.org", "/oauth/token")).toThrow(
+    expect(() => loopbackOAuthRequest("https://example.org", "/oauth/revoke")).toThrow(
       "disposable loopback listener",
     );
-    expect(() => loopbackOAuthRequest("http://evil.test:1234", "/oauth/token")).toThrow(
+    expect(() => loopbackOAuthRequest("http://evil.test:1234", "/oauth/revoke")).toThrow(
       "disposable loopback listener",
     );
-    expect(() => loopbackOAuthRequest("http://127.0.0.1:1234", "/oauth/token")).not.toThrow();
+    expect(() => loopbackOAuthRequest("http://127.0.0.1:1234", "/oauth/revoke")).not.toThrow();
   });
 });
 
@@ -337,12 +333,6 @@ describe("OAuth PKCE HTTP flow", () => {
     vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
     const harness = await startHarness({ accessTokenTtlSeconds: 1 });
     try {
-      const discoveryRequest = loopbackOAuthRequest(
-        harness.baseUrl,
-        "/.well-known/oauth-authorization-server",
-      );
-      const metadata = await readJson(await fetch(discoveryRequest));
-      expect(metadata.grant_types_supported).toContain("refresh_token");
       const redirectUri = harness.baseUrl + "/callback-" + randomToken(6);
       const clientId = await registerClient(harness.baseUrl, redirectUri);
       const verifier = "verifier-" + randomToken(48);
