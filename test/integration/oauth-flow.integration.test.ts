@@ -1,6 +1,12 @@
 import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import {
+  createServer,
+  request as httpRequest,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from "node:http";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
@@ -214,7 +220,7 @@ async function exchangeCode(
 }
 
 /** Only target the disposable HTTP listener started by this test harness. */
-function loopbackOAuthRequest(baseUrl: string, path: "/oauth/revoke", init?: RequestInit): Request {
+function loopbackTestPort(baseUrl: string): number {
   const origin = new URL(baseUrl);
   if (
     origin.protocol !== "http:" ||
@@ -226,7 +232,7 @@ function loopbackOAuthRequest(baseUrl: string, path: "/oauth/revoke", init?: Req
   ) {
     throw new Error("OAuth test request must target a disposable loopback listener");
   }
-  return new Request(new URL(path, origin), { ...init, redirect: "manual" });
+  return Number(origin.port);
 }
 
 async function refreshTokenRequest(
@@ -274,13 +280,9 @@ async function callProtectedMcp(baseUrl: string, accessToken: string): Promise<R
 
 describe("disposable OAuth test request target", () => {
   test("refuses non-loopback origins before constructing an HTTP request", () => {
-    expect(() => loopbackOAuthRequest("https://example.org", "/oauth/revoke")).toThrow(
-      "disposable loopback listener",
-    );
-    expect(() => loopbackOAuthRequest("http://evil.test:1234", "/oauth/revoke")).toThrow(
-      "disposable loopback listener",
-    );
-    expect(() => loopbackOAuthRequest("http://127.0.0.1:1234", "/oauth/revoke")).not.toThrow();
+    expect(() => loopbackTestPort("https://example.org")).toThrow("disposable loopback listener");
+    expect(() => loopbackTestPort("http://evil.test:1234")).toThrow("disposable loopback listener");
+    expect(() => loopbackTestPort("http://127.0.0.1:1234")).not.toThrow();
   });
 });
 
@@ -436,14 +438,32 @@ describe("OAuth PKCE HTTP flow", () => {
           token_type_hint: "refresh_token",
         });
         body.set("token", String(first.refresh_token));
-        const request = loopbackOAuthRequest(harness.baseUrl, "/oauth/revoke", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body,
+        // A fixed loopback host/path avoids even the appearance of an outbound request.
+        // The port comes only from startHarness() and is validated above.
+        const payload = body.toString();
+        return new Promise<number>((resolve, reject) => {
+          const request = httpRequest(
+            {
+              hostname: "127.0.0.1",
+              port: loopbackTestPort(harness.baseUrl),
+              path: "/oauth/revoke",
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Content-Length": Buffer.byteLength(payload),
+              },
+            },
+            (response) => {
+              response.resume();
+              response.once("end", () => resolve(response.statusCode ?? 0));
+              response.once("error", reject);
+            },
+          );
+          request.once("error", reject);
+          request.end(payload);
         });
-        return fetch(request);
       };
-      expect((await revoke(other)).status).toBe(200);
+      expect(await revoke(other)).toBe(200);
       const current = await refreshTokenRequest(
         harness.baseUrl,
         owner,
@@ -451,7 +471,7 @@ describe("OAuth PKCE HTTP flow", () => {
       );
       expect(current.status).toBe(200);
       const third = await readJson(current);
-      expect((await revoke(owner)).status).toBe(200);
+      expect(await revoke(owner)).toBe(200);
       expect(
         (await refreshTokenRequest(harness.baseUrl, owner, String(third.refresh_token))).status,
       ).toBe(400);
