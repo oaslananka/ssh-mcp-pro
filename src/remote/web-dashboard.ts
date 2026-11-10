@@ -12,6 +12,7 @@ import { jsonResponse } from "./util.js";
 import { renderDashboardHtml } from "./web-dashboard-html.js";
 import { serveAgentScript } from "./web-dashboard-static.js";
 import { createDashboardClientConfigs } from "./web-dashboard-client-config.js";
+import { buildDashboardEnrollmentCommands } from "./dashboard-enrollment-commands.js";
 import { fetchGitHubUserDirect, fetchGoogleUserDirect } from "./web-dashboard-oauth-users.js";
 
 export interface WebDashboardDependencies {
@@ -439,14 +440,6 @@ export class WebDashboardHandler {
     jsonResponse(res, 200, { devices: enriched }, addNoStore());
   }
 
-  private quotePosixArg(value: string): string {
-    return "'" + value.replaceAll("'", String.raw`'\''`) + "'";
-  }
-
-  private quotePowerShellArg(value: string): string {
-    return "'" + value.replaceAll("'", "''") + "'";
-  }
-
   private async handleApiEnrollDevice(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const principal = this.getPrincipalFromSession(req);
     if (!principal) {
@@ -462,25 +455,14 @@ export class WebDashboardHandler {
       throw safeError("INVALID_TOKEN", "Enrollment token was not generated", 500);
     }
 
-    const posixInstallerUrl = `${serverUrl}/install-agent.sh`;
-    const powerShellInstallerUrl = `${serverUrl}/install-agent.ps1`;
-
-    // Propagate curl failures instead of reporting success from an empty bash pipeline.
-    const curlScript = 'curl -fsSL "$1" | bash -s -- --server "$2" --token "$3" --alias "$4"';
-    const curlCommand = `bash -o pipefail -c ${this.quotePosixArg(curlScript)} _ ${this.quotePosixArg(posixInstallerUrl)} ${this.quotePosixArg(serverUrl)} ${this.quotePosixArg(token)} ${this.quotePosixArg(alias)}`;
-    const powershellCommand = `& ([scriptblock]::Create((Invoke-RestMethod -Uri ${this.quotePowerShellArg(powerShellInstallerUrl)}))) -Server ${this.quotePowerShellArg(serverUrl)} -Token ${this.quotePowerShellArg(token)} -Alias ${this.quotePowerShellArg(alias)}`;
-    const npmCommand = `npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent enroll --server ${this.quotePosixArg(serverUrl)} --token ${this.quotePosixArg(token)} --alias ${this.quotePosixArg(alias)} && npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent run`;
+    const commands = buildDashboardEnrollmentCommands(serverUrl, token, alias);
 
     jsonResponse(
       res,
       201,
       {
         ...tokenResult,
-        commands: {
-          linux: curlCommand,
-          windows: powershellCommand,
-          npm: npmCommand,
-        },
+        commands,
       },
       addNoStore(),
     );
