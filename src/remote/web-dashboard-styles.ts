@@ -47,7 +47,7 @@ export const DASHBOARD_STYLES = `
       text-transform: uppercase;
     }
     .badge-green { background: #238636; color: #fff; }
-    .badge-gray { background: #30363d; color: #8b949e; }
+    .badge-gray { background: #30363d; color: #c9d1d9; }
     .badge-blue { background: var(--blue-bg); color: var(--blue); border: 1px solid rgba(56,139,253,0.3); }
     .btn {
       display: inline-flex;
@@ -164,6 +164,13 @@ export const DASHBOARD_STYLES = `
       margin: 12px 0;
       position: relative;
     }
+    .code-box > span {
+      display: block;
+      padding-right: 52px;
+      overflow-wrap: anywhere;
+    }
+    .card a { color: var(--blue); text-underline-offset: 2px; }
+    .card a:hover { color: #b0d4ff; }
     .copy-btn {
       position: absolute;
       top: 8px;
@@ -177,6 +184,7 @@ export const DASHBOARD_STYLES = `
       cursor: pointer;
     }
     .copy-btn:hover { background: #30363d; color: #fff; }
+    .copy-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
     /* Config guide cards */
     .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 20px; }
