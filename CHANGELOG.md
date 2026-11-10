@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.4.3...ssh-mcp-pro-v1.5.0) (2026-11-10)
+
+
+### Features
+
+* **remote:** rotating OAuth refresh tokens for persistent MCP sessions ([8b1aad8](https://github.com/oaslananka/ssh-mcp-pro/commit/8b1aad8be7fcb779a5b409e31d034e941e100ce1))
+
 ## [1.4.3](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.4.2...ssh-mcp-pro-v1.4.3) (2026-11-10)
 
 
