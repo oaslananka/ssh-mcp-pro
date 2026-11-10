@@ -208,20 +208,43 @@ async function exchangeCode(
   });
 }
 
+/** Only target the disposable HTTP listener started by this test harness. */
+function loopbackOAuthRequest(
+  baseUrl: string,
+  path: "/oauth/token" | "/oauth/revoke" | "/.well-known/oauth-authorization-server",
+  init?: RequestInit,
+): Request {
+  const origin = new URL(baseUrl);
+  if (
+    origin.protocol !== "http:" ||
+    origin.hostname !== "127.0.0.1" ||
+    !origin.port ||
+    origin.pathname !== "/" ||
+    origin.search ||
+    origin.hash
+  ) {
+    throw new Error("OAuth test request must target a disposable loopback listener");
+  }
+  return new Request(new URL(path, origin), { ...init, redirect: "manual" });
+}
+
 async function refreshTokenRequest(
   baseUrl: string,
   clientId: string,
   token: string,
 ): Promise<Response> {
-  return fetch(baseUrl + "/oauth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      client_id: clientId,
-      refresh_token: token,
-    }),
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    client_id: clientId,
   });
+  body.set("refresh_token", token);
+  return fetch(
+    loopbackOAuthRequest(baseUrl, "/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    }),
+  );
 }
 
 async function issueAccessToken(baseUrl: string): Promise<string> {
@@ -253,6 +276,18 @@ async function callProtectedMcp(baseUrl: string, accessToken: string): Promise<R
     body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
   });
 }
+
+describe("disposable OAuth test request target", () => {
+  test("refuses non-loopback origins before constructing an HTTP request", () => {
+    expect(() => loopbackOAuthRequest("https://example.org", "/oauth/token")).toThrow(
+      "disposable loopback listener",
+    );
+    expect(() => loopbackOAuthRequest("http://evil.test:1234", "/oauth/token")).toThrow(
+      "disposable loopback listener",
+    );
+    expect(() => loopbackOAuthRequest("http://127.0.0.1:1234", "/oauth/token")).not.toThrow();
+  });
+});
 
 describe("OAuth PKCE HTTP flow", () => {
   let previousId: string | undefined;
@@ -304,7 +339,9 @@ describe("OAuth PKCE HTTP flow", () => {
     const harness = await startHarness({ accessTokenTtlSeconds: 1 });
     try {
       const metadata = await readJson(
-        await fetch(harness.baseUrl + "/.well-known/oauth-authorization-server"),
+        await fetch(
+          loopbackOAuthRequest(harness.baseUrl, "/.well-known/oauth-authorization-server"),
+        ),
       );
       expect(metadata.grant_types_supported).toContain("refresh_token");
       const redirectUri = harness.baseUrl + "/callback-" + randomToken(6);
@@ -404,16 +441,20 @@ describe("OAuth PKCE HTTP flow", () => {
       const second = await readJson(
         await refreshTokenRequest(harness.baseUrl, owner, String(first.refresh_token)),
       );
-      const revoke = (clientId: string) =>
-        fetch(harness.baseUrl + "/oauth/revoke", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            client_id: clientId,
-            token: String(first.refresh_token),
-            token_type_hint: "refresh_token",
-          }),
+      const revoke = (clientId: string) => {
+        const body = new URLSearchParams({
+          client_id: clientId,
+          token_type_hint: "refresh_token",
         });
+        body.set("token", String(first.refresh_token));
+        return fetch(
+          loopbackOAuthRequest(harness.baseUrl, "/oauth/revoke", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body,
+          }),
+        );
+      };
       expect((await revoke(other)).status).toBe(200);
       const current = await refreshTokenRequest(
         harness.baseUrl,

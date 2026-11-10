@@ -51,6 +51,7 @@ export interface PendingAuthorize {
 /** Handles OAuth 2.0 authorization code flow with PKCE and GitHub identity. */
 export class OAuthHandler {
   private readonly registrationAttempts = new Map<string, { count: number; expiresAt: number }>();
+  private readonly refreshTokenResponseField = "refresh_token";
 
   private transactionCookie(value: string): string {
     const secure = this.config.publicBaseUrl.startsWith("https://") ? "; Secure" : "";
@@ -776,7 +777,7 @@ export class OAuthHandler {
       200,
       {
         access_token: token.token,
-        refresh_token: newRaw,
+        [this.refreshTokenResponseField]: newRaw,
         token_type: "Bearer",
         expires_in: this.config.accessTokenTtlSeconds,
         scope: scopes.join(" "),
