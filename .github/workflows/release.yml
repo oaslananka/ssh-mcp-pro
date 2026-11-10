@@ -265,7 +265,7 @@ jobs:
           VERSION: ${{ steps.artifact.outputs.version }}
         run: |
           set -euo pipefail
-          if [[ "$(npm view "ssh-mcp-pro@${VERSION}" version --silent 2>/dev/null || true)" == "$VERSION" ]]; then
+          if [[ "$(npm view "ssh-mcp-pro@${VERSION}" version --silent --prefer-online 2>/dev/null || true)" == "$VERSION" ]]; then
             echo "already_published=true" >> "$GITHUB_OUTPUT"
             echo "ssh-mcp-pro@${VERSION} is already public; no duplicate publish."
           else
@@ -286,15 +286,15 @@ jobs:
           VERSION: ${{ steps.artifact.outputs.version }}
         run: |
           set -euo pipefail
-          for attempt in {1..12}; do
-            if [[ "$(npm view "ssh-mcp-pro@${VERSION}" version --silent 2>/dev/null || true)" == "$VERSION" ]]; then
+          for attempt in {1..60}; do
+            if [[ "$(npm view "ssh-mcp-pro@${VERSION}" version --silent --prefer-online 2>/dev/null || true)" == "$VERSION" ]]; then
               echo "Verified ssh-mcp-pro@${VERSION} on public npm."
               exit 0
             fi
-            echo "npm version ${VERSION} not visible (attempt ${attempt}/12)."
+            echo "npm version ${VERSION} still processing (attempt ${attempt}/60)."
             sleep 10
           done
-          echo "npm release ${VERSION} could not be verified." >&2
+          echo "npm release ${VERSION} could not be verified after bounded registry processing retries." >&2
           exit 1
 
       - name: Trigger MCP Registry publication

@@ -100,6 +100,9 @@ describe("gated release lifecycle", () => {
     expect(publishing).toContain("commits/${TAG}");
     expect(publishing).toContain("git merge-base --is-ancestor");
     expect(publishing).toContain("already_published == 'false'");
+    expect(publishing).toContain("for attempt in {1..60}; do");
+    expect(publishing).toContain("npm view ");
+    expect(publishing).toContain("--prefer-online");
     expect(publishing).toContain("npm publish");
     expect(publishing).not.toContain("npm stage publish");
     expect(publishing).not.toContain("AUTO_RELEASE_PUBLISH");
