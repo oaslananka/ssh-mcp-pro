@@ -5,6 +5,7 @@ const options = JSON.parse(fs.readFileSync("typedoc.json", "utf8")) as {
   readme: string;
   customCss: string;
   customJs: string;
+  favicon: string;
   navigationLinks: Record<string, string>;
 };
 const docsWorkflow = fs.readFileSync(".github/workflows/docs.yml", "utf8");
@@ -17,6 +18,8 @@ describe("API documentation theme and publish contract", () => {
     expect(options.readme).toBe("docs/api-overview.md");
     expect(options.customCss).toBe("docs/theme/ssh-docs.css");
     expect(options.customJs).toBe("docs/theme/ssh-docs.js");
+    expect(options.favicon).toBe("docs/theme/favicon.svg");
+    expect(fs.existsSync(options.favicon)).toBe(true);
     expect(options.navigationLinks.GitHub).toBe("https://github.com/oaslananka/ssh-mcp-pro");
     expect(overview).toContain('class="docs-hero"');
     expect(overview).toContain("## Quickstart");
@@ -49,6 +52,7 @@ describe("API documentation theme and publish contract", () => {
     expect(docsWorkflow).toContain("pnpm run docs:check");
     expect(docsWorkflow).toContain("test -s docs/api/assets/custom.css");
     expect(docsWorkflow).toContain("test -s docs/api/assets/custom.js");
+    expect(docsWorkflow).toContain("test -s docs/api/assets/favicon.svg");
     expect(docsWorkflow).toContain("actions/deploy-pages@");
   });
 });

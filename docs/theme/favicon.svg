@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="SSH MCP Pro">
+  <defs>
+    <linearGradient id="a" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#102e78"/>
+      <stop offset="100%" stop-color="#3678e7"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#a)"/>
+  <path d="m16 23 12 10-12 10" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M34 43h14" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="47" cy="19" r="4" fill="#9ee8fa"/>
+</svg>

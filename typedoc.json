@@ -22,6 +22,7 @@
   "readme": "docs/api-overview.md",
   "customCss": "docs/theme/ssh-docs.css",
   "customJs": "docs/theme/ssh-docs.js",
+  "favicon": "docs/theme/favicon.svg",
   "navigationLinks": {
     "GitHub": "https://github.com/oaslananka/ssh-mcp-pro",
     "npm": "https://www.npmjs.com/package/ssh-mcp-pro"

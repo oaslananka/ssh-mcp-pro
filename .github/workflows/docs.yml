@@ -88,6 +88,7 @@ jobs:
           pnpm exec prettier --check docs/theme/ssh-docs.css docs/theme/ssh-docs.js docs/api-overview.md
           test -s docs/api/assets/custom.css
           test -s docs/api/assets/custom.js
+          test -s docs/api/assets/favicon.svg
           grep -q 'assets/custom.css' docs/api/index.html
           grep -q 'assets/custom.js' docs/api/index.html
           grep -q 'class="docs-hero"' docs/api/index.html
