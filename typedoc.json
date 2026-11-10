@@ -19,7 +19,13 @@
   "excludePrivate": true,
   "excludeInternal": true,
   "skipErrorChecking": false,
-  "readme": "README.md",
+  "readme": "docs/api-overview.md",
+  "customCss": "docs/theme/ssh-docs.css",
+  "customJs": "docs/theme/ssh-docs.js",
+  "navigationLinks": {
+    "GitHub": "https://github.com/oaslananka/ssh-mcp-pro",
+    "npm": "https://www.npmjs.com/package/ssh-mcp-pro"
+  },
   "plugin": [],
   "name": "ssh-mcp-pro API",
   "includeVersion": true,

@@ -13,6 +13,8 @@ name: API Docs
       - "pnpm-lock.yaml"
       - "src/**"
       - "tsconfig.json"
+      - "docs/api-overview.md"
+      - "docs/theme/**"
       - "typedoc.json"
   pull_request:
     branches:
@@ -25,6 +27,8 @@ name: API Docs
       - "pnpm-lock.yaml"
       - "src/**"
       - "tsconfig.json"
+      - "docs/api-overview.md"
+      - "docs/theme/**"
       - "typedoc.json"
   workflow_dispatch:
 
@@ -78,6 +82,15 @@ jobs:
       - name: Build API docs
         run: pnpm run docs:check
 
+      - name: Verify custom theme and generated assets
+        run: |
+          set -euo pipefail
+          pnpm exec prettier --check docs/theme/ssh-docs.css docs/theme/ssh-docs.js docs/api-overview.md
+          test -s docs/api/assets/custom.css
+          test -s docs/api/assets/custom.js
+          grep -q 'assets/custom.css' docs/api/index.html
+          grep -q 'assets/custom.js' docs/api/index.html
+          grep -q 'class="docs-hero"' docs/api/index.html
       - name: Upload Pages artifact
         # yamllint disable rule:line-length
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
