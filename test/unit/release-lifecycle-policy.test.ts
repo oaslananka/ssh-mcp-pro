@@ -84,8 +84,13 @@ describe("gated release lifecycle", () => {
     expect(publishing).not.toContain("npm stage publish");
   });
 
-  test("manual Release publishes the existing checked artifact directly via OIDC", () => {
+  test("automatically publishes a verified release via OIDC, retaining manual recovery", () => {
     const publishing = release.slice(release.indexOf("  publish-npm:"));
+    expect(publishing).toContain("needs: [release, release-assets]");
+    expect(publishing).toContain("always()");
+    expect(publishing).toContain("github.event_name == 'push'");
+    expect(publishing).toContain("needs.release.outputs.release_created == 'true'");
+    expect(publishing).toContain("needs.release-assets.result == 'success'");
     expect(publishing).toContain("github.event_name == 'workflow_dispatch'");
     expect(publishing).toContain("github.ref == 'refs/heads/main'");
     expect(publishing).toContain("id-token: write");
