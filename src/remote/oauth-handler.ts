@@ -23,6 +23,7 @@ import {
   scopeList,
 } from "./http-util.js";
 import { RemoteStore } from "./store.js";
+import { exchangeGitHubIdentity, exchangeGoogleIdentity } from "./oauth-provider-exchange.js";
 import type {
   AuditEvent,
   GitHubUser,
@@ -499,40 +500,8 @@ export class OAuthHandler {
 
   async fetchGoogleUser(code: string): Promise<GoogleUser> {
     const testUser = this.testGoogleUser();
-    if (testUser) {
-      return testUser;
-    }
-    if (!this.config.googleClientId || !this.config.googleClientSecret) {
-      throw safeError("FORBIDDEN", "Google OAuth is not configured", 503);
-    }
-    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        code,
-        client_id: this.config.googleClientId,
-        client_secret: this.config.googleClientSecret,
-        redirect_uri: this.config.googleCallbackUrl,
-        grant_type: "authorization_code",
-      }).toString(),
-    });
-    const tokenPayload = (await tokenResponse.json()) as Record<string, unknown>;
-    const accessToken = asString(tokenPayload.access_token);
-    if (!accessToken) {
-      throw safeError("INVALID_TOKEN", "Google OAuth token exchange failed", 502);
-    }
-    const userResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    const userPayload = (await userResponse.json()) as Record<string, unknown>;
-    const googleSub = asString(userPayload.sub);
-    const email = asString(userPayload.email);
-    const name = asString(userPayload.name) ?? email ?? "Google User";
-    const picture = asString(userPayload.picture);
-    if (!googleSub || !email) {
-      throw safeError("INVALID_TOKEN", "Google OAuth user response missing valid identity", 502);
-    }
-    return { id: googleSub, email, name, picture };
+    if (testUser) return testUser;
+    return exchangeGoogleIdentity(this.config, code);
   }
 
   /** Fixture identities must never bypass provider login on public-facing hosts. */
@@ -592,37 +561,7 @@ export class OAuthHandler {
   }
 
   private async fetchGitHubUser(code: string): Promise<GitHubUser> {
-    const tokenResponse = await fetch("https://github.com/login/oauth/access_token", {
-      method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify({
-        client_id: this.config.githubClientId,
-        client_secret: this.config.githubClientSecret,
-        code,
-        redirect_uri: this.config.githubCallbackUrl,
-      }),
-    });
-    const tokenPayload = (await tokenResponse.json()) as Record<string, unknown>;
-    const accessToken = asString(tokenPayload.access_token);
-    if (!accessToken) {
-      throw safeError("INVALID_TOKEN", "GitHub OAuth token exchange failed", 502);
-    }
-    const userResponse = await fetch("https://api.github.com/user", {
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/vnd.github+json" },
-    });
-    const userPayload = (await userResponse.json()) as Record<string, unknown>;
-    const githubId = userPayload.id;
-    const githubLogin = userPayload.login;
-    if (
-      typeof githubId !== "number" ||
-      !Number.isSafeInteger(githubId) ||
-      githubId <= 0 ||
-      typeof githubLogin !== "string" ||
-      !githubLogin
-    ) {
-      throw safeError("INVALID_TOKEN", "GitHub OAuth user response missing valid identity", 502);
-    }
-    return { id: String(githubId), login: githubLogin };
+    return exchangeGitHubIdentity(this.config, code);
   }
 
   testGitHubUser(): GitHubUser | undefined {
