@@ -71,17 +71,21 @@ describe("maintenance subprocess security boundaries", () => {
     });
   });
 
-  test("rejects cmd.exe variable-expansion arguments for Windows shim fallback", () => {
-    const dir = mkdtempSync(join(tmpdir(), "ssh-mcp-windows-shim-"));
-    try {
-      writeFileSync(join(dir, "pnpm.cmd"), "@echo off\r\n");
-      Object.defineProperty(process, "platform", { configurable: true, value: "win32" });
-      process.env.PATH = dir + ";";
-      for (const arg of ["%COMSPEC%", "!TEMP!", "name^other", 'name"other', "<file"]) {
-        expect(() => capture("pnpm", [arg])).toThrow("unsafe Windows command shim argument");
+  // Windows tests force the fallback explicitly; real bundled Corepack bypasses cmd.exe.
+  test.skipIf(process.platform === "win32")(
+    "rejects cmd.exe variable-expansion arguments for Windows shim fallback",
+    () => {
+      const dir = mkdtempSync(join(tmpdir(), "ssh-mcp-windows-shim-"));
+      try {
+        writeFileSync(join(dir, "pnpm.cmd"), "@echo off\r\n");
+        Object.defineProperty(process, "platform", { configurable: true, value: "win32" });
+        process.env.PATH = dir + ";";
+        for (const arg of ["%COMSPEC%", "!TEMP!", "name^other", 'name"other', "<file"]) {
+          expect(() => capture("pnpm", [arg])).toThrow("unsafe Windows command shim argument");
+        }
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
       }
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
+    },
+  );
 });

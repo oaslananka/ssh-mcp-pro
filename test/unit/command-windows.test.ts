@@ -15,6 +15,7 @@ vi.mock("node:fs", async (original) => {
   return { ...actual, existsSync: vi.fn(() => false) };
 });
 
+const windowsPath = (value: unknown) => String(value).replaceAll("\\", "/");
 const mockSpawn = vi.mocked(spawnSync);
 const mockExists = vi.mocked(existsSync);
 const platform = Object.getOwnPropertyDescriptor(process, "platform");
@@ -38,26 +39,28 @@ afterEach(() => {
 describe("Windows maintenance command invocation", () => {
   test.each(["npm", "npx"])("runs bundled %s JavaScript without shell/PATH .cmd", (tool) => {
     mockExists.mockImplementation((candidate) =>
-      String(candidate).endsWith(tool === "npm" ? "/npm/bin/npm-cli.js" : "/npm/bin/npx-cli.js"),
+      windowsPath(candidate).endsWith(
+        tool === "npm" ? "/npm/bin/npm-cli.js" : "/npm/bin/npx-cli.js",
+      ),
     );
     const result = capture(tool, ["--version"]);
     expect(result.status).toBe(0);
     expect(mockSpawn).toHaveBeenCalledOnce();
     const [command, args, options] = mockSpawn.mock.calls[0];
     expect(command).toBe(process.execPath);
-    expect(args?.[0]).toContain("npm/bin/");
+    expect(windowsPath(args?.[0])).toContain("npm/bin/");
     expect(args?.[1]).toBe("--version");
     expect(options?.shell).not.toBe(true);
   });
 
   test("routes pnpm through its Corepack JavaScript entrypoint when installed", () => {
     mockExists.mockImplementation((candidate) =>
-      String(candidate).endsWith("/corepack/dist/pnpm.js"),
+      windowsPath(candidate).endsWith("/corepack/dist/pnpm.js"),
     );
     run("pnpm", ["--version"]);
     expect(mockSpawn).toHaveBeenCalledWith(
       process.execPath,
-      [expect.stringContaining("corepack/dist/pnpm.js"), "--version"],
+      [expect.stringMatching(/corepack[\\/]dist[\\/]pnpm\.js$/u), "--version"],
       expect.objectContaining({ stdio: "inherit" }),
     );
   });
@@ -65,19 +68,19 @@ describe("Windows maintenance command invocation", () => {
   test("prefers the bundled pnpm Corepack entrypoint over a PATH shim", () => {
     mockExists.mockImplementation(
       (candidate) =>
-        String(candidate).endsWith("/corepack/dist/pnpm.js") ||
-        String(candidate).endsWith("pnpm.cmd"),
+        windowsPath(candidate).endsWith("/corepack/dist/pnpm.js") ||
+        windowsPath(candidate).endsWith("pnpm.cmd"),
     );
     capture("pnpm", ["--version"]);
     expect(mockSpawn).toHaveBeenCalledWith(
       process.execPath,
-      [expect.stringContaining("corepack/dist/pnpm.js"), "--version"],
+      [expect.stringMatching(/corepack[\\/]dist[\\/]pnpm\.js$/u), "--version"],
       expect.objectContaining({ stdio: "pipe" }),
     );
   });
 
   test("uses a PATH pnpm shim when no bundled CLI is present", () => {
-    mockExists.mockImplementation((candidate) => String(candidate).endsWith("pnpm.cmd"));
+    mockExists.mockImplementation((candidate) => windowsPath(candidate).endsWith("pnpm.cmd"));
     capture("pnpm", ["list", "--json"]);
     expect(mockSpawn).toHaveBeenCalledWith(
       process.env.ComSpec,
@@ -90,7 +93,7 @@ describe("Windows maintenance command invocation", () => {
     "refuses a PATH-selected cmd shim containing command metacharacters: %s",
     (dir) => {
       process.env.PATH = `C:\\${dir};C:\\node`;
-      mockExists.mockImplementation((candidate) => String(candidate).endsWith("pnpm.cmd"));
+      mockExists.mockImplementation((candidate) => windowsPath(candidate).endsWith("pnpm.cmd"));
       expect(() => capture("pnpm", ["--version"])).toThrow(
         "Refusing unsafe Windows command shim path",
       );
@@ -100,7 +103,7 @@ describe("Windows maintenance command invocation", () => {
 
   test("accepts a normal PATH shim directory containing spaces", () => {
     process.env.PATH = "C:\\Program Files\\nodejs";
-    mockExists.mockImplementation((candidate) => String(candidate).endsWith("pnpm.cmd"));
+    mockExists.mockImplementation((candidate) => windowsPath(candidate).endsWith("pnpm.cmd"));
     capture("pnpm", ["--version"]);
     expect(mockSpawn).toHaveBeenCalledOnce();
   });
@@ -113,7 +116,7 @@ describe("Windows maintenance command invocation", () => {
   });
 
   test("rejects unsafe cmd variable expansion in an explicitly resolved PATH shim", () => {
-    mockExists.mockImplementation((candidate) => String(candidate).endsWith("pnpm.cmd"));
+    mockExists.mockImplementation((candidate) => windowsPath(candidate).endsWith("pnpm.cmd"));
     expect(() => capture("pnpm", ["%COMSPEC%"])).toThrow("unsafe Windows command shim");
     expect(mockSpawn).not.toHaveBeenCalled();
   });
