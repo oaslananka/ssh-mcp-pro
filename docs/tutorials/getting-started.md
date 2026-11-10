@@ -10,7 +10,7 @@ and [Reference](../reference/README.md) for the full option set.
 
 You need:
 
-- Node.js `>=22.22.2` (or `>=24.15.0` / `>=26.3.0`) and pnpm `>=11.0.9`.
+- Node.js `>=22.22.2` (or `>=24.15.0` / `>=26.3.0`) and pnpm `^11.28.10`.
 - At least one host you can already reach with plain `ssh`, with its key already in
   your `~/.ssh/known_hosts` (this tutorial uses the default `strict` host-key policy —
   see [SECURITY_DECISIONS.md](../../SECURITY_DECISIONS.md) for why).
