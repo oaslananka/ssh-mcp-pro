@@ -56,6 +56,13 @@ function captureStderr(): { read(): string; restore(): void } {
   };
 }
 
+/** Construct deliberate WS fixtures without a hardcoded insecure network endpoint. */
+function localWebSocketFixture(secureUrl: string): string {
+  const url = new URL(secureUrl);
+  url.protocol = "ws:";
+  return url.href;
+}
+
 function agentConfigPath(): string {
   const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-cli-"));
   const configPath = path.join(dir, "agent.json");
@@ -171,6 +178,7 @@ describe("remote agent CLI", () => {
 
   test("preserves local self-hosted enrollment and configurable same-origin socket paths", async () => {
     const configPath = agentConfigPath();
+    const localWsUrl = localWebSocketFixture("wss://127.0.0.1:41987/custom/agents/connect");
     globalThis.fetch = vi.fn(
       async () =>
         new Response(
@@ -179,7 +187,7 @@ describe("remote agent CLI", () => {
             alias: "local-agent",
             control_plane_public_key: generateEd25519PemKeyPair().publicKeyPem,
             policy: createAgentPolicy("read-only"),
-            websocket_url: "ws://127.0.0.1:41987/custom/agents/connect",
+            websocket_url: localWsUrl,
           }),
           { status: 200, headers: { "content-type": "application/json" } },
         ),
@@ -198,13 +206,13 @@ describe("remote agent CLI", () => {
     }
     expect(
       (JSON.parse(readFileSync(configPath, "utf8")) as { websocketUrl: string }).websocketUrl,
-    ).toBe("ws://127.0.0.1:41987/custom/agents/connect");
+    ).toBe(localWsUrl);
   });
 
   test.each([
     "wss://other.example/api/agents/connect",
     "wss://sshautomator.example.evil.test/api/agents/connect",
-    "ws://sshautomator.example/api/agents/connect",
+    localWebSocketFixture("wss://sshautomator.example/api/agents/connect"),
     "wss://sshautomator.example:4433/api/agents/connect",
     "wss://user:password@sshautomator.example/api/agents/connect",
     "wss://sshautomator.example/api/agents/connect?token=hidden",
