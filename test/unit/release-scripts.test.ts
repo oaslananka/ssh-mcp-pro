@@ -52,7 +52,8 @@ describe("release scripts", () => {
       workflow: {
         hasOidcPermission: boolean;
         usesNpmPublish: boolean;
-        requiresManualDispatch: boolean;
+        automaticallyPublishesOnRelease: boolean;
+        allowsManualRecovery: boolean;
         verifiesReleasedArtifact: boolean;
       };
     };
@@ -62,7 +63,8 @@ describe("release scripts", () => {
     expect(state.trustedPublishing.allowedAction).toBe("npm publish");
     expect(state.workflow.hasOidcPermission).toBe(true);
     expect(state.workflow.usesNpmPublish).toBe(true);
-    expect(state.workflow.requiresManualDispatch).toBe(true);
+    expect(state.workflow.automaticallyPublishesOnRelease).toBe(true);
+    expect(state.workflow.allowsManualRecovery).toBe(true);
     expect(state.workflow.verifiesReleasedArtifact).toBe(true);
   }, 15_000);
 });

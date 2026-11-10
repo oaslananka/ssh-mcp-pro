@@ -201,8 +201,19 @@ jobs:
         run: gh workflow run docker.yml --repo "$GITHUB_REPOSITORY" --ref main -f "ref=${RELEASE_TAG}"
 
   publish-npm:
-    name: Publish current GitHub Release to npm
-    if: ${{ github.repository == 'oaslananka/ssh-mcp-pro' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    name: Publish verified GitHub Release to npm
+    needs: [release, release-assets]
+    if: >-
+      ${{
+        always() &&
+        github.repository == 'oaslananka/ssh-mcp-pro' &&
+        (
+          (github.event_name == 'push' &&
+           needs.release.outputs.release_created == 'true' &&
+           needs.release-assets.result == 'success') ||
+          (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+        )
+      }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: npm-production

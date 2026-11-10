@@ -26,12 +26,24 @@ assertIncludes(
 );
 assertIncludes("OIDC permission", workflow, "id-token: write");
 assertIncludes("npm trusted publish command", workflow, "npm publish");
-assertIncludes("manual npm publishing", workflow, "github.event_name == 'workflow_dispatch'");
+const publishing = workflow.slice(workflow.indexOf("  publish-npm:"));
+assertIncludes("npm job release dependencies", publishing, "needs: [release, release-assets]");
+assertIncludes(
+  "automatic release publishing",
+  publishing,
+  "needs.release.outputs.release_created == 'true'",
+);
+assertIncludes(
+  "verified release assets gate",
+  publishing,
+  "needs.release-assets.result == 'success'",
+);
+assertIncludes("safe manual recovery", publishing, "github.event_name == 'workflow_dispatch'");
 assertIncludes("published package integrity", workflow, "gh attestation verify");
 assertIncludes("immutable tarball checksum", workflow, "sha256sum -c");
 if (workflow.includes("npm stage publish") || workflow.includes("AUTO_RELEASE_PUBLISH")) {
   failures.push(
-    "release workflow must use one-click direct npm publishing without stage or automatic publish toggle.",
+    "release workflow must use direct npm publishing without staging or an unverified publish toggle.",
   );
 }
 assertEqual("publish access", packageJson.publishConfig?.access, "public");

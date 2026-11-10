@@ -32,7 +32,7 @@ const state = {
     workflowFile: basename(".github/workflows/release.yml"),
     environment: "npm-production",
     allowedAction: "npm publish",
-    publication: "manual workflow_dispatch on main",
+    publication: "automatic after verified GitHub Release; manual recovery on main",
   },
   localTools: {
     node: process.version,
@@ -57,7 +57,11 @@ function inspectWorkflow(workflow) {
     hasNpmProductionEnvironment: workflow.includes("environment: npm-production"),
     hasOidcPermission: workflow.includes("id-token: write"),
     usesNpmPublish: workflow.includes("npm publish"),
-    requiresManualDispatch: workflow.includes("github.event_name == 'workflow_dispatch'"),
+    automaticallyPublishesOnRelease:
+      workflow.includes("needs: [release, release-assets]") &&
+      workflow.includes("needs.release.outputs.release_created == 'true'") &&
+      workflow.includes("needs.release-assets.result == 'success'"),
+    allowsManualRecovery: workflow.includes("github.event_name == 'workflow_dispatch'"),
     verifiesReleasedArtifact: workflow.includes("gh attestation verify"),
   };
 }
