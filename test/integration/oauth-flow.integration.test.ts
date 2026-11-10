@@ -137,13 +137,18 @@ async function readJson(response: Response): Promise<Record<string, unknown>> {
   return payload as Record<string, unknown>;
 }
 
-async function registerClient(baseUrl: string, redirectUri: string): Promise<string> {
+async function registerClient(
+  baseUrl: string,
+  redirectUri: string,
+  grants?: string[],
+): Promise<string> {
   const response = await fetch(`${baseUrl}/oauth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       client_name: "PKCE Integration Test",
       redirect_uris: [redirectUri],
+      ...(grants ? { grant_types: grants } : {}),
     }),
   });
   const body = await readJson(response);
@@ -200,6 +205,22 @@ async function exchangeCode(
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
+  });
+}
+
+async function refreshTokenRequest(
+  baseUrl: string,
+  clientId: string,
+  token: string,
+): Promise<Response> {
+  return fetch(baseUrl + "/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: clientId,
+      refresh_token: token,
+    }),
   });
 }
 
@@ -272,6 +293,183 @@ describe("OAuth PKCE HTTP flow", () => {
           result: expect.objectContaining({ tools: expect.any(Array) }),
         }),
       );
+    } finally {
+      await closeHarness(harness);
+    }
+  });
+
+  test("refreshes an expired MCP login without another browser consent and rejects token replay", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+    const harness = await startHarness({ accessTokenTtlSeconds: 1 });
+    try {
+      const metadata = await readJson(
+        await fetch(harness.baseUrl + "/.well-known/oauth-authorization-server"),
+      );
+      expect(metadata.grant_types_supported).toContain("refresh_token");
+      const redirectUri = harness.baseUrl + "/callback-" + randomToken(6);
+      const clientId = await registerClient(harness.baseUrl, redirectUri);
+      const verifier = "verifier-" + randomToken(48);
+      const code = await authorize(harness.baseUrl, clientId, redirectUri, verifier);
+      const firstResponse = await exchangeCode(
+        harness.baseUrl,
+        clientId,
+        code,
+        redirectUri,
+        verifier,
+      );
+      expect(firstResponse.status).toBe(200);
+      const first = await readJson(firstResponse);
+      expect(first.refresh_token).toEqual(expect.any(String));
+      vi.setSystemTime(new Date("2026-01-01T00:00:02.000Z"));
+      expect((await callProtectedMcp(harness.baseUrl, String(first.access_token))).status).toBe(
+        401,
+      );
+      const secondResponse = await refreshTokenRequest(
+        harness.baseUrl,
+        clientId,
+        String(first.refresh_token),
+      );
+      expect(secondResponse.status).toBe(200);
+      const second = await readJson(secondResponse);
+      expect(second.refresh_token).toEqual(expect.any(String));
+      expect(second.refresh_token).not.toBe(first.refresh_token);
+      expect(second.scope).toBe(first.scope);
+      expect((await callProtectedMcp(harness.baseUrl, String(second.access_token))).status).toBe(
+        200,
+      );
+      expect(
+        (await refreshTokenRequest(harness.baseUrl, clientId, String(first.refresh_token))).status,
+      ).toBe(400);
+      expect(
+        (await refreshTokenRequest(harness.baseUrl, clientId, String(second.refresh_token))).status,
+      ).toBe(400);
+    } finally {
+      await closeHarness(harness);
+    }
+  });
+
+  test("refresh token is client-bound and another client cannot revoke a valid session", async () => {
+    const harness = await startHarness();
+    try {
+      const redirect = harness.baseUrl + "/cb-" + randomToken(6);
+      const client = await registerClient(harness.baseUrl, redirect);
+      const otherClient = await registerClient(
+        harness.baseUrl,
+        harness.baseUrl + "/other-callback",
+      );
+      const verifier = "verifier-" + randomToken(48);
+      const code = await authorize(harness.baseUrl, client, redirect, verifier, "hosts:read");
+      const first = await readJson(
+        await exchangeCode(harness.baseUrl, client, code, redirect, verifier),
+      );
+      expect(first.scope).toBe("hosts:read");
+      expect(first.refresh_token).toEqual(expect.any(String));
+      expect(
+        (await refreshTokenRequest(harness.baseUrl, otherClient, String(first.refresh_token)))
+          .status,
+      ).toBe(400);
+      const rightful = await refreshTokenRequest(
+        harness.baseUrl,
+        client,
+        String(first.refresh_token),
+      );
+      expect(rightful.status).toBe(200);
+      const next = await readJson(rightful);
+      expect(next.scope).toBe("hosts:read");
+      const mcp = await readJson(
+        await callProtectedMcp(harness.baseUrl, String(next.access_token)),
+      );
+      const names = (mcp.result as { tools: Array<{ name: string }> }).tools.map(
+        (tool) => tool.name,
+      );
+      expect(names).toContain("list_hosts");
+      expect(names).not.toContain("run_shell");
+    } finally {
+      await closeHarness(harness);
+    }
+  });
+
+  test("a client can revoke its refresh grant even after rotation without exposing it", async () => {
+    const harness = await startHarness();
+    try {
+      const redirect = harness.baseUrl + "/cb-" + randomToken(6);
+      const owner = await registerClient(harness.baseUrl, redirect);
+      const other = await registerClient(harness.baseUrl, harness.baseUrl + "/other-cb");
+      const verifier = "verifier-" + randomToken(48);
+      const code = await authorize(harness.baseUrl, owner, redirect, verifier);
+      const first = await readJson(
+        await exchangeCode(harness.baseUrl, owner, code, redirect, verifier),
+      );
+      const second = await readJson(
+        await refreshTokenRequest(harness.baseUrl, owner, String(first.refresh_token)),
+      );
+      const revoke = (clientId: string) =>
+        fetch(harness.baseUrl + "/oauth/revoke", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            client_id: clientId,
+            token: String(first.refresh_token),
+            token_type_hint: "refresh_token",
+          }),
+        });
+      expect((await revoke(other)).status).toBe(200);
+      const current = await refreshTokenRequest(
+        harness.baseUrl,
+        owner,
+        String(second.refresh_token),
+      );
+      expect(current.status).toBe(200);
+      const third = await readJson(current);
+      expect((await revoke(owner)).status).toBe(200);
+      expect(
+        (await refreshTokenRequest(harness.baseUrl, owner, String(third.refresh_token))).status,
+      ).toBe(400);
+    } finally {
+      await closeHarness(harness);
+    }
+  });
+
+  test("clients opting out of refresh receive only short-lived bearer credentials", async () => {
+    const harness = await startHarness();
+    try {
+      const redirect = harness.baseUrl + "/cb-" + randomToken(6);
+      const client = await registerClient(harness.baseUrl, redirect, ["authorization_code"]);
+      const verifier = "verifier-" + randomToken(48);
+      const code = await authorize(harness.baseUrl, client, redirect, verifier);
+      const response = await exchangeCode(harness.baseUrl, client, code, redirect, verifier);
+      const token = await readJson(response);
+      expect(response.status).toBe(200);
+      expect(token).not.toHaveProperty("refresh_token");
+      expect((await refreshTokenRequest(harness.baseUrl, client, randomToken(32))).status).toBe(
+        400,
+      );
+    } finally {
+      await closeHarness(harness);
+    }
+  });
+
+  test("refresh grants expire at a fixed 30-day absolute lifetime", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-01-01T00:00:00.000Z"));
+    const harness = await startHarness();
+    try {
+      const redirect = harness.baseUrl + "/cb-" + randomToken(6);
+      const client = await registerClient(harness.baseUrl, redirect);
+      const verifier = "verifier-" + randomToken(48);
+      const code = await authorize(harness.baseUrl, client, redirect, verifier);
+      const first = await readJson(
+        await exchangeCode(harness.baseUrl, client, code, redirect, verifier),
+      );
+      vi.setSystemTime(new Date("2026-02-01T00:00:00.000Z"));
+      const response = await refreshTokenRequest(
+        harness.baseUrl,
+        client,
+        String(first.refresh_token),
+      );
+      expect(response.status).toBe(400);
+      expect(await readJson(response)).toMatchObject({ error: "invalid_grant" });
     } finally {
       await closeHarness(harness);
     }

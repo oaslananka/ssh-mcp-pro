@@ -183,6 +183,10 @@ export class RemoteControlPlane {
       await this.oauth.handleToken(req, res);
       return true;
     }
+    if (pathname === "/oauth/revoke" && req.method === "POST") {
+      await this.oauth.handleRevoke(req, res);
+      return true;
+    }
     if (pathname === "/oauth/jwks.json" && req.method === "GET") {
       await this.oauth.handleJwks(res);
       return true;

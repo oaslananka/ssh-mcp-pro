@@ -30,6 +30,7 @@ import type {
   GoogleUser,
   OAuthAuthorizationCode,
   OAuthClient,
+  OAuthRefreshTokenRecord,
   RemoteConfig,
 } from "./types.js";
 import { REMOTE_SCOPES } from "./types.js";
@@ -88,10 +89,11 @@ export class OAuthHandler {
       authorization_response_iss_parameter_supported: true,
       authorization_endpoint: `${this.config.publicBaseUrl}/oauth/authorize`,
       token_endpoint: `${this.config.publicBaseUrl}/oauth/token`,
+      revocation_endpoint: `${this.config.publicBaseUrl}/oauth/revoke`,
       registration_endpoint: `${this.config.publicBaseUrl}/oauth/register`,
       jwks_uri: `${this.config.publicBaseUrl}/oauth/jwks.json`,
       response_types_supported: ["code"],
-      grant_types_supported: ["authorization_code"],
+      grant_types_supported: ["authorization_code", "refresh_token"],
       code_challenge_methods_supported: ["S256"],
       token_endpoint_auth_methods_supported: ["none"],
       scopes_supported: REMOTE_SCOPES,
@@ -122,13 +124,25 @@ export class OAuthHandler {
     if (this.store.countOAuthClients() >= this.config.maxOAuthClients) {
       throw safeError("FORBIDDEN", "OAuth client registration limit reached", 429);
     }
+    const grantTypes =
+      body.grant_types === undefined
+        ? ["authorization_code", "refresh_token"]
+        : asStringArray(body.grant_types);
+    if (
+      (!Array.isArray(body.grant_types) && body.grant_types !== undefined) ||
+      !grantTypes.includes("authorization_code") ||
+      grantTypes.some((grant) => !["authorization_code", "refresh_token"].includes(grant)) ||
+      new Set(grantTypes).size !== grantTypes.length
+    ) {
+      throw safeError("INVALID_CLIENT", "Unsupported OAuth grant_types");
+    }
     const now = nowIso();
     const client: OAuthClient = {
       id: id("clirow"),
       clientId: id("cli"),
       clientName: asString(body.client_name) ?? "ChatGPT Connector",
       redirectUris,
-      grantTypes: ["authorization_code"],
+      grantTypes,
       responseTypes: ["code"],
       tokenEndpointAuthMethod: "none",
       createdAt: now,
@@ -409,7 +423,7 @@ export class OAuthHandler {
       clientId,
       clientName: "Restored ChatGPT Connector",
       redirectUris: [redirectUri],
-      grantTypes: ["authorization_code"],
+      grantTypes: ["authorization_code", "refresh_token"],
       responseTypes: ["code"],
       tokenEndpointAuthMethod: "none",
       createdAt: nowIso(),
@@ -619,9 +633,25 @@ export class OAuthHandler {
     return code;
   }
 
+  /** Explicit OAuth revocation; RFC 7009 never reveals token validity. */
+  async handleRevoke(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const body = await readJsonOrForm(req);
+    const token = body.token ?? "";
+    const clientId = body.client_id ?? "";
+    if (/^[a-zA-Z0-9_-]{32,128}$/u.test(token) && clientId) {
+      this.store.revokeRefreshFamily(hashSecret(token), clientId, nowIso());
+    }
+    res.writeHead(200, { "Cache-Control": "no-store", Pragma: "no-cache" });
+    res.end();
+  }
+
   /** POST /oauth/token */
   async handleToken(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const body = await readJsonOrForm(req);
+    if (body.grant_type === "refresh_token") {
+      await this.refreshAccessToken(res, body);
+      return;
+    }
     if (body.grant_type !== "authorization_code") {
       throw safeError("INVALID_CLIENT", "grant_type must be authorization_code");
     }
@@ -652,11 +682,101 @@ export class OAuthHandler {
       throw safeError("INVALID_TOKEN", "Authorization code is expired or already used");
     }
     const token = await issueAccessToken(this.config, jwtKeyPair, user, scopes);
+    const refreshToken = client.grantTypes.includes("refresh_token") ? randomToken(32) : undefined;
+    if (refreshToken) {
+      this.store.createRefreshToken({
+        tokenHash: hashSecret(refreshToken),
+        familyId: id("refreshfam"),
+        clientId,
+        userId: codeRecord.userId,
+        resource: codeRecord.resource,
+        scope: scopes.join(" "),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: nowIso(),
+      });
+    }
     jsonResponse(
       res,
       200,
       {
         access_token: token.token,
+        ...(refreshToken ? { refresh_token: refreshToken } : {}),
+        token_type: "Bearer",
+        expires_in: this.config.accessTokenTtlSeconds,
+        scope: scopes.join(" "),
+      },
+      addNoStore(),
+    );
+  }
+
+  /** Rotate a bearer refresh token exactly once; all descendants die on replay. */
+  private async refreshAccessToken(
+    res: ServerResponse,
+    body: Record<string, string>,
+  ): Promise<void> {
+    const clientId = body.client_id ?? "";
+    const raw = body.refresh_token ?? "";
+    const client = this.store.getClient(clientId);
+    const invalidGrant = () => jsonResponse(res, 400, { error: "invalid_grant" }, addNoStore());
+    if (
+      !client ||
+      !client.grantTypes.includes("refresh_token") ||
+      !/^[a-zA-Z0-9_-]{32,128}$/u.test(raw)
+    ) {
+      invalidGrant();
+      return;
+    }
+    const old = this.store.getRefreshTokenByHash(hashSecret(raw));
+    if (!old) {
+      invalidGrant();
+      return;
+    }
+    if (old.clientId !== clientId || old.resource !== this.config.mcpResourceUrl) {
+      invalidGrant();
+      return;
+    }
+    const now = nowIso();
+    if (old.expiresAt <= now || old.revokedAt) {
+      invalidGrant();
+      return;
+    }
+    const user = this.userFromId(old.userId);
+    if (
+      (user.githubId &&
+        !this.isGitHubUserAllowed({ id: user.githubId, login: user.githubLogin ?? "" })) ||
+      (user.googleId &&
+        !this.isGoogleUserAllowed({
+          id: user.googleId,
+          email: user.email ?? "",
+          name: user.displayName ?? "",
+        }))
+    ) {
+      invalidGrant();
+      return;
+    }
+    const scopes = scopeList(old.scope);
+    const token = await issueAccessToken(this.config, this.getJwtKeyPair(), user, scopes);
+    const newRaw = randomToken(32);
+    const successor: OAuthRefreshTokenRecord = {
+      tokenHash: hashSecret(newRaw),
+      familyId: old.familyId,
+      clientId: old.clientId,
+      userId: old.userId,
+      resource: old.resource,
+      scope: old.scope,
+      expiresAt: old.expiresAt,
+      createdAt: now,
+    };
+    if (!this.store.rotateRefreshToken(old.tokenHash, clientId, successor, now)) {
+      invalidGrant();
+      return;
+    }
+    jsonResponse(
+      res,
+      200,
+      {
+        access_token: token.token,
+        refresh_token: newRaw,
         token_type: "Bearer",
         expires_in: this.config.accessTokenTtlSeconds,
         scope: scopes.join(" "),

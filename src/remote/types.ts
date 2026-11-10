@@ -85,6 +85,20 @@ export interface OAuthClient {
   createdAt: string;
 }
 
+/** Persist only the hash of a rotating OAuth refresh credential. */
+export interface OAuthRefreshTokenRecord {
+  tokenHash: string;
+  familyId: string;
+  clientId: string;
+  userId: string;
+  resource: string;
+  scope: string;
+  expiresAt: string;
+  usedAt?: string | undefined;
+  revokedAt?: string | undefined;
+  createdAt: string;
+}
+
 export interface OAuthAuthorizationCode {
   id: string;
   codeHash: string;

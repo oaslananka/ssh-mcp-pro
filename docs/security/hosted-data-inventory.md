@@ -2,7 +2,7 @@
 
 **Engineering evidence only — not a privacy notice or terms of service.**
 This document describes the repository's remote control-plane source
-on 2026-11-04, **not necessarily the version deployed in production**.
+on 2026-11-10, **not necessarily the version deployed in production**.
 It does not claim legal compliance or promise any retention period.
 
 ## Data handled in the remote control plane
@@ -12,6 +12,7 @@ It does not claim legal compliance or promise any retention period.
 | Account identity | GitHub ID/login/name or Google ID/email/name when configured | SQLite `users` in [remote store](../../src/remote/store.ts) |
 | Dashboard sessions | Random browser session token, a stored token hash, user ID and expiry | `dashboard_sessions` in [remote store](../../src/remote/store.ts) and [dashboard](../../src/remote/web-dashboard.ts) |
 | OAuth clients/codes | Client identity, redirect URIs, scopes and hashed authorization codes with expiry and use status | `oauth_clients` and `oauth_authorization_codes` in [remote store](../../src/remote/store.ts) |
+| OAuth refresh sessions | Hashed rotating refresh tokens bound to OAuth client, user, resource and scopes, with a fixed 30-day maximum lifetime, use/revocation timestamps and family-replay invalidation | `oauth_refresh_tokens` in [remote store](../../src/remote/store.ts) |
 | Devices | Alias, public key, policy, status, host metadata and last seen | `agents` in [remote store](../../src/remote/store.ts) |
 | Enrollment | Hashed one-time tokens with expiration and use status | `agent_enrollment_tokens` in [remote store](../../src/remote/store.ts) |
 | Remote actions | Tool and capability, **arguments**, status, deadline, **result**, and error details | `actions` in [remote store](../../src/remote/store.ts) |
@@ -33,6 +34,7 @@ in the action table.
   and can be used only once. The existing minute maintenance tick also
   removes physically expired code/token rows. Non-expired rows are retained
   even if already used.
+- Refresh grants are rotated after use, expire after at most 30 days, and can be explicitly revoked through `/oauth/revoke`. Expired refresh records are pruned by the existing maintenance tick. A replayed used refresh token revokes its token family.
 - The periodic cleanup also clears in-memory OAuth and connection state.
   It does **not** impose automatic retention/deletion on users, OAuth
   clients, devices, action history, audit events or infrastructure logs.
