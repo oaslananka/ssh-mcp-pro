@@ -215,6 +215,8 @@ describe("remote control plane remote-agent contracts", () => {
         expect.objectContaining({
           issuer: "http://127.0.0.1:3000",
           token_endpoint: "http://127.0.0.1:3000/oauth/token",
+          revocation_endpoint: "http://127.0.0.1:3000/oauth/revoke",
+          grant_types_supported: ["authorization_code", "refresh_token"],
           authorization_response_iss_parameter_supported: true,
         }),
       );

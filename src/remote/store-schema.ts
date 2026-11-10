@@ -80,6 +80,22 @@ export function migrateRemoteStoreSchema(db: DatabaseSync): void {
         created_at TEXT NOT NULL
       ) STRICT;
 
+      CREATE TABLE IF NOT EXISTS oauth_refresh_tokens (
+        token_hash TEXT PRIMARY KEY,
+        family_id TEXT NOT NULL,
+        client_id TEXT NOT NULL REFERENCES oauth_clients(client_id) ON DELETE CASCADE,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        resource TEXT NOT NULL,
+        scope TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        used_at TEXT,
+        revoked_at TEXT,
+        created_at TEXT NOT NULL
+      ) STRICT;
+
+      CREATE INDEX IF NOT EXISTS idx_oauth_refresh_expiry ON oauth_refresh_tokens(expires_at);
+      CREATE INDEX IF NOT EXISTS idx_oauth_refresh_family ON oauth_refresh_tokens(family_id);
+
       CREATE TABLE IF NOT EXISTS agents (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,

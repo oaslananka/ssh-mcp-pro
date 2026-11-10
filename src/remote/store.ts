@@ -9,6 +9,7 @@ import type {
   GitHubUser,
   GoogleUser,
   OAuthAuthorizationCode,
+  OAuthRefreshTokenRecord,
   OAuthClient,
   RemoteAgentRecord,
 } from "./types.js";
@@ -106,6 +107,7 @@ export class RemoteStore {
   pruneExpiredTransientRecords(now: string): void {
     this.db.prepare("DELETE FROM dashboard_sessions WHERE expires_at <= ?").run(now);
     this.db.prepare("DELETE FROM oauth_authorization_codes WHERE expires_at <= ?").run(now);
+    this.db.prepare("DELETE FROM oauth_refresh_tokens WHERE expires_at <= ?").run(now);
     this.db.prepare("DELETE FROM agent_enrollment_tokens WHERE expires_at <= ?").run(now);
   }
 
@@ -270,6 +272,108 @@ export class RemoteStore {
     const row = this.db.prepare("SELECT COUNT(*) AS count FROM oauth_clients").get() as
       Record<string, unknown> | undefined;
     return Number(row?.count ?? 0);
+  }
+
+  createRefreshToken(token: OAuthRefreshTokenRecord): void {
+    this.db
+      .prepare(
+        "INSERT INTO oauth_refresh_tokens " +
+          "(token_hash, family_id, client_id, user_id, resource, scope, expires_at, used_at, revoked_at, created_at) " +
+          "VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)",
+      )
+      .run(
+        token.tokenHash,
+        token.familyId,
+        token.clientId,
+        token.userId,
+        token.resource,
+        token.scope,
+        token.expiresAt,
+        token.createdAt,
+      );
+  }
+
+  getRefreshTokenByHash(tokenHash: string): OAuthRefreshTokenRecord | undefined {
+    const row = this.db
+      .prepare("SELECT * FROM oauth_refresh_tokens WHERE token_hash = ?")
+      .get(tokenHash) as Record<string, unknown> | undefined;
+    if (!row) return undefined;
+    return {
+      tokenHash: rowString(row, "token_hash"),
+      familyId: rowString(row, "family_id"),
+      clientId: rowString(row, "client_id"),
+      userId: rowString(row, "user_id"),
+      resource: rowString(row, "resource"),
+      scope: rowString(row, "scope"),
+      expiresAt: rowString(row, "expires_at"),
+      usedAt: optionalRowString(row, "used_at"),
+      revokedAt: optionalRowString(row, "revoked_at"),
+      createdAt: rowString(row, "created_at"),
+    };
+  }
+
+  /** Atomically consume and rotate. Replaying a consumed token revokes the family. */
+  rotateRefreshToken(
+    oldHash: string,
+    clientId: string,
+    successor: OAuthRefreshTokenRecord,
+    now: string,
+  ): boolean {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const previous = this.getRefreshTokenByHash(oldHash);
+      if (!previous) {
+        this.db.exec("COMMIT");
+        return false;
+      }
+      if (
+        previous.clientId !== clientId ||
+        previous.resource !== successor.resource ||
+        previous.scope !== successor.scope ||
+        previous.userId !== successor.userId ||
+        previous.familyId !== successor.familyId ||
+        previous.revokedAt ||
+        previous.expiresAt <= now
+      ) {
+        this.db.exec("COMMIT");
+        return false;
+      }
+      if (previous.usedAt) {
+        this.db
+          .prepare(
+            "UPDATE oauth_refresh_tokens SET revoked_at = ? WHERE family_id = ? AND revoked_at IS NULL",
+          )
+          .run(now, previous.familyId);
+        this.db.exec("COMMIT");
+        return false;
+      }
+      const result = this.db
+        .prepare(
+          "UPDATE oauth_refresh_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND revoked_at IS NULL",
+        )
+        .run(now, oldHash);
+      if (Number(result.changes) !== 1) {
+        throw tokenUseConflict("Refresh token already consumed");
+      }
+      this.createRefreshToken(successor);
+      this.db.exec("COMMIT");
+      return true;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  /** Revoke all descendants of a credential without leaking whether it was valid. */
+  revokeRefreshFamily(tokenHash: string, clientId: string, now: string): void {
+    const token = this.getRefreshTokenByHash(tokenHash);
+    if (!token) return;
+    if (token.clientId !== clientId) return;
+    this.db
+      .prepare(
+        "UPDATE oauth_refresh_tokens SET revoked_at = ? WHERE family_id = ? AND revoked_at IS NULL",
+      )
+      .run(now, token.familyId);
   }
 
   insertAuthorizationCode(code: OAuthAuthorizationCode): void {

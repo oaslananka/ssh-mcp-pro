@@ -3,12 +3,104 @@ import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, test } from "vitest";
+import { hashSecret, randomToken } from "../../src/remote/crypto.js";
 import { createAgentPolicy } from "../../src/remote/policy.js";
 import { RemoteStore } from "../../src/remote/store.js";
 
 const now = "2026-01-01T00:00:00.000Z";
 
 describe("remote durable store", () => {
+  test("persists only hashed rotating refresh credentials through SQLite restart and revocation", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "ssh-mcp-refresh-store-"));
+    const databasePath = path.join(dir, "tokens.db");
+    const base = {
+      familyId: "family_1",
+      clientId: "client_refresh",
+      userId: "github:43",
+      resource: "https://example.test/mcp",
+      scope: "hosts:read",
+      expiresAt: "2026-02-01T00:00:00.000Z",
+      createdAt: now,
+    };
+    const secret = randomToken(32);
+    const successor = randomToken(32);
+    let store: RemoteStore | undefined;
+    try {
+      store = new RemoteStore("file:" + databasePath);
+      store.upsertUser({ internalId: "github:43", id: "43", login: "tester", now });
+      store.insertClient({
+        id: "client_row",
+        clientId: base.clientId,
+        clientName: "Refresh Test",
+        redirectUris: ["https://example.test/callback"],
+        grantTypes: ["authorization_code", "refresh_token"],
+        responseTypes: ["code"],
+        tokenEndpointAuthMethod: "none",
+        createdAt: now,
+      });
+      store.createRefreshToken({ ...base, tokenHash: hashSecret(secret) });
+      store.close();
+      store = undefined;
+
+      const file = new DatabaseSync(databasePath, { readOnly: true });
+      try {
+        const records = file.prepare("SELECT * FROM oauth_refresh_tokens").all();
+        expect(records).toHaveLength(1);
+        expect(records[0]).toMatchObject({
+          token_hash: hashSecret(secret),
+          client_id: "client_refresh",
+          user_id: "github:43",
+        });
+        expect(JSON.stringify(records)).not.toContain(secret);
+        expect(file.prepare("PRAGMA integrity_check").get()).toMatchObject({
+          integrity_check: "ok",
+        });
+        expect(file.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+      } finally {
+        file.close();
+      }
+
+      store = new RemoteStore(databasePath);
+      const nextRecord = {
+        ...base,
+        tokenHash: hashSecret(successor),
+        createdAt: "2026-01-02T00:00:00.000Z",
+      };
+      expect(
+        store.rotateRefreshToken(
+          hashSecret(secret),
+          base.clientId,
+          nextRecord,
+          nextRecord.createdAt,
+        ),
+      ).toBe(true);
+      expect(store.getRefreshTokenByHash(hashSecret(successor))).toMatchObject({
+        userId: "github:43",
+        scope: "hosts:read",
+      });
+      expect(
+        store.rotateRefreshToken(
+          hashSecret(secret),
+          base.clientId,
+          nextRecord,
+          nextRecord.createdAt,
+        ),
+      ).toBe(false);
+      expect(store.getRefreshTokenByHash(hashSecret(successor))?.revokedAt).toBeDefined();
+      expect(
+        store.rotateRefreshToken(
+          hashSecret(successor),
+          base.clientId,
+          { ...nextRecord, tokenHash: hashSecret(randomToken(32)) },
+          nextRecord.createdAt,
+        ),
+      ).toBe(false);
+    } finally {
+      store?.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("throws actionable startup error when node:sqlite cannot provide DatabaseSync", () => {
     expect(
       () =>

@@ -154,6 +154,23 @@ export class RemoteControlPlane {
     await this.oauth.handleGoogleCallback(req, res);
   }
 
+  /** Keep credential-exchange routes together without inflating OAuth dispatch complexity. */
+  private async handleOAuthGrantRequest(
+    req: IncomingMessage,
+    res: ServerResponse,
+    pathname: string,
+  ): Promise<boolean> {
+    if (pathname === "/oauth/token" && req.method === "POST") {
+      await this.oauth.handleToken(req, res);
+      return true;
+    }
+    if (pathname === "/oauth/revoke" && req.method === "POST") {
+      await this.oauth.handleRevoke(req, res);
+      return true;
+    }
+    return false;
+  }
+
   private async handleOAuthRequest(
     req: IncomingMessage,
     res: ServerResponse,
@@ -179,8 +196,7 @@ export class RemoteControlPlane {
       await this.handleGoogleOAuthCallback(req, res);
       return true;
     }
-    if (pathname === "/oauth/token" && req.method === "POST") {
-      await this.oauth.handleToken(req, res);
+    if (await this.handleOAuthGrantRequest(req, res, pathname)) {
       return true;
     }
     if (pathname === "/oauth/jwks.json" && req.method === "GET") {
