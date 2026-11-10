@@ -80,6 +80,25 @@ The flow is intentional:
 
 These findings are dismissed individually with a false-positive rationale. No broad CodeQL suppression is used.
 
+### CodeQL #156: required signed agent hello
+
+CodeQL alert #156 (`js/file-access-to-http`) traces the locally stored agent
+configuration through the signed `agent.hello` WebSocket send. This is
+**intentional authenticated protocol traffic**, not an arbitrary upload of
+the configuration file. The message contains the agent ID, capability names,
+version, host metadata, nonce, timestamp, and Ed25519 signature. It does
+**not** include the saved private key or enrollment token.
+
+As defense in depth, enrollment and subsequent agent startup now check that
+the WebSocket destination has the **same host and port** as the explicitly
+enrolled HTTP(S) server, uses the matching WS(S) transport without a downgrade,
+and contains no URL credentials, query, or fragment. Configured custom
+WebSocket paths still work. Mismatched enrollment responses are rejected
+without saving a config; modified saved destinations are rejected before
+connecting. Do not suppress this rule globally or weaken legitimate signed
+hello delivery to silence taint analysis.
+
+
 ## Other CodeQL False-Positive Dispositions
 
 - **`js/file-access-to-http` in `scripts/check-dependency-freshness.mjs` (`fetchJson`)**: annotated in-code with `codeql[js/file-access-to-http]`. Every URL reaching `fetch()` is either a hardcoded constant or built by `registryPackageUrl()`, which validates the package name against `assertNpmPackageName()` before use; names originate from this repository's own `package.json`, not external input.

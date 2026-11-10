@@ -149,6 +149,39 @@ function runtimeWebSocket(): RuntimeWebSocketConstructor {
   return candidate;
 }
 
+/**
+ * An enrollment response cannot redirect the signed agent hello or action
+ * results to a different origin or downgrade a secure transport. The
+ * connection path remains configurable on the server.
+ */
+function validateAgentWebSocketDestination(serverAddress: string, destination: string): string {
+  let server: URL;
+  let websocket: URL;
+  try {
+    server = new URL(serverAddress);
+    websocket = new URL(destination);
+  } catch {
+    throw new Error("Agent WebSocket destination does not match enrolled server");
+  }
+  const requiredProtocol = server.protocol === "https:" ? "wss:" : "ws:";
+  if (
+    (server.protocol !== "https:" && server.protocol !== "http:") ||
+    server.username ||
+    server.password ||
+    server.search ||
+    server.hash ||
+    websocket.protocol !== requiredProtocol ||
+    websocket.host !== server.host ||
+    websocket.username ||
+    websocket.password ||
+    websocket.search ||
+    websocket.hash
+  ) {
+    throw new Error("Agent WebSocket destination does not match enrolled server");
+  }
+  return websocket.href;
+}
+
 function removeTrailingSlashes(value: string): string {
   let end = value.length;
   while (end > 0 && value[end - 1] === "/") {
@@ -185,7 +218,10 @@ async function enroll(argv: string[]): Promise<void> {
       "control_plane_public_key",
     ),
     policy: requirePolicy(response.policy),
-    websocketUrl: requireString(response.websocket_url, "websocket_url"),
+    websocketUrl: validateAgentWebSocketDestination(
+      server,
+      requireString(response.websocket_url, "websocket_url"),
+    ),
     enrolledAt: nowIso(),
   };
   saveConfig(config);
@@ -293,7 +329,9 @@ async function runAgent(): Promise<void> {
   }
 
   await new Promise<void>((resolve, reject) => {
-    const ws = new WebSocketCtor(config.websocketUrl);
+    const ws = new WebSocketCtor(
+      validateAgentWebSocketDestination(config.server, config.websocketUrl),
+    );
     ws.onopen = () => {
       const hello: AgentHelloEnvelope = {
         type: "agent.hello",

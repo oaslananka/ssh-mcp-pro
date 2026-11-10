@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, vi, test } from "vitest";
@@ -167,6 +167,81 @@ describe("remote agent CLI", () => {
     expect(persistedConfig.controlPlanePublicKeyPem).toBe(controlPlaneKeys.publicKeyPem);
     expect(persisted).not.toContain(oneTimeToken);
     expect(stdout.read()).not.toContain(oneTimeToken);
+  });
+
+  test("preserves local self-hosted enrollment and configurable same-origin socket paths", async () => {
+    const configPath = agentConfigPath();
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            agent_id: "agt_local",
+            alias: "local-agent",
+            control_plane_public_key: generateEd25519PemKeyPair().publicKeyPem,
+            policy: createAgentPolicy("read-only"),
+            websocket_url: "ws://127.0.0.1:41987/custom/agents/connect",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    ) as typeof fetch;
+    const stdout = captureStdout();
+    try {
+      await runAgentCli([
+        "enroll",
+        "--server",
+        "http://127.0.0.1:41987",
+        "--token",
+        "local-one-time",
+      ]);
+    } finally {
+      stdout.restore();
+    }
+    expect(
+      (JSON.parse(readFileSync(configPath, "utf8")) as { websocketUrl: string }).websocketUrl,
+    ).toBe("ws://127.0.0.1:41987/custom/agents/connect");
+  });
+
+  test.each([
+    "wss://other.example/api/agents/connect",
+    "wss://sshautomator.example.evil.test/api/agents/connect",
+    "ws://sshautomator.example/api/agents/connect",
+    "wss://sshautomator.example:4433/api/agents/connect",
+    "wss://user:password@sshautomator.example/api/agents/connect",
+    "wss://sshautomator.example/api/agents/connect?token=hidden",
+    "not-a-websocket-url",
+  ])("rejects an enrollment response that redirects agent messages: %s", async (destination) => {
+    const config = agentConfigPath();
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            agent_id: "agt_enrolled",
+            alias: "sample-agent",
+            control_plane_public_key: generateEd25519PemKeyPair().publicKeyPem,
+            policy: createAgentPolicy("read-only"),
+            websocket_url: destination,
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    ) as typeof fetch;
+    await expect(
+      runAgentCli(["enroll", "--server", "https://sshautomator.example", "--token", "one-time"]),
+    ).rejects.toThrow("Agent WebSocket destination does not match enrolled server");
+    expect(existsSync(config)).toBe(false);
+  });
+
+  test("refuses a tampered stored WebSocket destination before opening a socket", async () => {
+    const configPath = agentConfigPath();
+    writeAgentConfig(configPath, {});
+    const stored = JSON.parse(readFileSync(configPath, "utf8")) as Record<string, unknown>;
+    stored.websocketUrl = "wss://untrusted.example/api/agents/connect";
+    writeFileSync(configPath, JSON.stringify(stored));
+    const socketConstructor = vi.fn();
+    (globalThis as { WebSocket?: unknown }).WebSocket = socketConstructor;
+    await expect(runAgentCli(["run"])).rejects.toThrow(
+      "Agent WebSocket destination does not match enrolled server",
+    );
+    expect(socketConstructor).not.toHaveBeenCalled();
   });
 
   test("status reports enrollment metadata without exposing private material", async () => {
