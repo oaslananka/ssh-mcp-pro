@@ -12,6 +12,8 @@ const allowedLicenses = new Set([
   "CC0-1.0",
   "ISC",
   "MIT",
+  // Vite 8 build tooling uses Lightning CSS under the file-level MPL-2.0 license.
+  "MPL-2.0",
   "Python-2.0",
   "Unlicense",
 ]);

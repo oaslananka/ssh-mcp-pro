@@ -245,7 +245,8 @@ afterEach(async () => {
   }
 });
 
-describe.sequential("remote WebSocket protocol", () => {
+// Vitest 5 runs tests sequentially by default; describe.sequential was removed.
+describe("remote WebSocket protocol", () => {
   test("exchanges text and JSON messages and observes pong/close lifecycle", async () => {
     const running = await startServer();
     const client = await openClient(running.port);
