@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.4.0...ssh-mcp-pro-v1.4.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* bind agent WebSocket to enrolled control-plane origin ([#194](https://github.com/oaslananka/ssh-mcp-pro/issues/194)) ([7ab181f](https://github.com/oaslananka/ssh-mcp-pro/commit/7ab181f474d283fb15358f467f89b42be2ba9236))
+* harden Windows acceptance and dashboard onboarding ([#191](https://github.com/oaslananka/ssh-mcp-pro/issues/191)) ([d950b65](https://github.com/oaslananka/ssh-mcp-pro/commit/d950b65d42f4938e7b75feed94949a0d5a8e6050))
+* make dashboard copy actions accessible and readable ([#193](https://github.com/oaslananka/ssh-mcp-pro/issues/193)) ([f6a8c94](https://github.com/oaslananka/ssh-mcp-pro/commit/f6a8c94e72b55b17296e795195710e21fe80672b))
+
 ## [1.4.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.3.0...ssh-mcp-pro-v1.4.0) (2026-11-06)
 
 
