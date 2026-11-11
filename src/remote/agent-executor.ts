@@ -11,7 +11,11 @@ import {
 } from "./agent-bounded-io.js";
 import { isContainerAllowed, isServiceAllowed } from "./policy.js";
 import { searchAuthorizedFileNames, type FileSearchInput } from "./agent-file-search.js";
-import { withAuthorizedRead, writeAuthorizedFileAtomic } from "./safe-file.js";
+import {
+  withAuthorizedRead,
+  writeAuthorizedFileAtomic,
+  replaceAuthorizedText,
+} from "./safe-file.js";
 import { TOOL_CAPABILITY_MAP } from "./types.js";
 import type {
   ActionRequestEnvelope,
@@ -281,6 +285,8 @@ export class AgentExecutor {
           hasPaging ? { offsetBytes, maxBytes } : undefined,
         );
       }
+      case "file_replace":
+        return this.fileReplace(action.args);
       case "file_write":
         return this.fileWrite(
           scalarActionArgument(action.args.path ?? ""),
@@ -451,6 +457,23 @@ export class AgentExecutor {
         };
       },
     );
+  }
+
+  private async fileReplace(args: Record<string, unknown>): Promise<ExecResult> {
+    if (!this.policy.capabilities["files.read"]) {
+      throw Object.assign(new Error("file_replace also requires files.read"), {
+        code: "CAPABILITY_DENIED" as const,
+      });
+    }
+    const result = await replaceAuthorizedText(this.policy, {
+      path: scalarActionArgument(args.path),
+      oldText: scalarActionArgument(args.old_text),
+      newText: scalarActionArgument(args.new_text),
+      dryRun: args.dry_run === undefined ? true : args.dry_run,
+      expectedSha256:
+        args.expected_sha256 === undefined ? undefined : scalarActionArgument(args.expected_sha256),
+    });
+    return { exitCode: 0, stdout: JSON.stringify(result), stderr: "", truncated: false };
   }
 
   private async fileWrite(filePath: string, content: string): Promise<ExecResult> {

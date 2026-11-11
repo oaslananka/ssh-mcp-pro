@@ -152,6 +152,27 @@ searches as truncated; narrow the root or pattern for more precise results.
 The agent skips symbolic links and does not search paths denied by its local
 policy. Read-only profiles do not gain file access automatically.
 
+## Preview and apply one precise file edit
+
+On an authorized device, clients with **both** `files.read` and
+`files.write` can call `file_replace` instead of overwriting a whole file.
+Give it an existing path, an exact `old_text` snippet and a `new_text` value.
+The default `dry_run: true` returns a short diff and `before_sha256`
+**without changing the file**.
+
+To apply, call the same tool with `dry_run: false` and
+`expected_sha256` equal to the preview's `before_sha256`. It replaces
+**exactly one** occurrence, stages the new content as a temporary file,
+checks the file hash again just before replacing the original, and reports
+`FILE_CONFLICT` if it has changed. Reinspect/repreview after a conflict.
+This is a best-effort optimistic stale-write check, **not** an atomic
+compare-and-swap guarantee against concurrent external writes.
+
+The agent refuses ambiguous/missing matches, non-UTF-8 text, files over
+1 MiB and edits that exceed its output limits. Files outside the local
+allowlist and read-only profiles cannot use this tool. Normal
+`file_write` remains unchanged for full-file edits.
+
 ## Changing a policy later
 
 Capabilities are server-authoritative and pushed live to a connected agent —
