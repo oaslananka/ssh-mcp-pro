@@ -152,6 +152,32 @@ searches as truncated; narrow the root or pattern for more precise results.
 The agent skips symbolic links and does not search paths denied by its local
 policy. Read-only profiles do not gain file access automatically.
 
+## Find a setting inside a file without knowing its location
+
+When `files.read` is enabled, you can ask your AI client:
+
+> On my connected device, find which configuration file contains
+> `mode=advanced`, and show me where it appears.
+
+The hosted `file_content_search` tool accepts `agent_id_or_alias` and a
+literal `query`. It searches locally allowed folders, returning one matching
+line number and a short snippet **per file**; it never edits files. You can
+optionally restrict the filename with `name_pattern` (e.g. `*.ini`) or an
+allowed `root_path`. The query is plain text, **not a regular expression**,
+and is case-insensitive by default unless `case_sensitive: true` is passed.
+
+One search examines at most 128 files of up to 128 KiB each, traverses at
+most 128 directories and 2,000 entries, and returns at most 50 matches
+(default 20). Depth defaults to 3 (maximum 5). Binary/invalid UTF-8 and
+oversized files are skipped, hidden paths are excluded unless explicitly
+requested, and symbolic links are not followed. A `truncated: true` result
+means the scan or output limit was reached: narrow the filename/root and
+search again. Long files can instead be inspected with paged `file_read`.
+
+The control plane masks the search phrase in stored action metadata.
+Matched snippets are still sent to the authenticated AI client, so avoid
+requesting secrets or credentials unless they are genuinely needed.
+
 ## Preview and apply one precise file edit
 
 On an authorized device, clients with **both** `files.read` and

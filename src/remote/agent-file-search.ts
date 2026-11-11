@@ -12,11 +12,13 @@ export interface FileSearchInput {
   include_hidden?: boolean;
 }
 
-export interface FileSearchResult {
-  matches: Array<{ name: string; path: string }>;
+export interface AuthorizedScanResult<T> {
+  matches: T[];
   truncated: boolean;
   scanned_entries: number;
 }
+
+export type FileSearchResult = AuthorizedScanResult<{ name: string; path: string }>;
 
 interface SearchOptions {
   maxDepth: number;
@@ -29,10 +31,13 @@ interface SearchNode {
   directory: string;
   depth: number;
 }
-interface ScanState extends SearchOptions {
+interface ScanState<T> extends SearchOptions {
   policy: AgentPolicy;
   queue: SearchNode[];
-  matches: FileSearchResult["matches"];
+  matches: T[];
+  onMatch: (name: string, canonicalPath: string) => Promise<T | null>;
+  maxCandidateFiles: number;
+  candidateFiles: number;
   scannedEntries: number;
   scannedDirectories: number;
   truncated: boolean;
@@ -161,15 +166,20 @@ async function resolveRoot(
   }
 }
 
-function limitReached(state: ScanState): boolean {
+function limitReached<T>(state: ScanState<T>): boolean {
   return (
     state.scannedEntries >= MAX_SCAN_ENTRIES ||
     state.scannedDirectories >= MAX_SCAN_DIRECTORIES ||
+    state.candidateFiles >= state.maxCandidateFiles ||
     state.matches.length >= state.maxResults
   );
 }
 
-async function inspectEntry(state: ScanState, current: SearchNode, entry: Dirent): Promise<void> {
+async function inspectEntry<T>(
+  state: ScanState<T>,
+  current: SearchNode,
+  entry: Dirent,
+): Promise<void> {
   if (
     entry.name === "." ||
     entry.name === ".." ||
@@ -188,15 +198,17 @@ async function inspectEntry(state: ScanState, current: SearchNode, entry: Dirent
       if (current.depth < state.maxDepth)
         state.queue.push({ root: current.root, directory: canonical, depth: current.depth + 1 });
     } else if (info.isFile() && state.matchName(entry.name)) {
-      state.matches.push({ name: entry.name, path: canonical });
+      state.candidateFiles += 1;
+      const matched = await state.onMatch(entry.name, canonical);
+      if (matched !== null) state.matches.push(matched);
     }
   } catch {
     // A directory entry may disappear while scanning; never return its path.
   }
 }
 
-async function consumeEntries(
-  state: ScanState,
+async function consumeEntries<T>(
+  state: ScanState<T>,
   current: SearchNode,
   directory: Dir,
 ): Promise<void> {
@@ -211,7 +223,7 @@ async function consumeEntries(
   return consumeEntries(state, current, directory);
 }
 
-async function visitDirectory(state: ScanState, current: SearchNode): Promise<void> {
+async function visitDirectory<T>(state: ScanState<T>, current: SearchNode): Promise<void> {
   if (
     !isPathAllowed(state.policy, current.directory) ||
     !withinRoot(current.root, current.directory)
@@ -235,7 +247,7 @@ async function visitDirectory(state: ScanState, current: SearchNode): Promise<vo
   }
 }
 
-async function scanQueue(state: ScanState): Promise<void> {
+async function scanQueue<T>(state: ScanState<T>): Promise<void> {
   if (!state.queue.length) return;
   if (limitReached(state)) {
     state.truncated = true;
@@ -246,8 +258,8 @@ async function scanQueue(state: ScanState): Promise<void> {
   return scanQueue(state);
 }
 
-function boundedResult(state: ScanState): FileSearchResult {
-  let result: FileSearchResult = {
+function boundedResult<T>(state: ScanState<T>): AuthorizedScanResult<T> {
+  let result: AuthorizedScanResult<T> = {
     matches: state.matches,
     truncated: state.truncated,
     scanned_entries: state.scannedEntries,
@@ -264,11 +276,13 @@ function boundedResult(state: ScanState): FileSearchResult {
   return result;
 }
 
-/** A bounded, filename-only search inside agent-local approved folders. */
-export async function searchAuthorizedFileNames(
+/** Reusable bounded enumeration: callbacks only receive authorized regular files. */
+export async function scanAuthorizedFiles<T>(
   policy: AgentPolicy,
   args: FileSearchInput,
-): Promise<FileSearchResult> {
+  onMatch: (name: string, canonicalPath: string) => Promise<T | null>,
+  maxCandidateFiles = MAX_SCAN_ENTRIES,
+): Promise<AuthorizedScanResult<T>> {
   const options = parseOptions(args);
   const roots = args.root_path === undefined ? policy.allowPaths : [args.root_path];
   if (roots.length > 32) throw denied("Too many search roots configured by local policy");
@@ -279,9 +293,12 @@ export async function searchAuthorizedFileNames(
   if (!uniqueRoots.length)
     throw denied("No accessible search roots are configured by local policy");
 
-  const state: ScanState = {
+  const state: ScanState<T> = {
     ...options,
     policy,
+    onMatch,
+    maxCandidateFiles,
+    candidateFiles: 0,
     queue: uniqueRoots.map((root) => ({ root, directory: root, depth: 0 })),
     matches: [],
     scannedEntries: 0,
@@ -290,4 +307,15 @@ export async function searchAuthorizedFileNames(
   };
   await scanQueue(state);
   return boundedResult(state);
+}
+
+/** A bounded, filename-only search inside agent-local approved folders. */
+export async function searchAuthorizedFileNames(
+  policy: AgentPolicy,
+  args: FileSearchInput,
+): Promise<FileSearchResult> {
+  return scanAuthorizedFiles(policy, args, async (name, canonicalPath) => ({
+    name,
+    path: canonicalPath,
+  }));
 }

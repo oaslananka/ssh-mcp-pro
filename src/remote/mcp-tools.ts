@@ -212,6 +212,41 @@ const descriptors: Record<
       additionalProperties: false,
     },
   },
+  file_content_search: {
+    description:
+      "Find which allowed text files contain a literal phrase, with the first matching line and short snippet. " +
+      "Defaults to all names; optional name_pattern narrows files. Case-insensitive by default. " +
+      "Only scans up to 128 text files (128 KiB each); returns truncated when scan/output limits apply.",
+    inputSchema: {
+      type: "object",
+      required: ["agent_id_or_alias", "query"],
+      properties: {
+        agent_id_or_alias: agentSelector,
+        query: {
+          type: "string",
+          minLength: 1,
+          maxLength: 200,
+          description: "Single-line literal text to find (not a regex).",
+        },
+        name_pattern: {
+          type: "string",
+          minLength: 1,
+          maxLength: 100,
+          description: "Optional filename fragment or * / ? wildcard; defaults to *.",
+        },
+        root_path: {
+          type: "string",
+          minLength: 1,
+          description: "Optional allowed folder. Omit to search all locally approved roots.",
+        },
+        max_depth: { type: "integer", minimum: 0, maximum: 5, default: 3 },
+        max_results: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+        include_hidden: { type: "boolean", default: false },
+        case_sensitive: { type: "boolean", default: false },
+      },
+      additionalProperties: false,
+    },
+  },
   file_read: {
     description: "Read an allowed text file; optional byte offsets and limits page large files.",
     inputSchema: {
@@ -385,6 +420,7 @@ const READ_ONLY_REMOTE_TOOLS = new Set<RemoteToolName>([
   "docker_ps",
   "docker_logs",
   "file_search",
+  "file_content_search",
   "file_read",
   "process_read",
   "get_audit_events",
