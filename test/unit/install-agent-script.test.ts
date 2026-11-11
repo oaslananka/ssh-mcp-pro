@@ -54,8 +54,8 @@ describe("Windows agent Scheduled Task launcher", () => {
       "Get-Command ssh-mcp-pro-agent.cmd -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1",
     );
     expect(content).toContain("& $agentCmd enroll --server $Server --token $Token --alias $Alias");
-    expect(content).not.toMatch(/& \\$agentBin enroll/u);
-    expect(content).not.toMatch(/^(?!#).*\\bnpm install -g/mu);
+    expect(content).not.toContain("& $agentBin enroll");
+    expect(content).not.toContain("npm install -g");
   });
 
   test("starts npm's CMD shim, not the PowerShell wrapper", () => {
