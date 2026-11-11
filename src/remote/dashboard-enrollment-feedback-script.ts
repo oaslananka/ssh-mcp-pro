@@ -1,5 +1,5 @@
 /** Client-side enrollment status and first-run feedback embedded in the dashboard HTML. */
-export const DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT = String.raw`
+export const DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT = `
     let enrollmentPollTimer = null;
     let enrollmentPollAgentId = null;
     let enrollmentPollAttempts = 0;

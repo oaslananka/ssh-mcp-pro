@@ -50,8 +50,12 @@ function browserHarness() {
     JSON.stringify("https://example.test/mcp"),
     JSON.stringify("https://example.test"),
   );
-  const script = html.match(/<script>([\s\S]*?)<\/script>/u)?.[1];
-  expect(script).toBeDefined();
+  const openingScript = "<script>";
+  const start = html.indexOf(openingScript);
+  const end = html.indexOf("</script>", start + openingScript.length);
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(end).toBeGreaterThan(start);
+  const script = html.slice(start + openingScript.length, end);
   const context = createContext({
     atob: (value: string) => Buffer.from(value, "base64").toString("utf8"),
     document: {
@@ -93,7 +97,7 @@ function browserHarness() {
     },
     navigator: {},
   });
-  runInContext(script!, context, { timeout: 1_000 });
+  runInContext(script, context, { timeout: 1_000 });
 
   return {
     data,
