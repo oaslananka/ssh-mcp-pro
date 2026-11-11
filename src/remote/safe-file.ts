@@ -180,6 +180,32 @@ export async function withAuthorizedRead<T>(
   }
 }
 
+async function verifyExpectedFileDigest(
+  policy: AgentPolicy,
+  target: string,
+  expectedSha256: string | undefined,
+  denialMessage: string,
+  operationMessage: string,
+): Promise<void> {
+  if (expectedSha256 === undefined) return;
+  const currentSha = await withAuthorizedRead(
+    policy,
+    target,
+    denialMessage,
+    operationMessage,
+    async (file) =>
+      createHash("sha256")
+        .update(await file.readFile())
+        .digest("hex"),
+  );
+  if (currentSha !== expectedSha256) {
+    throw codedError(
+      "File changed since preview; inspect it again before replacing",
+      "FILE_CONFLICT",
+    );
+  }
+}
+
 /** Stage verified writes in the destination directory before atomic replacement. */
 export async function writeAuthorizedFileAtomic(
   policy: AgentPolicy,
@@ -239,24 +265,7 @@ export async function writeAuthorizedFileAtomic(
     await temporary.sync();
     await temporary.close();
     temporary = undefined;
-    if (expectedSha256 !== undefined) {
-      const currentSha = await withAuthorizedRead(
-        policy,
-        target,
-        denialMessage,
-        operationMessage,
-        async (file) =>
-          createHash("sha256")
-            .update(await file.readFile())
-            .digest("hex"),
-      );
-      if (currentSha !== expectedSha256) {
-        throw codedError(
-          "File changed since preview; inspect it again before replacing",
-          "FILE_CONFLICT",
-        );
-      }
-    }
+    await verifyExpectedFileDigest(policy, target, expectedSha256, denialMessage, operationMessage);
     await rename(temporaryPath, path.join(anchor, leaf));
     temporaryPath = undefined;
     if (parent) await parent.sync();
@@ -333,7 +342,10 @@ export async function replaceAuthorizedText(
   }
   const afterSha = sha256(after);
   const excerpt = (value: string) =>
-    value.replaceAll("\r", "\\r").replaceAll("\n", "\\n").slice(0, 120);
+    value
+      .replaceAll("\r", String.raw`\r`)
+      .replaceAll("\n", String.raw`\n`)
+      .slice(0, 120);
   const diff = `-${excerpt(input.oldText)}\n+${excerpt(input.newText)}`;
   const response = {
     applied: !input.dryRun,
