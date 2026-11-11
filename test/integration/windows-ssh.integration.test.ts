@@ -100,28 +100,30 @@ windowsDescribe("Windows SSH integration coverage", () => {
   test("runs the PowerShell agent installer through enrollment and Scheduled Task setup", () => {
     const dir = mkdtempSync(join(tmpdir(), "ssh mcp windows installer "));
     const shim = join(dir, "fake agent.cmd");
+    const npmShim = join(dir, "fake npm.cmd");
+    const npmLog = join(dir, "npm-invocation.txt");
     const log = join(dir, "agent-invocation.txt");
     const harness = join(dir, "bootstrap-test.ps1");
     try {
       // The native installer runs, but npm, enrollment and Scheduled Task
       // side effects are all replaced by local disposable fixtures.
       writeFileSync(shim, '@echo off\r\n>> "%SSH_MCP_TEST_AGENT_ARGS%" echo %*\r\nexit /b 0\r\n');
+      writeFileSync(npmShim, '@echo off\r\n>> "%SSH_MCP_TEST_NPM_ARGS%" echo %*\r\nexit /b 0\r\n');
       writeFileSync(
         harness,
-        String.raw`param([string]$Installer, [string]$AgentShim)
+        String.raw`param([string]$Installer, [string]$AgentShim, [string]$NpmShim)
 $ErrorActionPreference = 'Stop'
 $global:sshMcpSmokeAgentShim = $AgentShim
-$global:sshMcpSmokeNpmArgs = @()
+$global:sshMcpSmokeNpmShim = $NpmShim
 $global:sshMcpSmokeRegistered = $null
 $global:sshMcpSmokeStarted = $null
 
-function npm {
-  $global:sshMcpSmokeNpmArgs = @($args)
-  $global:LASTEXITCODE = 0
-}
 function Get-Command {
   [CmdletBinding()]
   param([string]$Name, [string]$CommandType)
+  if ($Name -eq 'npm.cmd') {
+    return [pscustomobject]@{ Source = $global:sshMcpSmokeNpmShim }
+  }
   if ($Name -in @('ssh-mcp-pro-agent', 'ssh-mcp-pro-agent.cmd')) {
     return [pscustomobject]@{ Source = $global:sshMcpSmokeAgentShim }
   }
@@ -174,7 +176,7 @@ if ($null -eq $global:sshMcpSmokeRegistered -or $null -eq $global:sshMcpSmokeSta
   throw 'Installer did not register and start a task'
 }
 [pscustomobject]@{
-  NpmArguments = @($global:sshMcpSmokeNpmArgs)
+  NpmArguments = @(((Get-Content -LiteralPath $env:SSH_MCP_TEST_NPM_ARGS -Raw).Trim()) -split '\s+')
   Execute = $global:sshMcpSmokeRegistered.Action.Execute
   Arguments = $global:sshMcpSmokeRegistered.Action.Argument
   TaskName = $global:sshMcpSmokeRegistered.TaskName
@@ -194,12 +196,13 @@ if ($null -eq $global:sshMcpSmokeRegistered -or $null -eq $global:sshMcpSmokeSta
           harness,
           join(process.cwd(), "scripts", "install-agent.ps1"),
           shim,
+          npmShim,
         ],
         {
           encoding: "utf8",
           windowsHide: true,
           timeout: 25_000,
-          env: { ...process.env, SSH_MCP_TEST_AGENT_ARGS: log },
+          env: { ...process.env, SSH_MCP_TEST_AGENT_ARGS: log, SSH_MCP_TEST_NPM_ARGS: npmLog },
         },
       );
       expect(proc.error).toBeUndefined();

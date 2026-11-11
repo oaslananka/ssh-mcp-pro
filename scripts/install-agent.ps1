@@ -48,9 +48,10 @@ function Die($message) {
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
   Die "node is not installed (need Node 22.22+ or 24+)"
 }
-if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-  Die "npm is not installed"
-}
+# npm installs both npm.ps1 and npm.cmd. PowerShell may select npm.ps1 even
+# when the user's execution policy forbids running scripts; use CMD directly.
+$npmCmd = (Get-Command npm.cmd -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+if (-not $npmCmd) { Die "npm.cmd was not found; install a supported Node.js release with npm" }
 
 # WebSocket is exposed as a global from Node 22.22+ (and all of 23/24+).
 $nodeMajor = [int](node -p "process.versions.node.split('.')[0]")
@@ -60,20 +61,17 @@ if ($nodeMajor -lt 22 -or ($nodeMajor -eq 22 -and $nodeMinor -lt 22)) {
 }
 
 Write-Host "install-agent: installing ssh-mcp-pro@$Version globally"
-npm install -g "ssh-mcp-pro@$Version"
+& $npmCmd install -g "ssh-mcp-pro@$Version"
 if ($LASTEXITCODE -ne 0) { Die "npm install failed" }
 
-$agentBin = (Get-Command ssh-mcp-pro-agent -ErrorAction SilentlyContinue).Source
-if (-not $agentBin) { Die "ssh-mcp-pro-agent not found on PATH after install" }
+# Use the same CMD executable for enrollment and the scheduled background task.
+# Unlike npm's PowerShell wrapper, this works under a restricted script policy.
+$agentCmd = (Get-Command ssh-mcp-pro-agent.cmd -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+if (-not $agentCmd) { Die "ssh-mcp-pro-agent.cmd not found on PATH after install" }
 
 Write-Host "install-agent: enrolling as alias '$Alias'"
-& $agentBin enroll --server $Server --token $Token --alias $Alias
+& $agentCmd enroll --server $Server --token $Token --alias $Alias
 if ($LASTEXITCODE -ne 0) { Die "enrollment failed" }
-
-# npm installs distinct PowerShell (.ps1) and CMD (.cmd) wrappers on Windows.
-# Resolve the CMD wrapper explicitly: Task Scheduler invokes cmd.exe, not PowerShell.
-$agentCmd = (Get-Command ssh-mcp-pro-agent.cmd -CommandType Application -ErrorAction SilentlyContinue).Source
-if (-not $agentCmd) { Die "ssh-mcp-pro-agent.cmd not found on PATH after install" }
 
 # /d skips user AutoRun commands; /s ensures a quoted path survives /c.
 $taskArguments = '/d /s /c ""{0}" run"' -f $agentCmd

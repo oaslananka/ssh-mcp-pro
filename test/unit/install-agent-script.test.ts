@@ -44,6 +44,20 @@ describe.skipIf(process.platform === "win32")("agent bootstrap Bash validation",
 });
 
 describe("Windows agent Scheduled Task launcher", () => {
+  test("uses Windows CMD shims for install and enrollment under restrictive PowerShell policies", () => {
+    const content = readFileSync(windowsScript, "utf8");
+    expect(content).toContain(
+      "Get-Command npm.cmd -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1",
+    );
+    expect(content).toContain('& $npmCmd install -g "ssh-mcp-pro@$Version"');
+    expect(content).toContain(
+      "Get-Command ssh-mcp-pro-agent.cmd -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1",
+    );
+    expect(content).toContain("& $agentCmd enroll --server $Server --token $Token --alias $Alias");
+    expect(content).not.toContain("& $agentBin enroll");
+    expect(content).not.toContain("npm install -g");
+  });
+
   test("starts npm's CMD shim, not the PowerShell wrapper", () => {
     const content = readFileSync(windowsScript, "utf8");
     expect(content).toContain("Get-Command ssh-mcp-pro-agent.cmd -CommandType Application");
@@ -52,6 +66,64 @@ describe("Windows agent Scheduled Task launcher", () => {
     );
     expect(content).toContain("/d /s /c");
     expect(content).toContain('""{0}" run"');
+  });
+});
+
+describe.skipIf(process.platform !== "win32")("Windows restricted-policy enrollment smoke", () => {
+  test("installs, enrolls and registers a task using CMD wrappers without executing PS1 shims", () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), "ssh-agent-win-smoke-"));
+    const shim = path.join(root, "shims");
+    const log = path.join(root, "operations.txt");
+    mkdirSync(shim);
+    try {
+      writeFileSync(
+        path.join(shim, "npm.cmd"),
+        '@echo off\r\necho npm:%1>>"%TEST_LOG%"\r\nexit /b 0\r\n',
+      );
+      writeFileSync(path.join(shim, "npm.ps1"), 'throw "npm.ps1 must not execute"\r\n');
+      writeFileSync(
+        path.join(shim, "ssh-mcp-pro-agent.cmd"),
+        '@echo off\r\necho agent:%1>>"%TEST_LOG%"\r\nexit /b 0\r\n',
+      );
+      writeFileSync(
+        path.join(shim, "ssh-mcp-pro-agent.ps1"),
+        'throw "agent.ps1 must not execute"\r\n',
+      );
+
+      const wrapper = [
+        '$ErrorActionPreference = "Stop"',
+        'function New-ScheduledTaskAction { return "action" }',
+        'function New-ScheduledTaskTrigger { return "trigger" }',
+        'function New-ScheduledTaskSettingsSet { return "settings" }',
+        'function Register-ScheduledTask { Add-Content $env:TEST_LOG "task:registered"; return "ok" }',
+        'function Start-ScheduledTask { Add-Content $env:TEST_LOG "task:started" }',
+        "$source = [System.IO.File]::ReadAllText($env:TEST_INSTALL_SCRIPT)",
+        '& ([scriptblock]::Create($source)) -Server "https://example.invalid" -Token "disposable-test" -Alias "test-device"',
+      ].join("; ");
+      const result = spawnSync(
+        "powershell.exe",
+        ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Restricted", "-Command", wrapper],
+        {
+          encoding: "utf8",
+          timeout: 15_000,
+          env: {
+            ...process.env,
+            PATH: [shim, process.env.PATH ?? ""].join(path.delimiter),
+            TEST_LOG: log,
+            TEST_INSTALL_SCRIPT: windowsScript,
+          },
+        },
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(readFileSync(log, "utf8").trim().split(/\r?\n/u)).toEqual([
+        "npm:install",
+        "agent:enroll",
+        "task:registered",
+        "task:started",
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
