@@ -93,13 +93,21 @@ system-wide service instead.
 ### Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/oaslananka/ssh-mcp-pro/main/scripts/install-agent.ps1 -OutFile install-agent.ps1
-./install-agent.ps1 -Server https://your-control-plane.example.com -Token <one-time-token> -Alias office-pc
+Invoke-RestMethod https://raw.githubusercontent.com/oaslananka/ssh-mcp-pro/main/scripts/install-agent.ps1 -OutFile install-agent.ps1
+& ([scriptblock]::Create((Get-Content -LiteralPath ./install-agent.ps1 -Raw))) -Server 'https://your-control-plane.example.com' -Token '<one-time-token>' -Alias 'office-pc'
 ```
 
 This registers a Scheduled Task that runs the agent at logon and restarts it
-on failure. For a fully headless host that must run before any user logs in,
-run the agent under a service manager such as NSSM instead.
+on failure. The dashboard's Windows one-liner is preferred: it downloads from
+your authenticated HTTPS control plane and uses an in-memory script block,
+so no machine-wide PowerShell execution-policy change is needed. The
+installer invokes npm and the agent through their `.cmd` wrappers to avoid
+blocked npm/agent `.ps1` shims. Review the installer source and only use a
+trusted server; a missing or outdated Node.js runtime still requires setup
+before this command can succeed.
+
+For a fully headless host that must run before any user logs in, run the agent
+under a service manager such as NSSM instead.
 
 ## Step 3 — Verify
 
