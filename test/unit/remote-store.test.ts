@@ -263,6 +263,83 @@ describe("remote durable store", () => {
     }
   });
 
+  test("prunes only abandoned pending agents after their last enrollment token expires", () => {
+    const store = new RemoteStore(":memory:");
+    const before = "2026-01-01T00:00:00.000Z";
+    const cutoff = "2026-01-01T00:10:00.000Z";
+    const after = "2026-01-01T00:10:00.001Z";
+    const policy = createAgentPolicy("read-only");
+    const addAgent = (
+      id: string,
+      status: "pending" | "offline" | "revoked",
+      createdAt = before,
+      userId = "alice",
+    ) =>
+      store.insertAgent({
+        id,
+        userId,
+        alias: id,
+        status,
+        profile: "read-only",
+        policy,
+        policyVersion: policy.version,
+        createdAt,
+        updatedAt: createdAt,
+        ...(status === "offline" ? { publicKey: "device-key" } : {}),
+      });
+    try {
+      addAgent("stale", "pending");
+      addAgent("still-valid", "pending");
+      addAgent("enrolled", "offline");
+      addAgent("revoked", "revoked");
+      addAgent("legacy-orphan", "pending");
+      addAgent("brand-new", "pending", after);
+      addAgent("other-tenant", "pending", before, "bob");
+
+      for (const [id, expiresAt] of [
+        ["stale", before],
+        ["still-valid", after],
+        ["enrolled", before],
+        ["revoked", before],
+        ["other-tenant", after],
+      ]) {
+        store.insertEnrollmentToken({
+          id: "enr-" + id,
+          agentId: id,
+          userId: id === "other-tenant" ? "bob" : "alice",
+          tokenHash: "token-" + id,
+          expiresAt,
+          createdAt: before,
+        });
+      }
+      store.insertAudit({
+        id: "aud-abandoned",
+        userId: "alice",
+        agentId: "stale",
+        eventType: "enrollment_token_created",
+        severity: "info",
+        metadata: {},
+        createdAt: before,
+      });
+
+      store.pruneExpiredTransientRecords(cutoff);
+      store.pruneExpiredTransientRecords(cutoff); // safe to repeat
+
+      expect(store.getAgent("stale")).toBeUndefined();
+      expect(store.getAgent("legacy-orphan")).toBeUndefined();
+      for (const id of ["still-valid", "enrolled", "revoked", "brand-new", "other-tenant"]) {
+        expect(store.getAgent(id), id).toBeDefined();
+      }
+      expect(store.getEnrollmentTokenByHash("token-stale")).toBeUndefined();
+      expect(store.getEnrollmentTokenByHash("token-still-valid")).toBeDefined();
+      expect(store.listAudit("alice", undefined, 10)).toMatchObject([
+        { agentId: "stale", eventType: "enrollment_token_created" },
+      ]);
+    } finally {
+      store.close();
+    }
+  });
+
   test("enforces single-use authorization codes atomically", () => {
     const store = new RemoteStore(":memory:");
     store.insertAuthorizationCode({
