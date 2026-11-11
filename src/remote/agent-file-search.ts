@@ -35,7 +35,7 @@ interface ScanState<T> extends SearchOptions {
   policy: AgentPolicy;
   queue: SearchNode[];
   matches: T[];
-  onMatch: (name: string, canonicalPath: string) => Promise<T | null>;
+  onMatch: (name: string, canonicalPath: string) => T | null | Promise<T | null>;
   maxCandidateFiles: number;
   candidateFiles: number;
   scannedEntries: number;
@@ -280,7 +280,7 @@ function boundedResult<T>(state: ScanState<T>): AuthorizedScanResult<T> {
 export async function scanAuthorizedFiles<T>(
   policy: AgentPolicy,
   args: FileSearchInput,
-  onMatch: (name: string, canonicalPath: string) => Promise<T | null>,
+  onMatch: (name: string, canonicalPath: string) => T | null | Promise<T | null>,
   maxCandidateFiles = MAX_SCAN_ENTRIES,
 ): Promise<AuthorizedScanResult<T>> {
   const options = parseOptions(args);
@@ -314,7 +314,7 @@ export async function searchAuthorizedFileNames(
   policy: AgentPolicy,
   args: FileSearchInput,
 ): Promise<FileSearchResult> {
-  return scanAuthorizedFiles(policy, args, async (name, canonicalPath) => ({
+  return scanAuthorizedFiles(policy, args, (name, canonicalPath) => ({
     name,
     path: canonicalPath,
   }));
