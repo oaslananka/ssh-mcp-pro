@@ -425,7 +425,7 @@ async function runAgent(): Promise<void> {
       activity.event("warn", "disconnected", "Connection closed. Awaiting service restart.");
       reject(new Error("Agent WebSocket connection closed"));
     };
-  });
+  }).finally(() => executor.dispose());
 }
 
 function status(): void {

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { ManagedProcessRegistry } from "./agent-managed-process.js";
 import { access } from "node:fs/promises";
 import os from "node:os";
 import {
@@ -163,14 +164,25 @@ function runCommand(
   });
 }
 
+function managedResult(value: unknown): ExecResult {
+  return { exitCode: 0, stdout: JSON.stringify(value), stderr: "", truncated: false };
+}
+
 export class AgentExecutor {
+  private readonly processes = new ManagedProcessRegistry();
+
   constructor(
     private policy: AgentPolicy,
     private readonly privateKeyPem: string,
   ) {}
 
   updatePolicy(policy: AgentPolicy): void {
+    if (!policy.capabilities["shell.exec"]) this.processes.stopAll();
     this.policy = policy;
+  }
+
+  dispose(): void {
+    this.processes.dispose();
   }
 
   async execute(action: ActionRequestEnvelope): Promise<ActionResultEnvelope> {
@@ -292,6 +304,23 @@ export class AgentExecutor {
           scalarActionArgument(action.args.path ?? ""),
           scalarActionArgument(action.args.content ?? ""),
         );
+      case "process_start":
+        return managedResult(
+          await this.processes.start(
+            action.user_id,
+            action.agent_id,
+            action.args,
+            () => this.policy.capabilities["shell.exec"],
+          ),
+        );
+      case "process_read":
+        return managedResult(
+          this.processes.read(action.user_id, action.agent_id, action.args, this.policy),
+        );
+      case "process_input":
+        return managedResult(this.processes.input(action.user_id, action.agent_id, action.args));
+      case "process_stop":
+        return managedResult(this.processes.stop(action.user_id, action.agent_id, action.args));
       case "run_shell":
         return this.runShell(
           scalarActionArgument(action.args.command ?? ""),

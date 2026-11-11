@@ -29,6 +29,7 @@ import {
 } from "./http-util.js";
 import { listRemoteToolDescriptors } from "./mcp-tools.js";
 import { mergeCustomPolicy } from "./policy.js";
+import { safeStoredActionArgs } from "./action-record-sanitize.js";
 import { parseAgentHostMetadata } from "./schemas.js";
 import { hasCapability } from "./scopes.js";
 import { RemoteStore } from "./store.js";
@@ -763,7 +764,7 @@ export class RemoteControlPlane {
       agentId: agent.id,
       tool,
       capability,
-      args,
+      args: safeStoredActionArgs(tool, args),
       status: "sent",
       issuedAt,
       deadline,
