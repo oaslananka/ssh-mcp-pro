@@ -100,11 +100,25 @@ export class RemoteStore {
   }
 
   /**
-   * Reclaim only records whose time-limited credentials have expired.
-   * Device, account, action and security audit history is intentionally
-   * outside this cleanup policy.
+   * Reclaim expired credentials and unclaimed device placeholders. Real
+   * devices, accounts, actions and security audit history are preserved.
    */
   pruneExpiredTransientRecords(now: string): void {
+    // Remove only placeholders that have never enrolled and have no usable
+    // token. Do this before pruning expired tokens, preserving their expiry
+    // distinction and making an abandoned alias available for retry.
+    this.db
+      .prepare(
+        `DELETE FROM agents
+         WHERE status = 'pending'
+           AND public_key IS NULL AND last_seen_at IS NULL
+           AND created_at < ?
+           AND NOT EXISTS (
+             SELECT 1 FROM agent_enrollment_tokens AS t
+             WHERE t.agent_id = agents.id AND t.expires_at > ?
+           )`,
+      )
+      .run(now, now);
     this.db.prepare("DELETE FROM dashboard_sessions WHERE expires_at <= ?").run(now);
     this.db.prepare("DELETE FROM oauth_authorization_codes WHERE expires_at <= ?").run(now);
     this.db.prepare("DELETE FROM oauth_refresh_tokens WHERE expires_at <= ?").run(now);

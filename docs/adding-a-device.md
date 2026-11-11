@@ -261,6 +261,10 @@ restart is required.
   (`systemctl --user status ssh-mcp-pro-agent` on Linux, the Scheduled Task on
   Windows) and that the device can reach the control plane URL over HTTPS.
 - **Enrollment fails with an expired token**: tokens are single-use and
-  short-lived. Create a fresh one and retry.
+  short-lived. An unused, never-connected pending device is removed after its
+  token expires, by the control plane's existing periodic cleanup (once per
+  minute). You can then generate a fresh command with the same alias; if the
+  alias is still reserved, refresh the device list after the next cleanup.
+  Already enrolled or revoked devices and the security audit remain intact.
 - **WebSocket error on start**: confirm Node 22.22+ or 24+, DNS/TLS
   connectivity to the configured server, and that the agent has not been revoked.

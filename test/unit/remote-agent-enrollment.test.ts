@@ -101,6 +101,19 @@ describe("remote agent enrollment service", () => {
     expect(store.listAgents("bob")).toHaveLength(1);
   });
 
+  test("allows retrying the same alias after an unused enrollment token has expired", () => {
+    const { service, store, principal } = fixture();
+    const first = service.createEnrollmentToken(principal("alice"), { alias: "linux-laptop" });
+    const firstToken = store.getEnrollmentTokenByHash(hashSecret(String(first.enrollment_token)));
+    expect(firstToken).toBeDefined();
+    store.pruneExpiredTransientRecords(firstToken!.expiresAt);
+
+    expect(store.getAgentByAlias("alice", "linux-laptop")).toBeUndefined();
+    const second = service.createEnrollmentToken(principal("alice"), { alias: "linux-laptop" });
+    expect(second.agent_id).not.toBe(first.agent_id);
+    expect(store.listAgents("alice")).toHaveLength(1);
+  });
+
   test("quotes apostrophes in install commands and does not claim old tokens are recoverable", () => {
     const { service, store, principal } = fixture();
     const result = service.createEnrollmentToken(principal("alice"), {
