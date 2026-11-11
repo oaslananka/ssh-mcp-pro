@@ -77,7 +77,7 @@ export async function searchAuthorizedFileContents(
     args.query.length > 200 ||
     args.query.includes("\n") ||
     args.query.includes("\r") ||
-    args.query.includes(String.fromCharCode(0))
+    args.query.includes(String.fromCodePoint(0))
   ) {
     throw denied("query must be a single-line literal string of 1-200 characters");
   }
