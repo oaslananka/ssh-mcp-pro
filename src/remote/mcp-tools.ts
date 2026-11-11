@@ -240,6 +240,23 @@ const descriptors: Record<
       additionalProperties: false,
     },
   },
+  file_replace: {
+    description:
+      "Preview or apply one exact text replacement in an allowed existing file. Preview first (default); apply requires expected_sha256 from preview. Both files.read and files.write must be granted.",
+    inputSchema: {
+      type: "object",
+      required: ["agent_id_or_alias", "path", "old_text", "new_text"],
+      properties: {
+        agent_id_or_alias: agentSelector,
+        path: { type: "string", minLength: 1 },
+        old_text: { type: "string", minLength: 1, maxLength: 20000 },
+        new_text: { type: "string", maxLength: 20000 },
+        dry_run: { type: "boolean", default: true },
+        expected_sha256: { type: "string", pattern: "^[a-f0-9]{64}$" },
+      },
+      additionalProperties: false,
+    },
+  },
   run_shell: {
     description: "Run a bounded shell command. Disabled unless shell.exec is explicitly granted.",
     inputSchema: {
@@ -326,6 +343,7 @@ const DESTRUCTIVE_REMOTE_TOOLS = new Set<RemoteToolName>([
   "update_agent_policy",
   "revoke_agent",
   "file_write",
+  "file_replace",
   "restart_service",
   "docker_restart",
 ]);
@@ -344,7 +362,11 @@ export function listRemoteToolDescriptors(
   capabilities: readonly RemoteCapability[],
 ): RemoteToolDescriptor[] {
   const allowed = new Set(capabilities);
-  return REMOTE_TOOLS.filter((name) => allowed.has(TOOL_CAPABILITY_MAP[name])).map((name) => ({
+  return REMOTE_TOOLS.filter(
+    (name) =>
+      allowed.has(TOOL_CAPABILITY_MAP[name]) &&
+      (name !== "file_replace" || allowed.has("files.read")),
+  ).map((name) => ({
     name,
     capability: TOOL_CAPABILITY_MAP[name],
     outputSchema: REMOTE_OUTPUT_SCHEMAS[name] ?? ACTION_OUTPUT_SCHEMA,

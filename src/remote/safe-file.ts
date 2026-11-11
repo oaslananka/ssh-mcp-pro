@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { open, realpath, rename, stat, unlink } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
@@ -187,6 +187,7 @@ export async function writeAuthorizedFileAtomic(
   content: string,
   denialMessage: string,
   operationMessage: string,
+  expectedSha256?: string,
 ): Promise<void> {
   assertRequestedPath(policy, requestedPath, denialMessage);
   let target: string;
@@ -238,15 +239,129 @@ export async function writeAuthorizedFileAtomic(
     await temporary.sync();
     await temporary.close();
     temporary = undefined;
+    if (expectedSha256 !== undefined) {
+      const currentSha = await withAuthorizedRead(
+        policy,
+        target,
+        denialMessage,
+        operationMessage,
+        async (file) =>
+          createHash("sha256")
+            .update(await file.readFile())
+            .digest("hex"),
+      );
+      if (currentSha !== expectedSha256) {
+        throw codedError(
+          "File changed since preview; inspect it again before replacing",
+          "FILE_CONFLICT",
+        );
+      }
+    }
     await rename(temporaryPath, path.join(anchor, leaf));
     temporaryPath = undefined;
     if (parent) await parent.sync();
   } catch (error) {
-    if (errorCode(error) === "POLICY_DENIED") throw error;
+    if (errorCode(error) === "POLICY_DENIED" || errorCode(error) === "FILE_CONFLICT") throw error;
     throw operationFailed(operationMessage);
   } finally {
     await closeQuietly(temporary);
     if (temporaryPath) await unlink(temporaryPath).catch(() => undefined);
     await closeQuietly(parent);
   }
+}
+
+const MAX_EDIT_FILE_BYTES = 1_048_576;
+const MAX_EDIT_TEXT_BYTES = 20_000;
+
+export interface SafeTextReplacement {
+  path: string;
+  oldText: string;
+  newText: string;
+  dryRun: unknown;
+  expectedSha256?: string | undefined;
+}
+
+/**
+ * Exact, one-occurrence text editing. Dry run is the default.
+ * The expected digest is checked again immediately before the staged
+ * replacement is renamed; this is optimistic concurrency, not a kernel CAS.
+ */
+export async function replaceAuthorizedText(
+  policy: AgentPolicy,
+  input: SafeTextReplacement,
+): Promise<{
+  applied: boolean;
+  before_sha256: string;
+  after_sha256: string;
+  diff: string;
+}> {
+  if (
+    !input.oldText ||
+    input.oldText === input.newText ||
+    Buffer.byteLength(input.oldText, "utf8") > MAX_EDIT_TEXT_BYTES ||
+    Buffer.byteLength(input.newText, "utf8") > MAX_EDIT_TEXT_BYTES ||
+    typeof input.dryRun !== "boolean"
+  ) {
+    throw policyDenied("Provide distinct, bounded old_text/new_text and boolean dry_run");
+  }
+  const sha256 = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
+  const before = await withAuthorizedRead(
+    policy,
+    input.path,
+    "Path is not allowed by local policy",
+    "File edit preflight failed",
+    async (file) => {
+      if ((await file.stat()).size > MAX_EDIT_FILE_BYTES)
+        throw new Error("File is too large to edit");
+      const bytes = await file.readFile();
+      if (bytes.length > MAX_EDIT_FILE_BYTES) throw new Error("File grew while reading");
+      const content = bytes.toString("utf8");
+      if (!Buffer.from(content, "utf8").equals(bytes) || content.includes("\u0000")) {
+        throw new Error("Only valid UTF-8 text files can be edited");
+      }
+      return content;
+    },
+  );
+  const matches = before.split(input.oldText).length - 1;
+  if (matches !== 1) {
+    throw policyDenied("Expected exactly one old_text match; narrow the selection and retry");
+  }
+  const beforeSha = sha256(before);
+  const after = before.replace(input.oldText, input.newText);
+  if (Buffer.byteLength(after, "utf8") > MAX_EDIT_FILE_BYTES) {
+    throw policyDenied("Edited file would exceed the one-megabyte safety limit");
+  }
+  const afterSha = sha256(after);
+  const excerpt = (value: string) =>
+    value.replaceAll("\r", "\\r").replaceAll("\n", "\\n").slice(0, 120);
+  const diff = `-${excerpt(input.oldText)}\n+${excerpt(input.newText)}`;
+  const response = {
+    applied: !input.dryRun,
+    before_sha256: beforeSha,
+    after_sha256: afterSha,
+    diff,
+  };
+  if (Buffer.byteLength(JSON.stringify(response), "utf8") > policy.maxOutputBytes) {
+    throw policyDenied("Agent output limit is too low for the edit preview");
+  }
+  if (!input.dryRun) {
+    if (!input.expectedSha256 || !/^[a-f0-9]{64}$/u.test(input.expectedSha256)) {
+      throw policyDenied("Applying changes requires expected_sha256 from the preview");
+    }
+    if (beforeSha !== input.expectedSha256) {
+      throw codedError(
+        "File changed since preview; inspect it again before replacing",
+        "FILE_CONFLICT",
+      );
+    }
+    await writeAuthorizedFileAtomic(
+      policy,
+      input.path,
+      after,
+      "Path is not allowed by local policy",
+      "File edit commit failed",
+      beforeSha,
+    );
+  }
+  return response;
 }
