@@ -36,8 +36,13 @@ describe("Docker release workflow", () => {
 
   test("packages the exact public installer scripts in both runtime images and smoke-tests their bytes", () => {
     const assetCopy = "COPY scripts/install-agent.sh scripts/install-agent.ps1 ./scripts/";
+    const immutableNodeImage =
+      "node@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1";
     for (const dockerfile of ["Dockerfile", "Dockerfile.coolify"]) {
-      expect(readText(dockerfile), dockerfile).toContain(assetCopy);
+      const source = readText(dockerfile);
+      expect(source, dockerfile).toContain(assetCopy);
+      expect(source, dockerfile).toContain(immutableNodeImage);
+      expect(source, dockerfile).not.toMatch(/FROM node:[^\s]+@sha256:/u);
     }
     const workflow = readText(dockerWorkflowPath);
     expect(workflow).toContain("- name: Smoke installer assets match source");
