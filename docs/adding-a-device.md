@@ -90,8 +90,13 @@ bash install-agent.sh \
 ```
 
 This creates a **user** systemd service and enables linger so it survives
-logout and starts at boot. Pass `--system` (with `sudo`) to install a
-system-wide service instead.
+logout and starts at boot. If enabling linger is denied, the installer now
+reports **incomplete setup** instead of claiming success: the running agent
+may disconnect when the user logs out. Ask an administrator to run
+`sudo loginctl enable-linger <linux-username>`, then verify
+`loginctl show-user <linux-username> -p Linger` reports `Linger=yes`.
+This repair does **not** require a new enrollment token. Pass `--system`
+(with `sudo`) to install a system-wide service instead.
 
 ### Windows (PowerShell)
 

@@ -43,6 +43,15 @@ describe.skipIf(process.platform === "win32")("agent bootstrap Bash validation",
   });
 });
 
+describe("Linux agent user-service persistence guard", () => {
+  test("cannot silently ignore a failed loginctl linger setup", () => {
+    const source = readFileSync(script, "utf8");
+    expect(source).not.toContain('loginctl enable-linger "$USER" >/dev/null 2>&1 || true');
+    expect(source).toContain('if ! loginctl enable-linger "$USER"');
+    expect(source).toContain("sudo loginctl enable-linger");
+  });
+});
+
 describe("Windows agent Scheduled Task launcher", () => {
   test("uses Windows CMD shims for install and enrollment under restrictive PowerShell policies", () => {
     const content = readFileSync(windowsScript, "utf8");
@@ -169,7 +178,10 @@ describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
           "esac",
         ].join("\n"),
       );
-      stubFile(path.join(shimDir, "loginctl"), "exit 0");
+      stubFile(
+        path.join(shimDir, "loginctl"),
+        'if [[ "${MOCK_LINGER_FAILURE:-}" == "1" ]]; then exit 17; fi',
+      );
 
       const agentBin = path.join(globalBin, "ssh-mcp-pro-agent");
       if (installAgent) {
@@ -250,6 +262,22 @@ describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
           "--user daemon-reload\n--user enable ssh-mcp-pro-agent.service\n--user restart ssh-mcp-pro-agent.service\n",
         );
         expect(readFileSync(mock.serviceState, "utf8")).toBe("restarted\n");
+      } finally {
+        mock.cleanup();
+      }
+    });
+
+    test("reports incomplete setup when user linger cannot be enabled after service start", () => {
+      const mock = setupInstaller(true);
+      try {
+        Object.assign(mock.env, { MOCK_LINGER_FAILURE: "1" });
+        const result = mock.run();
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain("loginctl");
+        expect(result.stderr).toContain("sudo loginctl enable-linger");
+        expect(result.stdout).not.toContain("install-agent: done");
+        expect(readFileSync(mock.serviceState, "utf8")).toBe("restarted\n");
+        expect(readFileSync(mock.enrollLog, "utf8")).toContain("enroll --server");
       } finally {
         mock.cleanup();
       }
