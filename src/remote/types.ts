@@ -278,6 +278,7 @@ export interface ActionResultEnvelope {
   started_at: string;
   finished_at: string;
   truncated: boolean;
+  next_offset_bytes?: number | undefined;
   error_code?: RemoteErrorCode | undefined;
   message?: string | undefined;
   signature: string;

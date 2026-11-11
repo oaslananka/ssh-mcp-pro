@@ -5,6 +5,7 @@ import {
   appendBoundedOutput,
   finalizeBoundedOutput,
   readFileBounded,
+  readFilePageBounded,
   readFileTailBounded,
   type OutputAccumulator,
 } from "./agent-bounded-io.js";
@@ -24,6 +25,7 @@ interface ExecResult {
   stdout: string;
   stderr: string;
   truncated: boolean;
+  nextOffsetBytes?: number;
 }
 
 const SAFE_IDENTIFIER_PATTERN = /^[A-Za-z0-9_.@:-]{1,128}$/u;
@@ -38,6 +40,23 @@ function scalarActionArgument(value: unknown): string {
   throw Object.assign(new Error("Action arguments must be scalar values"), {
     code: "POLICY_DENIED" as const,
   });
+}
+
+function requireByteCount(value: unknown, label: string, minimum: number, maximum: number): number {
+  if (
+    typeof value !== "number" ||
+    !Number.isSafeInteger(value) ||
+    value < minimum ||
+    value > maximum
+  ) {
+    throw Object.assign(
+      new Error(`${label} must be an integer between ${minimum} and ${maximum}`),
+      {
+        code: "POLICY_DENIED" as const,
+      },
+    );
+  }
+  return value;
 }
 
 function platformShell(command: string): { command: string; args: string[] } {
@@ -165,6 +184,9 @@ export class AgentExecutor {
         started_at: startedAt,
         finished_at: nowIso(),
         truncated: result.truncated,
+        ...(result.nextOffsetBytes === undefined
+          ? {}
+          : { next_offset_bytes: result.nextOffsetBytes }),
         signature: "",
       });
     } catch (error) {
@@ -237,8 +259,25 @@ export class AgentExecutor {
           scalarActionArgument(action.args.container ?? ""),
           timeoutSeconds,
         );
-      case "file_read":
-        return this.fileRead(scalarActionArgument(action.args.path ?? ""));
+      case "file_read": {
+        const hasPaging =
+          action.args.offset_bytes !== undefined || action.args.max_bytes !== undefined;
+        const offsetBytes = hasPaging
+          ? requireByteCount(action.args.offset_bytes ?? 0, "offset_bytes", 0, 2_147_483_647)
+          : 0;
+        const maxBytes = hasPaging
+          ? requireByteCount(
+              action.args.max_bytes ?? this.policy.maxOutputBytes,
+              "max_bytes",
+              4,
+              1_048_576,
+            )
+          : this.policy.maxOutputBytes;
+        return this.fileRead(
+          scalarActionArgument(action.args.path ?? ""),
+          hasPaging ? { offsetBytes, maxBytes } : undefined,
+        );
+      }
       case "file_write":
         return this.fileWrite(
           scalarActionArgument(action.args.path ?? ""),
@@ -371,19 +410,31 @@ export class AgentExecutor {
     });
   }
 
-  private async fileRead(filePath: string): Promise<ExecResult> {
+  private async fileRead(
+    filePath: string,
+    page?: { offsetBytes: number; maxBytes: number },
+  ): Promise<ExecResult> {
     return withAuthorizedRead(
       this.policy,
       filePath,
       "Path is not allowed by local policy",
       "File read failed",
       async (file) => {
-        const truncated = await readFileBounded(file, this.policy.maxOutputBytes);
+        const result = page
+          ? await readFilePageBounded(
+              file,
+              page.offsetBytes,
+              Math.min(page.maxBytes, this.policy.maxOutputBytes),
+            )
+          : await readFileBounded(file, this.policy.maxOutputBytes);
         return {
           exitCode: 0,
-          stdout: truncated.value.toString("utf8"),
+          stdout: result.value.toString("utf8"),
           stderr: "",
-          truncated: truncated.truncated,
+          truncated: result.truncated,
+          ...("nextOffsetBytes" in result && typeof result.nextOffsetBytes === "number"
+            ? { nextOffsetBytes: result.nextOffsetBytes }
+            : {}),
         };
       },
     );
