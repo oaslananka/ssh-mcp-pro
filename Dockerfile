@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.28
 
-FROM node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS alpine-patched
+FROM node@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS alpine-patched
 # Keep the pinned base digest while applying Alpine's patched zlib and musl packages.
 # Fail closed if a fix is unavailable; keep build/runtime aligned.
 RUN apk add --no-cache 'zlib>=1.3.2-r1' 'musl>=1.2.6-r3' 'musl-utils>=1.2.6-r3'
@@ -50,6 +50,8 @@ COPY --from=build /app/dist ./dist
 COPY README.md LICENSE SECURITY.md SECURITY_DECISIONS.md ARCHITECTURE.md REGISTRY_SUBMISSION.md ./
 COPY LICENSES ./LICENSES
 COPY docs ./docs
+# Keep GHCR/CLI images aligned with the hosted installer routes in Dockerfile.coolify.
+COPY scripts/install-agent.sh scripts/install-agent.ps1 ./scripts/
 COPY mcp.json server.json ./
 COPY registry ./registry
 
