@@ -1,3 +1,4 @@
+import type { Dir, Dirent } from "node:fs";
 import { lstat, opendir, realpath } from "node:fs/promises";
 import path from "node:path";
 import { isPathAllowed } from "./policy.js";
@@ -15,6 +16,26 @@ export interface FileSearchResult {
   matches: Array<{ name: string; path: string }>;
   truncated: boolean;
   scanned_entries: number;
+}
+
+interface SearchOptions {
+  maxDepth: number;
+  maxResults: number;
+  includeHidden: boolean;
+  matchName: (filename: string) => boolean;
+}
+interface SearchNode {
+  root: string;
+  directory: string;
+  depth: number;
+}
+interface ScanState extends SearchOptions {
+  policy: AgentPolicy;
+  queue: SearchNode[];
+  matches: FileSearchResult["matches"];
+  scannedEntries: number;
+  scannedDirectories: number;
+  truncated: boolean;
 }
 
 const MAX_SCAN_ENTRIES = 2_000;
@@ -55,7 +76,7 @@ function filenameMatcher(pattern: string): (filename: string) => boolean {
   if (!query.includes("*") && !query.includes("?")) {
     return (name) => name.toLocaleLowerCase().includes(query);
   }
-  // Linear wildcard matching: avoid exponential regex backtracking on user input.
+  // Linear wildcard matching prevents regex backtracking from user input.
   return (name) => {
     const candidate = name.toLocaleLowerCase();
     let nameIndex = 0;
@@ -84,14 +105,7 @@ function filenameMatcher(pattern: string): (filename: string) => boolean {
   };
 }
 
-/**
- * Bounded, filename-only discovery inside an agent's local file-read policy.
- * No file content is accessed. Symlinks are never traversed or returned.
- */
-export async function searchAuthorizedFileNames(
-  policy: AgentPolicy,
-  args: FileSearchInput,
-): Promise<FileSearchResult> {
+function parseOptions(args: FileSearchInput): SearchOptions {
   const pattern = args.name_pattern;
   if (
     typeof pattern !== "string" ||
@@ -112,120 +126,168 @@ export async function searchAuthorizedFileNames(
   ) {
     throw denied("root_path must be a nonempty path");
   }
-  const maxDepth = boundedInteger(args.max_depth, 3, 0, 5);
-  const maxResults = boundedInteger(args.max_results, 20, 1, 50);
-  const matchName = filenameMatcher(pattern);
-  const roots = args.root_path === undefined ? policy.allowPaths : [args.root_path];
-  if (roots.length > 32) throw denied("Too many search roots configured by local policy");
-  const queue: Array<{ root: string; directory: string; depth: number }> = [];
+  return {
+    matchName: filenameMatcher(pattern),
+    includeHidden: args.include_hidden ?? false,
+    maxDepth: boundedInteger(args.max_depth, 3, 0, 5),
+    maxResults: boundedInteger(args.max_results, 20, 1, 50),
+  };
+}
 
-  for (const requested of roots) {
-    if (!isPathAllowed(policy, requested)) {
-      if (args.root_path !== undefined) throw denied("Search root is not allowed by local policy");
-      continue;
-    }
-    try {
-      const rootInfo = await lstat(requested);
-      if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink()) {
-        if (args.root_path !== undefined) throw denied("Search root must be a regular directory");
-        continue;
-      }
-      const canonical = await realpath(requested);
-      if (!isPathAllowed(policy, canonical)) {
-        if (args.root_path !== undefined)
-          throw denied("Search root is not allowed by local policy");
-        continue;
-      }
-      if (!queue.some((entry) => entry.root === canonical)) {
-        queue.push({ root: canonical, directory: canonical, depth: 0 });
-      }
-    } catch (error) {
-      if (args.root_path !== undefined)
-        throw denied("Search root is unavailable under local policy");
-      if (error && typeof error === "object" && "code" in error && error.code === "POLICY_DENIED")
-        throw error;
-    }
+async function resolveRoot(
+  policy: AgentPolicy,
+  requested: string,
+  explicit: boolean,
+): Promise<string | null> {
+  if (!isPathAllowed(policy, requested)) {
+    if (explicit) throw denied("Search root is not allowed by local policy");
+    return null;
   }
-
-  if (!queue.length) throw denied("No accessible search roots are configured by local policy");
-
-  const matches: FileSearchResult["matches"] = [];
-  let scannedEntries = 0;
-  let scannedDirectories = 0;
-  let truncated = false;
-
-  while (
-    queue.length &&
-    scannedEntries < MAX_SCAN_ENTRIES &&
-    scannedDirectories < MAX_SCAN_DIRECTORIES &&
-    matches.length < maxResults
-  ) {
-    const current = queue.shift()!;
-    if (!isPathAllowed(policy, current.directory) || !withinRoot(current.root, current.directory))
-      continue;
-    let directory;
-    try {
-      const info = await lstat(current.directory);
-      if (
-        !info.isDirectory() ||
-        info.isSymbolicLink() ||
-        !withinRoot(current.root, await realpath(current.directory))
-      )
-        continue;
-      directory = await opendir(current.directory);
-    } catch {
-      continue;
+  try {
+    const info = await lstat(requested);
+    if (!info.isDirectory() || info.isSymbolicLink()) {
+      if (explicit) throw denied("Search root must be a regular directory");
+      return null;
     }
-    scannedDirectories += 1;
-    for await (const entry of directory) {
-      if (scannedEntries >= MAX_SCAN_ENTRIES || matches.length >= maxResults) {
-        truncated = true;
-        break;
-      }
-      scannedEntries += 1;
-      if (
-        entry.name === "." ||
-        entry.name === ".." ||
-        (!args.include_hidden && entry.name.startsWith(".")) ||
-        entry.isSymbolicLink()
-      )
-        continue;
-      const candidate = path.join(current.directory, entry.name);
-      if (!isPathAllowed(policy, candidate)) continue;
-      try {
-        const info = await lstat(candidate);
-        if (info.isSymbolicLink()) continue;
-        const canonical = await realpath(candidate);
-        if (!withinRoot(current.root, canonical) || !isPathAllowed(policy, canonical)) continue;
-        if (info.isDirectory()) {
-          if (current.depth < maxDepth)
-            queue.push({ root: current.root, directory: canonical, depth: current.depth + 1 });
-        } else if (info.isFile() && matchName(entry.name)) {
-          matches.push({ name: entry.name, path: canonical });
-        }
-      } catch {
-        // A directory entry can disappear while scanning; no path details escape.
-      }
+    const canonical = await realpath(requested);
+    if (!isPathAllowed(policy, canonical)) {
+      if (explicit) throw denied("Search root is not allowed by local policy");
+      return null;
     }
+    return canonical;
+  } catch {
+    if (explicit) throw denied("Search root is unavailable under local policy");
+    return null;
   }
+}
+
+function limitReached(state: ScanState): boolean {
+  return (
+    state.scannedEntries >= MAX_SCAN_ENTRIES ||
+    state.scannedDirectories >= MAX_SCAN_DIRECTORIES ||
+    state.matches.length >= state.maxResults
+  );
+}
+
+async function inspectEntry(state: ScanState, current: SearchNode, entry: Dirent): Promise<void> {
   if (
-    queue.length ||
-    scannedEntries >= MAX_SCAN_ENTRIES ||
-    scannedDirectories >= MAX_SCAN_DIRECTORIES ||
-    matches.length >= maxResults
-  ) {
-    truncated = true;
+    entry.name === "." ||
+    entry.name === ".." ||
+    (!state.includeHidden && entry.name.startsWith(".")) ||
+    entry.isSymbolicLink()
+  )
+    return;
+  const candidate = path.join(current.directory, entry.name);
+  if (!isPathAllowed(state.policy, candidate)) return;
+  try {
+    const info = await lstat(candidate);
+    if (info.isSymbolicLink()) return;
+    const canonical = await realpath(candidate);
+    if (!withinRoot(current.root, canonical) || !isPathAllowed(state.policy, canonical)) return;
+    if (info.isDirectory()) {
+      if (current.depth < state.maxDepth)
+        state.queue.push({ root: current.root, directory: canonical, depth: current.depth + 1 });
+    } else if (info.isFile() && state.matchName(entry.name)) {
+      state.matches.push({ name: entry.name, path: canonical });
+    }
+  } catch {
+    // A directory entry may disappear while scanning; never return its path.
   }
+}
 
-  let result: FileSearchResult = { matches, truncated, scanned_entries: scannedEntries };
+async function consumeEntries(
+  state: ScanState,
+  current: SearchNode,
+  directory: Dir,
+): Promise<void> {
+  if (limitReached(state)) {
+    state.truncated = true;
+    return;
+  }
+  const entry = await directory.read();
+  if (!entry) return;
+  state.scannedEntries += 1;
+  await inspectEntry(state, current, entry);
+  return consumeEntries(state, current, directory);
+}
+
+async function visitDirectory(state: ScanState, current: SearchNode): Promise<void> {
+  if (
+    !isPathAllowed(state.policy, current.directory) ||
+    !withinRoot(current.root, current.directory)
+  )
+    return;
+  let directory: Dir;
+  try {
+    const info = await lstat(current.directory);
+    if (!info.isDirectory() || info.isSymbolicLink()) return;
+    const canonical = await realpath(current.directory);
+    if (!withinRoot(current.root, canonical) || !isPathAllowed(state.policy, canonical)) return;
+    directory = await opendir(current.directory);
+  } catch {
+    return;
+  }
+  state.scannedDirectories += 1;
+  try {
+    await consumeEntries(state, current, directory);
+  } finally {
+    await directory.close().catch(() => undefined);
+  }
+}
+
+async function scanQueue(state: ScanState): Promise<void> {
+  if (!state.queue.length) return;
+  if (limitReached(state)) {
+    state.truncated = true;
+    return;
+  }
+  const current = state.queue.shift()!;
+  await visitDirectory(state, current);
+  return scanQueue(state);
+}
+
+function boundedResult(state: ScanState): FileSearchResult {
+  let result: FileSearchResult = {
+    matches: state.matches,
+    truncated: state.truncated,
+    scanned_entries: state.scannedEntries,
+  };
   while (
-    Buffer.byteLength(JSON.stringify(result), "utf8") > policy.maxOutputBytes &&
+    Buffer.byteLength(JSON.stringify(result), "utf8") > state.policy.maxOutputBytes &&
     result.matches.length
   ) {
     result = { ...result, matches: result.matches.slice(0, -1), truncated: true };
   }
-  if (Buffer.byteLength(JSON.stringify(result), "utf8") > policy.maxOutputBytes) {
+  if (Buffer.byteLength(JSON.stringify(result), "utf8") > state.policy.maxOutputBytes) {
     throw denied("Agent output limit is too small for file search results");
   }
   return result;
+}
+
+/** A bounded, filename-only search inside agent-local approved folders. */
+export async function searchAuthorizedFileNames(
+  policy: AgentPolicy,
+  args: FileSearchInput,
+): Promise<FileSearchResult> {
+  const options = parseOptions(args);
+  const roots = args.root_path === undefined ? policy.allowPaths : [args.root_path];
+  if (roots.length > 32) throw denied("Too many search roots configured by local policy");
+  const resolved = await Promise.all(
+    roots.map((root) => resolveRoot(policy, root, args.root_path !== undefined)),
+  );
+  const uniqueRoots = [...new Set(resolved.filter((root): root is string => root !== null))];
+  if (!uniqueRoots.length)
+    throw denied("No accessible search roots are configured by local policy");
+
+  const state: ScanState = {
+    ...options,
+    policy,
+    queue: uniqueRoots.map((root) => ({ root, directory: root, depth: 0 })),
+    matches: [],
+    scannedEntries: 0,
+    scannedDirectories: 0,
+    truncated: false,
+  };
+  await scanQueue(state);
+  return boundedResult(state);
 }
