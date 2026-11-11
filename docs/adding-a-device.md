@@ -72,9 +72,12 @@ returned token with the installer in Step 2 or the returned npm commands.
 ## Step 2 — Run the bootstrap on the new device
 
 The Linux/Windows bootstrap installs the package, enrolls the machine, and
-registers startup so the agent reconnects after restarts. It needs Node
-22.22+ or 24+. The dashboard-generated command is the shortest path; the
-manual commands below are alternatives if you already have a one-time token.
+registers startup so the agent reconnects after restarts. It requires a
+supported Node.js runtime (22.22+ or a newer LTS). On Windows, if Node.js is
+missing, the installer attempts to install the official Active LTS through
+Windows Package Manager (WinGet). The dashboard-generated command is the
+shortest path; the manual commands below are alternatives if you already have
+a one-time token.
 
 ### Linux / WSL
 
@@ -103,8 +106,15 @@ your authenticated HTTPS control plane and uses an in-memory script block,
 so no machine-wide PowerShell execution-policy change is needed. The
 installer invokes npm and the agent through their `.cmd` wrappers to avoid
 blocked npm/agent `.ps1` shims. Review the installer source and only use a
-trusted server; a missing or outdated Node.js runtime still requires setup
-before this command can succeed.
+trusted server. If Node.js is missing, WinGet will download and install
+`OpenJS.NodeJS.LTS` from its official `winget` source, potentially prompting
+for Windows administrator approval (UAC). Nothing bypasses that prompt. The
+installer refreshes its own PATH and continues automatically when Node is
+available. If WinGet is unavailable or the user declines installation, the
+script exits with actionable guidance to install Node LTS from
+https://nodejs.org/en/download and rerun the command. An *outdated* Node
+installation is not silently upgraded. Linux/WSL still requires Node
+installed beforehand.
 
 For a fully headless host that must run before any user logs in, run the agent
 under a service manager such as NSSM instead.

@@ -7,6 +7,9 @@
   enrollment token, and registers a Scheduled Task so the agent reconnects
   at logon and restarts if it stops. Run it once per new device.
 
+  When Node.js is missing, installs the official Active LTS through WinGet. Windows
+  may prompt for administrator approval. Never bypass UAC.
+
   The agent capabilities are fixed by the profile chosen when the enrollment
   token is created on the control plane (read-only / operations / full-admin),
   not by this script.
@@ -45,8 +48,26 @@ function Die($message) {
   exit 1
 }
 
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-  Die "node is not installed (need Node 22.22+ or 24+)"
+$nodeBin = (Get-Command node.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+if (-not $nodeBin) {
+  # WinGet installs the official Node.js Active LTS package. It can require
+  # Windows administrator approval; do not bypass UAC or loosen script policy.
+  $wingetBin = (Get-Command winget.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+  if (-not $wingetBin) {
+    Die "Node.js is missing and WinGet is unavailable. Install Node.js LTS from https://nodejs.org/en/download and retry."
+  }
+  Write-Host "install-agent: installing official Node.js LTS with WinGet (Windows may request administrator approval)"
+  & $wingetBin install --id OpenJS.NodeJS.LTS --exact --source winget --accept-source-agreements --accept-package-agreements
+  if ($LASTEXITCODE -ne 0) { Die "WinGet Node.js installation failed or was cancelled; install Node.js LTS and retry." }
+
+  # MSI installers update the registry PATH but cannot update this shell's PATH.
+  $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+  $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+  $env:Path = @($env:Path, $machinePath, $userPath) -join ";"
+  $nodeBin = (Get-Command node.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+  if (-not $nodeBin) {
+    Die "WinGet completed but Node.js is not on PATH. Reopen PowerShell and rerun the install command."
+  }
 }
 # npm installs both npm.ps1 and npm.cmd. PowerShell may select npm.ps1 even
 # when the user's execution policy forbids running scripts; use CMD directly.
@@ -54,10 +75,10 @@ $npmCmd = (Get-Command npm.cmd -CommandType Application -ErrorAction SilentlyCon
 if (-not $npmCmd) { Die "npm.cmd was not found; install a supported Node.js release with npm" }
 
 # WebSocket is exposed as a global from Node 22.22+ (and all of 23/24+).
-$nodeMajor = [int](node -p "process.versions.node.split('.')[0]")
-$nodeMinor = [int](node -p "process.versions.node.split('.')[1]")
+$nodeMajor = [int](& $nodeBin -p "process.versions.node.split('.')[0]")
+$nodeMinor = [int](& $nodeBin -p "process.versions.node.split('.')[1]")
 if ($nodeMajor -lt 22 -or ($nodeMajor -eq 22 -and $nodeMinor -lt 22)) {
-  Die "Node $(node -v) is too old; install Node 22.22+ or 24+"
+  Die "Node $(& $nodeBin -v) is too old; install Node 22.22+ or 24/26 LTS"
 }
 
 Write-Host "install-agent: installing ssh-mcp-pro@$Version globally"
