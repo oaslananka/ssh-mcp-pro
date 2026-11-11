@@ -204,7 +204,9 @@ else
   systemctl --user enable ssh-mcp-pro-agent.service
   systemctl --user restart ssh-mcp-pro-agent.service
   # Allow the user service to keep running after logout / start on boot.
-  loginctl enable-linger "$USER" >/dev/null 2>&1 || true
+  if ! loginctl enable-linger "$USER" >/dev/null 2>&1; then
+    die "loginctl could not enable linger for '$USER'. The agent service started but may stop after logout. Ask an administrator to run: sudo loginctl enable-linger '$USER'. No re-enrollment is required."
+  fi
   echo "install-agent: user service started — check 'systemctl --user status ssh-mcp-pro-agent'"
 fi
 
