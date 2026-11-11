@@ -123,8 +123,10 @@ describe("bounded authorized remote file discovery", () => {
   test("caps output by local policy without returning partial JSON", async () => {
     const env = workspace();
     try {
+      // A long filename makes the overflow deterministic on both Linux and Windows.
+      writeFileSync(path.join(env.allowed, `oversized-${"x".repeat(115)}.log`), "safe");
       const policy = { ...env.policy, maxOutputBytes: 130 };
-      const result = await searchAuthorizedFileNames(policy, { name_pattern: "*config*" });
+      const result = await searchAuthorizedFileNames(policy, { name_pattern: "oversized-*" });
       expect(Buffer.byteLength(JSON.stringify(result), "utf8")).toBeLessThanOrEqual(130);
       expect(result.truncated).toBe(true);
       expect(result.matches).toHaveLength(0);
