@@ -93,6 +93,26 @@ describe("remote MCP tool descriptors", () => {
     }
   });
 
+  test("exposes a bounded read-only file search tool for clients with file-read access", () => {
+    const tools = listRemoteToolDescriptors(["files.read"]);
+    expect(tools.map((tool) => tool.name)).toEqual(["file_search", "file_read"]);
+    const search = tools.find((tool) => tool.name === "file_search");
+    expect(search?.annotations).toEqual(
+      expect.objectContaining({ readOnlyHint: true, destructiveHint: false }),
+    );
+    expect(search?.inputSchema).toEqual(
+      expect.objectContaining({
+        required: ["agent_id_or_alias", "name_pattern"],
+        additionalProperties: false,
+        properties: expect.objectContaining({
+          root_path: expect.objectContaining({ type: "string" }),
+          max_depth: expect.objectContaining({ maximum: 5 }),
+          max_results: expect.objectContaining({ maximum: 50 }),
+        }),
+      }),
+    );
+  });
+
   test("retains read-only metadata for inspection tools", () => {
     const tools = listRemoteToolDescriptors(REMOTE_CAPABILITIES);
     const inspection = tools.filter((tool) =>

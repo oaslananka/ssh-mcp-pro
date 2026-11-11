@@ -633,6 +633,34 @@ describe("remote agent executor", () => {
     expect(denied).toMatchObject({ status: "error", error_code: "POLICY_DENIED" });
   });
 
+  test("discovers allowed files through a signed, bounded remote action", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-remote-search-"));
+    writeFileSync(path.join(dir, "service.config"), "safe");
+    const key = generateEd25519PemKeyPair();
+    const policy = mergeCustomPolicy({
+      capabilities: { "files.read": true },
+      allowPaths: [dir.replace(/\\/gu, "/")],
+      denyPaths: ["/"],
+    });
+    const executor = new AgentExecutor(policy, key.privateKeyPem);
+    const result = await executor.execute(
+      action("file_search", "files.read", { name_pattern: "*.config" }),
+    );
+    expect(result).toMatchObject({ status: "ok", exit_code: 0, truncated: false });
+    expect(JSON.parse(result.stdout ?? "")).toMatchObject({
+      matches: [expect.objectContaining({ name: "service.config" })],
+      truncated: false,
+    });
+    expect(verifyEnvelope(result as unknown as Record<string, unknown>, key.publicKeyPem)).toBe(
+      true,
+    );
+
+    const denied = await executor.execute(
+      action("file_search", "files.read", { name_pattern: "*", root_path: path.dirname(dir) }),
+    );
+    expect(denied).toMatchObject({ status: "error", error_code: "POLICY_DENIED" });
+  });
+
   test("streams file reads up to the configured output limit", async () => {
     const tempDir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-"));
     const target = path.join(tempDir, "large.txt");

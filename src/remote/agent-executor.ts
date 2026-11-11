@@ -10,6 +10,7 @@ import {
   type OutputAccumulator,
 } from "./agent-bounded-io.js";
 import { isContainerAllowed, isServiceAllowed } from "./policy.js";
+import { searchAuthorizedFileNames, type FileSearchInput } from "./agent-file-search.js";
 import { withAuthorizedRead, writeAuthorizedFileAtomic } from "./safe-file.js";
 import { TOOL_CAPABILITY_MAP } from "./types.js";
 import type {
@@ -259,6 +260,8 @@ export class AgentExecutor {
           scalarActionArgument(action.args.container ?? ""),
           timeoutSeconds,
         );
+      case "file_search":
+        return this.fileSearch(action.args);
       case "file_read": {
         const hasPaging =
           action.args.offset_bytes !== undefined || action.args.max_bytes !== undefined;
@@ -408,6 +411,16 @@ export class AgentExecutor {
       timeoutSeconds,
       maxOutputBytes: this.policy.maxOutputBytes,
     });
+  }
+
+  private async fileSearch(args: Record<string, unknown>): Promise<ExecResult> {
+    const result = await searchAuthorizedFileNames(this.policy, args as unknown as FileSearchInput);
+    return {
+      exitCode: 0,
+      stdout: JSON.stringify(result),
+      stderr: "",
+      truncated: result.truncated,
+    };
   }
 
   private async fileRead(
