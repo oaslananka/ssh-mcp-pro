@@ -7,7 +7,14 @@ describe("remote MCP tool descriptors", () => {
   test("returns only descriptors granted by caller capabilities", () => {
     const tools = listRemoteToolDescriptors(["hosts.read", "shell.exec"]);
 
-    expect(tools.map((tool) => tool.name)).toEqual(["list_hosts", "run_shell"]);
+    expect(tools.map((tool) => tool.name)).toEqual([
+      "list_hosts",
+      "run_shell",
+      "process_start",
+      "process_read",
+      "process_input",
+      "process_stop",
+    ]);
     expect(tools).toEqual([
       expect.objectContaining({
         name: "list_hosts",
@@ -21,6 +28,9 @@ describe("remote MCP tool descriptors", () => {
           required: ["agent_id_or_alias", "command"],
         }),
       }),
+      ...(["process_start", "process_read", "process_input", "process_stop"] as const).map((name) =>
+        expect.objectContaining({ name, capability: "shell.exec" }),
+      ),
     ]);
   });
 

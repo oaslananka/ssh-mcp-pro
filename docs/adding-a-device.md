@@ -173,6 +173,33 @@ The agent refuses ambiguous/missing matches, non-UTF-8 text, files over
 allowlist and read-only profiles cannot use this tool. Normal
 `file_write` remains unchanged for full-file edits.
 
+## Follow a long-running command without keeping a terminal open
+
+When the agent's `shell.exec` capability is enabled, you can ask an AI
+client: *"Start the test runner on my enrolled device, show its output, send
+input if it asks, and stop it when I tell you."* The agent exposes four
+tools that operate on a **user-owned process session**:
+
+1. `process_start`: provide `agent_id_or_alias` and `command`, optionally
+   `cwd` and `max_runtime_seconds` (1–600; default 300). Save the returned
+   `process_id`; the command runs on that device, not on the cloud server.
+2. `process_read`: supply the same agent and process ID, plus a `cursor`
+   (start at 0). It returns status, exit code, a bounded list of stdout/stderr
+   chunks, and `next_cursor` for the next read.
+3. `process_input`: send short stdin text or close stdin. Do not type
+   passwords/tokens into shell commands or client conversations.
+4. `process_stop`: terminate the process and its descendants when finished.
+
+Sessions do not survive agent restart, disconnection or permission revocation.
+A device supports up to four simultaneous managed processes; runtime and
+output memory are bounded. When output exceeds the local 64 KiB ring buffer,
+`dropped_before_cursor` indicates earlier content that can no longer be
+retrieved. Finished process results are retained for at most two minutes.
+
+The control plane masks managed command and stdin payloads in durable action
+metadata; the AI client may still receive and display command output. This
+tool does not elevate shell permissions or bypass the local device policy.
+
 ## Changing a policy later
 
 Capabilities are server-authoritative and pushed live to a connected agent —

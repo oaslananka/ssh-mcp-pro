@@ -271,6 +271,62 @@ const descriptors: Record<
       additionalProperties: false,
     },
   },
+  process_start: {
+    description:
+      "Start a bounded interactive shell process on an enrolled agent. Use process_read to view output and process_stop to cancel. Requires shell.exec.",
+    inputSchema: {
+      type: "object",
+      required: ["agent_id_or_alias", "command"],
+      properties: {
+        agent_id_or_alias: agentSelector,
+        command: { type: "string", minLength: 1, maxLength: 4096 },
+        cwd: { type: "string", minLength: 1 },
+        max_runtime_seconds: { type: "integer", minimum: 1, maximum: 600, default: 300 },
+      },
+      additionalProperties: false,
+    },
+  },
+  process_read: {
+    description:
+      "Read cursor-paged output and status for a managed shell process owned by the current user.",
+    inputSchema: {
+      type: "object",
+      required: ["agent_id_or_alias", "process_id"],
+      properties: {
+        agent_id_or_alias: agentSelector,
+        process_id: { type: "string", minLength: 1 },
+        cursor: { type: "integer", minimum: 0, default: 0 },
+        max_bytes: { type: "integer", minimum: 1024, maximum: 32768, default: 8192 },
+      },
+      additionalProperties: false,
+    },
+  },
+  process_input: {
+    description: "Send limited text to stdin of a running shell process owned by the current user.",
+    inputSchema: {
+      type: "object",
+      required: ["agent_id_or_alias", "process_id", "input"],
+      properties: {
+        agent_id_or_alias: agentSelector,
+        process_id: { type: "string", minLength: 1 },
+        input: { type: "string", maxLength: 4096 },
+        close_stdin: { type: "boolean", default: false },
+      },
+      additionalProperties: false,
+    },
+  },
+  process_stop: {
+    description: "Terminate a managed shell process owned by the current user.",
+    inputSchema: {
+      type: "object",
+      required: ["agent_id_or_alias", "process_id"],
+      properties: {
+        agent_id_or_alias: agentSelector,
+        process_id: { type: "string", minLength: 1 },
+      },
+      additionalProperties: false,
+    },
+  },
   run_shell_as_root: {
     description:
       "Run a bounded privileged command. Disabled unless sudo.exec is explicitly granted.",
@@ -330,6 +386,7 @@ const READ_ONLY_REMOTE_TOOLS = new Set<RemoteToolName>([
   "docker_logs",
   "file_search",
   "file_read",
+  "process_read",
   "get_audit_events",
 ]);
 
@@ -339,6 +396,9 @@ const READ_ONLY_REMOTE_TOOLS = new Set<RemoteToolName>([
 const DESTRUCTIVE_REMOTE_TOOLS = new Set<RemoteToolName>([
   "create_enrollment_token",
   "run_shell",
+  "process_start",
+  "process_input",
+  "process_stop",
   "run_shell_as_root",
   "update_agent_policy",
   "revoke_agent",
