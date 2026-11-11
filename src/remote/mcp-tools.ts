@@ -12,6 +12,7 @@ interface RemoteToolDescriptor {
   description: string;
   capability: RemoteCapability;
   inputSchema: Record<string, unknown>;
+  outputSchema: Record<string, unknown>;
   annotations?: ToolAnnotations;
 }
 
@@ -27,7 +28,67 @@ const limitSchema = {
   default: 50,
 };
 
-const descriptors: Record<RemoteToolName, Omit<RemoteToolDescriptor, "name" | "capability">> = {
+// Every hosted MCP tool returns structuredContent. Exposing the actual
+// top-level result shape helps clients validate responses and plan follow-up
+// calls without assuming an arbitrary JSON blob.
+const ACTION_OUTPUT_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  properties: { action: { type: "object" } },
+  required: ["action"],
+};
+
+const REMOTE_OUTPUT_SCHEMAS: Partial<Record<RemoteToolName, Record<string, unknown>>> = {
+  list_hosts: {
+    type: "object",
+    properties: { hosts: { type: "array", items: { type: "object" } } },
+    required: ["hosts"],
+  },
+  list_agents: {
+    type: "object",
+    properties: { agents: { type: "array", items: { type: "object" } } },
+    required: ["agents"],
+  },
+  create_enrollment_token: {
+    type: "object",
+    properties: {
+      agent_id: { type: "string" },
+      alias: { type: "string" },
+      commands: { type: "object" },
+      enrollment_token: { type: "string" },
+    },
+    required: ["agent_id", "alias", "commands", "enrollment_token"],
+  },
+  get_agent_install_command: {
+    type: "object",
+    properties: {
+      agent_id: { type: "string" },
+      alias: { type: "string" },
+      commands: { type: "object" },
+      token_recoverable: { type: "boolean" },
+    },
+    required: ["agent_id", "alias", "commands", "token_recoverable"],
+  },
+  update_agent_policy: {
+    type: "object",
+    properties: { agent: { type: "object" } },
+    required: ["agent"],
+  },
+  revoke_agent: {
+    type: "object",
+    properties: { agent: { type: "object" } },
+    required: ["agent"],
+  },
+  get_audit_events: {
+    type: "object",
+    properties: { events: { type: "array", items: { type: "object" } } },
+    required: ["events"],
+  },
+};
+
+const descriptors: Record<
+  RemoteToolName,
+  Omit<RemoteToolDescriptor, "name" | "capability" | "outputSchema">
+> = {
   list_hosts: {
     description: "List enrolled host aliases available through outbound agents.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
@@ -222,8 +283,14 @@ const READ_ONLY_REMOTE_TOOLS = new Set<RemoteToolName>([
   "get_audit_events",
 ]);
 
+// These hints communicate potential impact to AI clients, not the permission
+// decision. Arbitrary shell commands and administrative enrollment/policy
+// changes can mutate state even when an individual invocation does not.
 const DESTRUCTIVE_REMOTE_TOOLS = new Set<RemoteToolName>([
+  "create_enrollment_token",
+  "run_shell",
   "run_shell_as_root",
+  "update_agent_policy",
   "revoke_agent",
   "file_write",
   "restart_service",
@@ -247,6 +314,7 @@ export function listRemoteToolDescriptors(
   return REMOTE_TOOLS.filter((name) => allowed.has(TOOL_CAPABILITY_MAP[name])).map((name) => ({
     name,
     capability: TOOL_CAPABILITY_MAP[name],
+    outputSchema: REMOTE_OUTPUT_SCHEMAS[name] ?? ACTION_OUTPUT_SCHEMA,
     annotations: remoteToolAnnotations(name),
     ...descriptors[name],
   }));
