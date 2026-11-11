@@ -7,5 +7,6 @@ export function safeStoredActionArgs(
 ): Record<string, unknown> {
   if (tool === "process_start") return { ...args, command: "[redacted]" };
   if (tool === "process_input") return { ...args, input: "[redacted]" };
+  if (tool === "file_content_search") return { ...args, query: "[redacted]" };
   return args;
 }

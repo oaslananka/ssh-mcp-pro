@@ -28,6 +28,15 @@ describe("managed process action record sanitization", () => {
     });
   });
 
+  test("redacts content queries from persisted audit metadata", () => {
+    const args = { agent_id_or_alias: "device", query: "secret-token-fragment", max_depth: 2 };
+    expect(safeStoredActionArgs("file_content_search", args)).toEqual({
+      ...args,
+      query: "[redacted]",
+    });
+    expect(args.query).toBe("secret-token-fragment");
+  });
+
   test("preserves non-managed action arguments", () => {
     const args = { path: "/tmp/config", old_text: "from", new_text: "to" };
     expect(safeStoredActionArgs("file_replace", args)).toEqual(args);

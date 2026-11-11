@@ -12,6 +12,7 @@ import {
 } from "./agent-bounded-io.js";
 import { isContainerAllowed, isServiceAllowed } from "./policy.js";
 import { searchAuthorizedFileNames, type FileSearchInput } from "./agent-file-search.js";
+import { searchAuthorizedFileContents, type ContentSearchInput } from "./agent-content-search.js";
 import {
   withAuthorizedRead,
   writeAuthorizedFileAtomic,
@@ -278,6 +279,8 @@ export class AgentExecutor {
         );
       case "file_search":
         return this.fileSearch(action.args);
+      case "file_content_search":
+        return this.fileContentSearch(action.args);
       case "file_read": {
         const hasPaging =
           action.args.offset_bytes !== undefined || action.args.max_bytes !== undefined;
@@ -456,6 +459,14 @@ export class AgentExecutor {
       stderr: "",
       truncated: result.truncated,
     };
+  }
+
+  private async fileContentSearch(args: Record<string, unknown>): Promise<ExecResult> {
+    const result = await searchAuthorizedFileContents(
+      this.policy,
+      args as unknown as ContentSearchInput,
+    );
+    return { exitCode: 0, stdout: JSON.stringify(result), stderr: "", truncated: result.truncated };
   }
 
   private async fileRead(

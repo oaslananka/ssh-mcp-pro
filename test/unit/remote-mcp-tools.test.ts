@@ -105,7 +105,11 @@ describe("remote MCP tool descriptors", () => {
 
   test("exposes a bounded read-only file search tool for clients with file-read access", () => {
     const tools = listRemoteToolDescriptors(["files.read"]);
-    expect(tools.map((tool) => tool.name)).toEqual(["file_search", "file_read"]);
+    expect(tools.map((tool) => tool.name)).toEqual([
+      "file_search",
+      "file_content_search",
+      "file_read",
+    ]);
     const search = tools.find((tool) => tool.name === "file_search");
     expect(search?.annotations).toEqual(
       expect.objectContaining({ readOnlyHint: true, destructiveHint: false }),
