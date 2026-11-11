@@ -1,4 +1,5 @@
 import { DASHBOARD_STYLES } from "./web-dashboard-styles.js";
+import { DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT } from "./dashboard-enrollment-feedback-script.js";
 export function renderDashboardHtml(
   initialUserBase64: string,
   mcpUrlJson: string,
@@ -37,6 +38,7 @@ export function renderDashboardHtml(
     let activeTab = 'devices';
     let devicesList = [];
     let auditList = [];
+    ${DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT}
 
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>"']/g, char => ({
@@ -96,6 +98,7 @@ export function renderDashboardHtml(
     }
 
     function switchTab(tab) {
+      stopEnrollmentPolling();
       activeTab = tab;
       renderApp();
       document.querySelector('[data-dashboard-tab="' + tab + '"]')?.focus({ preventScroll: true });
@@ -195,9 +198,12 @@ export function renderDashboardHtml(
                 </select>
               </div>
             </div>
-            <button class="btn btn-primary" onclick="generateEnrollment()">Generate Install Command</button>
+            <button id="generateEnrollmentButton" type="button" class="btn btn-primary" onclick="generateEnrollment()">Generate Install Command</button>
+            <p id="enrollError" role="alert" hidden style="color:var(--danger, #f85149); margin-top:12px;"></p>
 
             <div id="enrollOutput" style="margin-top:24px; display:none;">
+              <p id="enrollStatus" role="status" aria-live="polite" style="margin-bottom:12px; color:var(--text-muted);"></p>
+              <button id="enrollViewDevice" type="button" class="btn btn-primary" hidden style="display:none; margin-bottom:16px;" onclick="switchTab('devices')">View connected device</button>
               <h3 style="margin-bottom:12px; color:#fff;">One-Liner Installation Commands:</h3>
 
               <div style="margin-bottom:16px;">
@@ -217,7 +223,8 @@ export function renderDashboardHtml(
               </div>
 
               <div>
-                <div style="font-weight:600; font-size:13px; color:var(--blue); margin-bottom:4px;">📦 Node CLI (Linux/macOS)</div>
+                <div style="font-weight:600; font-size:13px; color:var(--blue); margin-bottom:4px;">📦 Manual Node CLI (foreground)</div>
+                <p style="font-size:12px; color:var(--text-muted); margin-bottom:6px;">Advanced Linux/macOS fallback: the terminal must stay open. Use an OS service installer for automatic restart.</p>
                 <div class="code-box">
                   <button type="button" class="copy-btn" aria-live="polite" aria-label="Copy Node install command" onclick="copySnippet('cmdNpm')">Copy</button>
                   <span id="cmdNpm"></span>
@@ -342,29 +349,6 @@ export function renderDashboardHtml(
         }
       } catch (e) {
         console.error('Failed to load audit events', e);
-      }
-    }
-
-    async function generateEnrollment() {
-      const alias = document.getElementById('enrollAlias').value.trim() || 'server-' + Math.floor(Math.random() * 1000);
-      const profile = document.getElementById('enrollProfile').value;
-      try {
-        const res = await fetch('/api/dashboard/devices/enroll', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-SSH-MCP-Dashboard': '1' },
-          body: JSON.stringify({ alias, requested_profile: profile })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          document.getElementById('cmdLinux').textContent = data.commands.linux;
-          document.getElementById('cmdWindows').textContent = data.commands.windows;
-          document.getElementById('cmdNpm').textContent = data.commands.npm;
-          document.getElementById('enrollOutput').style.display = 'block';
-        } else {
-          alert('Failed to generate enrollment token.');
-        }
-      } catch (e) {
-        alert('Error: ' + e.message);
       }
     }
 
