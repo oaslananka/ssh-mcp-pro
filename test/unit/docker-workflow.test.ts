@@ -34,6 +34,18 @@ describe("Docker release workflow", () => {
     );
   });
 
+  test("packages the exact public installer scripts in both runtime images and smoke-tests their bytes", () => {
+    const assetCopy = "COPY scripts/install-agent.sh scripts/install-agent.ps1 ./scripts/";
+    for (const dockerfile of ["Dockerfile", "Dockerfile.coolify"]) {
+      expect(readText(dockerfile), dockerfile).toContain(assetCopy);
+    }
+    const workflow = readText(dockerWorkflowPath);
+    expect(workflow).toContain("- name: Smoke installer assets match source");
+    expect(workflow).toContain("--entrypoint /bin/busybox");
+    expect(workflow).toContain("sha256sum");
+    expect(workflow).toContain("scripts/install-agent.sh scripts/install-agent.ps1");
+  });
+
   test("blocks fixable high and critical image vulnerabilities while retaining SARIF evidence", () => {
     const workflow = readText(dockerWorkflowPath);
 

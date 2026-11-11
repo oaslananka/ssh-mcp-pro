@@ -50,6 +50,8 @@ COPY --from=build /app/dist ./dist
 COPY README.md LICENSE SECURITY.md SECURITY_DECISIONS.md ARCHITECTURE.md REGISTRY_SUBMISSION.md ./
 COPY LICENSES ./LICENSES
 COPY docs ./docs
+# Keep GHCR/CLI images aligned with the hosted installer routes in Dockerfile.coolify.
+COPY scripts/install-agent.sh scripts/install-agent.ps1 ./scripts/
 COPY mcp.json server.json ./
 COPY registry ./registry
 

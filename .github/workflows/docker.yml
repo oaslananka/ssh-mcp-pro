@@ -63,6 +63,19 @@ jobs:
           docker run --rm ssh-mcp-pro:local --version
           docker run --rm ssh-mcp-pro:local --help
 
+      - name: Smoke installer assets match source
+        run: |
+          set -euo pipefail
+          for script in scripts/install-agent.sh scripts/install-agent.ps1; do
+            source_sha="$(sha256sum "$script" | cut -d' ' -f1)"
+            image_sha="$(docker run --rm --network none --read-only --cap-drop ALL \
+              --entrypoint /bin/busybox ssh-mcp-pro:local sha256sum "$script" | cut -d' ' -f1)"
+            if [[ "$image_sha" != "$source_sha" ]]; then
+              echo "::error::Missing or stale installer asset in runtime image: $script"
+              exit 1
+            fi
+          done
+
       - name: Smoke image labels
         run: |
           set -euo pipefail
