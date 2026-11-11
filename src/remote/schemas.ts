@@ -87,6 +87,7 @@ export const actionResultEnvelopeSchema = z
     started_at: z.iso.datetime(),
     finished_at: z.iso.datetime(),
     truncated: z.boolean(),
+    next_offset_bytes: z.number().int().nonnegative().optional(),
     error_code: errorCodeSchema.optional(),
     message: z.string().optional(),
     signature: z.string().min(1),

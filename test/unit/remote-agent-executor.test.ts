@@ -499,6 +499,140 @@ describe("remote agent executor", () => {
     expect(result.exit_code).toBe(124);
   });
 
+  test("reads large authorized text files in bounded pages with resumable byte offsets", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-paged-"));
+    const target = path.join(dir, "long.txt");
+    writeFileSync(target, "abcdefghijklmnopqrstuvwxyz");
+    const key = generateEd25519PemKeyPair();
+    const policy = mergeCustomPolicy({
+      capabilities: { "files.read": true },
+      allowPaths: [dir.replace(/\\/gu, "/")],
+      denyPaths: ["/"],
+      maxOutputBytes: 8,
+    });
+    const executor = new AgentExecutor(policy, key.privateKeyPem);
+    const first = await executor.execute(
+      action("file_read", "files.read", {
+        path: target,
+        offset_bytes: 0,
+        max_bytes: 5,
+      }),
+    );
+    expect(first).toMatchObject({
+      status: "ok",
+      stdout: "abcde",
+      truncated: true,
+      next_offset_bytes: 5,
+    });
+    const second = await executor.execute(
+      action("file_read", "files.read", {
+        path: target,
+        offset_bytes: first.next_offset_bytes,
+        max_bytes: 20,
+      }),
+    );
+    expect(second).toMatchObject({
+      status: "ok",
+      stdout: "fghijklm",
+      truncated: true,
+      next_offset_bytes: 13,
+    });
+    expect(verifyEnvelope(second as unknown as Record<string, unknown>, key.publicKeyPem)).toBe(
+      true,
+    );
+    const last = await executor.execute(
+      action("file_read", "files.read", {
+        path: target,
+        offset_bytes: 24,
+        max_bytes: 8,
+      }),
+    );
+    expect(last).toMatchObject({ status: "ok", stdout: "yz", truncated: false });
+    expect(last.next_offset_bytes).toBeUndefined();
+  });
+
+  test("keeps UTF-8 characters intact and refuses pages too small to make progress", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-utf8-page-"));
+    const target = path.join(dir, "utf8.txt");
+    writeFileSync(target, "ab🙂cd");
+    const key = generateEd25519PemKeyPair();
+    const policy = mergeCustomPolicy({
+      capabilities: { "files.read": true },
+      allowPaths: [dir.replace(/\\/gu, "/")],
+      denyPaths: ["/"],
+      maxOutputBytes: 16,
+    });
+    const executor = new AgentExecutor(policy, key.privateKeyPem);
+    const first = await executor.execute(
+      action("file_read", "files.read", {
+        path: target,
+        offset_bytes: 0,
+        max_bytes: 5,
+      }),
+    );
+    expect(first).toMatchObject({
+      status: "ok",
+      stdout: "ab",
+      truncated: true,
+      next_offset_bytes: 2,
+    });
+    const second = await executor.execute(
+      action("file_read", "files.read", {
+        path: target,
+        offset_bytes: 2,
+        max_bytes: 5,
+      }),
+    );
+    expect(second).toMatchObject({
+      status: "ok",
+      stdout: "🙂c",
+      truncated: true,
+      next_offset_bytes: 7,
+    });
+    const tooSmall = await executor.execute(
+      action("file_read", "files.read", {
+        path: target,
+        offset_bytes: 2,
+        max_bytes: 3,
+      }),
+    );
+    expect(tooSmall).toMatchObject({ status: "error", error_code: "POLICY_DENIED" });
+  });
+
+  test("rejects invalid page arguments and preserves path authorization", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-paged-errors-"));
+    const target = path.join(dir, "safe.txt");
+    writeFileSync(target, "safe");
+    const key = generateEd25519PemKeyPair();
+    const policy = mergeCustomPolicy({
+      capabilities: { "files.read": true },
+      allowPaths: [dir.replace(/\\/gu, "/")],
+      denyPaths: ["/"],
+      maxOutputBytes: 64,
+    });
+    const executor = new AgentExecutor(policy, key.privateKeyPem);
+    for (const args of [
+      { offset_bytes: -1 },
+      { max_bytes: 0 },
+      { max_bytes: "64" },
+      { offset_bytes: 1.5 },
+    ]) {
+      const result = await executor.execute(
+        action("file_read", "files.read", { path: target, ...args }),
+      );
+      expect(result.status).toBe("error");
+      expect(result.error_code).toBe("POLICY_DENIED");
+    }
+    const denied = await executor.execute(
+      action("file_read", "files.read", {
+        path: path.join(os.tmpdir(), "outside-allowed.txt"),
+        offset_bytes: 0,
+        max_bytes: 8,
+      }),
+    );
+    expect(denied).toMatchObject({ status: "error", error_code: "POLICY_DENIED" });
+  });
+
   test("streams file reads up to the configured output limit", async () => {
     const tempDir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-"));
     const target = path.join(tempDir, "large.txt");

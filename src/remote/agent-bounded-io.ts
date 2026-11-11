@@ -99,6 +99,49 @@ export async function readFileBounded(
   return truncateBuffer(buffer, cappedBytes);
 }
 
+/**
+ * Read one page using byte offsets without buffering the entire file.
+ * Unlike a legacy read, a page must not include a truncation marker in text.
+ * Valid UTF-8 is kept at code-point boundaries when a page ends mid-character.
+ */
+export async function readFilePageBounded(
+  file: FileHandle,
+  offsetBytes: number,
+  maxBytes: number,
+): Promise<{ value: Buffer; truncated: boolean; nextOffsetBytes?: number }> {
+  const raw = await readHandleRange(file, offsetBytes, maxBytes + 1);
+  let page = raw.subarray(0, maxBytes);
+  let truncated = raw.byteLength > maxBytes;
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let validPage = false;
+  for (let removed = 0; removed <= (truncated ? Math.min(3, page.byteLength) : 0); removed += 1) {
+    try {
+      decoder.decode(page.subarray(0, page.byteLength - removed));
+      page = page.subarray(0, page.byteLength - removed);
+      validPage = true;
+      break;
+    } catch {
+      // A UTF-8 code point may cross the page boundary.
+    }
+  }
+  if (!validPage || (truncated && page.byteLength === 0)) {
+    throw Object.assign(
+      new Error(
+        "Page cannot advance at this UTF-8 boundary; increase max_bytes or use a valid offset",
+      ),
+      {
+        code: "POLICY_DENIED" as const,
+      },
+    );
+  }
+  truncated ||= page.byteLength < raw.byteLength;
+  return {
+    value: page,
+    truncated,
+    ...(truncated && page.byteLength > 0 ? { nextOffsetBytes: offsetBytes + page.byteLength } : {}),
+  };
+}
+
 const TAIL_SCAN_CHUNK_BYTES = 64 * 1024;
 const MAX_TAIL_SCAN_BYTES = 8 * 1024 * 1024;
 

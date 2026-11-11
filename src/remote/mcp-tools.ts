@@ -186,11 +186,16 @@ const descriptors: Record<
     },
   },
   file_read: {
-    description: "Read a bounded text file from an allowed path.",
+    description: "Read an allowed text file; optional byte offsets and limits page large files.",
     inputSchema: {
       type: "object",
       required: ["agent_id_or_alias", "path"],
-      properties: { agent_id_or_alias: agentSelector, path: { type: "string", minLength: 1 } },
+      properties: {
+        agent_id_or_alias: agentSelector,
+        path: { type: "string", minLength: 1 },
+        offset_bytes: { type: "integer", minimum: 0, maximum: 2147483647 },
+        max_bytes: { type: "integer", minimum: 4, maximum: 1048576 },
+      },
       additionalProperties: false,
     },
   },
