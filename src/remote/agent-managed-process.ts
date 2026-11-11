@@ -1,6 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { access } from "node:fs/promises";
+import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import type { AgentPolicy, RemoteErrorCode } from "./types.js";
 
@@ -70,7 +71,14 @@ function terminateTree(child: ChildProcessWithoutNullStreams): void {
     return;
   }
   if (process.platform === "win32") {
-    const killer = spawn("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], {
+    // Never resolve a privileged OS utility through a potentially writable PATH.
+    const configuredRoot = process.env.SystemRoot;
+    const windowsRoot =
+      configuredRoot && /^[A-Za-z]:\\Windows$/iu.test(configuredRoot)
+        ? configuredRoot
+        : String.raw`C:\Windows`;
+    const taskkill = path.win32.join(windowsRoot, "System32", "taskkill.exe");
+    const killer = spawn(taskkill, ["/PID", String(child.pid), "/T", "/F"], {
       windowsHide: true,
       stdio: "ignore",
     });
