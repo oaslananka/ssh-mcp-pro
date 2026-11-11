@@ -114,6 +114,26 @@ enrollment, **not** live connectivity. In the dashboard, open **Enrolled
 Devices** and verify the device reports **Live Online**. The audit log
 should contain `enrollment_token_created` and `agent_connected`.
 
+## Find files after connecting a device
+
+Once a device is **Live Online** with an `operations` or explicitly
+file-read-enabled policy, you can ask your MCP client:
+
+> Find JSON configuration files on my connected device.
+
+The hosted `file_search` tool needs the device alias and a `name_pattern`
+such as `*.json` or `config`. You do not need to know the complete file path.
+It searches the local policy's allowed folders by default, or you can specify
+an allowed `root_path` to narrow the search. Results contain file paths only,
+not file contents; use `file_read` to inspect a selected file afterward.
+
+Searches default to depth 3 and up to 20 matches. At most 2,000 entries,
+128 directories, depth 5 and 50 matches are considered per invocation.
+Hidden files are excluded unless requested. The response marks incomplete
+searches as truncated; narrow the root or pattern for more precise results.
+The agent skips symbolic links and does not search paths denied by its local
+policy. Read-only profiles do not gain file access automatically.
+
 ## Changing a policy later
 
 Capabilities are server-authoritative and pushed live to a connected agent —

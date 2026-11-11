@@ -185,6 +185,33 @@ const descriptors: Record<
       additionalProperties: false,
     },
   },
+  file_search: {
+    description:
+      "Find file names in locally allowed folders without reading file contents. Optional root_path narrows the search; results and scan depth are bounded.",
+    inputSchema: {
+      type: "object",
+      required: ["agent_id_or_alias", "name_pattern"],
+      properties: {
+        agent_id_or_alias: agentSelector,
+        name_pattern: {
+          type: "string",
+          minLength: 1,
+          maxLength: 100,
+          description:
+            "Case-insensitive name fragment or * / ? wildcard pattern; cannot contain directory separators.",
+        },
+        root_path: {
+          type: "string",
+          minLength: 1,
+          description: "Optional allowed folder. Omit to search all policy-allowed roots.",
+        },
+        max_depth: { type: "integer", minimum: 0, maximum: 5, default: 3 },
+        max_results: { type: "integer", minimum: 1, maximum: 50, default: 20 },
+        include_hidden: { type: "boolean", default: false },
+      },
+      additionalProperties: false,
+    },
+  },
   file_read: {
     description: "Read an allowed text file; optional byte offsets and limits page large files.",
     inputSchema: {
@@ -284,6 +311,7 @@ const READ_ONLY_REMOTE_TOOLS = new Set<RemoteToolName>([
   "tail_logs",
   "docker_ps",
   "docker_logs",
+  "file_search",
   "file_read",
   "get_audit_events",
 ]);
