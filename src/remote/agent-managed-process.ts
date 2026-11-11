@@ -74,7 +74,7 @@ function terminateTree(child: ChildProcessWithoutNullStreams): void {
     // Never resolve a privileged OS utility through a potentially writable PATH.
     const configuredRoot = process.env.SystemRoot;
     const windowsRoot =
-      configuredRoot && /^[A-Za-z]:\\Windows$/iu.test(configuredRoot)
+      configuredRoot && /^[A-Z]:\\Windows$/iu.test(configuredRoot)
         ? configuredRoot
         : String.raw`C:\Windows`;
     const taskkill = path.win32.join(windowsRoot, "System32", "taskkill.exe");
