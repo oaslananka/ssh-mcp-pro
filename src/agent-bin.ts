@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { runAgentCli } from "./remote/agent-cli.js";
+import { runAgentCliWithReconnect } from "./remote/agent-cli.js";
 
 try {
-  await runAgentCli(process.argv.slice(2));
+  await runAgentCliWithReconnect(process.argv.slice(2));
 } catch (error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   process.stderr.write(`${message}\n`);

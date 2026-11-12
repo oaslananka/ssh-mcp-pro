@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, vi, test } from "vitest";
-import { runAgentCli } from "../../src/remote/agent-cli.js";
+import { runAgentCli, runAgentCliWithReconnect } from "../../src/remote/agent-cli.js";
 import { AgentActivityLog, readAgentActivity } from "../../src/remote/agent-activity-log.js";
 import {
   generateEd25519PemKeyPair,
@@ -433,6 +433,62 @@ describe("remote agent CLI", () => {
     );
   });
 
+  test("treats a policy-denied socket close as non-retryable", async () => {
+    const config = agentConfigPath();
+    writeAgentConfig(config, {});
+    class PolicyDeniedSocket {
+      onopen: (() => void) | null = null;
+      onmessage: ((event: { data: unknown }) => void) | null = null;
+      onerror: ((event: unknown) => void) | null = null;
+      onclose: ((event: { code: number }) => void) | null = null;
+      constructor(readonly url: string) {
+        queueMicrotask(() => {
+          this.onerror?.(new Error("socket failed"));
+          this.onclose?.({ code: 1008 });
+        });
+      }
+      send(_data: string): void {}
+      close(): void {}
+    }
+    (globalThis as { WebSocket?: unknown }).WebSocket = PolicyDeniedSocket;
+
+    await expect(
+      runAgentCliWithReconnect(["run"], runAgentCli, async () => {
+        throw new Error("Unexpected reconnect after policy denial");
+      }),
+    ).rejects.toThrow("Agent connection rejected by server");
+  });
+  test("releases a failed socket when an error has no close event", async () => {
+    const config = agentConfigPath();
+    writeAgentConfig(config, {});
+    let socket: ErrorOnlySocket | undefined;
+    class ErrorOnlySocket {
+      onopen: (() => void) | null = null;
+      onmessage: ((event: { data: unknown }) => void) | null = null;
+      onerror: ((event: unknown) => void) | null = null;
+      onclose: (() => void) | null = null;
+      closed = false;
+      constructor(readonly url: string) {
+        socket = this;
+        queueMicrotask(() => this.onerror?.(new Error("transport unreachable")));
+      }
+      send(_data: string): void {}
+      close(): void {
+        this.closed = true;
+      }
+    }
+    (globalThis as { WebSocket?: unknown }).WebSocket = ErrorOnlySocket;
+    vi.useFakeTimers();
+    try {
+      const runPromise = runAgentCli(["run"]);
+      const rejection = expect(runPromise).rejects.toThrow("WebSocket transport error");
+      await vi.advanceTimersByTimeAsync(2_000);
+      await rejection;
+      expect(socket?.closed).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   test("run connects outbound, sends a signed hello, and signs action results", async () => {
     const configPath = agentConfigPath();
     const agentKeys = generateEd25519PemKeyPair();
@@ -553,6 +609,7 @@ describe("remote agent CLI", () => {
         "disconnected",
       ]),
     );
+    expect(events.find((item) => item.event === "disconnected")?.message).toMatch(/reconnect/iu);
     expect(JSON.stringify(events)).not.toContain("agent-ok");
     expect(JSON.stringify(events)).not.toContain("process.stdout.write");
   });
