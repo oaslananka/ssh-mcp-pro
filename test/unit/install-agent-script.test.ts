@@ -233,6 +233,68 @@ describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
       };
     }
 
+    test("bootstraps user-local Node when an existing Node is missing or unusable, without root", () => {
+      const mock = setupInstaller(true);
+      try {
+        const localNode = path.join(mock.root, "private-node");
+        mkdirSync(localNode);
+        writeFileSync(
+          path.join(localNode, "node"),
+          '#!/usr/bin/env bash\nexec "' + process.execPath + '" "$@"\n',
+          { mode: 0o755 },
+        );
+        writeFileSync(
+          path.join(localNode, "npm"),
+          [
+            "#!/usr/bin/env bash",
+            'case "$1" in',
+            '  prefix) printf "%s\\n" "$MOCK_NPM_PREFIX" ;;',
+            '  install) printf "installed\\n" >> "$MOCK_INSTALL_LOG" ;;',
+            "  *) exit 13 ;;",
+            "esac",
+          ].join("\n") + "\n",
+          { mode: 0o755 },
+        );
+        const localScript = path.join(mock.root, "install-agent.sh");
+        writeFileSync(localScript, readFileSync(script, "utf8"));
+        writeFileSync(
+          path.join(mock.root, "bootstrap-node-lts.sh"),
+          'bootstrap_node_lts() { printf "%s\\n" "$MOCK_PRIVATE_NODE"; }\n',
+        );
+        const shadowNode = path.join(mock.root, "shims", "node");
+        writeFileSync(shadowNode, "#!/usr/bin/env bash\nexit 1\n", { mode: 0o755 });
+
+        const result = spawnSync(
+          "bash",
+          [
+            localScript,
+            "--server",
+            "https://example.invalid",
+            "--token",
+            "placeholder",
+            "--alias",
+            "linux-test",
+          ],
+          {
+            encoding: "utf8",
+            timeout: 5_000,
+            env: { ...mock.env, MOCK_PRIVATE_NODE: path.join(localNode, "node") },
+          },
+        );
+        expect(result.status, result.stderr).toBe(0);
+        expect(readFileSync(mock.enrollLog, "utf8")).toContain("enroll --server");
+        expect(readFileSync(mock.serviceState, "utf8")).toBe("restarted\n");
+        expect(
+          readFileSync(
+            path.join(mock.home, ".config/systemd/user/ssh-mcp-pro-agent.service"),
+            "utf8",
+          ),
+        ).toContain(path.join(localNode, "node"));
+      } finally {
+        mock.cleanup();
+      }
+    });
+
     test("uses npm's global prefix/bin even when absent from PATH", () => {
       const mock = setupInstaller(true);
       try {

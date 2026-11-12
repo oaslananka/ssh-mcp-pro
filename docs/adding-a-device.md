@@ -72,12 +72,16 @@ returned token with the installer in Step 2 or the returned npm commands.
 ## Step 2 — Run the bootstrap on the new device
 
 The Linux/Windows bootstrap installs the package, enrolls the machine, and
-registers startup so the agent reconnects after restarts. It requires a
-supported Node.js runtime (22.22+ or a newer LTS). On Windows, if Node.js is
-missing, the installer attempts to install the official Active LTS through
-Windows Package Manager (WinGet). The dashboard-generated command is the
-shortest path; the manual commands below are alternatives if you already have
-a one-time token.
+registers startup so the agent reconnects after restarts. On Linux/WSL,
+the user-mode installer automatically installs verified **Node 26 LTS** into
+the user's private directory if Node.js/npm is missing or too old. It checks
+the official Node.js release signature and SHA-256 checksum before using the
+binary; no sudo, system-wide Node changes or additional commands are needed.
+System-wide Linux services still require a trusted system-installed Node
+runtime. On Windows, if Node.js is missing, the installer attempts to install
+the official Active LTS through Windows Package Manager (WinGet). The
+dashboard-generated command is the shortest path; the manual commands below
+are alternatives if you already have a one-time token.
 
 ### Linux / WSL
 
@@ -117,9 +121,12 @@ for Windows administrator approval (UAC). Nothing bypasses that prompt. The
 installer refreshes its own PATH and continues automatically when Node is
 available. If WinGet is unavailable or the user declines installation, the
 script exits with actionable guidance to install Node LTS from
-https://nodejs.org/en/download and rerun the command. An *outdated* Node
-installation is not silently upgraded. Linux/WSL still requires Node
-installed beforehand.
+https://nodejs.org/en/download and rerun the command. An *outdated* Windows Node
+installation is not silently upgraded. On Linux/WSL, the user-scope fallback
+also requires curl, tar, SHA-256 and GPG signature-verification tools; it
+reports missing prerequisites rather than running unverified downloads.
+The Node runtime and npm-installed agent are kept under
+~/.local/share/ssh-mcp-pro/, outside system locations.
 
 ### Repair an existing Windows agent task
 
