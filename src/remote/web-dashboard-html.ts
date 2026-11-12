@@ -1,3 +1,4 @@
+import { buildDashboardBrowserEnrollmentCommand } from "./dashboard-enrollment-commands.js";
 import { DASHBOARD_STYLES } from "./web-dashboard-styles.js";
 import { DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT } from "./dashboard-enrollment-feedback-script.js";
 export function renderDashboardHtml(
@@ -33,6 +34,7 @@ export function renderDashboardHtml(
     const INITIAL_USER = JSON.parse(atob("${initialUserBase64}"));
     const MCP_URL = ${mcpUrlJson};
     const PUBLIC_URL = ${publicUrlJson};
+    const BROWSER_LINUX_COMMAND = ${JSON.stringify(buildDashboardBrowserEnrollmentCommand(JSON.parse(publicUrlJson) as string))};
 
     let currentUser = INITIAL_USER;
     let activeTab = 'devices';
@@ -185,7 +187,15 @@ export function renderDashboardHtml(
         return \`
           <div class="card">
             <h2 style="margin-bottom:12px;">Enroll New Device</h2>
-            <p style="color:var(--text-muted); font-size:14px; margin-bottom:24px;">Generate an enrollment token and install the outbound agent on your target server.</p>
+            <p style="color:var(--text-muted); font-size:14px; margin-bottom:24px;">\${localBrowserLink ? 'Approve the local agent waiting in your terminal. The one-time credential stays inside your browser and device; do not copy it into chat.' : 'Generate a one-time install command and run it on your target device.'}</p>
+            <div style="display:\${localBrowserLink ? 'none' : 'block'}; margin-bottom:20px; padding:14px; border:1px solid var(--card-border); border-radius:8px;">
+              <h3 style="margin-bottom:8px;">Linux / WSL: Set up with your browser</h3>
+              <p style="color:var(--text-muted); font-size:13px; margin-bottom:12px;">Copy this command to the device you want to enroll. Open the URL printed in its terminal in a browser on that same device, sign in and approve. No token copying or sudo required.</p>
+              <div class="code-box">
+                <button type="button" class="copy-btn" aria-live="polite" aria-label="Copy token-free Linux browser setup" onclick="copySnippet('cmdBrowser')">Copy</button>
+                <span id="cmdBrowser">\${escapeHtml(BROWSER_LINUX_COMMAND)}</span>
+              </div>
+            </div>
             <div style="display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap;">
               <div style="flex:1; min-width:240px;">
                 <label for="enrollAlias" style="display:block; font-size:13px; font-weight:600; margin-bottom:6px;">Device Alias</label>
@@ -200,12 +210,13 @@ export function renderDashboardHtml(
                 </select>
               </div>
             </div>
-            <button id="generateEnrollmentButton" type="button" class="btn btn-primary" onclick="generateEnrollment()">Generate Install Command</button>
+            <button id="generateEnrollmentButton" type="button" class="btn btn-primary" onclick="generateEnrollment()">\${localBrowserLink ? 'Approve This Device' : 'Generate Install Command'}</button>
             <p id="enrollError" role="alert" hidden style="color:var(--danger, #f85149); margin-top:12px;"></p>
 
             <div id="enrollOutput" style="margin-top:24px; display:none;">
               <p id="enrollStatus" role="status" aria-live="polite" style="margin-bottom:12px; color:var(--text-muted);"></p>
               <button id="enrollViewDevice" type="button" class="btn btn-primary" hidden style="display:none; margin-bottom:16px;" onclick="switchTab('devices')">View connected device</button>
+              <div id="manualInstallCommands" style="display:\${localBrowserLink ? 'none' : 'block'};">
               <h3 style="margin-bottom:12px; color:#fff;">One-Liner Installation Commands:</h3>
 
               <div style="margin-bottom:16px;">
@@ -231,6 +242,7 @@ export function renderDashboardHtml(
                   <button type="button" class="copy-btn" aria-live="polite" aria-label="Copy Node install command" onclick="copySnippet('cmdNpm')">Copy</button>
                   <span id="cmdNpm"></span>
                 </div>
+              </div>
               </div>
             </div>
           </div>

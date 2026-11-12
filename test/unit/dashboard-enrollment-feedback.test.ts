@@ -17,14 +17,29 @@ interface TestElement {
   focus: () => void;
 }
 
-function browserHarness() {
+function browserHarness(
+  options: {
+    local?: boolean;
+    localAvailable?: boolean;
+    permission?: "granted" | "prompt" | "denied";
+  } = {},
+) {
   const nodes = new Map<string, TestElement>();
   const intervals = new Map<number, () => void>();
-  const data: { devices: Device[]; error: string | null; polls: number; creates: number } = {
+  const data: {
+    devices: Device[];
+    error: string | null;
+    polls: number;
+    creates: number;
+    handoffs: unknown[];
+    localFetchOptions: unknown[];
+  } = {
     devices: [],
     error: null,
     polls: 0,
     creates: 0,
+    handoffs: [],
+    localFetchOptions: [],
   };
   let nextTimerId = 1;
   const node = (id: string): TestElement => {
@@ -56,7 +71,28 @@ function browserHarness() {
   expect(start).toBeGreaterThanOrEqual(0);
   expect(end).toBeGreaterThan(start);
   const script = html.slice(start + openingScript.length, end);
+  const localState = "a".repeat(43);
+  const locationSearch = options.local
+    ? "?local_enroll_port=42712&local_enroll_state=" + localState + "&local_enroll_alias=local-wsl"
+    : "";
+  const stored = new Map<string, string>();
   const context = createContext({
+    window: {
+      location: { search: locationSearch, pathname: "/dashboard" },
+      history: { replaceState() {} },
+      sessionStorage: {
+        getItem: (key: string) => stored.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          stored.set(key, value);
+        },
+        removeItem: (key: string) => {
+          stored.delete(key);
+        },
+      },
+    },
+    URLSearchParams,
+    Date,
+
     atob: (value: string) => Buffer.from(value, "base64").toString("utf8"),
     document: {
       getElementById: node,
@@ -71,7 +107,20 @@ function browserHarness() {
     clearInterval(id: number) {
       intervals.delete(id);
     },
-    fetch: async (url: string) => {
+    fetch: async (url: string, init?: RequestInit) => {
+      if (url === "http://127.0.0.1:42712/ready") {
+        data.localFetchOptions.push(init);
+        return {
+          ok: options.localAvailable !== false,
+          status: options.localAvailable !== false ? 204 : 503,
+        };
+      }
+      if (url === "http://127.0.0.1:42712/enroll") {
+        data.localFetchOptions.push(init);
+        data.handoffs.push(JSON.parse(String(init?.body)));
+        return { ok: true, status: 200 };
+      }
+
       if (url === "/api/dashboard/devices/enroll") {
         data.creates += 1;
         if (data.error)
@@ -81,6 +130,7 @@ function browserHarness() {
           status: 201,
           json: async () => ({
             agent_id: "agent-new",
+            enrollment_token: "enr_0123456789abcdefghijklmnopqrstuvwxyzABC",
             commands: { linux: "linux command", windows: "windows command", npm: "npm command" },
           }),
         };
@@ -95,7 +145,14 @@ function browserHarness() {
     alert: (message: string) => {
       throw new Error("Unexpected alert: " + message);
     },
-    navigator: {},
+    navigator: {
+      permissions: {
+        query: async ({ name }: { name: string }) => {
+          expect(name).toBe("loopback-network");
+          return { state: options.permission ?? "prompt" };
+        },
+      },
+    },
   });
   runInContext(script, context, { timeout: 1_000 });
 
@@ -106,6 +163,45 @@ function browserHarness() {
     run: (code: string) => runInContext(code, context, { timeout: 1_000 }) as Promise<void>,
   };
 }
+
+describe("Dashboard same-device browser enrollment", () => {
+  test("sends a one-time credential only to the approved local listener, never to displayed commands", async () => {
+    const page = browserHarness({ local: true });
+    await page.run("generateEnrollment()");
+    expect(page.data.creates).toBe(1);
+    expect(page.data.localFetchOptions).toEqual([
+      expect.objectContaining({ targetAddressSpace: "loopback" }),
+      expect.objectContaining({ targetAddressSpace: "loopback" }),
+    ]);
+    expect(page.data.handoffs).toEqual([
+      {
+        state: "a".repeat(43),
+        token: "enr_0123456789abcdefghijklmnopqrstuvwxyzABC",
+      },
+    ]);
+    expect(page.node("cmdLinux").textContent).toBe("");
+    expect(page.node("cmdWindows").textContent).toBe("");
+    expect(page.node("manualInstallCommands").style.display).toBe("none");
+    expect(page.node("enrollStatus").textContent).toMatch(/waiting|online|connect/i);
+  });
+
+  test("explains denied loopback browser permission without generating a pending device", async () => {
+    const page = browserHarness({ local: true, permission: "denied" });
+    await page.run("generateEnrollment()");
+    expect(page.data.creates).toBe(0);
+    expect(page.data.handoffs).toHaveLength(0);
+    expect(page.node("enrollError").textContent).toMatch(/Loopback network access/u);
+    expect(page.node("enrollError").textContent).toMatch(/Site settings/u);
+  });
+
+  test("does not create a pending server device if the local browser listener cannot be reached", async () => {
+    const page = browserHarness({ local: true, localAvailable: false });
+    await page.run("generateEnrollment()");
+    expect(page.data.creates).toBe(0);
+    expect(page.data.handoffs).toHaveLength(0);
+    expect(page.node("enrollError").textContent).toMatch(/local|device|browser/i);
+  });
+});
 
 describe("Dashboard first-run live connection feedback", () => {
   test("explains that the advanced Node CLI does not provide unattended restart", () => {
