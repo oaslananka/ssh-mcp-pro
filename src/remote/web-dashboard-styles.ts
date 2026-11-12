@@ -149,6 +149,8 @@ export const DASHBOARD_STYLES = `
     }
     .device-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; flex-wrap: wrap; overflow-wrap: anywhere; gap: 8px; }
     .device-meta { font-size: 13px; color: var(--text-muted); font-family: var(--font-mono); overflow-wrap: anywhere; }
+    .device-scope-note { font-size: 13px; color: var(--text-muted); margin: 0 0 16px; line-height: 1.5; }
+    .device-scope-note strong { color: var(--text); }
     .device-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 
     /* Code block */

@@ -88,6 +88,7 @@ export function renderDashboardHtml(
           <button type="button" data-dashboard-tab="audit" aria-pressed="\${activeTab === 'audit'}" class="tab-item \${activeTab === 'audit' ? 'active' : ''}" onclick="switchTab('audit')">📜 Audit Log</button>
         </nav>
 
+        \${activeTab === 'devices' ? '<p class="device-scope-note" role="note">Device access is scoped to your <strong>' + escapeHtml(currentUser.provider === 'github' ? 'GitHub' : 'Google') + '</strong> sign-in. Switching sign-in providers shows a different device list.</p>' : ''}
         <div id="tabContent">
           \${renderTabContent()}
         </div>
@@ -120,6 +121,7 @@ export function renderDashboardHtml(
               Sign in with GitHub
             </a>
           </div>
+          <p class="device-scope-note" style="text-align:center; margin-top:12px;">Use the same Google or GitHub sign-in to see your enrolled devices.</p>
         </div>
 
         <div class="grid-2">

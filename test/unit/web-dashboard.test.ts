@@ -72,6 +72,18 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       });
       expect(res.body).toContain(".mcp.json");
       expect(res.body).toContain('aria-label="Dashboard sections"');
+      expect(res.body).toContain("Device access is scoped to your ");
+      expect(res.body).toContain("Switching sign-in providers shows a different device list.");
+      const providerHintAt = res.body.indexOf("Device access is scoped to your ");
+      const replaceableDevicePanelAt = res.body.indexOf('<div id="tabContent">');
+      expect(providerHintAt).toBeGreaterThan(0);
+      expect(providerHintAt).toBeLessThan(replaceableDevicePanelAt);
+      expect(res.body).toContain(
+        "escapeHtml(currentUser.provider === 'github' ? 'GitHub' : 'Google')",
+      );
+      expect(res.body).toContain(
+        "Use the same Google or GitHub sign-in to see your enrolled devices.",
+      );
       for (const tab of ["devices", "add-device", "clients", "audit"]) {
         expect(res.body).toContain('data-dashboard-tab="' + tab + '"');
       }
