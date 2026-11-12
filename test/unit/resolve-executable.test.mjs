@@ -1,9 +1,26 @@
-import { chmodSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+﻿import { chmodSync, mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import { resolveExecutableOnPath } from "../../scripts/lib/resolve-executable.mjs";
 
+/** File symlinks require Developer Mode or explicit privileges on Windows. */
+function canCreateFileSymlinks() {
+  if (process.platform !== "win32") return true;
+  const probe = mkdtempSync(join(tmpdir(), "ssh-mcp-symlink-capability-"));
+  try {
+    const target = join(probe, "target");
+    writeFileSync(target, "test-only");
+    symlinkSync(target, join(probe, "alias"));
+    return true;
+  } catch (error) {
+    if (error?.code === "EPERM" || error?.code === "EACCES") return false;
+    throw error;
+  } finally {
+    rmSync(probe, { recursive: true, force: true });
+  }
+}
+const canTestFileSymlinks = canCreateFileSymlinks();
 const directories = [];
 function fixture() {
   const directory = mkdtempSync(join(tmpdir(), "ssh-mcp-resolve-cli-"));
@@ -60,12 +77,15 @@ describe("resolve the two trusted maintenance CLIs", () => {
     expect(resolveExecutableOnPath("gh", [unsafe, safe].join(delimiter))).toBe(preferred);
   });
 
-  test("accepts a standard executable symlink within a trusted directory", () => {
-    const binDir = fixture();
-    const target = executable(binDir, "original");
-    symlinkSync(target, join(binDir, "ssh-mcp-pro"));
-    expect(resolveExecutableOnPath("ssh-mcp-pro", binDir)).toBe(target);
-  });
+  test.skipIf(!canTestFileSymlinks)(
+    "accepts a standard executable symlink within a trusted directory",
+    () => {
+      const binDir = fixture();
+      const target = executable(binDir, "original");
+      symlinkSync(target, join(binDir, "ssh-mcp-pro"));
+      expect(resolveExecutableOnPath("ssh-mcp-pro", binDir)).toBe(target);
+    },
+  );
 
   test.skipIf(process.platform === "win32")(
     "rejects a symlink into a world-writable target directory",

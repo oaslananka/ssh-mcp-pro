@@ -1,4 +1,9 @@
-import { exec, spawnSync } from "node:child_process";
+﻿import { exec, spawnSync } from "node:child_process";
+import { once } from "node:events";
+import { WebSocketServer, type WebSocket } from "ws";
+import { runAgentCliWithReconnect } from "../../src/remote/agent-cli.js";
+import { generateEd25519PemKeyPair, verifyEnvelope } from "../../src/remote/crypto.js";
+import { createAgentPolicy } from "../../src/remote/policy.js";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
@@ -311,4 +316,115 @@ if ($null -eq $global:sshMcpSmokeRegistered -or $null -eq $global:sshMcpSmokeSta
       expect(execSudo).not.toHaveBeenCalled();
     },
   );
+  test("reconnects real Windows WebSocket after listener outage and stops on 1008 denial", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ssh-mcp-windows-socket-"));
+    const originalConfig = process.env.SSHAUTOMATOR_AGENT_CONFIG;
+    const agentKeys = generateEd25519PemKeyPair();
+    const controlKeys = generateEd25519PemKeyPair();
+    const agentId = "agt_disposable_network_probe";
+    let firstServer = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+    let recoveredServer: WebSocketServer | undefined;
+    let firstClosed = false;
+    let signedHellos = 0;
+    let validSignatures = true;
+    let listenerRestored = false;
+    const connectedAt: number[] = [];
+
+    try {
+      await once(firstServer, "listening");
+      const address = firstServer.address();
+      if (!address || typeof address === "string") {
+        throw new Error("Unable to reserve isolated localhost port");
+      }
+      const port = address.port;
+      const configuration = join(dir, "agent.json");
+      writeFileSync(
+        configuration,
+        JSON.stringify({
+          server: "http://127.0.0.1:" + port,
+          websocketUrl: "ws://127.0.0.1:" + port + "/api/agents/connect",
+          agentId,
+          alias: "disposable-windows-agent",
+          publicKeyPem: agentKeys.publicKeyPem,
+          privateKeyPem: agentKeys.privateKeyPem,
+          controlPlanePublicKeyPem: controlKeys.publicKeyPem,
+          policy: createAgentPolicy("read-only"),
+          enrolledAt: new Date().toISOString(),
+        }),
+        { mode: 0o600 },
+      );
+      process.env.SSHAUTOMATOR_AGENT_CONFIG = configuration;
+
+      const onConnection = (socket: WebSocket): void => {
+        socket.once("message", (data) => {
+          let hello: Record<string, unknown>;
+          try {
+            hello = JSON.parse(String(data)) as Record<string, unknown>;
+          } catch {
+            validSignatures = false;
+            socket.close(1008);
+            return;
+          }
+          if (
+            hello.type !== "agent.hello" ||
+            hello.agent_id !== agentId ||
+            !verifyEnvelope(hello, agentKeys.publicKeyPem)
+          ) {
+            validSignatures = false;
+            socket.close(1008);
+            return;
+          }
+          signedHellos += 1;
+          connectedAt.push(Date.now());
+          socket.send(JSON.stringify({ type: "agent.ready", agent_id: agentId }));
+
+          if (signedHellos === 1) {
+            setTimeout(() => {
+              socket.terminate();
+              firstServer.close(() => {
+                firstClosed = true;
+                setTimeout(() => {
+                  recoveredServer = new WebSocketServer({ host: "127.0.0.1", port });
+                  recoveredServer.on("connection", onConnection);
+                  recoveredServer.once("listening", () => {
+                    listenerRestored = true;
+                  });
+                }, 200);
+              });
+            }, 75);
+          } else if (signedHellos === 2) {
+            setTimeout(() => {
+              socket.close(1008, "policy denied");
+            }, 75);
+          } else {
+            validSignatures = false;
+            socket.close(1008);
+          }
+        });
+      };
+
+      firstServer.on("connection", onConnection);
+      await expect(runAgentCliWithReconnect(["run"])).rejects.toThrow(
+        "Agent connection rejected by server",
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1_200));
+      expect(firstClosed).toBe(true);
+      expect(listenerRestored).toBe(true);
+      expect(signedHellos).toBe(2);
+      expect(validSignatures).toBe(true);
+      expect(connectedAt[1]! - connectedAt[0]!).toBeGreaterThanOrEqual(950);
+    } finally {
+      if (originalConfig === undefined) {
+        delete process.env.SSHAUTOMATOR_AGENT_CONFIG;
+      } else {
+        process.env.SSHAUTOMATOR_AGENT_CONFIG = originalConfig;
+      }
+      for (const active of [firstServer, recoveredServer]) {
+        if (!active) continue;
+        for (const socket of active.clients) socket.terminate();
+        if (active !== firstServer || !firstClosed) active.close();
+      }
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 15_000);
 });
