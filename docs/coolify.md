@@ -27,3 +27,12 @@ GITHUB_CALLBACK_URL=https://ssh-mcp-pro.oaslananka.dev/oauth/callback/github
 Dashboard login callback URLs additionally use `/auth/callback/google` and `/auth/callback/github`; register both with the relevant OAuth providers. Keep authentication allowlists configured as appropriate. Do not enable anonymous access as a workaround.
 
 Before deployment verify local OAuth login, dashboard and MCP flow. After deployment check health, login callbacks, device connectivity, and persistent state across a controlled restart. Do not run the SSH test fixture service in production.
+
+## Encrypted backup recovery gate
+
+Before changing the hosted image, validate a fresh offsite encrypted SQLite
+and signing-key backup on an independent recovery host. Follow
+[offline backup restore verification](backup-restore-verification.md).
+Passing offline integrity checks alone is **not** production restore or
+rollback acceptance: demonstrate a controlled service startup and signed
+agent/client action before authorizing the release.
