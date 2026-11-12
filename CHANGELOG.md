@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.5.0...ssh-mcp-pro-v1.6.0) (2026-11-12)
+
+
+### Features
+
+* **agent:** approve Linux enrollment in local browser ([#239](https://github.com/oaslananka/ssh-mcp-pro/issues/239)) ([7ba75d4](https://github.com/oaslananka/ssh-mcp-pro/commit/7ba75d42a19a07ae2de18a7872d2fa54eb0415b8))
+* **agent:** install Node LTS on first Windows enrollment ([#219](https://github.com/oaslananka/ssh-mcp-pro/issues/219)) ([8d2f82f](https://github.com/oaslananka/ssh-mcp-pro/commit/8d2f82f8696751bcf469fd42245327d5ed4007e7))
+* **dashboard:** confirm first device is Live Online during setup ([#227](https://github.com/oaslananka/ssh-mcp-pro/issues/227)) ([7447971](https://github.com/oaslananka/ssh-mcp-pro/commit/74479716133c8d34f7233d681d58d3881b3e5f47))
+* **install:** verified Node LTS bootstrap for clean Linux and WSL ([#237](https://github.com/oaslananka/ssh-mcp-pro/issues/237)) ([600b6f3](https://github.com/oaslananka/ssh-mcp-pro/commit/600b6f3f67ffd522817719be70c7839cb864d59e))
+* **recovery:** verify encrypted backup restore offline ([#233](https://github.com/oaslananka/ssh-mcp-pro/issues/233)) ([4187749](https://github.com/oaslananka/ssh-mcp-pro/commit/41877496c8233c1c02958fc1579ba96d0745fb7c))
+* **remote:** discover allowlisted files by name ([#217](https://github.com/oaslananka/ssh-mcp-pro/issues/217)) ([0f04209](https://github.com/oaslananka/ssh-mcp-pro/commit/0f04209464fd83b2d34ca8713b244969c8aeba80))
+* **remote:** manage interactive agent processes with bounded output ([#221](https://github.com/oaslananka/ssh-mcp-pro/issues/221)) ([1beaddb](https://github.com/oaslananka/ssh-mcp-pro/commit/1beaddb1ff96f3d2bcbeb407322b0a65aa87f218))
+* **remote:** page bounded file reads with UTF-8 safe cursors ([#215](https://github.com/oaslananka/ssh-mcp-pro/issues/215)) ([cce420b](https://github.com/oaslananka/ssh-mcp-pro/commit/cce420bcda302289fc92638e778f42848218cad1))
+* **remote:** preview and apply guarded file text replacements ([#220](https://github.com/oaslananka/ssh-mcp-pro/issues/220)) ([eb3a837](https://github.com/oaslananka/ssh-mcp-pro/commit/eb3a8374942c1fe939a71f1abf3ccd130e0d9d48))
+* **remote:** search allowed file contents by literal phrase ([#223](https://github.com/oaslananka/ssh-mcp-pro/issues/223)) ([f82034d](https://github.com/oaslananka/ssh-mcp-pro/commit/f82034d1c2cbad1706effc398c8666b48f9c1df7))
+
+
+### Bug Fixes
+
+* **agent:** make Windows enrollment work with restricted PowerShell ([#218](https://github.com/oaslananka/ssh-mcp-pro/issues/218)) ([de97766](https://github.com/oaslananka/ssh-mcp-pro/commit/de977665266ea7437ad885134d37b2ccb2f69025))
+* **agent:** reconnect safely after transient remote socket loss ([#230](https://github.com/oaslananka/ssh-mcp-pro/issues/230)) ([1f79e6e](https://github.com/oaslananka/ssh-mcp-pro/commit/1f79e6ec3a915eef66668c2dda90e7afe9be706b))
+* **agent:** remove Windows scheduled task runtime cap ([#229](https://github.com/oaslananka/ssh-mcp-pro/issues/229)) ([e0956bf](https://github.com/oaslananka/ssh-mcp-pro/commit/e0956bf084b4133b278ee5d3aaf8b315f95d3b92))
+* **agent:** report failure to persist Linux user service ([#224](https://github.com/oaslananka/ssh-mcp-pro/issues/224)) ([5976050](https://github.com/oaslananka/ssh-mcp-pro/commit/59760503acc5576c49bb7d48cea9220acff5f291))
+* **agent:** report Linux status without uptime utility ([#231](https://github.com/oaslananka/ssh-mcp-pro/issues/231)) ([8868741](https://github.com/oaslananka/ssh-mcp-pro/commit/8868741439407a3dbe6d10cb57a3b06efdfd865e))
+* **dashboard:** allow browser enrollment callback to loopback ([#242](https://github.com/oaslananka/ssh-mcp-pro/issues/242)) ([7ccf4d1](https://github.com/oaslananka/ssh-mcp-pro/commit/7ccf4d13485ca99aaff9142cf0a50f9fb656c8d1))
+* **dashboard:** explain provider-scoped device inventory ([#234](https://github.com/oaslananka/ssh-mcp-pro/issues/234)) ([ac5a10c](https://github.com/oaslananka/ssh-mcp-pro/commit/ac5a10c10ee81aae54e8c1dfae03d61e66639d6a))
+* **dashboard:** show tenant-scoped device names in audit history ([#232](https://github.com/oaslananka/ssh-mcp-pro/issues/232)) ([ef0b8eb](https://github.com/oaslananka/ssh-mcp-pro/commit/ef0b8eb9398216cc88b0deaa4c8de80e58f77665))
+* **docker:** bundle installer scripts in standard runtime image ([#226](https://github.com/oaslananka/ssh-mcp-pro/issues/226)) ([ba6fffe](https://github.com/oaslananka/ssh-mcp-pro/commit/ba6fffe78877da2b7abaf2676663f15ebde36e7b))
+* **install:** clarify WSL agent lifetime after setup ([#241](https://github.com/oaslananka/ssh-mcp-pro/issues/241)) ([e1215b1](https://github.com/oaslananka/ssh-mcp-pro/commit/e1215b19d5f4870ccaf99c938f12b5525f5ee2d0))
+* **install:** explain missing system Node and npm ([#240](https://github.com/oaslananka/ssh-mcp-pro/issues/240)) ([249ee4c](https://github.com/oaslananka/ssh-mcp-pro/commit/249ee4c8f4327bfaa20e90acb09ee6c66f8208cb))
+* **remote:** describe mutation risks and output schemas ([#213](https://github.com/oaslananka/ssh-mcp-pro/issues/213)) ([c7d18f4](https://github.com/oaslananka/ssh-mcp-pro/commit/c7d18f4bcb0f9c69537277db23ce971ad051f9ec))
+* **remote:** expire abandoned pending agents ([#225](https://github.com/oaslananka/ssh-mcp-pro/issues/225)) ([43a730b](https://github.com/oaslananka/ssh-mcp-pro/commit/43a730b543ce8d8d67111dfe0391a39c57aacee4))
+* **windows:** provide tokenless legacy agent task repair ([#235](https://github.com/oaslananka/ssh-mcp-pro/issues/235)) ([5a267e8](https://github.com/oaslananka/ssh-mcp-pro/commit/5a267e8cb60a4f25b3cb0fea2911439b8774d2c5))
+
 ## [1.5.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.4.3...ssh-mcp-pro-v1.5.0) (2026-11-10)
 
 
