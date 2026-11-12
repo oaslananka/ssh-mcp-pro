@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AgentExecutor, defaultHostMetadata } from "./agent-executor.js";
+import { startLocalBrowserEnrollment } from "./agent-browser-enrollment.js";
 import {
   AgentActivityLog,
   agentActivityLogPath,
@@ -194,15 +195,7 @@ function removeTrailingSlashes(value: string): string {
   return value.slice(0, end);
 }
 
-async function enroll(argv: string[]): Promise<void> {
-  const server = removeTrailingSlashes(parseFlag(argv, "--server") ?? "");
-  const token = parseFlag(argv, "--token");
-  const alias = parseFlag(argv, "--alias") ?? os.hostname();
-  if (!server || !token) {
-    throw new Error(
-      "Usage: ssh-mcp-pro-agent enroll --server <url> --token <token> --alias <alias>",
-    );
-  }
+async function enrollWithToken(server: string, token: string, alias: string): Promise<void> {
   const keyPair: PemKeyPair = ensurePemKeyPair(keyPath());
   const response = await postJson(`${server}/api/agents/enroll`, {
     token,
@@ -231,6 +224,37 @@ async function enroll(argv: string[]): Promise<void> {
   saveConfig(config);
   output(`Agent enrolled: ${config.agentId} (${config.alias})`);
   output(`Config: ${configPath()}`);
+}
+
+async function enroll(argv: string[]): Promise<void> {
+  const server = removeTrailingSlashes(parseFlag(argv, "--server") ?? "");
+  const token = parseFlag(argv, "--token");
+  const browser = argv.includes("--browser");
+  const alias = parseFlag(argv, "--alias") ?? os.hostname();
+  if (!server || (!token && !browser) || (token !== undefined && browser)) {
+    throw new Error(
+      "Usage: ssh-mcp-pro-agent enroll --server <url> --token <token> --alias <alias> (or --browser without --token)",
+    );
+  }
+  if (!browser) {
+    await enrollWithToken(server, token!, alias);
+    return;
+  }
+  const local = await startLocalBrowserEnrollment(server, alias, async (oneTimeToken) => {
+    await enrollWithToken(server, oneTimeToken, alias);
+  });
+  output(
+    "Open this URL in a browser on this same device to approve read-only or selected device access:",
+  );
+  output(local.verificationUrl);
+  output(
+    "Waiting for browser approval; the enrollment token stays on this device (10-minute limit).",
+  );
+  try {
+    await local.finished;
+  } finally {
+    local.close();
+  }
 }
 
 /** A server-side ready acknowledgement is distinct from an open WebSocket. */
@@ -506,6 +530,7 @@ function uninstallService(): void {
 function printAgentUsage(): void {
   output("Usage:");
   output("  ssh-mcp-pro-agent enroll --server <url> --token <token> --alias <alias>");
+  output("  ssh-mcp-pro-agent enroll --server <url> --browser --alias <alias>");
   output("  ssh-mcp-pro-agent run");
   output("  ssh-mcp-pro-agent status");
   output("  ssh-mcp-pro-agent logs [--tail 60] [--follow]");

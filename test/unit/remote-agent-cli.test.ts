@@ -18,6 +18,7 @@ import type {
 } from "../../src/remote/types.js";
 import { AGENT_ENROLL_COMMAND, LEGACY_AGENT_COMMAND_PATTERN } from "./helpers.js";
 
+const fixtureEnrollmentToken = `enr_${"x".repeat(43)}`;
 const originalAgentConfig = process.env.SSHAUTOMATOR_AGENT_CONFIG;
 const originalFetch = globalThis.fetch;
 const originalWebSocket = (globalThis as { WebSocket?: unknown }).WebSocket;
@@ -143,6 +144,64 @@ describe("remote agent CLI", () => {
       "Unknown agent command",
     );
   });
+  test("browser enrollment accepts a same-device callback and persists credentials without token in URL", async () => {
+    const configPath = agentConfigPath();
+
+    const controller = generateEd25519PemKeyPair();
+    const fetchMock = vi.fn(
+      async (_url: string, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            agent_id: "agt_browser",
+            alias: "local-wsl",
+            control_plane_public_key: controller.publicKeyPem,
+            policy: createAgentPolicy("read-only"),
+            websocket_url: "wss://sshautomator.example/api/agents/connect",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
+    globalThis.fetch = fetchMock as typeof fetch;
+    const stdout = captureStdout();
+    try {
+      const pending = runAgentCli([
+        "enroll",
+        "--browser",
+        "--server",
+        "https://sshautomator.example",
+        "--alias",
+        "local-wsl",
+      ]);
+      await waitFor(() =>
+        stdout.read().includes("https://sshautomator.example/dashboard?local_enroll_port="),
+      );
+      const url = new URL(
+        stdout.read().match(/https:\/\/sshautomator\.example\/dashboard\?\S+/u)?.[0] ?? "",
+      );
+      const port = url.searchParams.get("local_enroll_port");
+      const state = url.searchParams.get("local_enroll_state");
+      expect(url.href).not.toContain(fixtureEnrollmentToken);
+      expect(port).toMatch(/^\d+$/u);
+      expect(state).toMatch(/^[A-Za-z0-9_-]{43}$/u);
+      const handoff = await originalFetch(`http://127.0.0.1:${port}/enroll`, {
+        method: "POST",
+        headers: { Origin: "https://sshautomator.example", "Content-Type": "application/json" },
+        body: JSON.stringify({ state, token: fixtureEnrollmentToken }),
+      });
+      expect(handoff.status).toBe(200);
+      await pending;
+      expect(JSON.parse(readFileSync(configPath, "utf8")).agentId).toBe("agt_browser");
+      expect(readFileSync(configPath, "utf8")).not.toContain(fixtureEnrollmentToken);
+      expect(stdout.read()).not.toContain(fixtureEnrollmentToken);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).token).toBe(
+        fixtureEnrollmentToken,
+      );
+    } finally {
+      stdout.restore();
+    }
+  });
+
   test("enroll persists agent config without leaking the one-time token", async () => {
     const configPath = agentConfigPath();
     const controlPlaneKeys = generateEd25519PemKeyPair();
