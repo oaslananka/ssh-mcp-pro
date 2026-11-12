@@ -10,7 +10,7 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches ./patches
-RUN corepack enable && corepack prepare pnpm@11.28.10 --activate && pnpm install --frozen-lockfile --ignore-scripts
+RUN corepack enable && corepack prepare pnpm@11.28.11 --activate && pnpm install --frozen-lockfile --ignore-scripts
 
 COPY tsconfig.json typedoc.json ./
 COPY src ./src
@@ -35,7 +35,7 @@ ENV NODE_ENV=production
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY patches ./patches
 RUN corepack enable && \
-    corepack prepare pnpm@11.28.10 --activate && \
+    corepack prepare pnpm@11.28.11 --activate && \
     pnpm install --prod --frozen-lockfile --ignore-scripts && \
     pnpm store prune && \
     rm -rf /root/.cache /root/.local/share/pnpm && \

@@ -7,7 +7,7 @@ Version `1.0.0` is the initial public baseline for this repository. There are no
 When upgrading within `1.x`, preserve these compatibility expectations:
 
 - Node.js must satisfy `>=22.22.2` (Node 24 and 26 are tested in CI).
-- pnpm must satisfy `^11.28.10` for current development and build tooling.
+- pnpm must satisfy `^11.28.11` for current development and build tooling.
 - Existing stdio MCP client configs can continue to launch `ssh-mcp-pro` with no arguments.
 - HTTP deployments should keep explicit authentication, allowed origins, host allowlists, strict host-key verification, and a remote-safe tool profile.
 

@@ -15,7 +15,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Install dependencies
 RUN corepack enable \
-  && corepack prepare pnpm@11.28.10 --activate \
+  && corepack prepare pnpm@11.28.11 --activate \
   && pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy source and test files

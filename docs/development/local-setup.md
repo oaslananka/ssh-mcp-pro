@@ -9,7 +9,7 @@ it adds the one-command shortcuts.
 ```bash
 git clone https://github.com/oaslananka/ssh-mcp-pro.git
 cd ssh-mcp-pro
-task install   # or: corepack enable && corepack prepare pnpm@11.28.10 --activate && pnpm install --frozen-lockfile
+task install   # or: corepack enable && corepack prepare pnpm@11.28.11 --activate && pnpm install --frozen-lockfile
 task verify    # lint + format:check + typecheck + test + build
 ```
 
