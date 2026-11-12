@@ -150,7 +150,9 @@ def openssl_public_der(pem, private):
     args = ["openssl", "pkey", "-outform", "DER"]
     args.append("-pubout" if private else "-pubin")
     try:
-        result = subprocess.run(
+        # Fixed OpenSSL pkey flags; untrusted PEM is passed on stdin, never as
+        # executable arguments or a shell command.
+        result = subprocess.run(  # nosec B603
             args,
             input=pem.encode("utf-8"),
             stdout=subprocess.PIPE,
