@@ -95,8 +95,41 @@ else
   [[ "$(id -u)" -ne 0 ]] || die "user service must not be installed as root; run without sudo or pass --system"
 fi
 
-NODE_BIN="$(command -v node)" || die "node is not installed (need Node 22.22+ or 24+)"
-NPM_BIN="$(command -v npm)" || die "npm is not installed"
+# User-mode Linux/WSL onboarding must work without a preinstalled Node.
+# Never auto-install a user-owned runtime in a root / system scope.
+if [[ "$SCOPE" == "user" ]] &&
+   { ! command -v node >/dev/null 2>&1 ||
+     ! command -v npm >/dev/null 2>&1 ||
+     ! node -e 'const v=process.versions.node.split(".").map(Number);process.exit(v[0]>22 || (v[0]===22 && v[1]>=22) ? 0 : 1)' >/dev/null 2>&1; }; then
+    SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+    HELPER="$SCRIPT_DIR/bootstrap-node-lts.sh"
+    HELPER_TMP=""
+    if [[ ! -f "$HELPER" ]]; then
+      HELPER_TMP="$(mktemp)"
+      if ! curl --proto '=https' --tlsv1.2 -fsSL --retry 2 --max-time 35         -o "$HELPER_TMP" "https://raw.githubusercontent.com/oaslananka/ssh-mcp-pro/main/scripts/bootstrap-node-lts.sh"; then
+        rm -f -- "$HELPER_TMP"
+        die "could not download the official Node bootstrap helper"
+      fi
+      HELPER="$HELPER_TMP"
+    fi
+    source "$HELPER"
+    if [[ -n "$HELPER_TMP" ]]; then rm -f -- "$HELPER_TMP"; fi
+    NODE_BIN="$(bootstrap_node_lts)" || die "could not install verified private Node 26 LTS"
+    NPM_BIN="$(dirname "$NODE_BIN")/npm"
+    export PATH="$(dirname "$NODE_BIN"):$PATH"
+    NPM_CONFIG_PREFIX="$HOME/.local/share/ssh-mcp-pro/npm-global"
+    export NPM_CONFIG_PREFIX
+    mkdir -p -m 0700 "$NPM_CONFIG_PREFIX"
+    chmod 0700 "$NPM_CONFIG_PREFIX"
+fi
+NODE_BIN="${NODE_BIN:-$(command -v node)}"
+NPM_BIN="${NPM_BIN:-$(command -v npm)}"
+[[ -n "$NODE_BIN" ]] || die "node is not installed (need Node 22.22+ or 24+)"
+[[ -n "$NPM_BIN" ]] || die "npm is not installed"
+if [[ "$SCOPE" == "user" ]]; then
+  [[ -x "$NODE_BIN" && -x "$NPM_BIN" ]] ||
+    die "node/npm executable is missing; reinstall verified Node LTS or check your PATH"
+fi
 
 # Check both the visible directory and the resolved target (including parents).
 # Root-owned paths with group/world-writable ancestors are not trusted.
