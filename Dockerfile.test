@@ -1,5 +1,5 @@
 # Dockerfile for E2E testing ssh-mcp-pro against SSH server
-FROM node:24-alpine@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f
+FROM node@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f
 
 LABEL org.opencontainers.image.title="ssh-mcp-pro-test-runner" \
       org.opencontainers.image.description="SSH test image for ssh-mcp-pro integration checks" \
