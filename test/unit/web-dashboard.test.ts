@@ -28,6 +28,14 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(handled).toBe(true);
       expect(res.statusCode).toBe(200);
       expect(res.getHeader("content-type")).toContain("text/html");
+      // The signed-in HTTPS dashboard delivers enrollment credentials to
+      // a short-lived 127.0.0.1 listener. Same-origin-only CSP silently
+      // blocks that intended handshake before browser LNA consent.
+      const dashboardCsp = String(res.getHeader("content-security-policy"));
+      expect(dashboardCsp).toContain("connect-src 'self' http://127.0.0.1:*");
+      expect(dashboardCsp).toContain("frame-ancestors 'none'");
+      expect(dashboardCsp).not.toContain("http://*");
+      expect(dashboardCsp).not.toContain("http://localhost:*");
       expect(res.body).toContain("ssh-mcp-pro");
       expect(res.body).toContain("Sign in with Google");
       expect(res.body).toContain("Sign in with GitHub");

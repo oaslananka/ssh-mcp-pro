@@ -589,8 +589,11 @@ export class WebDashboardHandler {
     res.writeHead(200, {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
+      // The signed-in dashboard sends a one-time enrollment token only to
+      // its local 127.0.0.1 listener on an ephemeral port. Restrict this
+      // exception to loopback IPv4 (not arbitrary LAN/HTTP origins).
       "Content-Security-Policy":
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'",
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://127.0.0.1:*; frame-ancestors 'none'; base-uri 'self'",
       "X-Content-Type-Options": "nosniff",
     });
 
