@@ -3,7 +3,8 @@ import io
 import json
 import pathlib
 import sqlite3
-import subprocess
+# Test-only invocations use fixed binaries, synthetic fixtures and no shell.
+import subprocess  # nosec B404
 import sys
 import tarfile
 import tempfile
@@ -14,7 +15,9 @@ VERIFIER = ROOT / "scripts" / "verify-encrypted-backup.py"
 
 
 def run(*args):
-    return subprocess.run(args, check=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=15).stdout
+    return subprocess.run(  # nosec B603 - fixed test tools and temporary fixtures, shell=False
+        args, check=True, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=15
+    ).stdout
 
 
 def fixture(root, mode="valid", gz=False):
@@ -52,6 +55,10 @@ def fixture(root, mode="valid", gz=False):
             item = tarfile.TarInfo("../escape.txt")
             item.size = 4
             tar.addfile(item, io.BytesIO(b"test"))
+        if mode == "backslash":
+            item = tarfile.TarInfo(r"data\..\escape.txt")
+            item.size = 4
+            tar.addfile(item, io.BytesIO(b"test"))
         if mode == "symlink":
             item = tarfile.TarInfo("data/unsafe-link")
             item.type = tarfile.SYMTYPE
@@ -67,7 +74,7 @@ def fixture(root, mode="valid", gz=False):
 
 
 def verify(encrypted, identity):
-    outcome = subprocess.run(
+    outcome = subprocess.run(  # nosec B603 - fixed local verifier path, shell=False
         [sys.executable, str(VERIFIER), "--archive", str(encrypted), "--identity", str(identity)],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20,
     )
@@ -94,6 +101,22 @@ class OfflineRestoreVerifierTests(unittest.TestCase):
             })
             self.assertEqual(stderr, b"")
 
+    def test_archive_name_beginning_with_dash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            archive, identity = fixture(root)
+            unusual = root / "--version.age"
+            archive.replace(unusual)
+            outcome = subprocess.run(  # nosec B603 - fixture-only input, shell=False
+                [sys.executable, str(VERIFIER), "--archive=--version.age",
+                 "--identity", str(identity)],
+                cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                timeout=20,
+            )
+            self.assertEqual(outcome.returncode, 0)
+            self.assertEqual(json.loads(outcome.stdout)["status"], "pass")
+            self.assertEqual(outcome.stderr, b"")
+
     def test_wrong_identity(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
@@ -119,6 +142,9 @@ class OfflineRestoreVerifierTests(unittest.TestCase):
 
     def test_tar_symlink(self):
         self.assert_rejects("symlink", "UNSAFE_ARCHIVE")
+
+    def test_backslash_member(self):
+        self.assert_rejects("backslash", "UNSAFE_ARCHIVE")
 
     def assert_rejects(self, mode, expected):
         with tempfile.TemporaryDirectory(prefix="ssh-restore-fixture-") as tmp:

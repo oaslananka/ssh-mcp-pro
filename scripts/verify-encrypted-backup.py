@@ -10,7 +10,8 @@ from contextlib import closing
 import pathlib
 import shutil
 import sqlite3
-import subprocess
+# age and OpenSSL require external executables; both use argv lists, never a shell.
+import subprocess  # nosec B404
 import sys
 import tarfile
 import tempfile
@@ -41,15 +42,27 @@ def decrypt_to_private_file(encrypted, identity, target):
         reject("INPUT_NOT_FOUND")
     if encrypted.stat().st_size > MAX_ENCRYPTED_BYTES:
         reject("ARCHIVE_TOO_LARGE")
-    if not shutil.which("age"):
+    if identity.stat().st_size > 65536:
+        reject("AGE_DECRYPT_FAILED")
+    age_executable = shutil.which("age")
+    if not age_executable:
         reject("AGE_NOT_INSTALLED")
+
+    # Stage the identity under a trusted path, and stream the user-supplied
+    # archive via stdin. User filenames never become executable arguments.
+    private_identity = target.with_name("age-identity")
     try:
-        with target.open("xb") as stream:
+        with identity.open("rb") as source, private_identity.open("xb") as destination:
+            private_identity.chmod(0o600)
+            shutil.copyfileobj(source, destination, length=32768)
+        with encrypted.open("rb") as source, target.open("xb") as destination:
             target.chmod(0o600)
-            result = subprocess.run(
-                ["age", "--decrypt", "--identity", str(identity), str(encrypted)],
-                stdin=subprocess.DEVNULL,
-                stdout=stream,
+            # Fixed flags, a resolved executable and a trusted temporary identity;
+            # the untrusted archive is passed only as an open file descriptor.
+            result = subprocess.run(  # nosec B603
+                [age_executable, "--decrypt", "--identity", str(private_identity)],
+                stdin=source,
+                stdout=destination,
                 stderr=subprocess.DEVNULL,
                 timeout=60,
                 check=False,
@@ -62,36 +75,36 @@ def decrypt_to_private_file(encrypted, identity, target):
         reject("AGE_DECRYPT_FAILED")
 
 
+def validate_member(member):
+    name = member.name
+    if (
+        not name
+        or name.startswith("/")
+        or "\\" in name
+        or ".." in pathlib.PurePosixPath(name).parts
+        or not (member.isfile() or member.isdir())
+    ):
+        reject("UNSAFE_ARCHIVE")
+    if member.isfile() and (member.size < 0 or member.size > MAX_ENCRYPTED_BYTES):
+        reject("UNSAFE_ARCHIVE")
+
+
 def selected_members(archive):
     selected = {}
-    size = 0
-    count = 0
-    for member in archive:
-        count += 1
-        name = member.name
-        parts = pathlib.PurePosixPath(name).parts
-        if (
-            count > MAX_MEMBERS
-            or not name
-            or name.startswith("/")
-            or "\\" in name
-            or ".." in parts
-            or not (member.isfile() or member.isdir())
-        ):
+    total_bytes = 0
+    for index, member in enumerate(archive, 1):
+        if index > MAX_MEMBERS:
             reject("UNSAFE_ARCHIVE")
-        if not member.isfile():
+        validate_member(member)
+        if member.isdir():
             continue
-        if member.size < 0:
+        total_bytes += member.size
+        if total_bytes > MAX_EXTRACTED_BYTES:
             reject("UNSAFE_ARCHIVE")
-        size += member.size
-        if size > MAX_EXTRACTED_BYTES or member.size > MAX_ENCRYPTED_BYTES:
-            reject("UNSAFE_ARCHIVE")
-        basename = pathlib.PurePosixPath(name).name
+        basename = pathlib.PurePosixPath(member.name).name
         if basename not in NEEDED:
             continue
-        if basename in selected:
-            reject("UNSAFE_ARCHIVE")
-        if basename in KEYS and member.size > 65536:
+        if basename in selected or (basename in KEYS and member.size > 65536):
             reject("UNSAFE_ARCHIVE")
         selected[basename] = member
 
@@ -164,7 +177,7 @@ def validate_signing_keys(restore):
             public = key_data["publicKeyPem"]
             if not isinstance(private, str) or not isinstance(public, str):
                 reject("KEY_PAIR_MISMATCH")
-        except (ValueError, KeyError, OSError, UnicodeError):
+        except (ValueError, KeyError, OSError):
             reject("KEY_PAIR_MISMATCH")
         derived = openssl_public_der(private, private=True)
         supplied = openssl_public_der(public, private=False)

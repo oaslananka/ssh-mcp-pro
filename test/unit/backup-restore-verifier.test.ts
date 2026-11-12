@@ -19,7 +19,7 @@ describe.skipIf(!hasTools)("offline encrypted backup recovery", () => {
     });
     expect(result.error).toBeUndefined();
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stderr).toContain("Ran 8 tests");
+    expect(result.stderr).toContain("Ran 10 tests");
     expect(result.stderr).toContain("OK");
   }, 95_000);
 });
