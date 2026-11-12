@@ -44,6 +44,13 @@ describe.skipIf(process.platform === "win32")("agent bootstrap Bash validation",
 });
 
 describe("Linux agent user-service persistence guard", () => {
+  test("warns WSL users that linger does not keep the Windows-hosted instance alive", () => {
+    const source = readFileSync(script, "utf8");
+    expect(source).toContain("grep -qi microsoft /proc/sys/kernel/osrelease");
+    expect(source).toContain("For always-on Windows use the native Windows agent");
+    expect(source).not.toContain("wsl --shutdown");
+  });
+
   test("cannot silently ignore a failed loginctl linger setup", () => {
     const source = readFileSync(script, "utf8");
     expect(source).not.toContain('loginctl enable-linger "$USER" >/dev/null 2>&1 || true');

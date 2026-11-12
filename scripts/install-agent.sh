@@ -261,6 +261,11 @@ else
     die "loginctl could not enable linger for '$USER'. The agent service started but may stop after logout. Ask an administrator to run: sudo loginctl enable-linger '$USER'. No re-enrollment is required."
   fi
   echo "install-agent: user service started — check 'systemctl --user status ssh-mcp-pro-agent'"
+  # WSL stops its Linux instance independently of systemd/linger. Do not
+  # promise always-on Windows uptime just because the user unit is enabled.
+  if [[ -r /proc/sys/kernel/osrelease ]] && grep -qi microsoft /proc/sys/kernel/osrelease; then
+    echo "install-agent: WSL note: systemd/linger cannot keep WSL running after Windows suspends the instance. For always-on Windows use the native Windows agent; WSL startup requires separate host configuration." >&2
+  fi
 fi
 
 echo "install-agent: done. Verify with: ${AGENT_BIN} status"

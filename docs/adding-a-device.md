@@ -111,10 +111,20 @@ bash install-agent.sh \
   --alias office-pc
 ```
 
-This creates a **user** systemd service and enables linger so it survives
-logout and starts at boot. If enabling linger is denied, the installer now
-reports **incomplete setup** instead of claiming success: the running agent
-may disconnect when the user logs out. Ask an administrator to run
+This creates a **user** systemd service and enables linger. On a normal
+Linux installation, that lets the agent survive logout and start with the
+systemd user manager at boot. **WSL is different:** Microsoft documents that
+systemd services do **not** keep a WSL instance alive. Windows can shut down
+an idle WSL instance even when the service is enabled and `Linger=yes`.
+For an always-on agent on a Windows PC, use the **native Windows installer**
+below instead. Only use WSL as a persistent agent host if you deliberately
+configure and verify its Windows-side startup/lifetime behavior; the Linux
+installer does not silently create a Windows task or disable WSL idling.
+See [Microsoft's WSL systemd documentation](https://learn.microsoft.com/en-us/windows/wsl/systemd).
+
+If enabling linger is denied, the installer reports **incomplete setup**
+instead of claiming success: even on ordinary Linux, the running agent may
+disconnect when the user logs out. Ask an administrator to run
 `sudo loginctl enable-linger <linux-username>`, then verify
 `loginctl show-user <linux-username> -p Linger` reports `Linger=yes`.
 This repair does **not** require a new enrollment token. Pass `--system`
