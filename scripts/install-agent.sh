@@ -7,11 +7,12 @@
 # automatically on boot. Run it once per new device.
 #
 # Usage:
-#   ./install-agent.sh --server <https://control-plane> --token <one-time-token> [options]
+#   ./install-agent.sh --server <https://control-plane> (--token <token> | --browser) [options]
 #
 # Options:
 #   --server  <url>     Control plane base URL (required)
-#   --token   <token>   One-time enrollment token (required)
+#   --token   <token>   One-time enrollment token (manual/remote flow)
+#   --browser          Approve enrollment through a browser on this same device, no token argument
 #   --alias   <name>    Agent alias shown in the fleet (default: hostname)
 #   --version <semver>  Package version to install (default: latest)
 #   --system            Install a system-wide service (needs root) instead of a user service
@@ -25,6 +26,7 @@ set -euo pipefail
 
 SERVER=""
 TOKEN=""
+BROWSER_ENROLL=false
 ALIAS="$(hostname)"
 VERSION="latest"
 SYSTEM_SCOPE="system"
@@ -36,7 +38,7 @@ die() {
 }
 
 usage() {
-  sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,29p' "$0" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -49,6 +51,10 @@ while [[ $# -gt 0 ]]; do
     --token)
       TOKEN="${2:-}"
       shift 2
+      ;;
+    --browser)
+      BROWSER_ENROLL=true
+      shift
       ;;
     --alias)
       ALIAS="${2:-}"
@@ -72,7 +78,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$SERVER" ]] || die "--server is required"
-[[ -n "$TOKEN" ]] || die "--token is required"
+if [[ "$BROWSER_ENROLL" == "true" ]]; then
+  [[ -z "$TOKEN" ]] || die "--browser and --token cannot be combined"
+  [[ "$SCOPE" == "user" ]] || die "--browser only supports user-scoped services; use --token for --system"
+else
+  [[ -n "$TOKEN" ]] || die "--token is required"
+fi
 [[ -n "$ALIAS" ]] || die "--alias must not be empty"
 
 # System installs must not execute a user-managed Node/npm as root.
@@ -183,7 +194,9 @@ case "$SERVICE_PATH" in
 esac
 
 echo "install-agent: enrolling as alias '${ALIAS}'"
-if [[ "$SCOPE" == "$SYSTEM_SCOPE" && "$RUN_USER" != "root" ]]; then
+if [[ "$BROWSER_ENROLL" == "true" ]]; then
+  /usr/bin/env "PATH=$SERVICE_PATH" "HOME=$HOME" "$AGENT_BIN" enroll --server "$SERVER" --browser --alias "$ALIAS"
+elif [[ "$SCOPE" == "$SYSTEM_SCOPE" && "$RUN_USER" != "root" ]]; then
   [[ -x /usr/sbin/runuser ]] || die "--system needs /usr/sbin/runuser to enroll as service user '$RUN_USER'"
   /usr/sbin/runuser -u "$RUN_USER" -- /usr/bin/env "PATH=$SERVICE_PATH" "HOME=$RUN_HOME" "$AGENT_BIN" enroll --server "$SERVER" --token "$TOKEN" --alias "$ALIAS"
 else

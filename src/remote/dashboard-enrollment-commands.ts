@@ -12,3 +12,12 @@ export function buildDashboardEnrollmentCommands(serverUrl: string, token: strin
     npm: `npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent enroll --server ${quotePosix(serverUrl)} --token ${quotePosix(token)} --alias ${quotePosix(alias)} && npx --yes --package ssh-mcp-pro@latest ssh-mcp-pro-agent run`,
   };
 }
+
+// For a browser on the same device as the agent, no bearer credential is
+// ever placed in the copied install command or shell argument list.
+export function buildDashboardBrowserEnrollmentCommand(serverUrl: string): string {
+  const quotePosix = (value: string): string => "'" + value.replaceAll("'", String.raw`'\''`) + "'";
+  const source = new URL("/install-agent.sh", serverUrl).href;
+  const run = 'curl -fsSL "$1" | bash -s -- --server "$2" --browser';
+  return `bash -o pipefail -c ${quotePosix(run)} _ ${quotePosix(source)} ${quotePosix(serverUrl)}`;
+}

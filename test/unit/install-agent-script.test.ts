@@ -295,6 +295,26 @@ describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
       }
     });
 
+    test("supports same-device browser enrollment without placing a token on the agent command line", () => {
+      const mock = setupInstaller(true);
+      try {
+        const result = spawnSync(
+          "bash",
+          [script, "--server", "https://example.invalid", "--browser", "--alias", "linux-test"],
+          { encoding: "utf8", env: mock.env, timeout: 5_000 },
+        );
+        expect(result.status, result.stderr).toBe(0);
+        const used = readFileSync(mock.enrollLog, "utf8");
+        expect(used).toContain(
+          "enroll --server https://example.invalid --browser --alias linux-test",
+        );
+        expect(used).not.toContain("--token");
+        expect(readFileSync(mock.serviceState, "utf8")).toBe("restarted\n");
+      } finally {
+        mock.cleanup();
+      }
+    });
+
     test("uses npm's global prefix/bin even when absent from PATH", () => {
       const mock = setupInstaller(true);
       try {

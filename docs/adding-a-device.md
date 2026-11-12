@@ -85,6 +85,24 @@ are alternatives if you already have a one-time token.
 
 ### Linux / WSL
 
+**Same-device browser setup (recommended for Linux/WSL with a browser):**
+
+From the authenticated dashboard's **Add Device** tab, copy the
+**Linux / WSL: Set up with your browser** command and run it in the
+device's own terminal. It installs a verified user-local Node LTS if needed,
+installs the agent and prints an HTTPS approval link. Open that link in a
+browser on the **same device** (including a Windows browser that can reach
+WSL loopback), sign in, choose the initial policy and click **Approve This
+Device**. The one-time enrollment token is handed directly to the agent's
+temporary `127.0.0.1` listener; it is never copied to a chat, terminal
+argument or browser URL. The listener accepts only the control-plane origin
+plus a random one-time link challenge and expires after 10 minutes. Browser
+privacy/localhost network protections must allow the connection. If the
+browser is on another machine, use the existing manual command instead.
+
+For **headless or remote-only devices**, the existing manually generated
+one-time token and installation command remain supported:
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/oaslananka/ssh-mcp-pro/main/scripts/install-agent.sh -o install-agent.sh
 bash install-agent.sh \

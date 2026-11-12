@@ -1,7 +1,18 @@
 import { describe, expect, test } from "vitest";
-import { buildDashboardEnrollmentCommands } from "../../src/remote/dashboard-enrollment-commands.js";
+import {
+  buildDashboardBrowserEnrollmentCommand,
+  buildDashboardEnrollmentCommands,
+} from "../../src/remote/dashboard-enrollment-commands.js";
 
 describe("dashboard agent enrollment commands", () => {
+  test("offers a token-free browser-assisted Linux one-liner", () => {
+    const command = buildDashboardBrowserEnrollmentCommand("https://example.test");
+    expect(command).toContain("install-agent.sh");
+    expect(command).toContain("--browser");
+    expect(command).toContain("bash -o pipefail -c");
+    expect(command).not.toContain("--token");
+  });
+
   test("preserves Linux, PowerShell and npm installation contracts", () => {
     const commands = buildDashboardEnrollmentCommands(
       "https://example.test",
