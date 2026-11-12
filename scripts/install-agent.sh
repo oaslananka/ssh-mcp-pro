@@ -133,10 +133,17 @@ if [[ "$SCOPE" == "user" ]] &&
     mkdir -p -m 0700 "$NPM_CONFIG_PREFIX"
     chmod 0700 "$NPM_CONFIG_PREFIX"
 fi
-NODE_BIN="${NODE_BIN:-$(command -v node)}"
-NPM_BIN="${NPM_BIN:-$(command -v npm)}"
-[[ -n "$NODE_BIN" ]] || die "node is not installed (need Node 22.22+ or 24+)"
-[[ -n "$NPM_BIN" ]] || die "npm is not installed"
+# `command -v` can return 1 when `--system` excludes user-local Node/npm.
+# Do not let `set -e` turn a missing runtime into a silent exit.
+NODE_BIN="${NODE_BIN:-$(command -v node || true)}"
+NPM_BIN="${NPM_BIN:-$(command -v npm || true)}"
+if [[ "$SCOPE" == "$SYSTEM_SCOPE" ]]; then
+  [[ -n "$NODE_BIN" ]] || die "--system needs root-owned system Node.js under /usr or /opt (not a user-local runtime); install system Node.js and retry"
+  [[ -n "$NPM_BIN" ]] || die "--system needs root-owned system npm under /usr or /opt (not a user-local npm); install system npm and retry"
+else
+  [[ -n "$NODE_BIN" ]] || die "node is not installed (need Node 22.22+ or 24+)"
+  [[ -n "$NPM_BIN" ]] || die "npm is not installed"
+fi
 if [[ "$SCOPE" == "user" ]]; then
   [[ -x "$NODE_BIN" && -x "$NPM_BIN" ]] ||
     die "node/npm executable is missing; reinstall verified Node LTS or check your PATH"

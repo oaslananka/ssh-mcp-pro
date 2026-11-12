@@ -470,11 +470,43 @@ describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
           {
             encoding: "utf8",
             timeout: 5_000,
-            env: { ...mock.env, SUDO_USER: "root", MOCK_NODE: path.join(mock.root, "user-node") },
+            env: {
+              ...mock.env,
+              SUDO_USER: "root",
+              MOCK_NODE: path.join(mock.root, "user-node"),
+              NODE_BIN: path.join(mock.root, "user-node"),
+              NPM_BIN: path.join(mock.root, "shims", "npm"),
+            },
           },
         );
         expect(result.status).toBe(1);
         expect(result.stderr).toContain("--system needs root-owned system Node.js");
+        const missingSystemNode = spawnSync(
+          "/usr/bin/bash",
+          [
+            isolatedProbe,
+            script,
+            "--server",
+            "https://example.invalid",
+            "--token",
+            "placeholder",
+            "--alias",
+            "linux-test",
+            "--system",
+          ],
+          {
+            encoding: "utf8",
+            timeout: 5_000,
+            env: {
+              ...mock.env,
+              SUDO_USER: "root",
+              MOCK_NODE: "",
+              NPM_BIN: path.join(mock.root, "shims", "npm"),
+            },
+          },
+        );
+        expect(missingSystemNode.status).toBe(1);
+        expect(missingSystemNode.stderr).toContain("--system needs root-owned system Node.js");
         expect(() => readFileSync(mock.installLog, "utf8")).toThrow();
         expect(() => readFileSync(mock.enrollLog, "utf8")).toThrow();
         expect(() => readFileSync(mock.serviceLog, "utf8")).toThrow();
