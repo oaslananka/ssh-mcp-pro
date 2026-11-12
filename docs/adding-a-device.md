@@ -121,6 +121,26 @@ https://nodejs.org/en/download and rerun the command. An *outdated* Node
 installation is not silently upgraded. Linux/WSL still requires Node
 installed beforehand.
 
+### Repair an existing Windows agent task
+
+Earlier Windows installations may still have Task Scheduler's default 72-hour
+process limit even though new installations now set unlimited runtime. If your
+existing agent disconnects after a long uptime, open **administrator PowerShell**
+and approve the normal UAC prompt. Run this **without re-enrolling**:
+
+```powershell
+Invoke-RestMethod https://raw.githubusercontent.com/oaslananka/ssh-mcp-pro/main/scripts/repair-agent-task.ps1 -OutFile repair-agent-task.ps1
+& ([scriptblock]::Create((Get-Content -LiteralPath ./repair-agent-task.ps1 -Raw)))
+```
+
+The repair does not require a new enrollment token, does not reinstall Node or
+npm, and does not restart the running agent. It verifies that the task runs
+`ssh-mcp-pro-agent.cmd run`, then changes only `ExecutionTimeLimit` from
+`PT72H` to `PT0S`. If the task already has unlimited runtime, it succeeds
+without changes. If permissions are insufficient or the task looks unfamiliar,
+it stops and reports an error instead of bypassing UAC or overwriting settings.
+The existing restart-on-failure policy is preserved.
+
 For a fully headless host that must run before any user logs in, run the agent
 under a service manager such as NSSM instead.
 
