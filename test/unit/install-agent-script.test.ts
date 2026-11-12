@@ -412,3 +412,52 @@ describe.skipIf(process.platform === "win32" || process.getuid?.() === 0)(
     });
   },
 );
+
+const windowsTaskRepair = path.join(repoRoot, "scripts/repair-agent-task.ps1");
+
+describe("Windows legacy scheduled-task repair", () => {
+  test("requires explicit admin privilege and changes only the running-time limit", () => {
+    const source = readFileSync(windowsTaskRepair, "utf8");
+    expect(source).toContain("IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)");
+    expect(source).toContain('ExecutionTimeLimit -eq "PT0S"');
+    expect(source).toContain('ExecutionTimeLimit -ne "PT72H"');
+    expect(source).toContain('ExecutionTimeLimit = "PT0S"');
+    expect(source).toContain("Set-ScheduledTask -TaskName $TaskName -Settings $settings");
+    expect(source).toContain("Get-ScheduledTask -TaskName $TaskName");
+    expect(source).toContain("ssh-mcp-pro-agent");
+    expect(source).toContain("Arguments -notmatch");
+    expect(source).not.toContain("Register-ScheduledTask");
+    expect(source).not.toContain("Unregister-ScheduledTask");
+    expect(source).not.toContain("Start-ScheduledTask");
+    expect(source).not.toContain("Stop-ScheduledTask");
+    expect(source).not.toContain("enroll --");
+    expect(source).not.toContain("npm install");
+  });
+
+  test("documents a token-free elevated repair path that preserves enrollment", () => {
+    const instructions = readFileSync(path.join(repoRoot, "docs/adding-a-device.md"), "utf8");
+    expect(instructions).toContain("repair-agent-task.ps1");
+    expect(instructions).toContain("administrator PowerShell");
+    expect(instructions).toContain("does not require a new enrollment token");
+  });
+});
+
+describe.skipIf(process.platform !== "win32")("Windows repair script syntax", () => {
+  test("parses in Windows PowerShell without running system commands", () => {
+    const program = [
+      "$tokens = $null; $errors = $null",
+      "[System.Management.Automation.Language.Parser]::ParseFile($env:TEST_REPAIR_SCRIPT, [ref]$tokens, [ref]$errors) | Out-Null",
+      "if ($errors.Count -gt 0) { throw ($errors | Out-String) }",
+    ].join("; ");
+    const result = spawnSync(
+      "powershell.exe",
+      ["-NoProfile", "-NonInteractive", "-Command", program],
+      {
+        encoding: "utf8",
+        timeout: 12_000,
+        env: { ...process.env, TEST_REPAIR_SCRIPT: windowsTaskRepair },
+      },
+    );
+    expect(result.status, result.stderr).toBe(0);
+  });
+});
