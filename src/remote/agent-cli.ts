@@ -563,24 +563,33 @@ export async function runAgentCli(argv: string[]): Promise<void> {
   }
 }
 /** Keep installed agents online across transient socket failures without re-enrollment. */
-export async function runAgentCliWithReconnect(
+export function runAgentCliWithReconnect(
   argv: string[],
   run: (args: string[]) => Promise<void> = runAgentCli,
   pause: (delayMs: number) => Promise<void> = (ms) =>
     new Promise((resolve) => setTimeout(resolve, ms)),
 ): Promise<void> {
   let delayMs = 1_000;
-  for (;;) {
-    try {
-      await run(argv);
-      return;
-    } catch (error) {
-      if (argv[0] !== "run" || !(error instanceof RetryableAgentTransportError)) {
-        throw error;
-      }
-      process.stderr.write(`Agent connection lost; retrying in ${delayMs / 1_000} seconds.\n`);
-      await pause(delayMs);
-      delayMs = Math.min(delayMs * 2, 30_000);
-    }
-  }
+  // Schedule each attempt independently so long-lived agents do not retain retry stacks.
+  return new Promise<void>((resolve, reject) => {
+    const attempt = (): void => {
+      void Promise.resolve()
+        .then(() => run(argv))
+        .then(resolve, (error: unknown) => {
+          if (argv[0] !== "run" || !(error instanceof RetryableAgentTransportError)) {
+            reject(error);
+            return;
+          }
+          const currentDelayMs = delayMs;
+          delayMs = Math.min(delayMs * 2, 30_000);
+          process.stderr.write(
+            `Agent connection lost; retrying in ${currentDelayMs / 1_000} seconds.\n`,
+          );
+          void Promise.resolve()
+            .then(() => pause(currentDelayMs))
+            .then(attempt, reject);
+        });
+    };
+    attempt();
+  });
 }
