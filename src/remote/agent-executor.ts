@@ -347,8 +347,16 @@ export class AgentExecutor {
     const command =
       process.platform === "win32"
         ? "Get-ComputerInfo | Select-Object CsName,OsName,OsVersion,CsTotalPhysicalMemory | ConvertTo-Json -Compress"
-        : "uname -a && uptime && df -h /";
-    const shell = platformShell(command);
+        : [
+            "uname -a",
+            String.raw`{ if command -v uptime >/dev/null 2>&1; then uptime; elif [ -r /proc/uptime ]; then read -r seconds _ < /proc/uptime && printf 'Uptime: %s seconds\n' "$seconds"; else printf 'Uptime unavailable\n' >&2; exit 1; fi; }`,
+            "df -h /",
+          ].join(" && ");
+    // A non-login shell respects the caller's PATH and avoids unexpected /etc/profile side effects.
+    const shell =
+      process.platform === "win32"
+        ? platformShell(command)
+        : { command: "/bin/sh", args: ["-c", command] };
     return runCommand(shell.command, shell.args, {
       timeoutSeconds,
       maxOutputBytes: this.policy.maxOutputBytes,
