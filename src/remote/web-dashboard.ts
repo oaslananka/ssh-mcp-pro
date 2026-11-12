@@ -543,7 +543,13 @@ export class WebDashboardHandler {
       jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
       return;
     }
-    const events = this.deps.store.listAudit(principal.userId, undefined, 50);
+    const aliases = new Map(
+      this.deps.store.listAgents(principal.userId).map((agent) => [agent.id, agent.alias]),
+    );
+    const events = this.deps.store.listAudit(principal.userId, undefined, 50).map((event) => ({
+      ...event,
+      agentAlias: event.agentId ? aliases.get(event.agentId) : undefined,
+    }));
     jsonResponse(res, 200, { events }, addNoStore());
   }
 

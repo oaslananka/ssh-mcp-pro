@@ -144,7 +144,19 @@ describe("Hosted OAuth providers and tenant isolation", () => {
         audit as unknown as ServerResponse,
         "/api/dashboard/audit",
       );
-      expect(JSON.parse(audit.body).events.length).toBeGreaterThan(0);
+      const ownerEvents = JSON.parse(audit.body).events as Array<{
+        agentId?: string;
+        agentAlias?: string;
+        eventType: string;
+      }>;
+      expect(ownerEvents).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            agentId: deviceId,
+            agentAlias: "safe's machine",
+          }),
+        ]),
+      );
       const otherAudit = captureResponse();
       await cp.handleHttp(
         request("GET", "/api/dashboard/audit", { cookie: secondCookie }),
@@ -154,6 +166,7 @@ describe("Hosted OAuth providers and tenant isolation", () => {
       const secondEvents = JSON.parse(otherAudit.body).events as { eventType: string }[];
       expect(secondEvents.length).toBeGreaterThan(0); // Their own sign-in audit is allowed.
       expect(secondEvents.every((event) => event.eventType === "user_login")).toBe(true);
+      expect(JSON.stringify(secondEvents)).not.toContain("safe's machine");
     } finally {
       cp.close();
       rmSync(dir, { recursive: true, force: true });

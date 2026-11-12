@@ -84,6 +84,7 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(res.body).toContain('class="device-actions"');
       expect(res.body).toContain("Local Stdio Mode (Policy-Controlled)");
       expect(res.body).toContain(".code-box > span");
+      expect(res.body).toContain("escapeHtml(e.agentAlias || e.agentId || e.actionId || '-')");
       expect(res.body).toContain(".card a { color: var(--blue);");
       expect(res.body).toContain(".badge-gray { background: #30363d; color: #c9d1d9; }");
       expect(res.body).toContain('aria-label="Copy ChatGPT MCP URL"');

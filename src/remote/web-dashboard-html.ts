@@ -310,7 +310,7 @@ export function renderDashboardHtml(
                     <td style="padding:12px 16px; font-family:var(--font-mono); color:var(--text-muted);">\${new Date(e.createdAt).toLocaleTimeString()}</td>
                     <td style="padding:12px 16px; font-weight:600;">\${escapeHtml(e.eventType)}</td>
                     <td style="padding:12px 16px;"><span class="badge \${e.severity === 'info' ? 'badge-blue' : (e.severity === 'warn' ? 'badge-green' : 'badge-gray')}">\${e.severity}</span></td>
-                    <td style="padding:12px 16px; font-family:var(--font-mono); color:var(--text-muted);">\${escapeHtml(e.agentId || e.actionId || '-')}</td>
+                    <td style="padding:12px 16px; font-family:var(--font-mono); color:var(--text-muted);">\${escapeHtml(e.agentAlias || e.agentId || e.actionId || '-')}</td>
                   </tr>
                 \`).join('')}
               </tbody>
