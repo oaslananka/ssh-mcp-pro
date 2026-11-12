@@ -97,10 +97,10 @@ fi
 
 # User-mode Linux/WSL onboarding must work without a preinstalled Node.
 # Never auto-install a user-owned runtime in a root / system scope.
-if [[ "$SCOPE" == "user" ]]; then
-  if ! command -v node >/dev/null 2>&1 ||
+if [[ "$SCOPE" == "user" ]] &&
+   { ! command -v node >/dev/null 2>&1 ||
      ! command -v npm >/dev/null 2>&1 ||
-     ! node -e 'const v=process.versions.node.split(".").map(Number);process.exit(v[0]>22 || (v[0]===22 && v[1]>=22) ? 0 : 1)' >/dev/null 2>&1; then
+     ! node -e 'const v=process.versions.node.split(".").map(Number);process.exit(v[0]>22 || (v[0]===22 && v[1]>=22) ? 0 : 1)' >/dev/null 2>&1; }; then
     SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
     HELPER="$SCRIPT_DIR/bootstrap-node-lts.sh"
     HELPER_TMP=""
@@ -121,7 +121,6 @@ if [[ "$SCOPE" == "user" ]]; then
     export NPM_CONFIG_PREFIX
     mkdir -p -m 0700 "$NPM_CONFIG_PREFIX"
     chmod 0700 "$NPM_CONFIG_PREFIX"
-  fi
 fi
 NODE_BIN="${NODE_BIN:-$(command -v node)}"
 NPM_BIN="${NPM_BIN:-$(command -v npm)}"

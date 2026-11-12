@@ -79,6 +79,19 @@ describe.skipIf(process.platform === "win32")("verified user-local Node LTS boot
     expect(code).toContain('trusted_system_path "$NODE_BIN"');
   });
 
+  test("authenticates the Node release keyring itself before allowing gpgv trust", () => {
+    const code = readFileSync(helper, "utf8");
+    expect(code).toContain(
+      "nodejs/release-keys/481637f813e912c4aa3622d7964ab426c97b8e8d/gpg/pubring.kbx",
+    );
+    expect(code).toContain("610b8d249da3d5733f5a128def2dd0294dbbf5b5713e6ca2529db8db419dee00");
+    const verifyAt = code.indexOf("release keyring checksum mismatch");
+    const trustAt = code.indexOf("gpgv --quiet");
+    expect(verifyAt).toBeGreaterThan(0);
+    expect(trustAt).toBeGreaterThan(verifyAt);
+    expect(code).not.toContain("release-keys/HEAD/gpg/pubring.kbx");
+  });
+
   test("requires PGP-signed checksums and a private installation directory", () => {
     const code = readFileSync(helper, "utf8");
     expect(code).toContain("gpgv");

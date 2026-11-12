@@ -46,8 +46,14 @@ bootstrap_node_lts() (
   local source="https://nodejs.org/dist/latest-v26.x"
   curl --proto '=https' --tlsv1.2 -fsSL --retry 2 --connect-timeout 12 --max-time 60 \
     -o "$stage/SHASUMS256.txt.asc" "$source/SHASUMS256.txt.asc"
+  # Node release public keys are a trust anchor. Pin both the upstream commit
+  # and the keyring bytes; TLS alone must not silently accept replacement keys.
   curl --proto '=https' --tlsv1.2 -fsSL --retry 2 --connect-timeout 12 --max-time 60 \
-    -o "$stage/release-keys.kbx" "https://raw.githubusercontent.com/nodejs/release-keys/HEAD/gpg/pubring.kbx"
+    -o "$stage/release-keys.kbx" \
+    "https://raw.githubusercontent.com/nodejs/release-keys/481637f813e912c4aa3622d7964ab426c97b8e8d/gpg/pubring.kbx"
+  printf '%s  %s\n' "610b8d249da3d5733f5a128def2dd0294dbbf5b5713e6ca2529db8db419dee00" \
+    "$stage/release-keys.kbx" | sha256sum --check --status ||
+    { fail "release keyring checksum mismatch"; exit 1; }
 
   gpgv --quiet --keyring "$stage/release-keys.kbx" --output "$stage/SHASUMS256.txt" \
     "$stage/SHASUMS256.txt.asc" >/dev/null 2>&1 ||
