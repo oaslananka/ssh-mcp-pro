@@ -46,12 +46,15 @@ interface RuntimeWebSocket {
   onopen: (() => void) | null;
   onmessage: ((event: { data: unknown }) => void) | null;
   onerror: ((event: unknown) => void) | null;
-  onclose: (() => void) | null;
+  onclose: ((event?: { code?: number }) => void) | null;
   send(data: string): void;
   close(): void;
 }
 
 type RuntimeWebSocketConstructor = new (url: string) => RuntimeWebSocket;
+
+/** Recoverable network failure; invalid enrollment/configuration must not be retried. */
+export class RetryableAgentTransportError extends Error {}
 
 function output(line: string): void {
   process.stdout.write(`${line}\n`);
@@ -416,14 +419,39 @@ async function runAgent(): Promise<void> {
         activity.event("error", "action_failed", "Action processing failed; details withheld.");
       });
     };
+    // An error can precede the close event carrying a non-retryable policy code.
+    let errorCloseTimer: ReturnType<typeof setTimeout> | undefined;
+    let closed = false;
     ws.onerror = () => {
-      activity.event("error", "socket_error", "Connection error. Service restart may be required.");
-      reject(new Error("WebSocket transport error"));
+      if (closed) return;
+      activity.event("error", "socket_error", "Connection error. Checking close reason.");
+      errorCloseTimer ??= setTimeout(() => {
+        errorCloseTimer = undefined;
+        closed = true;
+        reject(new RetryableAgentTransportError("WebSocket transport error"));
+        // If a runtime never delivers close after error, do not retain a stale socket.
+        try {
+          ws.close();
+        } catch {
+          // The transport may already be unusable.
+        }
+      }, 2_000);
     };
-    // A disconnected agent must exit nonzero so its service supervisor can restart it.
-    ws.onclose = () => {
-      activity.event("warn", "disconnected", "Connection closed. Awaiting service restart.");
-      reject(new Error("Agent WebSocket connection closed"));
+    // Policy-denied agents must not loop; ordinary transport losses are recoverable.
+    ws.onclose = (event) => {
+      if (closed) return;
+      closed = true;
+      if (errorCloseTimer) {
+        clearTimeout(errorCloseTimer);
+        errorCloseTimer = undefined;
+      }
+      if (event?.code === 1008) {
+        activity.event("error", "connection_denied", "Server rejected the agent connection.");
+        reject(new Error("Agent connection rejected by server"));
+        return;
+      }
+      activity.event("warn", "disconnected", "Connection closed. Reconnecting automatically.");
+      reject(new RetryableAgentTransportError("Agent WebSocket connection closed"));
     };
   }).finally(() => executor.dispose());
 }
@@ -532,5 +560,27 @@ export async function runAgentCli(argv: string[]): Promise<void> {
       break;
     default:
       throw new Error("Unknown agent command. Run ssh-mcp-pro-agent --help for usage.");
+  }
+}
+/** Keep installed agents online across transient socket failures without re-enrollment. */
+export async function runAgentCliWithReconnect(
+  argv: string[],
+  run: (args: string[]) => Promise<void> = runAgentCli,
+  pause: (delayMs: number) => Promise<void> = (ms) =>
+    new Promise((resolve) => setTimeout(resolve, ms)),
+): Promise<void> {
+  let delayMs = 1_000;
+  for (;;) {
+    try {
+      await run(argv);
+      return;
+    } catch (error) {
+      if (argv[0] !== "run" || !(error instanceof RetryableAgentTransportError)) {
+        throw error;
+      }
+      process.stderr.write(`Agent connection lost; retrying in ${delayMs / 1_000} seconds.\n`);
+      await pause(delayMs);
+      delayMs = Math.min(delayMs * 2, 30_000);
+    }
   }
 }
