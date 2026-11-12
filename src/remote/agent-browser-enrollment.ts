@@ -113,7 +113,7 @@ export async function startLocalBrowserEnrollment(
   });
   async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const remote = req.socket.remoteAddress ?? "";
-    const localOnly = remote === "127.0.0.1" || remote === "::ffff:127.0.0.1";
+    const localOnly = remote === "127.0.0.1";
     if (!localOnly || req.headers.origin !== origin) {
       send(res, 403, "Browser origin is not allowed");
       return;

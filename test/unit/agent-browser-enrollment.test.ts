@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { startLocalBrowserEnrollment } from "../../src/remote/agent-browser-enrollment.js";
 
+const fixtureEnrollmentToken = `enr_${"x".repeat(43)}`;
 const origin = "https://example.test";
 
 describe("same-device browser enrollment handshake", () => {
@@ -20,7 +21,7 @@ describe("same-device browser enrollment handshake", () => {
       expect(verify.searchParams.get("local_enroll_port")).toBe(String(session.port));
       const state = verify.searchParams.get("local_enroll_state") ?? "";
       expect(state).toMatch(/^[a-zA-Z0-9_-]{43}$/u);
-      expect(verify.href).not.toContain("enr_0123456789abcdefghijklmnopqrstuvwxyzABC");
+      expect(verify.href).not.toContain(fixtureEnrollmentToken);
 
       const ready = await fetch(`http://127.0.0.1:${session.port}/ready`, {
         method: "GET",
@@ -49,7 +50,7 @@ describe("same-device browser enrollment handshake", () => {
       const blocked = await fetch(session.callbackUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", Origin: "https://evil.example" },
-        body: JSON.stringify({ state, token: "enr_0123456789abcdefghijklmnopqrstuvwxyzABC" }),
+        body: JSON.stringify({ state, token: fixtureEnrollmentToken }),
       });
       expect(blocked.status).toBe(403);
       expect(accepted).toHaveLength(0);
@@ -59,7 +60,7 @@ describe("same-device browser enrollment handshake", () => {
         headers: { "Content-Type": "application/json", Origin: origin },
         body: JSON.stringify({
           state: "wrong",
-          token: "enr_0123456789abcdefghijklmnopqrstuvwxyzABC",
+          token: fixtureEnrollmentToken,
         }),
       });
       expect(wrongState.status).toBe(403);
@@ -68,11 +69,11 @@ describe("same-device browser enrollment handshake", () => {
       const ok = await fetch(session.callbackUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", Origin: origin },
-        body: JSON.stringify({ state, token: "enr_0123456789abcdefghijklmnopqrstuvwxyzABC" }),
+        body: JSON.stringify({ state, token: fixtureEnrollmentToken }),
       });
       expect(ok.status).toBe(200);
       await session.finished;
-      expect(accepted).toEqual(["enr_0123456789abcdefghijklmnopqrstuvwxyzABC"]);
+      expect(accepted).toEqual([fixtureEnrollmentToken]);
     } finally {
       session.close();
     }

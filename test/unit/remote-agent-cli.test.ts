@@ -18,6 +18,7 @@ import type {
 } from "../../src/remote/types.js";
 import { AGENT_ENROLL_COMMAND, LEGACY_AGENT_COMMAND_PATTERN } from "./helpers.js";
 
+const fixtureEnrollmentToken = `enr_${"x".repeat(43)}`;
 const originalAgentConfig = process.env.SSHAUTOMATOR_AGENT_CONFIG;
 const originalFetch = globalThis.fetch;
 const originalWebSocket = (globalThis as { WebSocket?: unknown }).WebSocket;
@@ -145,7 +146,7 @@ describe("remote agent CLI", () => {
   });
   test("browser enrollment accepts a same-device callback and persists credentials without token in URL", async () => {
     const configPath = agentConfigPath();
-    const secret = "enr_0123456789abcdefghijklmnopqrstuvwxyzABC";
+    const secret = fixtureEnrollmentToken;
     const controller = generateEd25519PemKeyPair();
     const fetchMock = vi.fn(
       async (_url: string, _init?: RequestInit) =>

@@ -2,6 +2,8 @@ import { createContext, runInContext } from "node:vm";
 import { describe, expect, test } from "vitest";
 import { renderDashboardHtml } from "../../src/remote/web-dashboard-html.js";
 
+const fixtureEnrollmentToken = `enr_${"x".repeat(43)}`;
+
 interface Device {
   id: string;
   isLiveConnected: boolean;
@@ -130,7 +132,7 @@ function browserHarness(
           status: 201,
           json: async () => ({
             agent_id: "agent-new",
-            enrollment_token: "enr_0123456789abcdefghijklmnopqrstuvwxyzABC",
+            enrollment_token: fixtureEnrollmentToken,
             commands: { linux: "linux command", windows: "windows command", npm: "npm command" },
           }),
         };
@@ -176,7 +178,7 @@ describe("Dashboard same-device browser enrollment", () => {
     expect(page.data.handoffs).toEqual([
       {
         state: "a".repeat(43),
-        token: "enr_0123456789abcdefghijklmnopqrstuvwxyzABC",
+        token: fixtureEnrollmentToken,
       },
     ]);
     expect(page.node("cmdLinux").textContent).toBe("");
