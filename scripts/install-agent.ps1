@@ -98,11 +98,13 @@ if ($LASTEXITCODE -ne 0) { Die "enrollment failed" }
 $taskArguments = '/d /s /c ""{0}" run"' -f $agentCmd
 $action = New-ScheduledTaskAction -Execute "cmd.exe" -Argument $taskArguments
 $trigger = New-ScheduledTaskTrigger -AtLogOn
+# Keep the persistent outbound agent alive beyond Task Scheduler's 72-hour default.
 $settings = New-ScheduledTaskSettingsSet `
   -AllowStartIfOnBatteries `
   -DontStopIfGoingOnBatteries `
   -RestartCount 999 `
   -RestartInterval (New-TimeSpan -Minutes 1) `
+  -ExecutionTimeLimit (New-TimeSpan -Seconds 0) `
   -StartWhenAvailable
 
 Register-ScheduledTask `
