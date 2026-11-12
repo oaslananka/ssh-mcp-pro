@@ -146,7 +146,7 @@ describe("remote agent CLI", () => {
   });
   test("browser enrollment accepts a same-device callback and persists credentials without token in URL", async () => {
     const configPath = agentConfigPath();
-    const secret = fixtureEnrollmentToken;
+
     const controller = generateEd25519PemKeyPair();
     const fetchMock = vi.fn(
       async (_url: string, _init?: RequestInit) =>
@@ -180,21 +180,23 @@ describe("remote agent CLI", () => {
       );
       const port = url.searchParams.get("local_enroll_port");
       const state = url.searchParams.get("local_enroll_state");
-      expect(url.href).not.toContain(secret);
+      expect(url.href).not.toContain(fixtureEnrollmentToken);
       expect(port).toMatch(/^\d+$/u);
       expect(state).toMatch(/^[A-Za-z0-9_-]{43}$/u);
       const handoff = await originalFetch(`http://127.0.0.1:${port}/enroll`, {
         method: "POST",
         headers: { Origin: "https://sshautomator.example", "Content-Type": "application/json" },
-        body: JSON.stringify({ state, token: secret }),
+        body: JSON.stringify({ state, token: fixtureEnrollmentToken }),
       });
       expect(handoff.status).toBe(200);
       await pending;
       expect(JSON.parse(readFileSync(configPath, "utf8")).agentId).toBe("agt_browser");
-      expect(readFileSync(configPath, "utf8")).not.toContain(secret);
-      expect(stdout.read()).not.toContain(secret);
+      expect(readFileSync(configPath, "utf8")).not.toContain(fixtureEnrollmentToken);
+      expect(stdout.read()).not.toContain(fixtureEnrollmentToken);
       expect(fetchMock).toHaveBeenCalledTimes(1);
-      expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).token).toBe(secret);
+      expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)).token).toBe(
+        fixtureEnrollmentToken,
+      );
     } finally {
       stdout.restore();
     }

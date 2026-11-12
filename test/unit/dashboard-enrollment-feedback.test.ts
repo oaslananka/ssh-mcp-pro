@@ -175,12 +175,10 @@ describe("Dashboard same-device browser enrollment", () => {
       expect.objectContaining({ targetAddressSpace: "loopback" }),
       expect.objectContaining({ targetAddressSpace: "loopback" }),
     ]);
-    expect(page.data.handoffs).toEqual([
-      {
-        state: "a".repeat(43),
-        token: fixtureEnrollmentToken,
-      },
-    ]);
+    expect(page.data.handoffs).toHaveLength(1);
+    const handoff = page.data.handoffs[0] as { state: string; token: string };
+    expect(handoff.state).toBe("a".repeat(43));
+    expect(handoff.token).toBe(fixtureEnrollmentToken);
     expect(page.node("cmdLinux").textContent).toBe("");
     expect(page.node("cmdWindows").textContent).toBe("");
     expect(page.node("manualInstallCommands").style.display).toBe("none");

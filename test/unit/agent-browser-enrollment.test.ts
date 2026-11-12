@@ -2,6 +2,10 @@ import { describe, expect, test } from "vitest";
 import { startLocalBrowserEnrollment } from "../../src/remote/agent-browser-enrollment.js";
 
 const fixtureEnrollmentToken = `enr_${"x".repeat(43)}`;
+function handoffBody(state: string | null, token: string): string {
+  return JSON.stringify({ state, token });
+}
+
 const origin = "https://example.test";
 
 describe("same-device browser enrollment handshake", () => {
@@ -50,7 +54,7 @@ describe("same-device browser enrollment handshake", () => {
       const blocked = await fetch(session.callbackUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", Origin: "https://evil.example" },
-        body: JSON.stringify({ state, token: fixtureEnrollmentToken }),
+        body: handoffBody(state, fixtureEnrollmentToken),
       });
       expect(blocked.status).toBe(403);
       expect(accepted).toHaveLength(0);
@@ -58,10 +62,7 @@ describe("same-device browser enrollment handshake", () => {
       const wrongState = await fetch(session.callbackUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", Origin: origin },
-        body: JSON.stringify({
-          state: "wrong",
-          token: fixtureEnrollmentToken,
-        }),
+        body: handoffBody("wrong", fixtureEnrollmentToken),
       });
       expect(wrongState.status).toBe(403);
       expect(accepted).toHaveLength(0);
@@ -69,7 +70,7 @@ describe("same-device browser enrollment handshake", () => {
       const ok = await fetch(session.callbackUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", Origin: origin },
-        body: JSON.stringify({ state, token: fixtureEnrollmentToken }),
+        body: handoffBody(state, fixtureEnrollmentToken),
       });
       expect(ok.status).toBe(200);
       await session.finished;
