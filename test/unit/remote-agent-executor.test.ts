@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import { open } from "node:fs/promises";
 import { vi } from "vitest";
@@ -191,6 +191,34 @@ describe("remote agent executor", () => {
     expect(logs.stdout).toContain("three");
   }, 15_000);
 
+  test.skipIf(process.platform !== "linux")(
+    "reports status when a minimal Linux environment has no uptime binary",
+    async () => {
+      const toolsDir = mkdtempSync(path.join(os.tmpdir(), "agent-status-minimal-"));
+      const originalPath = process.env.PATH;
+      try {
+        symlinkSync("/usr/bin/uname", path.join(toolsDir, "uname"));
+        symlinkSync("/usr/bin/df", path.join(toolsDir, "df"));
+        process.env.PATH = toolsDir;
+        const keyPair = generateEd25519PemKeyPair();
+        const executor = new AgentExecutor(createAgentPolicy("read-only"), keyPair.privateKeyPem);
+        const status = await executor.execute(
+          action("get_system_status", "system.read", { timeout_seconds: 10 }),
+        );
+        expect(status).toMatchObject({ status: "ok", exit_code: 0 });
+        expect(status.stdout).toMatch(/Uptime: [0-9.]+ seconds/u);
+        expect(status.stdout).toContain("Filesystem");
+      } finally {
+        if (originalPath === undefined) {
+          delete process.env.PATH;
+        } else {
+          process.env.PATH = originalPath;
+        }
+        rmSync(toolsDir, { recursive: true, force: true });
+      }
+    },
+    15_000,
+  );
   test("file writes are path scoped and use local policy", async () => {
     const tempDir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-agent-"));
     const target = path.join(tempDir, "state.txt");
