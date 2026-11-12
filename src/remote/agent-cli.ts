@@ -572,24 +572,27 @@ export function runAgentCliWithReconnect(
   let delayMs = 1_000;
   // Schedule each attempt independently so long-lived agents do not retain retry stacks.
   return new Promise<void>((resolve, reject) => {
-    const attempt = (): void => {
+    function handleFailure(error: unknown): void {
+      if (argv[0] !== "run" || !(error instanceof RetryableAgentTransportError)) {
+        reject(error);
+        return;
+      }
+      const currentDelayMs = delayMs;
+      delayMs = Math.min(delayMs * 2, 30_000);
+      process.stderr.write(
+        `Agent connection lost; retrying in ${currentDelayMs / 1_000} seconds.\n`,
+      );
+      void Promise.resolve()
+        .then(() => pause(currentDelayMs))
+        .then(attempt, reject);
+    }
+
+    function attempt(): void {
       void Promise.resolve()
         .then(() => run(argv))
-        .then(resolve, (error: unknown) => {
-          if (argv[0] !== "run" || !(error instanceof RetryableAgentTransportError)) {
-            reject(error);
-            return;
-          }
-          const currentDelayMs = delayMs;
-          delayMs = Math.min(delayMs * 2, 30_000);
-          process.stderr.write(
-            `Agent connection lost; retrying in ${currentDelayMs / 1_000} seconds.\n`,
-          );
-          void Promise.resolve()
-            .then(() => pause(currentDelayMs))
-            .then(attempt, reject);
-        });
-    };
+        .then(resolve, handleFailure);
+    }
+
     attempt();
   });
 }
