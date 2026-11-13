@@ -188,6 +188,7 @@ export function renderDashboardHtml(
           <div class="card">
             <h2 style="margin-bottom:12px;">Enroll New Device</h2>
             <p style="color:var(--text-muted); font-size:14px; margin-bottom:24px;">\${localBrowserLink ? 'Approve the local agent waiting in your terminal. The one-time credential stays inside your browser and device; do not copy it into chat.' : 'Generate a one-time install command and run it on your target device.'}</p>
+            \${localBrowserLink ? '<p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">Chrome may ask to access other apps and services on this device. Bring this browser window to the front and choose Allow for this trusted site. If the prompt is hidden, check Chrome’s address bar; the connection check stops after one minute so you can retry.</p>' : ''}
             <div style="display:\${localBrowserLink ? 'none' : 'block'}; margin-bottom:20px; padding:14px; border:1px solid var(--card-border); border-radius:8px;">
               <h3 style="margin-bottom:8px;">Linux / WSL: Set up with your browser</h3>
               <p style="color:var(--text-muted); font-size:13px; margin-bottom:12px;">Copy this command to the device you want to enroll. Open the URL printed in its terminal in a browser on that same device, sign in and approve. No token copying or sudo required.</p>
