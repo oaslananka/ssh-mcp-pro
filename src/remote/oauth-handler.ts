@@ -33,7 +33,7 @@ import type {
   OAuthRefreshTokenRecord,
   RemoteConfig,
 } from "./types.js";
-import { REMOTE_SCOPES } from "./types.js";
+import { PUBLIC_REMOTE_SCOPES } from "./types.js";
 import { jsonResponse } from "./util.js";
 
 /** Pending OAuth authorization transaction. */
@@ -79,7 +79,7 @@ export class OAuthHandler {
       resource_name: "SshAutomator MCP",
       authorization_servers: [this.config.publicBaseUrl],
       bearer_methods_supported: ["header"],
-      scopes_supported: REMOTE_SCOPES,
+      scopes_supported: PUBLIC_REMOTE_SCOPES,
     };
   }
 
@@ -97,7 +97,7 @@ export class OAuthHandler {
       grant_types_supported: ["authorization_code", "refresh_token"],
       code_challenge_methods_supported: ["S256"],
       token_endpoint_auth_methods_supported: ["none"],
-      scopes_supported: REMOTE_SCOPES,
+      scopes_supported: PUBLIC_REMOTE_SCOPES,
     };
   }
 

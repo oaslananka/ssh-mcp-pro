@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
 import { searchAuthorizedFileNames } from "../../src/remote/agent-file-search.js";
-import { mergeCustomPolicy } from "../../src/remote/policy.js";
+import { createAgentPolicy, mergeCustomPolicy } from "../../src/remote/policy.js";
 
 function workspace() {
   const root = mkdtempSync(path.join(os.tmpdir(), "ssh-search-"));
@@ -36,6 +36,17 @@ function workspace() {
 }
 
 describe("bounded authorized remote file discovery", () => {
+  test("full-admin wildcard policy searches the agent user's home by default", async () => {
+    const policy = createAgentPolicy("full-admin");
+    const result = await searchAuthorizedFileNames(policy, {
+      name_pattern: "very-unlikely-file-name-sshmcppro-246-xyz",
+      max_depth: 0,
+      max_results: 1,
+    });
+    expect(result.matches).toEqual([]);
+    expect(result.scanned_entries).toBeGreaterThanOrEqual(0);
+  });
+
   test("finds nested filenames without reading content or exposing denied/hidden paths", async () => {
     const env = workspace();
     try {

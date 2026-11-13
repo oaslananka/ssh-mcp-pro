@@ -1673,6 +1673,18 @@ describe("remote control plane remote-agent contracts", () => {
       });
 
       await expect(
+        harness.callRemoteTool(principal(["files.write"]), "file_manage", {
+          agent_id_or_alias: agent.alias,
+          operation: "copy",
+          path: "/tmp/source.txt",
+          destination_path: "/tmp/copy.txt",
+        }),
+      ).rejects.toMatchObject({
+        code: "INVALID_SCOPE",
+        status: 403,
+      });
+
+      await expect(
         harness.callRemoteTool(principal(["system.read"]), "get_system_status", {
           agent_id_or_alias: agent.alias,
         }),

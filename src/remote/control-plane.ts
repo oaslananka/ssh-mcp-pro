@@ -595,6 +595,15 @@ export class RemoteControlPlane {
     if (!hasCapability(principal.capabilities, capability)) {
       throw safeError("INVALID_SCOPE", `Scope does not grant ${capability}`, 403);
     }
+    // Copying reads an existing file before writing the destination. Both permissions
+    // must belong to the OAuth client; agent-side policy checks alone are insufficient.
+    if (
+      tool === "file_manage" &&
+      args.operation === "copy" &&
+      !hasCapability(principal.capabilities, "files.read")
+    ) {
+      throw safeError("INVALID_SCOPE", "Copy requires files.read and files.write", 403);
+    }
 
     if (tool === "list_hosts") {
       return {

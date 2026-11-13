@@ -52,8 +52,10 @@ export function createAgentPolicy(profile: AgentProfileName = "read-only"): Agen
   return {
     profile,
     capabilities: base,
-    allowPaths: ["/tmp", "/var/tmp"],
-    denyPaths: ["/", "/etc", "/boot", "/dev", "/proc", "/sys"],
+    // A user-selected Full Admin profile follows the agent process's OS account permissions.
+    // Previously the temp-only defaults made ordinary Windows/home/project files unusable.
+    allowPaths: profile === "full-admin" ? ["*"] : ["/tmp", "/var/tmp"],
+    denyPaths: profile === "full-admin" ? [] : ["/", "/etc", "/boot", "/dev", "/proc", "/sys"],
     allowServices,
     allowContainers,
     maxOutputBytes: 200_000,
@@ -111,6 +113,8 @@ export function isPathAllowed(policy: AgentPolicy, filePath: string): boolean {
     return false;
   }
   return policy.allowPaths.some((rawPrefix) => {
+    if (rawPrefix === "*")
+      return path.posix.isAbsolute(filePath) || path.win32.isAbsolute(filePath);
     const prefix = normalizePolicyPath(rawPrefix);
     return prefix === "/"
       ? normalized === "/"

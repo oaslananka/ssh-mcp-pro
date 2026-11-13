@@ -715,7 +715,11 @@ describe("remote agent executor", () => {
     const keyPair = generateEd25519PemKeyPair();
     const executor = new AgentExecutor(createAgentPolicy("read-only"), keyPair.privateKeyPem);
     const fileExecutor = new AgentExecutor(createAgentPolicy("operations"), keyPair.privateKeyPem);
-    const writeExecutor = new AgentExecutor(createAgentPolicy("full-admin"), keyPair.privateKeyPem);
+    // Full Admin now follows OS filesystem rights; custom denied paths still block writes.
+    const writeExecutor = new AgentExecutor(
+      mergeCustomPolicy({ profile: "full-admin", allowPaths: ["*"], denyPaths: ["/etc"] }),
+      keyPair.privateKeyPem,
+    );
 
     await expect(
       executor.execute(action("tail_logs", "logs.read", { unit_or_file: "", timeout_seconds: 10 })),

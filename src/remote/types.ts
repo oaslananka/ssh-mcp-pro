@@ -32,6 +32,12 @@ export const REMOTE_SCOPES = [
 
 export type RemoteScope = (typeof REMOTE_SCOPES)[number];
 
+// Public discovery avoids vendor/application-specific grants. Legacy scopes are
+// still accepted for already connected v1.x clients until the next major release.
+export const PUBLIC_REMOTE_SCOPES: readonly RemoteScope[] = REMOTE_SCOPES.filter(
+  (scope) => scope !== "docker:manage",
+);
+
 export const SCOPE_CAPABILITY_MAP: Record<RemoteScope, RemoteCapability[]> = {
   "hosts:read": ["hosts.read"],
   "agents:read": ["agents.read"],
@@ -188,6 +194,8 @@ export const REMOTE_TOOLS = [
   "file_read",
   "file_write",
   "file_replace",
+  "file_inspect",
+  "file_manage",
   "run_shell",
   "process_start",
   "process_read",
@@ -217,6 +225,8 @@ export const TOOL_CAPABILITY_MAP: Record<RemoteToolName, RemoteCapability> = {
   file_read: "files.read",
   file_write: "files.write",
   file_replace: "files.write",
+  file_inspect: "files.read",
+  file_manage: "files.write",
   run_shell: "shell.exec",
   process_start: "shell.exec",
   process_read: "shell.exec",
