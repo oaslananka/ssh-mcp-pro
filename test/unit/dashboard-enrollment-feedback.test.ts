@@ -1,5 +1,5 @@
 import { createContext, runInContext } from "node:vm";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { renderDashboardHtml } from "../../src/remote/web-dashboard-html.js";
 
 const fixtureEnrollmentToken = `enr_${"x".repeat(43)}`;
@@ -24,6 +24,8 @@ function browserHarness(
     local?: boolean;
     localAvailable?: boolean;
     permission?: "granted" | "prompt" | "denied";
+    localReadyStalls?: boolean;
+    localHandoffStalls?: boolean;
   } = {},
 ) {
   const nodes = new Map<string, TestElement>();
@@ -35,6 +37,8 @@ function browserHarness(
     creates: number;
     handoffs: unknown[];
     localFetchOptions: unknown[];
+    localReadyAborted: boolean;
+    localHandoffAborted: boolean;
   } = {
     devices: [],
     error: null,
@@ -42,6 +46,8 @@ function browserHarness(
     creates: 0,
     handoffs: [],
     localFetchOptions: [],
+    localReadyAborted: false,
+    localHandoffAborted: false,
   };
   let nextTimerId = 1;
   const node = (id: string): TestElement => {
@@ -94,6 +100,9 @@ function browserHarness(
     },
     URLSearchParams,
     Date,
+    AbortController,
+    setTimeout,
+    clearTimeout,
 
     atob: (value: string) => Buffer.from(value, "base64").toString("utf8"),
     document: {
@@ -112,6 +121,14 @@ function browserHarness(
     fetch: async (url: string, init?: RequestInit) => {
       if (url === "http://127.0.0.1:42712/ready") {
         data.localFetchOptions.push(init);
+        if (options.localReadyStalls) {
+          return new Promise((_, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              data.localReadyAborted = true;
+              reject(new Error("Local callback aborted"));
+            });
+          });
+        }
         return {
           ok: options.localAvailable !== false,
           status: options.localAvailable !== false ? 204 : 503,
@@ -119,6 +136,14 @@ function browserHarness(
       }
       if (url === "http://127.0.0.1:42712/enroll") {
         data.localFetchOptions.push(init);
+        if (options.localHandoffStalls) {
+          return new Promise((_, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              data.localHandoffAborted = true;
+              reject(new Error("Local enrollment handoff aborted"));
+            });
+          });
+        }
         data.handoffs.push(JSON.parse(String(init?.body)));
         return { ok: true, status: 200 };
       }
@@ -192,6 +217,44 @@ describe("Dashboard same-device browser enrollment", () => {
     expect(page.data.handoffs).toHaveLength(0);
     expect(page.node("enrollError").textContent).toMatch(/Loopback network access/u);
     expect(page.node("enrollError").textContent).toMatch(/Site settings/u);
+  });
+
+  test("recovers from a hidden Chrome loopback permission prompt without creating a device", async () => {
+    vi.useFakeTimers();
+    try {
+      const page = browserHarness({ local: true, localReadyStalls: true });
+      expect(String(page.run("renderTabContent()"))).toContain("Chrome may ask");
+      const enrollment = page.run("generateEnrollment()");
+      await vi.advanceTimersByTimeAsync(60_000);
+      await enrollment;
+      expect(page.data.creates).toBe(0);
+      expect(page.data.localReadyAborted).toBe(true);
+      expect(page.data.handoffs).toHaveLength(0);
+      expect(page.node("generateEnrollmentButton").disabled).toBe(false);
+      expect(page.node("generateEnrollmentButton").textContent).toBe("Approve This Device");
+      expect(page.node("enrollError").hidden).toBe(false);
+      expect(page.node("enrollError").textContent).toMatch(/Loopback network access|local agent/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("restores the approval controls when a local enrollment handoff never finishes", async () => {
+    vi.useFakeTimers();
+    try {
+      const page = browserHarness({ local: true, localHandoffStalls: true });
+      const enrollment = page.run("generateEnrollment()");
+      await vi.advanceTimersByTimeAsync(30_000);
+      await enrollment;
+      expect(page.data.creates).toBe(1);
+      expect(page.data.localHandoffAborted).toBe(true);
+      expect(page.data.handoffs).toHaveLength(0);
+      expect(page.node("generateEnrollmentButton").disabled).toBe(false);
+      expect(page.node("enrollError").textContent).toMatch(/retry|local agent/i);
+      expect(page.node("cmdNpm").textContent).toBe("");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("does not create a pending server device if the local browser listener cannot be reached", async () => {

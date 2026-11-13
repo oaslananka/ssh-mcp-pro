@@ -52,6 +52,26 @@ export const DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT = `
       }
     }
 
+    // A background Chrome window can hide the Local Network Access prompt.
+    // Bound the pending request so an installer never looks stuck forever.
+    async function fetchLocalCallback(url, options, timeoutMs) {
+      const controller = new AbortController();
+      let timeout;
+      try {
+        return await Promise.race([
+          fetch(url, { ...options, signal: controller.signal }),
+          new Promise((_, reject) => {
+            timeout = setTimeout(() => {
+              controller.abort();
+              reject(new Error('Local device connection timed out'));
+            }, timeoutMs);
+          })
+        ]);
+      } finally {
+        if (timeout !== undefined) clearTimeout(timeout);
+      }
+    }
+
     let localBrowserLink = readLocalBrowserLink();
     if (localBrowserLink && currentUser) activeTab = 'add-device';
 
@@ -155,9 +175,9 @@ export const DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT = `
           }
           let reachable = false;
           try {
-            const result = await fetch('http://127.0.0.1:' + localBrowserLink.port + '/ready', {
+            const result = await fetchLocalCallback('http://127.0.0.1:' + localBrowserLink.port + '/ready', {
               cache: 'no-store', mode: 'cors', targetAddressSpace: 'loopback'
-            });
+            }, 60000);
             reachable = result.ok;
           } catch { /* browser and local WSL listener may not share localhost */ }
           if (!reachable) {
@@ -185,13 +205,13 @@ export const DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT = `
           }
           let delivered;
           try {
-            delivered = await fetch('http://127.0.0.1:' + localBrowserLink.port + '/enroll', {
+            delivered = await fetchLocalCallback('http://127.0.0.1:' + localBrowserLink.port + '/enroll', {
               method: 'POST',
               mode: 'cors',
               targetAddressSpace: 'loopback',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ state: localBrowserLink.state, token: data.enrollment_token })
-            });
+            }, 30000);
           } catch {
             throw new Error('Cannot reach the local agent. Keep the terminal open and retry with a fresh alias after the pending enrollment expires.');
           }
