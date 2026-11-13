@@ -134,6 +134,38 @@ List configured SSH hosts, explain the active SSH policy, connect to the selecte
 See [examples/README.md](examples/README.md) for additional workflows and
 [INSTALL.md](INSTALL.md) for client-specific setup.
 
+### General computer control through the hosted connector
+
+Once a user has enrolled a computer, ChatGPT, Claude or another authorized MCP
+client can manage it using generic tools, regardless of whether the computer
+has Git, Docker, a database, or other applications installed:
+
+- **Run an installed application:** `run_shell` or the managed
+  `process_start`, `process_read`, `process_input` and `process_stop` tools.
+  The shell is the native PowerShell on Windows or `sh` on Unix.
+- **Find and inspect files:** `file_search`, `file_content_search`,
+  `file_inspect` (`stat` / `list`) and `file_read`.
+- **Manage project files:** `file_manage` (`mkdir`, `copy`, `move`, `remove`),
+  `file_write`, and the preview/expected-hash `file_replace`.
+  Directory listings and file searches are bounded. File management operates
+  on the selected device itself rather than transferring entire files through
+  the AI conversation.
+
+Choose **Full Admin** for a device when you want unrestricted access *within
+that operating-system user account*. New Full Admin profiles can work with
+ordinary home, project and mounted-disk paths; the OS account still determines
+whether an operation succeeds. The device owner's saved custom allow/deny
+rules still take priority. Existing enrolled devices retain their saved
+policies until the owner edits them in the dashboard. OAuth scopes separately
+control which of those device operations a connected AI client may request.
+
+Dedicated Docker MCP tools are no longer advertised to newly connecting
+clients. Previously authorized clients may still use the legacy Docker tool
+names during the compatibility period; new users can call an installed
+application's own CLI through the generic shell instead. This does **not**
+provide GUI screen, mouse, keyboard or browser interaction: those require
+desktop-session integration and OS accessibility/screen permissions.
+
 ## Configuration
 
 All `SSH_MCP_*` environment variables parsed by `src/config.ts` are listed below. Comma-separated settings also accept newline-separated values.

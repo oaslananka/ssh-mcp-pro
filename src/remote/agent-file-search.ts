@@ -1,6 +1,7 @@
 import type { Dir, Dirent } from "node:fs";
 import { lstat, opendir, realpath } from "node:fs/promises";
 import path from "node:path";
+import { homedir } from "node:os";
 import { isPathAllowed } from "./policy.js";
 import type { AgentPolicy } from "./types.js";
 
@@ -284,7 +285,14 @@ export async function scanAuthorizedFiles<T>(
   maxCandidateFiles = MAX_SCAN_ENTRIES,
 ): Promise<AuthorizedScanResult<T>> {
   const options = parseOptions(args);
-  const roots = args.root_path === undefined ? policy.allowPaths : [args.root_path];
+  // "*" grants Full Admin access across volumes but is not a filesystem pathname.
+  // Search the owner's home by default; an AI can request any other allowed root explicitly.
+  const roots =
+    args.root_path !== undefined
+      ? [args.root_path]
+      : policy.allowPaths.includes("*")
+        ? [homedir()]
+        : policy.allowPaths;
   if (roots.length > 32) throw denied("Too many search roots configured by local policy");
   const resolved = await Promise.all(
     roots.map((root) => resolveRoot(policy, root, args.root_path !== undefined)),

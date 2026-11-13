@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { ManagedProcessRegistry } from "./agent-managed-process.js";
+import { inspectComputerFile, manageComputerFile } from "./agent-file-operations.js";
 import { access } from "node:fs/promises";
 import os from "node:os";
 import {
@@ -300,6 +301,15 @@ export class AgentExecutor {
           hasPaging ? { offsetBytes, maxBytes } : undefined,
         );
       }
+      case "file_inspect":
+        return this.jsonActionResult(await inspectComputerFile(this.policy, action.args));
+      case "file_manage":
+        if (action.args.operation === "copy" && !this.policy.capabilities["files.read"]) {
+          throw Object.assign(new Error("Copying a file also requires files.read"), {
+            code: "CAPABILITY_DENIED" as const,
+          });
+        }
+        return this.jsonActionResult(await manageComputerFile(this.policy, action.args));
       case "file_replace":
         return this.fileReplace(action.args);
       case "file_write":
@@ -475,6 +485,16 @@ export class AgentExecutor {
       args as unknown as ContentSearchInput,
     );
     return { exitCode: 0, stdout: JSON.stringify(result), stderr: "", truncated: result.truncated };
+  }
+
+  private jsonActionResult(value: Record<string, unknown>): ExecResult {
+    const stdout = JSON.stringify(value);
+    if (Buffer.byteLength(stdout, "utf8") > this.policy.maxOutputBytes) {
+      throw Object.assign(new Error("File operation response exceeds the agent output limit"), {
+        code: "POLICY_DENIED" as const,
+      });
+    }
+    return { exitCode: 0, stdout, stderr: "", truncated: false };
   }
 
   private async fileRead(

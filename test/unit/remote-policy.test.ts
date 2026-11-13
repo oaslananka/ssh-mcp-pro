@@ -27,6 +27,28 @@ describe("remote agent policy", () => {
     expect(isContainerAllowed(policy, "app")).toBe(true);
   });
 
+  test("full-admin can access normal Windows and Unix files using the agent OS account", () => {
+    const policy = createAgentPolicy("full-admin");
+    expect(isPathAllowed(policy, "/home/user/workspace/project/readme.md")).toBe(true);
+    expect(isPathAllowed(policy, "/etc/hosts")).toBe(true);
+    expect(isPathAllowed(policy, "C:\\Users\\Owner\\Documents\\project.txt")).toBe(true);
+    expect(isPathAllowed(policy, "\\\\server\\share\\project.txt")).toBe(true);
+    expect(isPathAllowed(policy, "/tmp/file.log")).toBe(true);
+    expect(isPathAllowed(policy, "relative/file.txt")).toBe(false);
+    expect(isPathAllowed(policy, "C:relative.txt")).toBe(false);
+  });
+
+  test("explicit custom deny paths still take priority over broad allow paths", () => {
+    const policy = mergeCustomPolicy({
+      profile: "full-admin",
+      allowPaths: ["*"],
+      denyPaths: ["/home/user/secrets", "C:\\Private"],
+    });
+    expect(isPathAllowed(policy, "/home/user/project.txt")).toBe(true);
+    expect(isPathAllowed(policy, "/home/user/secrets/token.txt")).toBe(false);
+    expect(isPathAllowed(policy, "C:\\Private\\token.txt")).toBe(false);
+  });
+
   test("denies root and system prefixes while preserving scoped writable paths", () => {
     const policy = createAgentPolicy("operations");
 

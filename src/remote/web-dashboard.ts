@@ -7,7 +7,7 @@ import type { OAuthHandler } from "./oauth-handler.js";
 import type { AgentWebSocketHandler } from "./agent-handler.js";
 import { RemoteStore } from "./store.js";
 import type { AuditEvent, RemoteAgentRecord, RemoteConfig, RemotePrincipal } from "./types.js";
-import { REMOTE_SCOPES } from "./types.js";
+import { PUBLIC_REMOTE_SCOPES } from "./types.js";
 import { jsonResponse } from "./util.js";
 import { renderDashboardHtml } from "./web-dashboard-html.js";
 import { serveAgentScript } from "./web-dashboard-static.js";
@@ -100,7 +100,7 @@ export class WebDashboardHandler {
     if (!session) return undefined;
     const user = this.deps.store.getUserById(session.userId);
     if (!user) return undefined;
-    const scopes = [...REMOTE_SCOPES];
+    const scopes = [...PUBLIC_REMOTE_SCOPES];
     return {
       userId: user.id,
       githubId: user.githubId ?? user.googleId ?? user.id,

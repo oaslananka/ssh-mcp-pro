@@ -67,7 +67,9 @@ describe("remote MCP tool descriptors", () => {
   test("maps every remote tool to the descriptor capability table", () => {
     const tools = listRemoteToolDescriptors(REMOTE_CAPABILITIES);
 
-    expect(tools.map((tool) => tool.name)).toEqual(REMOTE_TOOLS);
+    expect(tools.map((tool) => tool.name)).toEqual(
+      REMOTE_TOOLS.filter((name) => !name.startsWith("docker_")),
+    );
     for (const tool of tools) {
       expect(tool.capability).toBe(TOOL_CAPABILITY_MAP[tool.name]);
       expect(tool.description).toEqual(expect.any(String));
@@ -77,6 +79,24 @@ describe("remote MCP tool descriptors", () => {
 
   test("returns no descriptors when no capabilities are granted", () => {
     expect(listRemoteToolDescriptors([])).toEqual([]);
+  });
+
+  test("advertises generic file operations without app-specific Docker tool names", () => {
+    const names = listRemoteToolDescriptors(REMOTE_CAPABILITIES).map((tool) => tool.name);
+    expect(names).toContain("file_inspect");
+    expect(names).toContain("file_manage");
+    expect(names.some((name) => name.startsWith("docker_"))).toBe(false);
+    // Legacy signed requests can still be understood by already connected clients.
+    expect(REMOTE_TOOLS).toContain("docker_ps");
+    expect(listRemoteToolDescriptors(["files.read"]).map((tool) => tool.name)).toContain(
+      "file_inspect",
+    );
+    expect(listRemoteToolDescriptors(["files.write"]).map((tool) => tool.name)).toContain(
+      "file_manage",
+    );
+    expect(listRemoteToolDescriptors(["files.read"]).map((tool) => tool.name)).not.toContain(
+      "file_manage",
+    );
   });
 
   test("marks potentially destructive remote actions for MCP clients", () => {
@@ -91,7 +111,7 @@ describe("remote MCP tool descriptors", () => {
       "revoke_agent",
       "file_write",
       "restart_service",
-      "docker_restart",
+      "file_manage",
     ] as const) {
       expect(byName.get(name)?.annotations, name).toEqual(
         expect.objectContaining({
@@ -109,6 +129,7 @@ describe("remote MCP tool descriptors", () => {
       "file_search",
       "file_content_search",
       "file_read",
+      "file_inspect",
     ]);
     const search = tools.find((tool) => tool.name === "file_search");
     expect(search?.annotations).toEqual(

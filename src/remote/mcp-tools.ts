@@ -247,6 +247,60 @@ const descriptors: Record<
       additionalProperties: false,
     },
   },
+  file_inspect: {
+    description:
+      "Inspect an existing file/directory (stat) or list its immediate children (list). " +
+      "Works on Linux, macOS, and Windows through the owner's enrolled agent.",
+    inputSchema: {
+      type: "object",
+      required: ["agent_id_or_alias", "operation", "path"],
+      properties: {
+        agent_id_or_alias: agentSelector,
+        operation: { type: "string", enum: ["stat", "list"] },
+        path: {
+          type: "string",
+          minLength: 1,
+          description: "Absolute path on the selected device.",
+        },
+        max_entries: { type: "integer", minimum: 1, maximum: 100, default: 50 },
+      },
+      additionalProperties: false,
+    },
+  },
+  file_manage: {
+    description:
+      "Create directories, copy/move files, or remove files/directories on an owned device. " +
+      "Use run_shell for arbitrary installed applications; this generic file tool needs no app-specific connector.",
+    inputSchema: {
+      type: "object",
+      required: ["agent_id_or_alias", "operation", "path"],
+      properties: {
+        agent_id_or_alias: agentSelector,
+        operation: { type: "string", enum: ["mkdir", "copy", "move", "remove"] },
+        path: {
+          type: "string",
+          minLength: 1,
+          description: "Absolute source or target path on the selected device.",
+        },
+        destination_path: {
+          type: "string",
+          minLength: 1,
+          description: "Required for copy and move.",
+        },
+        recursive: {
+          type: "boolean",
+          default: false,
+          description: "Create parents or remove a directory tree when explicitly true.",
+        },
+        overwrite: {
+          type: "boolean",
+          default: false,
+          description: "Overwrite an existing file/destination only if true.",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
   file_read: {
     description: "Read an allowed text file; optional byte offsets and limits page large files.",
     inputSchema: {
@@ -422,6 +476,7 @@ const READ_ONLY_REMOTE_TOOLS = new Set<RemoteToolName>([
   "file_search",
   "file_content_search",
   "file_read",
+  "file_inspect",
   "process_read",
   "get_audit_events",
 ]);
@@ -440,6 +495,7 @@ const DESTRUCTIVE_REMOTE_TOOLS = new Set<RemoteToolName>([
   "revoke_agent",
   "file_write",
   "file_replace",
+  "file_manage",
   "restart_service",
   "docker_restart",
 ]);
@@ -454,12 +510,21 @@ export function remoteToolAnnotations(name: RemoteToolName): ToolAnnotations {
   };
 }
 
+// Existing signed Docker actions remain dispatchable for v1.x clients. New clients
+// discover generic shell/process operations instead of product-specific shortcuts.
+const LEGACY_APP_SPECIFIC_TOOL_NAMES = new Set<RemoteToolName>([
+  "docker_ps",
+  "docker_logs",
+  "docker_restart",
+]);
+
 export function listRemoteToolDescriptors(
   capabilities: readonly RemoteCapability[],
 ): RemoteToolDescriptor[] {
   const allowed = new Set(capabilities);
   return REMOTE_TOOLS.filter(
     (name) =>
+      !LEGACY_APP_SPECIFIC_TOOL_NAMES.has(name) &&
       allowed.has(TOOL_CAPABILITY_MAP[name]) &&
       (name !== "file_replace" || allowed.has("files.read")),
   ).map((name) => ({
