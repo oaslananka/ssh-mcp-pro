@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.6.0...ssh-mcp-pro-v1.7.0) (2026-11-13)
+
+
+### Features
+
+* **remote:** general computer files and Full Admin access ([#247](https://github.com/oaslananka/ssh-mcp-pro/issues/247)) ([b0c6b27](https://github.com/oaslananka/ssh-mcp-pro/commit/b0c6b273e331e87fc62d63e56ef849dff2055fa1))
+
+
+### Bug Fixes
+
+* **dashboard:** bound local enrollment permission waits ([#244](https://github.com/oaslananka/ssh-mcp-pro/issues/244)) ([4079902](https://github.com/oaslananka/ssh-mcp-pro/commit/4079902e110a5f0ba6b236c23093ba7c6e438414))
+
 ## [1.6.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.5.0...ssh-mcp-pro-v1.6.0) (2026-11-12)
 
 
