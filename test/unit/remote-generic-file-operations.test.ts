@@ -1,5 +1,5 @@
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, symlinkSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
 import { AgentExecutor } from "../../src/remote/agent-executor.js";
@@ -112,6 +112,69 @@ describe("generic computer file tools", () => {
     }
   });
 
+  test("Full Admin completes an ordinary project task in the current OS home directory", async () => {
+    const root = mkdtempSync(path.join(homedir(), ".ssh-mcp-real-home-"));
+    const key = generateEd25519PemKeyPair();
+    const agent = new AgentExecutor(createAgentPolicy("full-admin"), key.privateKeyPem);
+    const call = (
+      tool: string,
+      capability: ActionRequestEnvelope["capability"],
+      args: Record<string, unknown>,
+    ) => agent.execute(request(tool, capability, args));
+    try {
+      const folder = path.join(root, "ordinary-project");
+      const source = path.join(folder, "project.txt");
+      const copy = path.join(folder, "copy.txt");
+      const moved = path.join(folder, "moved.txt");
+      expect(
+        (await call("file_manage", "files.write", { operation: "mkdir", path: folder })).status,
+      ).toBe("ok");
+      expect(
+        (await call("file_write", "files.write", { path: source, content: "initial version" }))
+          .status,
+      ).toBe("ok");
+      expect((await call("file_read", "files.read", { path: source })).stdout).toBe(
+        "initial version",
+      );
+      expect(
+        (await call("file_write", "files.write", { path: source, content: "edited version" }))
+          .status,
+      ).toBe("ok");
+      expect(
+        (
+          await call("file_manage", "files.write", {
+            operation: "copy",
+            path: source,
+            destination_path: copy,
+          })
+        ).status,
+      ).toBe("ok");
+      expect(
+        (
+          await call("file_manage", "files.write", {
+            operation: "move",
+            path: copy,
+            destination_path: moved,
+          })
+        ).status,
+      ).toBe("ok");
+      expect((await call("file_read", "files.read", { path: moved })).stdout).toBe(
+        "edited version",
+      );
+      const cli = await call("run_shell", "shell.exec", { command: "node --version", cwd: folder });
+      expect(cli.status).toBe("ok");
+      expect(cli.stdout).toMatch(/^v\d+/u);
+      expect(
+        (await call("file_manage", "files.write", { operation: "remove", path: moved })).status,
+      ).toBe("ok");
+      expect(
+        (await call("file_inspect", "files.read", { operation: "list", path: folder })).status,
+      ).toBe("ok");
+    } finally {
+      agent.dispose();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
   test("never overwrites an existing destination unless explicitly requested", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "ssh-mcp-no-clobber-"));
     const key = generateEd25519PemKeyPair();
@@ -164,6 +227,28 @@ describe("generic computer file tools", () => {
     },
   );
 
+  test("recursive mkdir refuses a destination symlink outside a custom policy", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "ssh-mcp-mkdir-link-"));
+    const outside = mkdtempSync(path.join(tmpdir(), "ssh-mcp-mkdir-external-"));
+    const keys = generateEd25519PemKeyPair();
+    const agent = new AgentExecutor(
+      mergeCustomPolicy({ profile: "full-admin", allowPaths: [root], denyPaths: [] }),
+      keys.privateKeyPem,
+    );
+    try {
+      const link = path.join(root, "linked-directory");
+      symlinkSync(outside, link, process.platform === "win32" ? "junction" : "dir");
+      const result = await agent.execute(
+        request("file_manage", "files.write", { operation: "mkdir", path: link, recursive: true }),
+      );
+      expect(result.status).toBe("error");
+      expect(result.error_code).toBe("POLICY_DENIED");
+    } finally {
+      agent.dispose();
+      rmSync(root, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
+    }
+  });
   test("the same commands never bypass Read-Only and scoped file policies", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "ssh-mcp-restricted-"));
     const outside = mkdtempSync(path.join(tmpdir(), "ssh-mcp-external-"));

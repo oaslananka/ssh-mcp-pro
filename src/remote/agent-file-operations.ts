@@ -165,7 +165,7 @@ async function createComputerDirectory(
   value: unknown,
   recursive: boolean,
 ): Promise<Record<string, unknown>> {
-  const target = await canonicalTarget(policy, value);
+  const target = await assertSafeDestination(policy, value);
   await mkdir(target, { recursive });
   return { operation: "mkdir", path: target, success: true };
 }
