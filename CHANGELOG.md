@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.2](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.7.1...ssh-mcp-pro-v1.7.2) (2026-11-13)
+
+
+### Bug Fixes
+
+* **remote:** enforce destination policy for folder creation ([#252](https://github.com/oaslananka/ssh-mcp-pro/issues/252)) ([f8ebd85](https://github.com/oaslananka/ssh-mcp-pro/commit/f8ebd85f1c74c238c03472f627c9e11769d14fd7))
+
 ## [1.7.1](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.7.0...ssh-mcp-pro-v1.7.1) (2026-11-13)
 
 
