@@ -307,8 +307,13 @@ export class OAuthHandler {
    * the final client callback is deliberately not a permitted form destination.
    * A new document starts an ordinary navigation instead.
    */
-  private continueToGitHub(res: ServerResponse, githubUrl: URL): void {
-    const href = escapeHtml(githubUrl.toString());
+  private continueBrowserNavigation(
+    res: ServerResponse,
+    destination: URL,
+    target: "GitHub" | "Google" | "MCP client",
+  ): void {
+    const href = escapeHtml(destination.toString());
+    const label = target === "MCP client" ? "Return to MCP client" : "Continue with " + target;
     res.writeHead(200, {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
@@ -321,14 +326,18 @@ export class OAuthHandler {
       [
         '<!doctype html><html lang="en"><head><meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
-        "<title>Continue with GitHub — SSH MCP Pro</title>",
+        "<title>",
+        label,
+        " — SSH MCP Pro</title>",
         '<meta http-equiv="refresh" content="0;url=',
         href,
         '">',
         "</head><body>",
-        '<p>Continue to GitHub to sign in.</p><a href="',
+        '<p>Continue securely to the selected destination.</p><a href="',
         href,
-        '">Continue with GitHub</a>',
+        '\">',
+        label,
+        "</a>",
         "</body></html>",
       ].join(""),
     );
@@ -355,7 +364,7 @@ export class OAuthHandler {
       googleUrl.searchParams.set("response_type", "code");
       googleUrl.searchParams.set("scope", "openid email profile");
       googleUrl.searchParams.set("state", transactionId);
-      redirect(res, googleUrl.toString());
+      this.continueBrowserNavigation(res, googleUrl, "Google");
       return;
     }
 
@@ -368,7 +377,7 @@ export class OAuthHandler {
     githubUrl.searchParams.set("redirect_uri", this.config.githubCallbackUrl);
     githubUrl.searchParams.set("scope", "read:user");
     githubUrl.searchParams.set("state", transactionId);
-    this.continueToGitHub(res, githubUrl);
+    this.continueBrowserNavigation(res, githubUrl, "GitHub");
   }
 
   private validateAuthorizeParams(
@@ -496,7 +505,7 @@ export class OAuthHandler {
     destination.searchParams.set("iss", this.config.publicBaseUrl);
     if (pending.state) destination.searchParams.set("state", pending.state);
     res.setHeader("Set-Cookie", this.transactionCookie("").replace("Max-Age=300", "Max-Age=0"));
-    redirect(res, destination.toString());
+    this.continueBrowserNavigation(res, destination, "MCP client");
   }
 
   /** GET /oauth/callback/github */

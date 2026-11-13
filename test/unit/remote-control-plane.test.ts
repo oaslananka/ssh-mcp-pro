@@ -427,20 +427,22 @@ describe("remote control plane remote-agent contracts", () => {
           approval as ServerResponse,
           "/oauth/approve",
         );
-        if (provider === "github") {
-          // A same-origin HTML handoff avoids CSP form-action applying to the
-          // later GitHub -> MCP client redirect chain (ChatGPT/Gemini).
-          expect(approval.statusCode).toBe(200);
-          expect(approval.headers?.Location).toBeUndefined();
-          expect(approval.headers?.["Content-Security-Policy"]).toContain("form-action 'none'");
-          expect(approval.headers?.["Referrer-Policy"]).toBe("no-referrer");
-          expect(approval.body).toContain('<meta http-equiv="refresh"');
-          expect(approval.body).toContain('<a href="https://github.com/login/oauth/authorize?');
-          expect(approval.body).not.toContain("oauth-redirect.googleusercontent.com");
-        } else {
-          expect(approval.statusCode).toBe(302);
-          expect(new URL(String(approval.headers?.Location)).origin).toBe(expectedOrigin);
-        }
+        // A real Chrome form-action check follows redirects through the OAuth
+        // provider all the way to the client's registered callback. Both
+        // providers must end the form navigation in a separate safe document.
+        expect(approval.statusCode).toBe(200);
+        expect(approval.headers?.Location).toBeUndefined();
+        expect(approval.headers?.["Content-Security-Policy"]).toContain("form-action 'none'");
+        expect(approval.headers?.["Referrer-Policy"]).toBe("no-referrer");
+        expect(approval.headers?.["Cache-Control"]).toBe("no-store");
+        expect(approval.body).toContain('<meta http-equiv="refresh"');
+        expect(approval.body).toContain(
+          provider === "github"
+            ? '<a href="https://github.com/login/oauth/authorize?'
+            : '<a href="https://accounts.google.com/o/oauth2/v2/auth?',
+        );
+        expect(approval.body).toContain(expectedOrigin);
+        expect(approval.body).not.toContain("oauth-redirect.googleusercontent.com");
       }
     } finally {
       controlPlane.close();
@@ -761,12 +763,21 @@ describe("remote control plane remote-agent contracts", () => {
         callback as ServerResponse,
         "/oauth/callback/github",
       );
-      expect(callback.statusCode).toBe(302);
-      expect(String(callback.headers?.Location)).toContain("state=app-state");
-      expect(String(callback.headers?.Location)).toContain("code=");
-      expect(new URL(String(callback.headers?.Location)).searchParams.get("iss")).toBe(
-        config.publicBaseUrl,
-      );
+      // The final provider callback must not 302-chain directly to localhost
+      // (Chrome otherwise blocks the full form submission on form-action).
+      expect(callback.statusCode).toBe(200);
+      expect(callback.headers?.Location).toBeUndefined();
+      expect(callback.headers?.["Cache-Control"]).toBe("no-store");
+      expect(callback.headers?.["Referrer-Policy"]).toBe("no-referrer");
+      expect(callback.headers?.["Content-Security-Policy"]).toContain("form-action 'none'");
+      expect(callback.body).toContain('<meta http-equiv="refresh"');
+      const nextHref = /<a href="([^"]+)"/u.exec(callback.body)?.[1]?.replaceAll("&amp;", "&");
+      expect(nextHref).toBeTruthy();
+      const clientCallback = new URL(nextHref!);
+      expect(clientCallback.origin).toBe("http://localhost");
+      expect(clientCallback.searchParams.get("state")).toBe("app-state");
+      expect(clientCallback.searchParams.get("code")).toBeTruthy();
+      expect(clientCallback.searchParams.get("iss")).toBe(config.publicBaseUrl);
     } finally {
       globalThis.fetch = originalFetch;
       controlPlane.close();
