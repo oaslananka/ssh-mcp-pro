@@ -24,7 +24,7 @@ overrides:
   express-rate-limit: ^8.7.3
   fast-uri: ^3.1.9
   glob: ^13.0.7
-  hono: ^4.13.16
+  hono: ^4.13.17
   ip-address: ^10.7.6
   linkify-it: ^5.0.2
   markdown-it: ^14.3.3
