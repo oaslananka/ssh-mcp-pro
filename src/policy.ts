@@ -97,6 +97,19 @@ function matchesAny(value: string, patterns: string[]): boolean {
   return patterns.some((pattern) => compile(pattern)?.test(value));
 }
 
+// A command allowlist must not authorize additional shell operations or expansions.
+// This check applies only when commandAllow is configured; unrestricted command
+// execution retains its existing shell semantics.
+const RESTRICTED_SHELL_SYNTAX = /[;&|<>`$(){}\r\n\0]/u;
+
+function matchesCommandAllow(command: string, patterns: string[]): boolean {
+  if (RESTRICTED_SHELL_SYNTAX.test(command)) {
+    return false;
+  }
+
+  return patterns.some((pattern) => compile(`^(?:${pattern})$`)?.test(command));
+}
+
 function matchesPolicyValue(value: string, policies: string[]): boolean {
   return policies.some((policy) => policy === value || matchesAny(value, [policy]));
 }
@@ -438,7 +451,7 @@ export class PolicyEngine {
 
       if (
         this.config.commandAllow.length > 0 &&
-        !matchesAny(context.command, this.config.commandAllow)
+        !matchesCommandAllow(context.command, this.config.commandAllow)
       ) {
         return denied({
           mode,
