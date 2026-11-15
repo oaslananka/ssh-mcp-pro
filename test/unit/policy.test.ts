@@ -209,6 +209,63 @@ describe("PolicyEngine", () => {
     ).toThrow("outside allowed prefixes");
   });
 
+  test("command allowlists require a full, single-command match", () => {
+    const engine = policy({ commandAllow: ["^git .*"] });
+
+    for (const command of ["git status", "git status --short"]) {
+      expect(engine.check({ action: "proc.exec", command }).allowed).toBe(true);
+    }
+
+    for (const command of [
+      "git status; echo unexpected",
+      "git status && echo unexpected",
+      "git status || echo unexpected",
+      "git status | echo unexpected",
+      "git status\necho unexpected",
+      "git status\recho unexpected",
+      "git status $(echo unexpected)",
+      "git status `echo unexpected`",
+      "git status > unexpected",
+      "git status (echo unexpected)",
+      "git status { echo unexpected; }",
+    ]) {
+      expect(engine.check({ action: "proc.exec", command }).allowed).toBe(false);
+      expect(engine.check({ action: "proc.sudo", command }).allowed).toBe(false);
+    }
+
+    const sudoAllowed = policy({
+      commandAllow: ["^git .*"],
+      allowRawSudo: true,
+    });
+    expect(
+      sudoAllowed.check({
+        action: "proc.sudo",
+        command: "git status && echo blocked",
+        rawSudo: true,
+      }).allowed,
+    ).toBe(false);
+
+    const prefixOnly = policy({ commandAllow: ["^git "] });
+    expect(prefixOnly.check({ action: "proc.exec", command: "git status" }).allowed).toBe(false);
+    expect(prefixOnly.check({ action: "proc.exec", command: "notgit status" }).allowed).toBe(false);
+
+    const unrestricted = policy();
+    expect(
+      unrestricted.check({ action: "proc.exec", command: "git status; echo ok" }).allowed,
+    ).toBe(true);
+  });
+
+  test("rejects pathological allowlist regex inputs without backtracking", () => {
+    const engine = policy({ commandAllow: ["^(a+)+b$"] });
+    const longInput = "a".repeat(16_000);
+    expect(engine.check({ action: "proc.exec", command: longInput }).allowed).toBe(false);
+  });
+
+  test("rejects unsupported allowlist regex syntax rather than allowing a prefix", () => {
+    const engine = policy({ commandAllow: ["^(?=git)git .*"] });
+    expect(engine.check({ action: "proc.exec", command: "git status" }).allowed).toBe(false);
+  });
+
   test("enforces local transfer prefixes separately from remote path policy", () => {
     const engine = policy({
       localPathAllowPrefixes: ["/tmp/allowed"],

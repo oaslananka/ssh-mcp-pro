@@ -33,6 +33,21 @@ Deny lists are checked in addition to allow lists — see
 [docs/how-to/configure-ssh-policy.md](../how-to/configure-ssh-policy.md) for how to use
 both together.
 
+When `commandAllow` is nonempty, each allowed command must match a configured regex
+**in full**, not just a prefix or substring. The policy also rejects shell control,
+redirection and expansion syntax (including command chaining, pipes, newlines, `$`
+expansion and command substitution) even when an allowlist regex would match. For
+example, use `^git status(?: --short)?$` rather than a bare `^git ` prefix.
+Review existing `commandAllow` expressions after upgrading: expressions that
+previously relied on partial matching now fail closed. Allowed command patterns
+use the linear-time RE2 regex syntax; unsupported features such as backreferences
+and lookaround assertions are rejected instead of being executed. When no allowlist
+is configured, existing command execution behavior is unchanged.
+
+Command allowlists are not an operating-system sandbox. Even a permitted executable
+may itself launch other programs, so combine a narrow command policy with
+least-privilege SSH credentials and appropriate host/tool access restrictions.
+
 ## Size/resource bounds
 
 Every buffer- or transfer-related setting has an explicit byte ceiling:

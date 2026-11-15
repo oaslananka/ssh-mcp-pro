@@ -1,4 +1,6 @@
 import { describe, expect, vi, test } from "vitest";
+import { ConfigManager } from "../../src/config.js";
+import { PolicyEngine } from "../../src/policy.js";
 import { ErrorCode } from "../../src/types.js";
 import { createProcessService } from "../../src/process.js";
 import { createAllowPolicy, createSessionInfo, createTestConfig } from "./helpers.js";
@@ -29,6 +31,22 @@ function createDeps() {
 }
 
 describe("createProcessService", () => {
+  test("blocks restricted command chaining before reaching remote SSH", async () => {
+    const { config, execCommand, sessionManager } = createDeps();
+    const policy = new PolicyEngine({
+      ...new ConfigManager().get("policy"),
+      commandAllow: ["^git .*"],
+    });
+    const service = createProcessService({ sessionManager, config, policy } as any);
+
+    await expect(
+      service.execCommand("session-1", "git status; echo blocked"),
+    ).rejects.toMatchObject({
+      code: ErrorCode.EPOLICY,
+    });
+    expect(execCommand).not.toHaveBeenCalled();
+  });
+
   test("executes commands successfully", async () => {
     const { config, execCommand, policy, sessionManager } = createDeps();
     execCommand.mockResolvedValue({ code: 0, stdout: "ok", stderr: "" });

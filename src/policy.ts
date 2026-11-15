@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { posix as posixPath } from "node:path";
+import { RE2JS } from "re2js";
 import { createPolicyError } from "./errors.js";
 import { checkCommandSafety } from "./safety.js";
 import type { PolicyMode } from "./types.js";
@@ -95,6 +96,42 @@ function compile(pattern: string): RegExp | undefined {
 
 function matchesAny(value: string, patterns: string[]): boolean {
   return patterns.some((pattern) => compile(pattern)?.test(value));
+}
+
+// In restrictive mode, a command must not include shell controls or expansions.
+// Use literal character checks here to avoid regex backtracking on untrusted input.
+const RESTRICTED_SHELL_CHARACTERS = [
+  ";",
+  "&",
+  "|",
+  "<",
+  ">",
+  "`",
+  "$",
+  "(",
+  ")",
+  "{",
+  "}",
+  "\\",
+  "\r",
+  "\n",
+  "\0",
+];
+
+function matchesCommandAllow(command: string, patterns: string[]): boolean {
+  if (RESTRICTED_SHELL_CHARACTERS.some((character) => command.includes(character))) {
+    return false;
+  }
+
+  // Configured expressions use RE2 syntax: invalid or unsupported patterns fail closed.
+  // matches() requires the entire input to match, with linear-time matching.
+  return patterns.some((pattern) => {
+    try {
+      return RE2JS.compile(pattern).matches(command);
+    } catch {
+      return false;
+    }
+  });
 }
 
 function matchesPolicyValue(value: string, policies: string[]): boolean {
@@ -438,7 +475,7 @@ export class PolicyEngine {
 
       if (
         this.config.commandAllow.length > 0 &&
-        !matchesAny(context.command, this.config.commandAllow)
+        !matchesCommandAllow(context.command, this.config.commandAllow)
       ) {
         return denied({
           mode,
