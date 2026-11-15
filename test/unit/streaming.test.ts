@@ -1,8 +1,40 @@
 import { describe, expect, vi, test } from "vitest";
+import { ConfigManager } from "../../src/config.js";
+import { PolicyEngine } from "../../src/policy.js";
 import { createStreamingService, formatStreamOutput } from "../../src/streaming.js";
 import { createAllowPolicy, createSessionInfo, createTestConfig } from "./helpers.js";
 
 describe("createStreamingService", () => {
+  test("blocks restricted shell operators before starting an SSH stream", async () => {
+    const execCommand = vi.fn();
+    const policy = new PolicyEngine({
+      ...new ConfigManager().get("policy"),
+      commandAllow: ["^git .*"],
+    });
+    const service = createStreamingService({
+      sessionManager: {
+        getSession: () =>
+          ({
+            info: createSessionInfo(),
+            ssh: { execCommand },
+          }) as any,
+        getOSInfo: async () => {
+          throw new Error("Should not inspect remote OS");
+        },
+      },
+      config: createTestConfig(),
+      policy,
+    });
+
+    await expect(
+      service.execWithStreaming({
+        sessionId: "session-1",
+        command: "git status | echo blocked",
+      }),
+    ).rejects.toMatchObject({ code: "EPOLICY" });
+    expect(execCommand).not.toHaveBeenCalled();
+  });
+
   test("streams stdout and stderr chunks", async () => {
     const execCommand = vi.fn(
       async (

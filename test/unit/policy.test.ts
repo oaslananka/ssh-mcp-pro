@@ -233,6 +233,18 @@ describe("PolicyEngine", () => {
       expect(engine.check({ action: "proc.sudo", command }).allowed).toBe(false);
     }
 
+    const sudoAllowed = policy({
+      commandAllow: ["^git .*"],
+      allowRawSudo: true,
+    });
+    expect(
+      sudoAllowed.check({
+        action: "proc.sudo",
+        command: "git status && echo blocked",
+        rawSudo: true,
+      }).allowed,
+    ).toBe(false);
+
     const prefixOnly = policy({ commandAllow: ["^git "] });
     expect(prefixOnly.check({ action: "proc.exec", command: "git status" }).allowed).toBe(false);
     expect(prefixOnly.check({ action: "proc.exec", command: "notgit status" }).allowed).toBe(false);
