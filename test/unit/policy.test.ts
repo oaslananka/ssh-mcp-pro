@@ -255,6 +255,17 @@ describe("PolicyEngine", () => {
     ).toBe(true);
   });
 
+  test("rejects pathological allowlist regex inputs without backtracking", () => {
+    const engine = policy({ commandAllow: ["^(a+)+b$"] });
+    const longInput = "a".repeat(16_000);
+    expect(engine.check({ action: "proc.exec", command: longInput }).allowed).toBe(false);
+  });
+
+  test("rejects unsupported allowlist regex syntax rather than allowing a prefix", () => {
+    const engine = policy({ commandAllow: ["^(?=git)git .*"] });
+    expect(engine.check({ action: "proc.exec", command: "git status" }).allowed).toBe(false);
+  });
+
   test("enforces local transfer prefixes separately from remote path policy", () => {
     const engine = policy({
       localPathAllowPrefixes: ["/tmp/allowed"],

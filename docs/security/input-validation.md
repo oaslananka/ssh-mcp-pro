@@ -39,8 +39,10 @@ redirection and expansion syntax (including command chaining, pipes, newlines, `
 expansion and command substitution) even when an allowlist regex would match. For
 example, use `^git status(?: --short)?$` rather than a bare `^git ` prefix.
 Review existing `commandAllow` expressions after upgrading: expressions that
-previously relied on partial matching now fail closed. When no allowlist is
-configured, existing command execution behavior is unchanged.
+previously relied on partial matching now fail closed. Allowed command patterns
+use the linear-time RE2 regex syntax; unsupported features such as backreferences
+and lookaround assertions are rejected instead of being executed. When no allowlist
+is configured, existing command execution behavior is unchanged.
 
 Command allowlists are not an operating-system sandbox. Even a permitted executable
 may itself launch other programs, so combine a narrow command policy with
