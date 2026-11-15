@@ -103,7 +103,7 @@ before that label is reconsidered.
 | --- | --- | --- |
 | Visibility | Public | `GET /repos/oaslananka/ssh-mcp-pro` |
 | Default branch | `main` | Same |
-| License | MIT | `LICENSE`, repo metadata `license.spdx_id: MIT` |
+| License | AGPL-3.0-only | `LICENSE`, repo metadata `license.spdx_id: AGPL-3.0-only` |
 | Maintenance signal | Active — created 2026-06-28, commits and one open release PR as of this audit | Commit history, `list_workflow_runs` |
 | Archived/deprecated signal | None found | `archived: false`, `disabled: false` |
 | Primary purpose | MCP server exposing policy-guarded SSH automation tools to LLM clients | `README.md` intro, `package.json` `description` |

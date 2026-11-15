@@ -82,7 +82,7 @@ jobs:
           test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.title" }}')" = "ssh-mcp-pro"
           test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.source" }}')" = "https://github.com/oaslananka/ssh-mcp-pro"
           test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.documentation" }}')" = "https://github.com/oaslananka/ssh-mcp-pro/blob/main/docs/docker.md"
-          test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.licenses" }}')" = "MIT"
+          test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.licenses" }}')" = "AGPL-3.0-only"
           test "$(docker image inspect ssh-mcp-pro:local --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')" = "$(git rev-parse HEAD)"
 
       - name: Scan image for vulnerabilities
