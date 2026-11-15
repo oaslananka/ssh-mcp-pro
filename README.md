@@ -13,7 +13,7 @@
   <a href="https://www.npmjs.com/package/ssh-mcp-pro"><img alt="npm published version" src="https://img.shields.io/npm/v/ssh-mcp-pro?style=flat&amp;logo=npm" /></a>
   <a href="https://github.com/oaslananka/ssh-mcp-pro/releases/latest"><img alt="GitHub release version" src="https://img.shields.io/github/v/release/oaslananka/ssh-mcp-pro?style=flat&amp;label=GitHub%20Release" /></a>
   <a href="#prerequisites"><img alt="Node.js supported major versions: 22, 24, 26" src="https://img.shields.io/badge/Node.js-22%20%7C%2024%20%7C%2026-43853d?style=flat&amp;logo=nodedotjs&amp;logoColor=white" /></a>
-  <a href="LICENSE"><img alt="AGPL-3.0-only license" src="https://img.shields.io/badge/license-AGPL-3.0-only-ffcf33?style=flat" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0--only-blue" alt="AGPL-3.0-only license" /></a>
   <a href="https://oaslananka.github.io/ssh-mcp-pro/"><img alt="API documentation" src="https://img.shields.io/badge/Docs-API-2980b9?style=flat" /></a>
 </p>
 
@@ -21,8 +21,6 @@
   <a href="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml"><img alt="Main CI workflow status" src="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/ci.yml/badge.svg?branch=main" /></a>
   <a href="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/codeql.yml"><img alt="CodeQL analysis workflow status" src="https://github.com/oaslananka/ssh-mcp-pro/actions/workflows/codeql.yml/badge.svg?branch=main" /></a>
 </p>
-
-ssh-mcp-pro is a secure Model Context Protocol (MCP) server for SSH automation. It lets MCP-capable clients open SSH sessions, inspect hosts, run guarded commands, manage files, transfer artifacts, create tunnels, and perform idempotent package or service work through policy-controlled tools.
 
 <p align="center">
   <a href="https://www.npmjs.com/package/ssh-mcp-pro"><img src="https://img.shields.io/npm/dt/ssh-mcp-pro?label=total%20downloads" alt="npm total downloads" /></a>
@@ -35,6 +33,7 @@ ssh-mcp-pro is a secure Model Context Protocol (MCP) server for SSH automation. 
   <a href="https://github.com/oaslananka/ssh-mcp-pro"><img src="https://img.shields.io/github/stars/oaslananka/ssh-mcp-pro?label=Stars&amp;color=8e65d3" alt="Stars" /></a>
 </p>
 
+ssh-mcp-pro is a secure Model Context Protocol (MCP) server for SSH automation. It lets MCP-capable clients open SSH sessions, inspect hosts, run guarded commands, manage files, transfer artifacts, create tunnels, and perform idempotent package or service work through policy-controlled tools.
 
 ## Prerequisites
 
