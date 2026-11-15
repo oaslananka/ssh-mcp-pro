@@ -15,7 +15,7 @@ vocabulary.
 | --- | --- | --- |
 | Project has a public repository with a version-controlled history | Met | github.com/oaslananka/ssh-mcp-pro |
 | Project uses a common distributed version control system (Git) | Met | Git |
-| Project has FLOSS license | Met | `LICENSE` (MIT), `REUSE.toml` |
+| Project has FLOSS license | Met | `LICENSE` (AGPL-3.0-only), `REUSE.toml` |
 | License is OSI-approved | Met | MIT |
 | Documentation: basic description of purpose | Met | README.md intro |
 | Documentation: how to obtain/provide feedback and contribute | Met | CONTRIBUTING.md, SUPPORT.md |

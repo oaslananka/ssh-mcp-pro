@@ -28,7 +28,7 @@ LABEL org.opencontainers.image.title="ssh-mcp-pro" \
       org.opencontainers.image.source="https://github.com/oaslananka/ssh-mcp-pro" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.created="${BUILD_DATE}" \
-      org.opencontainers.image.licenses="MIT"
+      org.opencontainers.image.licenses="AGPL-3.0-only"
 
 ENV NODE_ENV=production
 
