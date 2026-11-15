@@ -6,7 +6,7 @@ LABEL org.opencontainers.image.title="ssh-mcp-pro-test-runner" \
       org.opencontainers.image.url="https://github.com/oaslananka/ssh-mcp-pro" \
       org.opencontainers.image.documentation="https://github.com/oaslananka/ssh-mcp-pro/blob/main/docs/docker.md" \
       org.opencontainers.image.source="https://github.com/oaslananka/ssh-mcp-pro" \
-      org.opencontainers.image.licenses="MIT"
+      org.opencontainers.image.licenses="AGPL-3.0-only"
 
 WORKDIR /app
 

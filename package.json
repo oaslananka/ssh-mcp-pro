@@ -22,7 +22,7 @@
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
-    "LICENSES/MIT.txt",
+    "LICENSES/AGPL-3.0-only.txt",
     "SECURITY.md",
     "SUPPORT.md",
     "REGISTRY_SUBMISSION.md",
@@ -117,7 +117,7 @@
     "infrastructure"
   ],
   "author": "Osman Aslan <oaslananka>",
-  "license": "MIT",
+  "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/oaslananka/ssh-mcp-pro.git"
