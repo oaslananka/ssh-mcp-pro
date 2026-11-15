@@ -12,6 +12,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { createContainer, type AppContainer } from "../../src/container.js";
 import { detectOS } from "../../src/detect.js";
 import { createFsService, type FsService } from "../../src/fs-tools.js";
+import { PolicyEngine } from "../../src/policy.js";
 import { createProcessService, type ProcessService } from "../../src/process.js";
 import { createStreamingService, type StreamingService } from "../../src/streaming.js";
 
@@ -195,6 +196,37 @@ e2eDescribe("SSH MCP Server E2E Tests", () => {
     expect(result.code).toBe(0);
     expect(chunks.length).toBeGreaterThan(0);
     expect(result.stdout).toContain("Line 1");
+  });
+
+  test("enforces restrictive command policy over a real SSH session", async () => {
+    const policy = new PolicyEngine({
+      ...container.config.get("policy"),
+      commandAllow: ["^printf .*"],
+    });
+    const restrictedProcess = createProcessService({
+      sessionManager: container.sessionManager,
+      config: container.config.getAll(),
+      policy,
+    });
+    const restrictedStreaming = createStreamingService({
+      sessionManager: container.sessionManager,
+      config: container.config.getAll(),
+      policy,
+    });
+
+    await expect(restrictedProcess.execCommand(sessionId, "printf SAFE")).resolves.toMatchObject({
+      code: 0,
+      stdout: "SAFE",
+    });
+    await expect(
+      restrictedProcess.execCommand(sessionId, "printf SAFE; printf UNEXPECTED"),
+    ).rejects.toMatchObject({ code: "EPOLICY" });
+    await expect(
+      restrictedStreaming.execWithStreaming({
+        sessionId,
+        command: "printf SAFE | printf UNEXPECTED",
+      }),
+    ).rejects.toMatchObject({ code: "EPOLICY" });
   });
 
   test("closes the session", async () => {
