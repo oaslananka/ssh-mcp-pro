@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.3](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.7.2...ssh-mcp-pro-v1.7.3) (2026-11-15)
+
+
+### Bug Fixes
+
+* **security:** enforce restrictive command allowlist boundaries ([#257](https://github.com/oaslananka/ssh-mcp-pro/issues/257)) ([8668717](https://github.com/oaslananka/ssh-mcp-pro/commit/8668717abeab2c42634e0ad3ad770e28476df844))
+
 ## [1.7.2](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.7.1...ssh-mcp-pro-v1.7.2) (2026-11-13)
 
 
