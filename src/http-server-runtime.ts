@@ -149,43 +149,10 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
 
   function getTrustedAuthority(req: IncomingMessage): string {
     const rawHost = req.headers.host;
-    if (typeof rawHost === "string" && rawHost.length > 0) {
-      const hostname = rawHost.startsWith("[")
-        ? rawHost.slice(1, rawHost.indexOf("]"))
-        : (rawHost.split(":")[0] ?? "");
-
-      if (hostname.length > 0) {
-        const serverIsLoopback =
-          isLoopbackHost(httpConfig.host) ||
-          httpConfig.host === "0.0.0.0" ||
-          httpConfig.host === "";
-        const isLoopbackCandidate = isLoopbackHost(hostname);
-
-        if (serverIsLoopback && isLoopbackCandidate) {
-          return rawHost;
-        }
-
-        if (hostname.toLowerCase() === httpConfig.host.toLowerCase()) {
-          return rawHost;
-        }
-
-        const matchesAllowedOrigin = httpConfig.allowedOrigins.some((origin) => {
-          try {
-            return new URL(origin).hostname.toLowerCase() === hostname.toLowerCase();
-          } catch {
-            return false;
-          }
-        });
-        if (matchesAllowedOrigin) {
-          return rawHost;
-        }
-      }
+    if (rawHost && isLoopbackHost(rawHost.replace(/:\d+$/u, ""))) {
+      return rawHost;
     }
-
-    const fallbackHost =
-      httpConfig.host === "0.0.0.0" || httpConfig.host === "" ? "127.0.0.1" : httpConfig.host;
-    const fallbackPort = activeListeningPort ?? httpConfig.port;
-    return `${fallbackHost}:${fallbackPort}`;
+    return `${httpConfig.host}:${activeListeningPort ?? httpConfig.port}`;
   }
 
   function buildPublicMcpUrl(req: IncomingMessage): string {

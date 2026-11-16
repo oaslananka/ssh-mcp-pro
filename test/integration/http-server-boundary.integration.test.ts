@@ -621,6 +621,19 @@ describe("real HTTP server boundary", () => {
     const poisonedBody = (await poisonedResponse.json()) as { resource: string };
     expect(poisonedBody.resource).not.toContain("attacker.com");
     expect(poisonedBody.resource).toMatch(/^https:\/\/127\.0\.0\.1:\d+\/mcp$/u);
+
+    const emptyHostResponse = await fetch(
+      `${forwarded.baseUrl}/.well-known/oauth-protected-resource`,
+      {
+        headers: {
+          Host: "",
+          "X-Forwarded-Proto": "https",
+        },
+      },
+    );
+    expect(emptyHostResponse.status).toBe(200);
+    const emptyHostBody = (await emptyHostResponse.json()) as { resource: string };
+    expect(emptyHostBody.resource).toMatch(/^https:\/\/127\.0\.0\.1:\d+\/mcp$/u);
   });
 
   test("handles open loopback mode, method rejection, not-found, empty, and malformed bodies", async () => {
@@ -758,6 +771,7 @@ describe("real HTTP server boundary", () => {
     const remote = { handleHttp, handleUpgrade, close };
     const remoteConfig = { ...loadRemoteConfig(), enabled: true };
     const harness = await startHarness({
+      http: { enableLegacySse: true },
       remoteConfig,
       remoteControlPlaneFactory: (() => Promise.resolve(remote)) as never,
     });
