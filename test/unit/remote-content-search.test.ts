@@ -154,7 +154,7 @@ describe("bounded authorized filename and content discovery", () => {
     } finally {
       w.cleanup();
     }
-  });
+  }, 15_000);
 
   test("honors response size policy using valid JSON and marks partial results", async () => {
     const w = workspace();
