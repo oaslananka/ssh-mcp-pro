@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.7.3...ssh-mcp-pro-v1.8.0) (2026-11-16)
+
+
+### Features
+
+* **ecosystem:** Align with 2026 OpenAI, Claude, Gemini, and MCP standards ([#263](https://github.com/oaslananka/ssh-mcp-pro/issues/263)) ([9330c6d](https://github.com/oaslananka/ssh-mcp-pro/commit/9330c6d7003541b7cb8a19a0b6645c969d24c8a0))
+
+
+### Bug Fixes
+
+* **release:** Add Claude plugin and Gemini extension to release-please extra-files ([#265](https://github.com/oaslananka/ssh-mcp-pro/issues/265)) ([05a87d3](https://github.com/oaslananka/ssh-mcp-pro/commit/05a87d3d26399c7cfb94454363450cd135fee9d7))
+* **security:** Remediate audit findings in streaming, tunnels, and HTTP runtime ([#261](https://github.com/oaslananka/ssh-mcp-pro/issues/261)) ([5cc75b1](https://github.com/oaslananka/ssh-mcp-pro/commit/5cc75b1ba27a0927fdd57fbc12c83458eeba1c0e))
+
 ## [1.7.3](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.7.2...ssh-mcp-pro-v1.7.3) (2026-11-15)
 
 
