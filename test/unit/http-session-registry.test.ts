@@ -81,4 +81,29 @@ describe("HttpSessionRegistry", () => {
 
     expect(registry.reserveCapacity()).toEqual({ allowed: false, reason: "capacity-full" });
   });
+
+  it("tracks in-flight reservations to prevent concurrent oversubscription", () => {
+    const registry = new HttpSessionRegistry<TestHttpSession>({
+      maxSessions: 2,
+      sessionIdleTtlMs: 60_000,
+      now: () => 1_000,
+    });
+
+    expect(registry.reserveCapacity()).toEqual({ allowed: true });
+    expect(registry.inFlightCount).toBe(1);
+    expect(registry.reserveCapacity()).toEqual({ allowed: true });
+    expect(registry.inFlightCount).toBe(2);
+    // Capacity full due to in-flight reservations
+    expect(registry.reserveCapacity()).toEqual({ allowed: false, reason: "capacity-full" });
+
+    // Setting a session completes reservation
+    registry.set("s1", { label: "s1", lastSeenAt: 1_000 });
+    expect(registry.inFlightCount).toBe(1);
+    expect(registry.size).toBe(1);
+
+    // Releasing a failed reservation frees a slot
+    registry.releaseReservation();
+    expect(registry.inFlightCount).toBe(0);
+    expect(registry.reserveCapacity()).toEqual({ allowed: true });
+  });
 });

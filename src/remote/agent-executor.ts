@@ -356,7 +356,7 @@ export class AgentExecutor {
   private getSystemStatus(timeoutSeconds: number): Promise<ExecResult> {
     const command =
       process.platform === "win32"
-        ? "Get-ComputerInfo | Select-Object CsName,OsName,OsVersion,CsTotalPhysicalMemory | ConvertTo-Json -Compress"
+        ? "[PSCustomObject]@{CsName=$env:COMPUTERNAME;OsName=(Get-CimInstance Win32_OperatingSystem).Caption;OsVersion=(Get-CimInstance Win32_OperatingSystem).Version;CsTotalPhysicalMemory=(Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory} | ConvertTo-Json -Compress"
         : [
             "uname -a",
             String.raw`{ if command -v uptime >/dev/null 2>&1; then uptime; elif [ -r /proc/uptime ]; then read -r seconds _ < /proc/uptime && printf 'Uptime: %s seconds\n' "$seconds"; else printf 'Uptime unavailable\n' >&2; exit 1; fi; }`,

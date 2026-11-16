@@ -153,7 +153,8 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     }
 
     const protocol = requestProtocol(req);
-    const authority = req.headers.host ?? `localhost:${httpConfig.port}`;
+    const host = isLoopbackHost(httpConfig.host) ? "localhost" : httpConfig.host;
+    const authority = `${host}:${httpConfig.port}`;
     return `${protocol}://${authority}${endpoint}`;
   }
 
@@ -323,51 +324,61 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
           span.setAttribute("mcp.session.id", sessionId);
         }
 
-        if (!session && req.method === "POST" && isInitializeRequest(parsedBody)) {
-          if (!canOpenHttpSession(req, res)) {
+        let reservedCapacity = false;
+        let initializedSessionId: string | undefined;
+        try {
+          if (!session && req.method === "POST" && isInitializeRequest(parsedBody)) {
+            if (!canOpenHttpSession(req, res)) {
+              return;
+            }
+            reservedCapacity = true;
+            const transport = new NodeStreamableHTTPServerTransport({
+              sessionIdGenerator: () => randomUUID(),
+              onsessioninitialized: (newSessionId) => {
+                initializedSessionId = newSessionId;
+                sessions.set(newSessionId, { server, transport, lastSeenAt: now() });
+                logger.info("Streamable HTTP MCP session initialized", { sessionId: newSessionId });
+              },
+            });
+            const server = new SSHMCPServer(container);
+            transport.onclose = () => {
+              const closedSessionId = transport.sessionId;
+              if (closedSessionId) {
+                removeHttpSession(closedSessionId, "transport-closed");
+              }
+            };
+            transport.onerror = (error) => {
+              logger.error("Streamable HTTP MCP transport error", { error: error.message });
+            };
+            await server.connect(transport);
+            session = { server, transport, lastSeenAt: now() };
+          }
+
+          if (!session) {
+            sendJson(req, res, 400, {
+              jsonrpc: "2.0",
+              error: {
+                code: -32000,
+                message: "Bad Request: initialize with POST /mcp or provide a valid MCP-Session-Id",
+              },
+              id: null,
+            });
             return;
           }
-          const transport = new NodeStreamableHTTPServerTransport({
-            sessionIdGenerator: () => randomUUID(),
-            onsessioninitialized: (newSessionId) => {
-              sessions.set(newSessionId, { server, transport, lastSeenAt: now() });
-              logger.info("Streamable HTTP MCP session initialized", { sessionId: newSessionId });
-            },
-          });
-          const server = new SSHMCPServer(container);
-          transport.onclose = () => {
-            const closedSessionId = transport.sessionId;
-            if (closedSessionId) {
-              removeHttpSession(closedSessionId, "transport-closed");
-            }
-          };
-          transport.onerror = (error) => {
-            logger.error("Streamable HTTP MCP transport error", { error: error.message });
-          };
-          await server.connect(transport);
-          session = { server, transport, lastSeenAt: now() };
-        }
 
-        if (!session) {
-          sendJson(req, res, 400, {
-            jsonrpc: "2.0",
-            error: {
-              code: -32000,
-              message: "Bad Request: initialize with POST /mcp or provide a valid MCP-Session-Id",
-            },
-            id: null,
-          });
-          return;
-        }
+          if (!(session.transport instanceof NodeStreamableHTTPServerTransport)) {
+            sendJson(req, res, 400, {
+              error: "Session exists but uses a different transport protocol",
+            });
+            return;
+          }
 
-        if (!(session.transport instanceof NodeStreamableHTTPServerTransport)) {
-          sendJson(req, res, 400, {
-            error: "Session exists but uses a different transport protocol",
-          });
-          return;
+          await session.transport.handleRequest(req, res, parsedBody);
+        } finally {
+          if (reservedCapacity && !initializedSessionId) {
+            sessions.releaseReservation();
+          }
         }
-
-        await session.transport.handleRequest(req, res, parsedBody);
       },
       {
         attributes: {
@@ -385,16 +396,24 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     if (!canOpenHttpSession(req, res)) {
       return;
     }
-    const transport = new SSEServerTransport(legacyMessageEndpoint, res);
-    const sessionId = transport.sessionId;
-    const server = new SSHMCPServer(container);
+    let initialized = false;
+    try {
+      const transport = new SSEServerTransport(legacyMessageEndpoint, res);
+      const sessionId = transport.sessionId;
+      const server = new SSHMCPServer(container);
 
-    transport.onclose = () => {
-      removeHttpSession(sessionId, "legacy-transport-closed");
-    };
-    sessions.set(sessionId, { server, transport, lastSeenAt: now() });
-    await server.connect(transport);
-    logger.warn("Legacy HTTP/SSE MCP session established", { sessionId });
+      transport.onclose = () => {
+        removeHttpSession(sessionId, "legacy-transport-closed");
+      };
+      sessions.set(sessionId, { server, transport, lastSeenAt: now() });
+      initialized = true;
+      await server.connect(transport);
+      logger.warn("Legacy HTTP/SSE MCP session established", { sessionId });
+    } finally {
+      if (!initialized) {
+        sessions.releaseReservation();
+      }
+    }
   }
 
   async function handleLegacyMessage(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -512,6 +531,15 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
           oauthConfigured: Boolean(authConfig.oauthIssuer && authConfig.oauthJwksUrl),
         });
       } else {
+        if (httpConfig.enableLegacySse) {
+          validateHttpStartupConfig(httpConfig, bearerToken, {
+            toolProfile: connectorConfig.toolProfile,
+            allowedHosts: policyConfig.allowedHosts,
+            hostKeyPolicy: container.config.get("security").hostKeyPolicy,
+            authMode: authConfig.mode,
+            oauthConfigured: Boolean(authConfig.oauthIssuer && authConfig.oauthJwksUrl),
+          });
+        }
         remoteControlPlanePromise = remoteControlPlaneFactory();
       }
 
