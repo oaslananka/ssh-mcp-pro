@@ -149,4 +149,23 @@ describe("createStreamingService", () => {
       ]),
     ).toBe("ab");
   });
+
+  test("rejects with timeout when command returns remote timeout exit code 124", async () => {
+    const execCommand = vi.fn(async () => ({ code: 124 }));
+    const service = createStreamingService({
+      sessionManager: {
+        getSession: () => ({ info: createSessionInfo(), ssh: { execCommand } }) as any,
+        getOSInfo: async () => ({ platform: "linux", shell: "bash", defaultShell: "bash" }) as any,
+      },
+      config: createTestConfig(),
+      policy: createAllowPolicy(),
+    });
+
+    await expect(
+      service.execWithStreaming({
+        sessionId: "session-1",
+        command: "sleep 10",
+      }),
+    ).rejects.toMatchObject({ code: "ETIMEOUT" });
+  });
 });

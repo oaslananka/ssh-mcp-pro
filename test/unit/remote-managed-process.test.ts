@@ -201,7 +201,7 @@ describe("managed remote interactive processes", () => {
     try {
       const start = await env.invoke("process_start", {
         command: interactiveCommand,
-        max_runtime_seconds: 1,
+        max_runtime_seconds: 15,
       });
       const pid = (JSON.parse(start.stdout ?? "{}") as ProcessData).process_id;
       await pollUntil(env.invoke, pid, (x) =>

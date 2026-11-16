@@ -78,6 +78,7 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
   const remoteControlPlaneFactory = options.remoteControlPlaneFactory ?? createRemoteControlPlane;
   let remoteControlPlanePromise: ReturnType<typeof createRemoteControlPlane> | undefined;
   let cleanupInterval: NodeJS.Timeout | undefined;
+  let activeListeningPort: number | undefined;
 
   const modernMcp = createMcpHandler(() => new SSHMCPServer(container).getSdkServer(), {
     legacy: "reject",
@@ -146,6 +147,14 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     return isLoopbackHost(httpConfig.host) ? "http" : "https";
   }
 
+  function getTrustedAuthority(req: IncomingMessage): string {
+    const rawHost = req.headers.host;
+    if (rawHost && isLoopbackHost(rawHost.replace(/:\d+$/u, ""))) {
+      return rawHost;
+    }
+    return `${httpConfig.host}:${activeListeningPort ?? httpConfig.port}`;
+  }
+
   function buildPublicMcpUrl(req: IncomingMessage): string {
     const configured = configuredPublicMcpUrl();
     if (configured) {
@@ -153,8 +162,7 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     }
 
     const protocol = requestProtocol(req);
-    const host = isLoopbackHost(httpConfig.host) ? "localhost" : httpConfig.host;
-    const authority = `${host}:${httpConfig.port}`;
+    const authority = getTrustedAuthority(req);
     return `${protocol}://${authority}${endpoint}`;
   }
 
@@ -551,6 +559,7 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
       cleanupInterval.unref?.();
     },
     afterListen: (listeningPort) => {
+      activeListeningPort = listeningPort;
       logger.info("Streamable HTTP MCP server listening", {
         host: httpConfig.host,
         port: listeningPort,
@@ -560,6 +569,7 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     },
     cleanup: async (reason) => {
       logger.info("Shutting down HTTP MCP server", { reason });
+      activeListeningPort = undefined;
       if (cleanupInterval) {
         clearInterval(cleanupInterval);
         cleanupInterval = undefined;
