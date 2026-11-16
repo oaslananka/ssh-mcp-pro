@@ -45,8 +45,18 @@
         },
         {
           "type": "json",
+          "path": "apps/claude/claude-plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
           "path": "apps/google/gemini-app-readiness.json",
           "jsonpath": "$.mcp.version"
+        },
+        {
+          "type": "json",
+          "path": "gemini-extension.json",
+          "jsonpath": "$.version"
         },
         {
           "type": "generic",

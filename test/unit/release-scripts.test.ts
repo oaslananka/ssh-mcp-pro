@@ -23,7 +23,7 @@ describe("release scripts", () => {
     expect(result.stdout).toContain("release configuration is ready");
   });
 
-  it("tracks Gemini version metadata in both release and manual sync contracts", () => {
+  it("tracks ecosystem version metadata in both release and manual sync contracts", () => {
     const config = JSON.parse(fs.readFileSync("release-please-config.json", "utf8")) as {
       packages: Record<
         string,
@@ -35,9 +35,21 @@ describe("release scripts", () => {
       path: "apps/google/gemini-app-readiness.json",
       jsonpath: "$.mcp.version",
     });
+    expect(config.packages["."]["extra-files"]).toContainEqual({
+      type: "json",
+      path: "apps/claude/claude-plugin.json",
+      jsonpath: "$.version",
+    });
+    expect(config.packages["."]["extra-files"]).toContainEqual({
+      type: "json",
+      path: "gemini-extension.json",
+      jsonpath: "$.version",
+    });
 
     const syncScript = fs.readFileSync("scripts/sync-version.mjs", "utf8");
     expect(syncScript).toContain('["apps/google/gemini-app-readiness.json", ["mcp", "version"]]');
+    expect(syncScript).toContain('["apps/claude/claude-plugin.json", ["version"]]');
+    expect(syncScript).toContain('["gemini-extension.json", ["version"]]');
   });
 
   it("reports offline release state as JSON", () => {
