@@ -115,4 +115,28 @@ describe("createTunnelService", () => {
     await expect(service.closeSessionTunnels("session-without-tunnels")).resolves.toBe(0);
     expect(service.listTunnels("session-without-tunnels")).toEqual([]);
   });
+
+  test("handles default remotePort and forwardIn failure in createRemoteForward", async () => {
+    const metrics = createTunnelMetrics();
+    const policy = createAllowPolicy();
+    const forwardIn = vi.fn(async (_host: string, _port: number) => {
+      throw new Error("forward failed");
+    });
+    const service = createTunnelService({
+      sessionManager: {
+        getSession: () =>
+          ({
+            info: createSessionInfo(),
+            ssh: { forwardIn, forwardOut: vi.fn() },
+          }) as any,
+      },
+      metrics,
+      policy,
+    });
+
+    await expect(service.createRemoteForward("session-1", 9000, "localhost")).rejects.toThrow(
+      "Remote tunnel forward failed on localhost:9000: forward failed",
+    );
+    expect(metrics.recordTunnelError).toHaveBeenCalled();
+  });
 });

@@ -1,0 +1,32 @@
+{
+  "name": "ssh-mcp-pro",
+  "version": "1.7.3",
+  "description": "Secure SSH automation and infrastructure inspection connector for Claude",
+  "author": {
+    "name": "Osman Aslan"
+  },
+  "homepage": "https://github.com/oaslananka/ssh-mcp-pro",
+  "repository": "https://github.com/oaslananka/ssh-mcp-pro",
+  "license": "AGPL-3.0-only",
+  "connectors": [
+    {
+      "name": "ssh-mcp-pro",
+      "type": "mcp",
+      "transport": "stdio",
+      "command": "ssh-mcp-pro",
+      "profile": "claude"
+    }
+  ],
+  "skills": [
+    {
+      "name": "ssh-inspect",
+      "path": "skills/ssh-inspect/SKILL.md",
+      "description": "Inspect remote host capabilities, OS details, and network topology safely"
+    },
+    {
+      "name": "ssh-plan-mutation",
+      "path": "skills/ssh-plan-mutation/SKILL.md",
+      "description": "Generate safe, reviewable mutation plans for remote system changes before execution"
+    }
+  ]
+}

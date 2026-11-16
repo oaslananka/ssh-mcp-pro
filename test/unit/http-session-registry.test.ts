@@ -106,4 +106,25 @@ describe("HttpSessionRegistry", () => {
     expect(registry.inFlightCount).toBe(0);
     expect(registry.reserveCapacity()).toEqual({ allowed: true });
   });
+
+  it("handles default now, empty eviction, nonexistent close, and boundary helpers", () => {
+    const defaultRegistry = new HttpSessionRegistry<TestHttpSession>({
+      maxSessions: 1,
+      sessionIdleTtlMs: 1_000,
+    });
+    expect(defaultRegistry.evictOldest()).toBeUndefined();
+    expect(defaultRegistry.close("missing", "manual")).toBe(false);
+    expect(defaultRegistry.getActive(undefined)).toBeUndefined();
+    defaultRegistry.releaseReservation();
+    expect(defaultRegistry.inFlightCount).toBe(0);
+
+    defaultRegistry.set("s1", { label: "s1", lastSeenAt: Date.now() });
+    expect(defaultRegistry.has("s1")).toBe(true);
+    expect(defaultRegistry.has("s2")).toBe(false);
+    expect(Array.from(defaultRegistry.entries())).toHaveLength(1);
+    expect(defaultRegistry.delete("s1")).toBe(true);
+    expect(defaultRegistry.delete("missing")).toBe(false);
+    defaultRegistry.clear();
+    expect(defaultRegistry.size).toBe(0);
+  });
 });
