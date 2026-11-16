@@ -47,7 +47,9 @@ export interface TunnelService {
 }
 
 export interface TunnelServiceDeps {
-  sessionManager: Pick<SessionManager, "getSession">;
+  sessionManager: Pick<SessionManager, "getSession"> & {
+    onSessionClose?: (callback: (sessionId: string) => Promise<void> | void) => void;
+  };
   metrics: Pick<
     MetricsCollector,
     "recordTunnelOpened" | "recordTunnelClosed" | "recordTunnelError"
@@ -114,6 +116,11 @@ class TunnelManager {
     const tunnelId = `tunnel-${Date.now()}-${++this.tunnelCounter}`;
     const targetPort = remotePort ?? localPort;
     const server = net.createServer((socket) => {
+      socket.on("error", (error) => {
+        this.metrics.recordTunnelError();
+        logger.error("Local tunnel socket error", { tunnelId, error });
+        socket.destroy();
+      });
       void session.ssh
         .forwardOut(
           socket.remoteAddress ?? localHost,
@@ -122,6 +129,21 @@ class TunnelManager {
           targetPort,
         )
         .then((channel) => {
+          socket.on("close", () => {
+            try {
+              channel.destroy();
+            } catch {
+              // ignore close errors on already-destroyed channel
+            }
+          });
+          channel.on("error", (error: Error) => {
+            this.metrics.recordTunnelError();
+            logger.error("Local tunnel channel failed", { tunnelId, error });
+            socket.destroy();
+          });
+          channel.on("close", () => {
+            socket.destroy();
+          });
           socket.pipe(channel).pipe(socket);
         })
         .catch((error) => {
@@ -155,6 +177,7 @@ class TunnelManager {
     this.handles.set(tunnelId, {
       close: () =>
         new Promise<void>((resolve, reject) => {
+          (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
           server.close((error) => (error ? reject(error) : resolve()));
         }),
     });
@@ -334,6 +357,12 @@ export function createTunnelService({
   policy,
 }: TunnelServiceDeps): TunnelService {
   const manager = new TunnelManager(sessionManager, metrics, policy);
+
+  if (sessionManager.onSessionClose) {
+    sessionManager.onSessionClose(async (sessionId) => {
+      await manager.closeSessionTunnels(sessionId);
+    });
+  }
 
   return {
     createLocalForward(

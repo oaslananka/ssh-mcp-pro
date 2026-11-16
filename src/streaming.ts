@@ -1,6 +1,6 @@
 import { logger } from "./logging.js";
 import { createTimeoutError } from "./errors.js";
-import { buildRemoteCommand } from "./shell.js";
+import { buildRemoteCommandWithTimeout } from "./shell.js";
 import type { PolicyEngine } from "./policy.js";
 import type { SessionManager } from "./session.js";
 import type { ServerConfig } from "./config.js";
@@ -100,21 +100,31 @@ export function createStreamingService({
     let fullStdout = "";
     let fullStderr = "";
     let truncated = false;
+    const effectiveTimeoutMs = options.timeoutMs ?? config.commandTimeoutMs;
 
     return new Promise((resolve, reject) => {
-      const shellCommand = buildRemoteCommand(command, osInfo, cwd, env);
+      let isTimedOut = false;
+      const shellCommand = buildRemoteCommandWithTimeout(
+        command,
+        osInfo,
+        effectiveTimeoutMs,
+        cwd,
+        env,
+      );
       const timeout = setTimeout(() => {
+        isTimedOut = true;
         reject(
           createTimeoutError(
-            `Streaming command timed out after ${options.timeoutMs ?? config.commandTimeoutMs}ms`,
+            `Streaming command timed out after ${effectiveTimeoutMs}ms`,
             "Increase timeout or use a shorter streaming command.",
           ),
         );
-      }, options.timeoutMs ?? config.commandTimeoutMs);
+      }, effectiveTimeoutMs);
 
       session.ssh
         .execCommand(shellCommand, {
           onStdout: (chunk: Buffer) => {
+            if (isTimedOut) return;
             const data = chunk.toString();
             const bounded = appendBounded(fullStdout, data, config.maxCommandOutputBytes);
             fullStdout = bounded.value;
@@ -131,6 +141,7 @@ export function createStreamingService({
             }
           },
           onStderr: (chunk: Buffer) => {
+            if (isTimedOut) return;
             const data = chunk.toString();
             const bounded = appendBounded(fullStderr, data, config.maxCommandOutputBytes);
             fullStderr = bounded.value;
@@ -149,6 +160,18 @@ export function createStreamingService({
         })
         .then((result) => {
           clearTimeout(timeout);
+          if (isTimedOut) {
+            return;
+          }
+          if (result.code === 124 || result.code === 137 || result.code === 143) {
+            reject(
+              createTimeoutError(
+                `Streaming command timed out after ${effectiveTimeoutMs}ms and remote termination was requested`,
+                "Increase timeout or use a shorter streaming command.",
+              ),
+            );
+            return;
+          }
           if (truncated) {
             const truncatedChunk: StreamChunk = {
               type: "truncated",
@@ -186,6 +209,9 @@ export function createStreamingService({
         })
         .catch((error) => {
           clearTimeout(timeout);
+          if (isTimedOut) {
+            return;
+          }
           reject(error);
         });
     });

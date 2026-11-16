@@ -59,4 +59,31 @@ describe("outbound agent reconnection", () => {
     );
     expect(commands).toEqual(["status"]);
   });
+
+  test("preserves agent runtime state across reconnect attempts", async () => {
+    const receivedStates: unknown[] = [];
+    let attempt = 0;
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      await runAgentCliWithReconnect(
+        ["run"],
+        async (_args, state) => {
+          receivedStates.push(state);
+          attempt += 1;
+          state?.seenActions?.set(`action-${attempt}`, Date.now() + 60_000);
+          if (attempt === 1) {
+            throw new RetryableAgentTransportError("Connection dropped");
+          }
+        },
+        async () => {},
+      );
+    } finally {
+      stderr.mockRestore();
+    }
+    expect(receivedStates.length).toBe(2);
+    expect(receivedStates[0]).toBe(receivedStates[1]);
+    const finalState = receivedStates[1] as { seenActions?: Map<string, number> };
+    expect(finalState.seenActions?.has("action-1")).toBe(true);
+    expect(finalState.seenActions?.has("action-2")).toBe(true);
+  });
 });

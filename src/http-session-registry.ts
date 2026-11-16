@@ -17,6 +17,7 @@ export interface HttpSessionCapacityResult {
 
 export class HttpSessionRegistry<TSession extends HttpSessionRecord> {
   private readonly sessions = new Map<string, TSession>();
+  private inFlightReservations = 0;
   private readonly maxSessions: number;
   private readonly sessionIdleTtlMs: number;
   private readonly now: () => number;
@@ -34,7 +35,22 @@ export class HttpSessionRegistry<TSession extends HttpSessionRecord> {
     return this.sessions.size;
   }
 
+  get inFlightCount(): number {
+    return this.inFlightReservations;
+  }
+
+  has(sessionId: string): boolean {
+    return this.sessions.has(sessionId);
+  }
+
+  releaseReservation(): void {
+    if (this.inFlightReservations > 0) {
+      this.inFlightReservations -= 1;
+    }
+  }
+
   set(sessionId: string, session: TSession): void {
+    this.releaseReservation();
     this.sessions.set(sessionId, session);
   }
 
@@ -54,6 +70,7 @@ export class HttpSessionRegistry<TSession extends HttpSessionRecord> {
   }
 
   clear(): void {
+    this.inFlightReservations = 0;
     this.sessions.clear();
   }
 
@@ -120,12 +137,14 @@ export class HttpSessionRegistry<TSession extends HttpSessionRecord> {
 
   reserveCapacity(): HttpSessionCapacityResult {
     this.cleanupExpired();
-    if (this.sessions.size < this.maxSessions) {
+    if (this.sessions.size + this.inFlightReservations < this.maxSessions) {
+      this.inFlightReservations += 1;
       return { allowed: true };
     }
 
     const evictedSessionId = this.evictOldest("capacity-evict-oldest");
     if (evictedSessionId) {
+      this.inFlightReservations += 1;
       return { allowed: true, evictedSessionId, reason: "capacity-evict-oldest" };
     }
 

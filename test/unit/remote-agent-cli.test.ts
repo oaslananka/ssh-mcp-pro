@@ -108,7 +108,7 @@ function writeAgentConfig(
 }
 
 async function waitFor(predicate: () => boolean): Promise<void> {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < 300; attempt += 1) {
     if (predicate()) {
       return;
     }

@@ -49,5 +49,8 @@ id_*
 *.tmp
 *.temp
 
+# SonarLint
+.sonarlint/
+
 # Generated audit reports
 audit-current.json

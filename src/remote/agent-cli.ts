@@ -325,15 +325,20 @@ function acceptAgentAction(
   return true;
 }
 
-async function runAgent(): Promise<void> {
+export interface AgentRuntimeState {
+  seenActions?: Map<string, number>;
+  seenPolicyUpdateNonces?: Map<string, number>;
+}
+
+async function runAgent(state?: AgentRuntimeState): Promise<void> {
   const config = requireConfig();
   const WebSocketCtor = runtimeWebSocket();
   const executor = new AgentExecutor(config.policy, config.privateKeyPem);
   const activity = new AgentActivityLog(configPath());
   activity.banner(config.alias, config.policy.profile, config.policy.version);
   activity.event("info", "agent_starting", "Agent starting. Preparing outbound connection.");
-  const seenActions = new Map<string, number>();
-  const seenPolicyUpdateNonces = new Map<string, number>();
+  const seenActions = state?.seenActions ?? new Map<string, number>();
+  const seenPolicyUpdateNonces = state?.seenPolicyUpdateNonces ?? new Map<string, number>();
 
   function rememberAction(actionId: string, deadline: string): boolean {
     const now = Date.now();
@@ -553,14 +558,14 @@ function printAgentVersion(): void {
   output(pkg.version);
 }
 
-export async function runAgentCli(argv: string[]): Promise<void> {
+export async function runAgentCli(argv: string[], state?: AgentRuntimeState): Promise<void> {
   const command = argv[0] ?? "help";
   switch (command) {
     case "enroll":
       await enroll(argv.slice(1));
       break;
     case "run":
-      await runAgent();
+      await runAgent(state);
       break;
     case "status":
       status();
@@ -590,11 +595,15 @@ export async function runAgentCli(argv: string[]): Promise<void> {
 /** Keep installed agents online across transient socket failures without re-enrollment. */
 export function runAgentCliWithReconnect(
   argv: string[],
-  run: (args: string[]) => Promise<void> = runAgentCli,
+  run: (args: string[], state?: AgentRuntimeState) => Promise<void> = runAgentCli,
   pause: (delayMs: number) => Promise<void> = (ms) =>
     new Promise((resolve) => setTimeout(resolve, ms)),
 ): Promise<void> {
   let delayMs = 1_000;
+  const state: AgentRuntimeState = {
+    seenActions: new Map<string, number>(),
+    seenPolicyUpdateNonces: new Map<string, number>(),
+  };
   // Schedule each attempt independently so long-lived agents do not retain retry stacks.
   return new Promise<void>((resolve, reject) => {
     function handleFailure(error: unknown): void {
@@ -614,7 +623,7 @@ export function runAgentCliWithReconnect(
 
     function attempt(): void {
       void Promise.resolve()
-        .then(() => run(argv))
+        .then(() => run(argv, state))
         .then(resolve, handleFailure);
     }
 
