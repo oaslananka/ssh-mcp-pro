@@ -27,11 +27,19 @@ if (plugin.version !== pkg.version) {
   );
 }
 
+const knownSkills = new Set(["skills/ssh-inspect/SKILL.md", "skills/ssh-plan-mutation/SKILL.md"]);
+
 for (const skill of plugin.skills ?? []) {
-  const skillFile = `apps/claude/${skill.path}`;
-  if (!existsSync(skillFile)) {
-    throw new Error(`Referenced skill file '${skillFile}' does not exist.`);
+  if (!knownSkills.has(skill.path)) {
+    throw new Error(`Referenced skill file '${skill.path}' is not in known skills.`);
   }
+}
+
+if (
+  !existsSync("apps/claude/skills/ssh-inspect/SKILL.md") ||
+  !existsSync("apps/claude/skills/ssh-plan-mutation/SKILL.md")
+) {
+  throw new Error("Required Claude skill markdown files do not exist.");
 }
 
 console.log("validate-claude-connector: readiness metadata and claude-plugin are consistent.");

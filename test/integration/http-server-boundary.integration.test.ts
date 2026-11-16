@@ -607,6 +607,20 @@ describe("real HTTP server boundary", () => {
     expect(forwardedResponse.status).toBe(200);
     const forwardedBody = (await forwardedResponse.json()) as { resource: string };
     expect(forwardedBody.resource).toMatch(/^https:\/\/127\.0\.0\.1:\d+\/mcp$/u);
+
+    const poisonedResponse = await fetch(
+      `${forwarded.baseUrl}/.well-known/oauth-protected-resource`,
+      {
+        headers: {
+          Host: "attacker.com",
+          "X-Forwarded-Proto": "https",
+        },
+      },
+    );
+    expect(poisonedResponse.status).toBe(200);
+    const poisonedBody = (await poisonedResponse.json()) as { resource: string };
+    expect(poisonedBody.resource).not.toContain("attacker.com");
+    expect(poisonedBody.resource).toMatch(/^https:\/\/127\.0\.0\.1:\d+\/mcp$/u);
   });
 
   test("handles open loopback mode, method rejection, not-found, empty, and malformed bodies", async () => {

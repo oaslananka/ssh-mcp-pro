@@ -78,6 +78,7 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
   const remoteControlPlaneFactory = options.remoteControlPlaneFactory ?? createRemoteControlPlane;
   let remoteControlPlanePromise: ReturnType<typeof createRemoteControlPlane> | undefined;
   let cleanupInterval: NodeJS.Timeout | undefined;
+  let activeListeningPort: number | undefined;
 
   const modernMcp = createMcpHandler(() => new SSHMCPServer(container).getSdkServer(), {
     legacy: "reject",
@@ -146,6 +147,47 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     return isLoopbackHost(httpConfig.host) ? "http" : "https";
   }
 
+  function getTrustedAuthority(req: IncomingMessage): string {
+    const rawHost = req.headers.host;
+    if (typeof rawHost === "string" && rawHost.length > 0) {
+      const hostname = rawHost.startsWith("[")
+        ? rawHost.slice(1, rawHost.indexOf("]"))
+        : (rawHost.split(":")[0] ?? "");
+
+      if (hostname.length > 0) {
+        const serverIsLoopback =
+          isLoopbackHost(httpConfig.host) ||
+          httpConfig.host === "0.0.0.0" ||
+          httpConfig.host === "";
+        const isLoopbackCandidate = isLoopbackHost(hostname);
+
+        if (serverIsLoopback && isLoopbackCandidate) {
+          return rawHost;
+        }
+
+        if (hostname.toLowerCase() === httpConfig.host.toLowerCase()) {
+          return rawHost;
+        }
+
+        const matchesAllowedOrigin = httpConfig.allowedOrigins.some((origin) => {
+          try {
+            return new URL(origin).hostname.toLowerCase() === hostname.toLowerCase();
+          } catch {
+            return false;
+          }
+        });
+        if (matchesAllowedOrigin) {
+          return rawHost;
+        }
+      }
+    }
+
+    const fallbackHost =
+      httpConfig.host === "0.0.0.0" || httpConfig.host === "" ? "127.0.0.1" : httpConfig.host;
+    const fallbackPort = activeListeningPort ?? httpConfig.port;
+    return `${fallbackHost}:${fallbackPort}`;
+  }
+
   function buildPublicMcpUrl(req: IncomingMessage): string {
     const configured = configuredPublicMcpUrl();
     if (configured) {
@@ -153,8 +195,7 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     }
 
     const protocol = requestProtocol(req);
-    const host = isLoopbackHost(httpConfig.host) ? "localhost" : httpConfig.host;
-    const authority = `${host}:${httpConfig.port}`;
+    const authority = getTrustedAuthority(req);
     return `${protocol}://${authority}${endpoint}`;
   }
 
@@ -551,6 +592,7 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
       cleanupInterval.unref?.();
     },
     afterListen: (listeningPort) => {
+      activeListeningPort = listeningPort;
       logger.info("Streamable HTTP MCP server listening", {
         host: httpConfig.host,
         port: listeningPort,
@@ -560,6 +602,7 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     },
     cleanup: async (reason) => {
       logger.info("Shutting down HTTP MCP server", { reason });
+      activeListeningPort = undefined;
       if (cleanupInterval) {
         clearInterval(cleanupInterval);
         cleanupInterval = undefined;
