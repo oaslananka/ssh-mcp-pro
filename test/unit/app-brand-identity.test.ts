@@ -26,15 +26,40 @@ describe("Cross-platform MCP app identity", () => {
     }
   });
 
+  test("ships a portable ChatGPT MCP plugin with the canonical name and DCR", () => {
+    const base = new URL("../../apps/chatgpt/plugin/", import.meta.url);
+    const plugin = JSON.parse(readFileSync(fileURLToPath(new URL("plugin.json", base)), "utf8"));
+    const mcp = JSON.parse(readFileSync(fileURLToPath(new URL("mcp.json", base)), "utf8"));
+    expect(plugin.name).toBe("ssh-mcp-pro");
+    expect(plugin.extensions["com.openai"].interface.displayName).toBe("ssh-mcp-pro");
+    expect(mcp.mcpServers["ssh-mcp-pro"]).toMatchObject({
+      type: "streamable-http",
+      url: "https://ssh-mcp-pro.oaslananka.dev/mcp",
+      extensions: { "com.openai": { auth: { type: "oauth", client: { mode: "dcr" } } } },
+    });
+  });
+
+  test("installs Gemini CLI extension without relying on unbuilt GitHub dist", () => {
+    const fullPath = fileURLToPath(new URL("../../gemini-extension.json", import.meta.url));
+    const ext = JSON.parse(readFileSync(fullPath, "utf8"));
+    expect(ext.name).toBe("ssh-mcp-pro");
+    expect(ext.contextFileName).toBe("AGENTS.md");
+    expect(ext.contextFiles).toBeUndefined();
+    expect(ext.mcpServers["ssh-mcp-pro"]).toMatchObject({
+      command: "npx",
+      args: ["--yes", "ssh-mcp-pro@latest"],
+    });
+  });
+
   test.each([
     "apps/chatgpt/app-readiness.json",
     "apps/claude/connector-readiness.json",
     "apps/google/gemini-app-readiness.json",
-  ])("%s presents the same SSH MCP Pro identity and retains real submission status", (file) => {
+  ])("%s presents the same ssh-mcp-pro identity and retains real submission status", (file) => {
     const fullPath = fileURLToPath(new URL("../../" + file, import.meta.url));
     const manifest = JSON.parse(readFileSync(fullPath, "utf8"));
     const displayName = manifest.app?.name ?? manifest.connector?.name;
-    expect(displayName).toBe("SSH MCP Pro");
+    expect(displayName).toBe("ssh-mcp-pro");
     if (file.includes("/chatgpt/")) expect(manifest.app.icon).toBe("assets/brand/icon-512.png");
     expect(manifest.publishReady).toBe(false);
     expect(manifest.mcp.packageName).toBe("ssh-mcp-pro");

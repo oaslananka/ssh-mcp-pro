@@ -18,7 +18,7 @@
     "legacySse": "compatibility-only"
   },
   "connector": {
-    "name": "SSH MCP Pro",
+    "name": "ssh-mcp-pro",
     "runtimeProfile": "claude",
     "credentialProviders": [
       "agent",

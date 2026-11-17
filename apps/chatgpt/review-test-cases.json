@@ -2,7 +2,7 @@
   "positive": [
     {
       "description": "Check the connection health",
-      "prompt": "Check the status of my SSH MCP Pro connector. Do not change any devices.",
+      "prompt": "Check the status of my ssh-mcp-pro connector. Do not change any devices.",
       "tools_triggered": [
         "connector_status"
       ],
@@ -27,7 +27,7 @@
     },
     {
       "description": "Explain a write-policy decision",
-      "prompt": "Without changing anything, explain whether changing a file on my SSH host would be permitted by the current SSH MCP Pro policy.",
+      "prompt": "Without changing anything, explain whether changing a file on my SSH host would be permitted by the current ssh-mcp-pro policy.",
       "tools_triggered": [
         "ssh_policy_explain"
       ],

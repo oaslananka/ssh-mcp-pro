@@ -21,7 +21,7 @@
     "recommendedProductionTransport": "streamable-http"
   },
   "app": {
-    "name": "SSH MCP Pro",
+    "name": "ssh-mcp-pro",
     "description": "Secure SSH inspection and policy-controlled planning through MCP.",
     "categories": [
       "Developer Tools",
@@ -39,7 +39,8 @@
     "credentialEntryInChat": false,
     "protectedResourceMetadata": "/.well-known/oauth-protected-resource",
     "productionAuth": "oauth-jwks",
-    "developmentAuth": "bearer"
+    "developmentAuth": "bearer",
+    "name": "ssh-mcp-pro"
   },
   "security": {
     "readOnlyDefaultProfile": true,

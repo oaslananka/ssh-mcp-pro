@@ -1,5 +1,5 @@
 <div class="docs-hero">
-  <span class="docs-kicker">SSH MCP Pro · API reference</span>
+  <span class="docs-kicker">ssh-mcp-pro · API reference</span>
   <h2>SSH automation, with control built in.</h2>
   <p>Integrate SSH workflows into MCP clients with strict host verification, scoped sessions and clear operational policies. Find the API you need without digging through configuration tables.</p>
   <div class="docs-hero-actions">

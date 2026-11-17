@@ -1,5 +1,5 @@
 export const EXPERIENCE_STYLES = `
-/* SSH MCP Pro · Luminous ink. Art direction: confident / approachable / precise.
+/* ssh-mcp-pro · Luminous ink. Art direction: confident / approachable / precise.
    Focus: legibility, obvious actions and stable desktop/mobile layouts. */
 :root {
   --accent-blue:#3478f6;

@@ -14,6 +14,7 @@ const jsonTargets = [
   ["apps/claude/claude-plugin.json", ["version"]],
   ["apps/google/gemini-app-readiness.json", ["mcp", "version"]],
   ["gemini-extension.json", ["version"]],
+  ["apps/chatgpt/plugin/plugin.json", ["version"]],
 ];
 
 const textTargets = [{ file: "src/mcp.ts", pattern: /export const SERVER_VERSION = "([^"]+)";/u }];

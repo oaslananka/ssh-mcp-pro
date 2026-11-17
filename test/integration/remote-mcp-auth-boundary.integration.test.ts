@@ -501,7 +501,7 @@ describe("remote-agent MCP real HTTP authorization boundary", () => {
       result: {
         protocolVersion: "2025-06-18",
         capabilities: { tools: {} },
-        serverInfo: { name: "sshautomator-remote-agent" },
+        serverInfo: { name: "ssh-mcp-pro" },
       },
     });
   });

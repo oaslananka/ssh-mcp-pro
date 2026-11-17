@@ -19,7 +19,7 @@
     "recommendedProductionTransport": "streamable-http"
   },
   "app": {
-    "name": "SSH MCP Pro",
+    "name": "ssh-mcp-pro",
     "description": "Secure SSH automation and infrastructure inspection for Gemini and Vertex AI agents.",
     "categories": [
       "Developer Tools",

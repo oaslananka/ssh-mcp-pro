@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="brandtitle">
-  <title id="brandtitle">SSH MCP Pro</title>
+  <title id="brandtitle">ssh-mcp-pro</title>
   <defs>
     <linearGradient id="outer" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#165ca3"/><stop offset="1" stop-color="#071b48"/></linearGradient>
     <linearGradient id="screen" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#21dfec"/><stop offset="1" stop-color="#1572cc"/></linearGradient>

@@ -15,7 +15,7 @@ export function renderDashboardHtml(
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>SSH MCP Pro · Connect your devices to AI</title>
+  <title>ssh-mcp-pro · Connect your devices to AI</title>
   <meta name="theme-color" content="#10111F">
   <meta name="description" content="Connect your own devices to ChatGPT, Claude and Gemini with controlled SSH MCP access.">
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=${DASHBOARD_BRAND_FINGERPRINT}">
@@ -32,9 +32,9 @@ ${AI_CLIENT_STYLES}</style>
 </head>
 <body>
   <header class="public-header">
-    <a class="logo-area" href="/" aria-label="SSH MCP Pro home">
-      <img class="brand-mark" src="/brand/ssh-mcp-pro-icon.png?v=${DASHBOARD_BRAND_FINGERPRINT}" width="46" height="46" alt="SSH MCP Pro">
-      <span><span class="brand-title">SSH MCP Pro</span><span class="brand-sub">Your computers, connected to AI</span></span>
+    <a class="logo-area" href="/" aria-label="ssh-mcp-pro home">
+      <img class="brand-mark" src="/brand/ssh-mcp-pro-icon.png?v=${DASHBOARD_BRAND_FINGERPRINT}" width="46" height="46" alt="ssh-mcp-pro">
+      <span><span class="brand-title">ssh-mcp-pro</span><span class="brand-sub">Your computers, connected to AI</span></span>
     </a>
     <div class="user-area" id="headerUserArea"></div>
   </header>
@@ -99,7 +99,7 @@ ${AI_CLIENT_STYLES}</style>
         return;
       }
       const pageMeta = {
-        devices: { title: 'Your devices', description: 'The computers and servers you have connected to SSH MCP Pro.' },
+        devices: { title: 'Your devices', description: 'The computers and servers you have connected to ssh-mcp-pro.' },
         'add-device': { title: 'Connect a device', description: 'Add a computer you own and choose what AI can do on it.' },
         clients: { title: 'Connect an AI app', description: 'Use the same secure MCP connection in the assistant you prefer.' },
         'ai-clients': { title: 'AI clients', description: 'Manage AI assistants authorized for your account.' },
@@ -125,9 +125,9 @@ ${AI_CLIENT_STYLES}</style>
       root.innerHTML = \`
         <div class="workspace-shell">
           <aside class="workspace-sidebar">
-            <a href="/dashboard" class="sidebar-brand" aria-label="SSH MCP Pro workspace">
-              <img src="/brand/ssh-mcp-pro-icon.png?v=${DASHBOARD_BRAND_FINGERPRINT}" alt="SSH MCP Pro" width="46" height="46" class="brand-mark">
-              <span><strong>SSH MCP Pro</strong><small>Cloud workspace</small></span>
+            <a href="/dashboard" class="sidebar-brand" aria-label="ssh-mcp-pro workspace">
+              <img src="/brand/ssh-mcp-pro-icon.png?v=${DASHBOARD_BRAND_FINGERPRINT}" alt="ssh-mcp-pro" width="46" height="46" class="brand-mark">
+              <span><strong>ssh-mcp-pro</strong><small>Cloud workspace</small></span>
             </a>
             <p class="sidebar-label">WORKSPACE</p>
             <nav class="workspace-nav" aria-label="Workspace navigation">
@@ -220,7 +220,7 @@ ${AI_CLIENT_STYLES}</style>
               <p class="landing-small-note">Already connected a device? Sign in with the same account to find it.</p>
               <p id="providerSetup" class="device-scope-note" role="status" hidden>Local sign-in is not configured yet. Configure a supported OAuth provider or use the <a href="https://ssh-mcp-pro.oaslananka.dev/">hosted dashboard</a>.</p>
             </div>
-            <div class="product-stage" aria-label="Illustration of SSH MCP Pro connecting AI clients to your device. Not a live session.">
+            <div class="product-stage" aria-label="Illustration of ssh-mcp-pro connecting AI clients to your device. Not a live session.">
               <div class="stage-overline">WORK WITH YOUR FAVORITE ASSISTANT</div>
               <div class="stage-clients">
                 <div class="assistant-chip"><span class="assistant-mark gpt-mark" aria-hidden="true">✳</span> ChatGPT</div>
@@ -230,7 +230,7 @@ ${AI_CLIENT_STYLES}</style>
               <div class="stage-connector" aria-hidden="true"><span></span><i></i><span></span></div>
               <div class="stage-gateway">
                 <img src="/brand/ssh-mcp-pro-icon.png?v=${DASHBOARD_BRAND_FINGERPRINT}" width="64" height="64" alt="" aria-hidden="true">
-                <div><strong>SSH MCP Pro</strong><small>One secure connection. Your rules.</small></div>
+                <div><strong>ssh-mcp-pro</strong><small>One secure connection. Your rules.</small></div>
                 <span class="stage-shield" aria-label="Policy controlled">✓</span>
               </div>
               <div class="stage-connector short" aria-hidden="true"><span></span><i></i><span></span></div>
@@ -306,7 +306,7 @@ ${AI_CLIENT_STYLES}</style>
                   </details>
                 </div>
               </div>
-              \${!dev.isLiveConnected && dev.status !== 'revoked' ? '<div class="device-offline-tip">Agent offline — start SSH MCP Pro Agent on this computer to reconnect. <a href="https://github.com/oaslananka/ssh-mcp-pro/blob/main/docs/adding-a-device.md" target="_blank" rel="noopener noreferrer">Connection help</a></div>' : ''}
+              \${!dev.isLiveConnected && dev.status !== 'revoked' ? '<div class="device-offline-tip">Agent offline — start ssh-mcp-pro Agent on this computer to reconnect. <a href="https://github.com/oaslananka/ssh-mcp-pro/blob/main/docs/adding-a-device.md" target="_blank" rel="noopener noreferrer">Connection help</a></div>' : ''}
             </article>
           \`).join('')}
           </div>
@@ -723,7 +723,7 @@ ${AI_CLIENT_STYLES}</style>
     renderHeader();
     renderApp();
   </script>
-  <footer class="site-footer"><span>SSH MCP Pro · Designed for controlled remote operations</span><span><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="https://github.com/oaslananka/ssh-mcp-pro/issues" rel="noopener noreferrer">Support</a></span></footer>
+  <footer class="site-footer"><span>ssh-mcp-pro · Designed for controlled remote operations</span><span><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="https://github.com/oaslananka/ssh-mcp-pro/issues" rel="noopener noreferrer">Support</a></span></footer>
 </body>
 </html>`;
 }

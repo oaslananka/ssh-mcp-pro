@@ -1,4 +1,4 @@
-# Claude Plugin & Connector Integration
+# ssh-mcp-pro · Claude connectors and plugins
 
 This directory packages `ssh-mcp-pro` as an Anthropic Claude Plugin and MCP Connector following the official [Claude Plugins Guide](https://claude.com/docs/plugins/build), [Claude Connectors Guide](https://claude.com/docs/connectors/building/index), and [Directory Publishing Guide](https://claude.com/docs/directory/publish).
 
@@ -46,6 +46,12 @@ Or connect via Streamable HTTP:
   }
 }
 ```
+
+## Claude Web custom connector
+
+In [Claude Customize → Connectors](https://claude.ai/customize/connectors), choose **Add custom connector**. Set the user-visible name to **ssh-mcp-pro**, connect https://ssh-mcp-pro.oaslananka.dev/mcp, select OAuth **Register automatically** (DCR), then sign in and grant the minimal requested scopes. Existing user-assigned connector names in Claude are not automatically renamed by an MCP server update; update or recreate the connection only if needed.
+
+The public endpoint must be reachable over HTTPS port 443 from Anthropic infrastructure. Claude Code's local plugin/stdio workflow is independent of Claude Web custom connectors. Test authenticated tools/list, a read-only tool, client isolation, disconnect/reconnect and token refresh before declaring hosted connector acceptance.
 
 ## Directory Publishing Checklist
 
