@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.9.0...ssh-mcp-pro-v1.10.0) (2026-11-17)
+
+
+### Features
+
+* **web:** make device onboarding and SSH MCP Pro workspace task-first ([#273](https://github.com/oaslananka/ssh-mcp-pro/issues/273)) ([aefded7](https://github.com/oaslananka/ssh-mcp-pro/commit/aefded7e6a7012cf9925c8ecb60ac32fb0177c8e))
+
 ## [1.9.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.8.2...ssh-mcp-pro-v1.9.0) (2026-11-17)
 
 
