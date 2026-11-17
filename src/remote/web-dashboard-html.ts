@@ -129,7 +129,7 @@ ${EXPERIENCE_STYLES}</style>
               \${currentUser.serviceOwner ? navItem('usage', 'Usage & Users') : ''}
             </nav>
             <div class="sidebar-bottom">
-              <div class="sidebar-help"><span class="live-indicator" aria-hidden="true"></span><span>Cloud connection active</span></div>
+              <div class="sidebar-help" title="Cloud service availability is separate from each device connection."><span class="live-indicator" aria-hidden="true"></span><span>Cloud service online</span></div>
               <div class="sidebar-account">
                 <span class="account-avatar" aria-hidden="true">\${escapeHtml((currentUser.displayName || currentUser.id || 'S').slice(0, 1).toUpperCase())}</span>
                 <span class="sidebar-account-text"><strong>\${escapeHtml(currentUser.displayName || 'Signed in')}</strong><small>\${escapeHtml(currentUser.provider === 'github' ? 'GitHub account' : 'Google account')}</small></span>
@@ -153,7 +153,7 @@ ${EXPERIENCE_STYLES}</style>
                   <strong>\${devicesError ? 'Device status unavailable' : !devicesLoaded ? 'Checking your devices…' : online > 0 ? "You're ready to work" : total > 0 ? 'Your devices are offline' : 'Connect your first device'}</strong>
                   <span>\${devicesError ? 'Please retry to check the current device status' : !devicesLoaded ? 'Loading live connection status' : online > 0 ? online + ' connected device' + (online === 1 ? '' : 's') + ' · Connect an AI app to start' : total > 0 ? 'Check the agent on your computer to reconnect' : 'Your AI assistant needs a connected computer to get started'}</span>
                 </div></div>
-                <button class="btn btn-soft" type="button" onclick="\${online > 0 ? "switchTab('clients')" : total > 0 ? 'retryDevices()' : "switchTab('add-device')"}">\${online > 0 ? 'Connect an AI app' : total > 0 ? 'Check connection' : 'Connect a device'} <span aria-hidden="true">→</span></button>
+                \${devicesLoaded && !devicesError && total > 0 ? \`<button class="btn btn-soft" type="button" onclick="\${online > 0 ? "switchTab('clients')" : 'retryDevices()'}">\${online > 0 ? 'Connect an AI app' : 'Check connection'} <span aria-hidden="true">→</span></button>\` : ''}
               </section>
               \${!devicesLoaded ? '' : total > 0 ? '<p class="device-scope-note" role="note">Showing devices for your ' + escapeHtml(currentUser.provider === 'github' ? 'GitHub' : 'Google') + ' account. Other sign-in providers have separate device lists.</p>' : ''}
             \` : ''}
@@ -264,7 +264,6 @@ ${EXPERIENCE_STYLES}</style>
             <div class="empty-next-step">Next: <strong>Connect an AI app</strong> after the device is online.</div>
           </div>\`;
         }
-        const hasLiveDevice = devicesList.some(d => d.isLiveConnected);
         return \`<section class="device-list-card card" aria-label="Your enrolled devices">
           <div class="device-list-heading"><div><h2>Your devices</h2><p>\${devicesList.length} enrolled · \${devicesList.filter(d => d.isLiveConnected).length} online</p></div><div class="device-list-tools"><button class="btn btn-outline btn-sm" type="button" onclick="switchTab('audit')">Open activity</button> <button class="btn btn-outline btn-sm" type="button" onclick="loadDevices()">Refresh</button></div></div>
           <div class="device-list-body">
@@ -300,15 +299,7 @@ ${EXPERIENCE_STYLES}</style>
           \`).join('')}
           </div>
         </section>
-        <section class="assistant-next-step" aria-label="Next step: connect an AI assistant">
-          <div class="assistant-next-copy">
-            <span class="eyebrow">NEXT STEP</span>
-            <h2>\${hasLiveDevice ? 'Bring these devices into your AI chat.' : 'Reconnect your device'}</h2>
-            <p>\${hasLiveDevice ? 'Connect ChatGPT, Claude or Gemini using your SSH MCP Pro endpoint. The same device permissions apply.' : 'Start SSH MCP Pro Agent on an enrolled device, then check its connection before using AI.'}</p>
-            <div class="assistant-next-badges" \${hasLiveDevice ? '' : 'hidden'}><span>ChatGPT</span><span>Claude</span><span>Gemini</span></div>
-          </div>
-          <button class="btn btn-primary" type="button" onclick="\${hasLiveDevice ? "switchTab('clients')" : 'loadDevices()'}">\${hasLiveDevice ? 'Set up an AI connection' : 'Check connection'} <span aria-hidden="true">→</span></button>
-        </section>\`;
+        \`;
       }
 
       if (activeTab === 'add-device') {
