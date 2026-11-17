@@ -67,9 +67,15 @@ describe("provider authorization-code identity exchange", () => {
   test("returns validated Google identity with optional picture", async () => {
     const mock = vi
       .fn()
-      .mockResolvedValueOnce({ json: async () => ({ access_token: "provider-token" }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: "provider-token" }) })
       .mockResolvedValueOnce({
-        json: async () => ({ sub: "google-user", email: "user@example.test", name: "User" }),
+        ok: true,
+        json: async () => ({
+          sub: "google-user",
+          email: "user@example.test",
+          name: "User",
+          email_verified: true,
+        }),
       });
     vi.stubGlobal("fetch", mock);
     await expect(exchangeGoogleIdentity(googleConfig, "code")).resolves.toEqual({
@@ -121,12 +127,73 @@ describe("provider authorization-code identity exchange", () => {
     expect(body.get("grant_type")).toBe("authorization_code");
   });
   test("rejects a Google token response without an access token", async () => {
-    const mock = vi.fn().mockResolvedValue({ json: async () => ({ error: "invalid_grant" }) });
+    const mock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, json: async () => ({ error: "invalid_grant" }) });
     vi.stubGlobal("fetch", mock);
     await expect(exchangeGoogleIdentity(googleConfig, "bad-code")).rejects.toMatchObject({
       code: "INVALID_TOKEN",
       status: 502,
     });
     expect(mock).toHaveBeenCalledTimes(1);
+  });
+
+  test("rejects non-2xx Google token exchange even when a token-shaped body is returned", async () => {
+    const mock = vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ access_token: "should-not-be-used" }),
+    });
+    vi.stubGlobal("fetch", mock);
+    await expect(exchangeGoogleIdentity(googleConfig, "code")).rejects.toMatchObject({
+      code: "INVALID_TOKEN",
+      status: 502,
+    });
+    expect(mock).toHaveBeenCalledTimes(1);
+  });
+
+  test("rejects non-2xx Google UserInfo response even when it contains a verified identity", async () => {
+    const mock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: "provider-token" }) })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({
+          sub: "google-user",
+          email: "user@example.test",
+          email_verified: true,
+        }),
+      });
+    vi.stubGlobal("fetch", mock);
+    await expect(exchangeGoogleIdentity(googleConfig, "code")).rejects.toMatchObject({
+      code: "INVALID_TOKEN",
+      status: 502,
+    });
+    expect(mock).toHaveBeenCalledTimes(2);
+  });
+
+  test.each([
+    ["missing", undefined],
+    ["false", false],
+    ["string", "true"],
+    ["number", 1],
+    ["null", null],
+  ])("rejects %s Google email verification", async (_case, emailVerified) => {
+    const mock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: "provider-token" }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          sub: "google-user",
+          email: "user@example.test",
+          email_verified: emailVerified,
+        }),
+      });
+    vi.stubGlobal("fetch", mock);
+    await expect(exchangeGoogleIdentity(googleConfig, "code")).rejects.toMatchObject({
+      code: "INVALID_TOKEN",
+      status: 502,
+    });
+    expect(mock).toHaveBeenCalledTimes(2);
   });
 });
