@@ -10,7 +10,12 @@
             "type": "oauth",
             "client": {
               "mode": "dcr"
-            }
+            },
+            "defaultScopes": [
+              "hosts:read",
+              "agents:read",
+              "status:read"
+            ]
           }
         }
       }

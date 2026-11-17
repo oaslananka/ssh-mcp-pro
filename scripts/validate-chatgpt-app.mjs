@@ -30,6 +30,8 @@ if (
   server?.type !== "streamable-http" ||
   server?.extensions?.["com.openai"]?.auth?.client?.mode !== "dcr" ||
   server?.extensions?.["com.openai"]?.auth?.type !== "oauth" ||
+  JSON.stringify(server?.extensions?.["com.openai"]?.auth?.defaultScopes) !==
+    JSON.stringify(["hosts:read", "agents:read", "status:read"]) ||
   !existsSync("apps/chatgpt/plugin/assets/icon-512.png")
 ) {
   throw new Error("Portable ChatGPT plugin identity, OAuth, or assets are not aligned.");
