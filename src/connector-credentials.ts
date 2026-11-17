@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { z } from "zod";
 import type { ServerConfig } from "./config.js";
 import { resolveSSHHost } from "./ssh-config.js";
@@ -105,6 +105,41 @@ async function resolveCommandCredentials(
   };
 }
 
+const credentialHelpersPendingTermination = new Set<ChildProcessWithoutNullStreams>();
+const CREDENTIAL_TERMINATION_GRACE_MS = 300;
+
+function terminateCredentialHelper(
+  child: ChildProcessWithoutNullStreams,
+): NodeJS.Timeout | undefined {
+  // Never start another helper until this child has actually closed.
+  credentialHelpersPendingTermination.add(child);
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return undefined;
+  }
+
+  try {
+    child.kill("SIGTERM");
+  } catch {
+    // Keep the admission guard in place until the close event is observed.
+  }
+
+  const escalation = setTimeout(() => {
+    if (
+      credentialHelpersPendingTermination.has(child) &&
+      child.exitCode === null &&
+      child.signalCode === null
+    ) {
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        // Unconfirmed termination remains fail-closed.
+      }
+    }
+  }, CREDENTIAL_TERMINATION_GRACE_MS);
+  escalation.unref();
+  return escalation;
+}
+
 async function runCredentialCommand(
   request: ConnectorCredentialRequest,
   config: ServerConfig["connector"],
@@ -112,6 +147,9 @@ async function runCredentialCommand(
   const command = config.credentialCommand;
   if (!command) {
     throw new Error("Credential command is not configured.");
+  }
+  if (credentialHelpersPendingTermination.size > 0) {
+    throw new Error("Previous credential command termination is not yet confirmed.");
   }
 
   const input = JSON.stringify(request);
@@ -128,32 +166,57 @@ async function runCredentialCommand(
       },
     });
 
-    const timeout = setTimeout(() => {
-      child.kill();
-      reject(new Error("Credential command timed out."));
-    }, timeoutMs);
-
+    let finished = false;
     let stdout = "";
     let stdoutBytes = 0;
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => {
-      stdoutBytes += Buffer.byteLength(chunk);
-      if (stdoutBytes > 32 * 1024) {
-        child.kill();
-        reject(new Error("Credential command output exceeded 32 KiB."));
+    let escalation: NodeJS.Timeout | undefined;
+    let failureTimer: NodeJS.Timeout | undefined;
+    let failure: Error | undefined;
+
+    const settleFailure = () => {
+      if (failure) {
+        const error = failure;
+        failure = undefined;
+        reject(error);
+      }
+    };
+
+    const fail = (error: Error) => {
+      if (finished) {
         return;
       }
-      stdout += chunk;
-    });
-    child.stderr.resume();
+      finished = true;
+      clearTimeout(timeout);
+      failure = error;
+      escalation = terminateCredentialHelper(child);
+      // A failed helper is not reusable. Give it a bounded close window;
+      // retain the admission guard if even forced termination cannot confirm closure.
+      failureTimer = setTimeout(settleFailure, CREDENTIAL_TERMINATION_GRACE_MS + 700);
+      failureTimer.unref();
+    };
+
+    const timeout = setTimeout(() => {
+      fail(new Error("Credential command timed out."));
+    }, timeoutMs);
 
     child.on("error", (error) => {
-      clearTimeout(timeout);
-      reject(error);
+      fail(error);
     });
-
     child.on("close", (code) => {
       clearTimeout(timeout);
+      if (escalation) {
+        clearTimeout(escalation);
+      }
+      credentialHelpersPendingTermination.delete(child);
+      if (failureTimer) {
+        clearTimeout(failureTimer);
+      }
+      if (finished) {
+        settleFailure();
+        return;
+      }
+      finished = true;
+
       if (code !== 0) {
         reject(new Error("Credential command failed."));
         return;
@@ -167,6 +230,34 @@ async function runCredentialCommand(
       }
     });
 
-    child.stdin.end(input);
+    child.stdin.on("error", (error) => {
+      fail(new Error("Credential command input stream failed.", { cause: error }));
+    });
+    child.stdout.on("error", (error) => {
+      fail(new Error("Credential command output stream failed.", { cause: error }));
+    });
+    child.stderr.on("error", (error) => {
+      fail(new Error("Credential command error stream failed.", { cause: error }));
+    });
+
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      if (finished) {
+        return;
+      }
+      stdoutBytes += Buffer.byteLength(chunk);
+      if (stdoutBytes > 32 * 1024) {
+        fail(new Error("Credential command output exceeded 32 KiB."));
+        return;
+      }
+      stdout += chunk;
+    });
+    child.stderr.resume();
+
+    try {
+      child.stdin.end(input);
+    } catch (error) {
+      fail(new Error("Credential command input stream failed.", { cause: error }));
+    }
   });
 }

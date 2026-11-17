@@ -1,6 +1,6 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 import { DEFAULT_CONFIG, type ServerConfig } from "../../src/config.js";
 import { resolveConnectorCredentials } from "../../src/connector-credentials.js";
@@ -153,6 +153,53 @@ describe("connector credential resolver", () => {
       ),
     ).rejects.toThrow("auth=key requires privateKeyPath");
   });
+
+  test.skipIf(process.platform === "win32")(
+    "escalates a non-cooperative helper and blocks admission until confirmed close",
+    async () => {
+      const helper = writeResolverScript("");
+      const pidFile = join(dirname(helper), "helper.pid");
+      writeFileSync(
+        helper,
+        [
+          'import { writeFileSync } from "node:fs";',
+          `writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));`,
+          'process.on("SIGTERM", () => {});',
+          "setInterval(() => {}, 1000);",
+        ].join("\n"),
+      );
+      const pending = resolveConnectorCredentials(
+        { hostAlias: "prod", purpose: "inspect" },
+        configFor(helper, { credentialCommandTimeoutMs: 350 }),
+      );
+
+      for (let attempt = 0; attempt < 50 && !existsSync(pidFile); attempt++) {
+        await new Promise((done) => setTimeout(done, 20));
+      }
+      expect(existsSync(pidFile)).toBe(true);
+      await new Promise((done) => setTimeout(done, 380));
+
+      const validHelper = writeResolverScript(
+        'console.log(JSON.stringify({ username: "deploy" }));',
+      );
+      await expect(
+        resolveConnectorCredentials(
+          { hostAlias: "prod", purpose: "inspect" },
+          configFor(validHelper),
+        ),
+      ).rejects.toThrow("termination is not yet confirmed");
+
+      await expect(pending).rejects.toThrow("timed out");
+      await expect(
+        resolveConnectorCredentials(
+          { hostAlias: "prod", purpose: "inspect" },
+          configFor(validHelper),
+        ),
+      ).resolves.toEqual(expect.objectContaining({ username: "deploy" }));
+      expect(() => process.kill(Number(readFileSync(pidFile, "utf8")), 0)).toThrow();
+    },
+    8000,
+  );
 });
 
 function writeResolverScript(source: string): string {
