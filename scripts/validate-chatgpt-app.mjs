@@ -13,6 +13,35 @@ const bundle = JSON.parse(readFileSync("apps/chatgpt/plugin/plugin.json", "utf8"
 const remote = JSON.parse(readFileSync("apps/chatgpt/plugin/mcp.json", "utf8"));
 const endpoint = "https://ssh-mcp-pro.oaslananka.dev/mcp";
 const server = remote.mcpServers?.["ssh-mcp-pro"];
+const reviewDraft = JSON.parse(readFileSync("apps/chatgpt/review-test-cases.json", "utf8"));
+const reviewCases = bundle.extensions?.["com.openai"]?.review?.test_cases;
+const hostedReadTools = new Set(["list_hosts", "list_agents", "get_system_status"]);
+const expectedPositive = reviewDraft.positive.map(
+  ({ description, prompt, tools_triggered, expected_behavior }) => ({
+    description,
+    prompt,
+    tools_triggered: tools_triggered.join(", "),
+    expected_behavior,
+  }),
+);
+const expectedNegative = reviewDraft.negative.map(({ description, prompt }) => ({
+  description,
+  prompt,
+}));
+if (
+  !reviewDraft.positive.every(
+    (entry) =>
+      entry.tools_triggered.length > 0 &&
+      entry.tools_triggered.every((name) => hostedReadTools.has(name)),
+  ) ||
+  JSON.stringify(reviewCases?.positive) !== JSON.stringify(expectedPositive) ||
+  JSON.stringify(reviewCases?.negative) !== JSON.stringify(expectedNegative)
+) {
+  throw new Error(
+    "OpenAI review scenarios must match hosted read-only MCP tools and ZIP manifest.",
+  );
+}
+
 if (
   bundle.name !== pkg.name ||
   bundle.version !== pkg.version ||

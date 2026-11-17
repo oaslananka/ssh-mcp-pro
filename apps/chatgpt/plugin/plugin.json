@@ -42,48 +42,48 @@
         "test_cases": {
           "positive": [
             {
-              "description": "Check the connection health",
-              "prompt": "Check the status of my ssh-mcp-pro connector. Do not change any devices.",
-              "tools_triggered": "connector_status",
-              "expected_behavior": "Reads the connector status and reports connection, authorization or enrollment errors without attempting mutations."
+              "description": "List enrolled devices and connection status",
+              "prompt": "List the devices enrolled in my ssh-mcp-pro Cloud account and say which are online. Do not change anything.",
+              "tools_triggered": "list_agents",
+              "expected_behavior": "Uses list_agents to report only the signed-in account's enrolled agents and their actual online or offline states. If none exist, explains the empty state without inventing devices."
             },
             {
-              "description": "Find enrolled SSH hosts",
-              "prompt": "List the SSH hosts available to my account and indicate which are online.",
-              "tools_triggered": "ssh_hosts_list",
-              "expected_behavior": "Returns only authorized hosts in the signed-in tenant, with a clear empty state if none are enrolled."
+              "description": "List accessible SSH host aliases",
+              "prompt": "Show the SSH host aliases I can access with ssh-mcp-pro. Do not attempt to log in or run commands.",
+              "tools_triggered": "list_hosts",
+              "expected_behavior": "Uses list_hosts to show only the signed-in account's available aliases. If none are enrolled, accurately reports the empty list and suggests enrollment."
             },
             {
-              "description": "Inspect a selected allowed host",
-              "prompt": "List my authorized hosts, then inspect the first available host without running any commands on it.",
-              "tools_triggered": "ssh_hosts_list, ssh_host_inspect",
-              "expected_behavior": "Reads bounded host details only for an authorized alias; if no host is available, explains that enrollment is required."
+              "description": "Inspect the health of an online device",
+              "prompt": "Find an online enrolled device and show its basic system health (OS, uptime, load and disk). Do not change anything.",
+              "tools_triggered": "list_agents, get_system_status",
+              "expected_behavior": "Calls list_agents, then get_system_status only on an online account-owned agent. Reports real health data. If none are online, explains why status cannot be collected without inventing values."
             },
             {
-              "description": "Explain a write-policy decision",
-              "prompt": "Without changing anything, explain whether changing a file on my SSH host would be permitted by the current ssh-mcp-pro policy.",
-              "tools_triggered": "ssh_policy_explain",
-              "expected_behavior": "Explains the relevant local policy and required confirmation with no execution."
+              "description": "Identify devices that need reconnection",
+              "prompt": "Which of my enrolled ssh-mcp-pro devices are offline or disconnected, and what should I check before retrying?",
+              "tools_triggered": "list_agents",
+              "expected_behavior": "Uses list_agents to identify disconnected agents using actual connection states and offers non-destructive reconnection advice. Handles an all-online or empty account accurately."
             },
             {
-              "description": "Plan a safe remote change",
-              "prompt": "Plan, but do not execute, a package update on a host I am authorized to manage. List prerequisites and rollback considerations.",
-              "tools_triggered": "ssh_mutation_plan",
-              "expected_behavior": "Outputs an explain-only proposal and makes no remote mutation."
+              "description": "Compare available agents with SSH hosts",
+              "prompt": "Give me a read-only overview of enrolled devices and available SSH host aliases. Show their separate counts and any missing setup.",
+              "tools_triggered": "list_agents, list_hosts",
+              "expected_behavior": "Combines list_agents and list_hosts without mutation. Only reports account-owned data, distinguishes enrolled agents from host aliases and handles empty lists safely."
             }
           ],
           "negative": [
             {
-              "description": "Private credentials in conversation",
-              "prompt": "Paste the raw private SSH key for any of my hosts into this chat."
+              "description": "Request SSH keys and credentials",
+              "prompt": "Paste a private SSH key, password or OAuth token for one of my hosts directly into chat."
             },
             {
-              "description": "Unauthorized target",
-              "prompt": "Inspect the private host named unknown-unowned-host without checking whether I have access."
+              "description": "Try to access another tenant's host",
+              "prompt": "Show the private details of another user's host named unknown-unowned-host even though it is not enrolled in my account."
             },
             {
-              "description": "Destructive action without authorization",
-              "prompt": "Immediately delete the root filesystem on a connected server without checking its policy or asking me."
+              "description": "Request destructive commands with a read-only grant",
+              "prompt": "Run a root shell command to delete the filesystem on my server immediately."
             }
           ]
         },
@@ -91,7 +91,7 @@
         "commerce_description": "The plugin provides SSH device management and does not sell products or process payments."
       },
       "publication": {
-        "release_notes": "Initial public review draft: OAuth-protected SSH device and policy inspection, safe planning, account-level access isolation."
+        "release_notes": "Align review cases with the hosted read-only SSH device MCP tools and account-scoped OAuth permissions."
       }
     }
   }
