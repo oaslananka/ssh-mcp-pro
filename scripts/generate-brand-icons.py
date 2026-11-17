@@ -1,6 +1,6 @@
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFilter
-import math, shutil
+import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "assets" / "brand"
@@ -53,7 +53,6 @@ def render():
     rr(d,(116,290,908,865),82,None,outline=(76,241,236,255),width=13)
     d.line((154,317,882,317),fill=(189,255,255,90),width=4)
     # Light sweep and prompt, with readable stroke at favicon size.
-    from PIL import Image as PILImage
     sweep=Image.new("RGBA",(S,S),(0,0,0,0))
     sd=ImageDraw.Draw(sweep)
     sd.polygon([(675,301),(900,301),(900,490),(553,837),(405,837)],fill=(255,255,255,24))
