@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/ssh-mcp-pro-icon.png" alt="SSH MCP Pro icon" width="88" height="88" /></p>
+<p align="center"><img src="assets/brand/icon-192.png" alt="SSH MCP Pro icon" width="88" height="88" /></p>
 <h1 align="center">ssh-mcp-pro</h1>
 
 <p align="center"><strong>Policy-controlled SSH automation for MCP clients</strong></p>

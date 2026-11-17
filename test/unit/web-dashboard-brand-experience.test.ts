@@ -2,7 +2,6 @@ import { describe, expect, test } from "vitest";
 import { Script } from "node:vm";
 import { parse as parseHtml } from "parse5";
 import type { DefaultTreeAdapterMap } from "parse5";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { renderDashboardHtml } from "../../src/remote/web-dashboard-html.js";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
@@ -69,11 +68,74 @@ async function renderWithUnavailableApi(tab: "devices" | "audit") {
 }
 
 describe("SSH MCP Pro brand and first-use journey", () => {
-  test("the supplied product icon remains byte-identical", () => {
-    const icon = readFileSync(new URL("../../assets/ssh-mcp-pro-icon.png", import.meta.url));
-    expect(createHash("sha256").update(icon).digest("hex")).toBe(
-      "2ce10de7c6d2c2e21aa1f813e43a27bd7aaf2b35f11acbde4476dd2fbbefab1f",
+  test("ships recognizable, correctly sized icons across browser, Apple and Android surfaces", () => {
+    for (const [asset, expectedSize] of [
+      ["favicon-16.png", 16],
+      ["favicon-32.png", 32],
+      ["apple-touch-icon.png", 180],
+      ["icon-192.png", 192],
+      ["icon-512.png", 512],
+    ] as const) {
+      const png = readFileSync(new URL("../../assets/brand/" + asset, import.meta.url));
+      expect(png.subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+      expect(png.readUInt32BE(16)).toBe(expectedSize);
+      expect(png.readUInt32BE(20)).toBe(expectedSize);
+    }
+    const ico = readFileSync(new URL("../../assets/brand/favicon.ico", import.meta.url));
+    expect(ico.subarray(0, 4).toString("hex")).toBe("00000100");
+  });
+
+  test("uses standard favicon and app icon links with a real manifest", () => {
+    const html = markup();
+    for (const path of [
+      "/favicon.ico",
+      "/brand/favicon-32.png",
+      "/brand/apple-touch-icon.png",
+      "/site.webmanifest",
+      "/brand/icon-192.png",
+    ]) {
+      expect(html).toContain(path);
+    }
+    expect(html).toContain('name="theme-color" content="#10111F"');
+  });
+
+  test("shows the outcome and primary sign-in before the supporting product preview", () => {
+    const html = renderDashboardHtml(
+      Buffer.from("null").toString("base64"),
+      JSON.stringify("https://example.test/mcp"),
+      JSON.stringify("https://example.test"),
     );
+    expect(html).toContain('class="product-stage"');
+    expect(html).toContain('class="assistant-chip"');
+    expect(html).toContain('class="terminal-preview"');
+    const renderedLanding = html.slice(html.indexOf("function renderLanding()"));
+    expect(renderedLanding.indexOf("Continue with Google")).toBeLessThan(
+      renderedLanding.indexOf('class="product-stage"'),
+    );
+  });
+
+  test("uses purpose-made vector navigation icons instead of decorative characters", () => {
+    const html = markup();
+    expect(html).toContain("const navIcons =");
+    expect(html).toContain('stroke-width="1.8"');
+    expect(html).not.toContain("navItem('devices', '▤'");
+    expect(html).not.toContain("navItem('clients', '✦'");
+  });
+
+  test("offers assistant next steps from the device screen, not only a separate settings tab", () => {
+    const html = markup();
+    expect(html).toContain('class="assistant-next-step"');
+    expect(html).toContain("Set up an AI connection");
+  });
+
+  test("uses a distinctive ink-blue visual identity and separates actions from status", () => {
+    const html = markup();
+    expect(html).toContain("--accent-blue:#3478f6");
+    expect(html).toContain("--surface-primary:#171b2a");
+    expect(html).toContain("YOUR DEVICES");
+    expect(html).toContain("Quick start");
+    expect(html).toContain("npx -y ssh-mcp-pro web");
+    expect(html).toContain("navItem('clients'");
   });
 
   test("the browser script is syntactically valid in both signed-out and signed-in states", () => {
@@ -108,7 +170,7 @@ describe("SSH MCP Pro brand and first-use journey", () => {
         "Connect an AI app",
         "You're ready to work",
         "Open activity",
-        "navItem('usage', '▥', 'Usage & Users')",
+        "navItem('usage', 'Usage & Users')",
         "Advanced device controls",
       ],
     },
@@ -160,7 +222,44 @@ describe("SSH MCP Pro brand and first-use journey", () => {
     expect(panel).not.toContain("No audit events recorded yet.");
   });
 
-  test("serves the exact supplied PNG as a versioned public brand asset", async () => {
+  test("serves the standard favicon sizes and app manifest", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "brand-routes-"));
+    const plane = new RemoteControlPlane(testConfig(dir));
+    await plane.initialize();
+    try {
+      for (const [route, type] of [
+        ["/favicon.ico", "image/x-icon"],
+        ["/brand/favicon-16.png", "image/png"],
+        ["/brand/favicon-32.png", "image/png"],
+        ["/brand/icon-192.png", "image/png"],
+        ["/brand/icon-512.png", "image/png"],
+        ["/brand/apple-touch-icon.png", "image/png"],
+        ["/site.webmanifest", "application/manifest+json"],
+      ]) {
+        const response = captureResponse();
+        expect(
+          await plane.handleHttp(
+            request("GET", route),
+            response as unknown as ServerResponse,
+            route,
+          ),
+        ).toBe(true);
+        expect(response.statusCode, route).toBe(200);
+        expect(response.getHeader("content-type"), route).toContain(type);
+        expect(response.getHeader("x-content-type-options"), route).toBe("nosniff");
+        if (route === "/site.webmanifest") {
+          const manifest = JSON.parse(response.body);
+          expect(manifest.name).toBe("SSH MCP Pro");
+          expect(manifest.icons[1].sizes).toBe("512x512");
+        }
+      }
+    } finally {
+      plane.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("serves the primary brand icon with secure caching", async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "brand-assets-"));
     const plane = new RemoteControlPlane(testConfig(dir));
     await plane.initialize();

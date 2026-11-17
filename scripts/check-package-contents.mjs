@@ -17,7 +17,15 @@ for (const file of packageJson.files ?? []) {
     continue;
   }
   if (file === "assets") {
-    requiredFiles.push("assets/ssh-mcp-pro-icon.png");
+    requiredFiles.push(
+      "assets/ssh-mcp-pro-icon.png",
+      "assets/brand/favicon.ico",
+      "assets/brand/favicon-16.png",
+      "assets/brand/favicon-32.png",
+      "assets/brand/apple-touch-icon.png",
+      "assets/brand/icon-192.png",
+      "assets/brand/icon-512.png",
+    );
     continue;
   }
   requiredFiles.push(file);
