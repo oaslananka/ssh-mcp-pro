@@ -24,6 +24,37 @@ const markup = () =>
     JSON.stringify("https://example.test"),
   );
 
+function extractBrowserScript(html: string): string {
+  const startTag = "<script>";
+  const endTag = "</script>";
+  const start = html.indexOf(startTag);
+  if (start < 0) throw new Error("Dashboard is missing a browser script");
+  const end = html.indexOf(endTag, start + startTag.length);
+  if (end < 0) throw new Error("Dashboard browser script was not terminated");
+  return html.slice(start + startTag.length, end);
+}
+
+async function renderWithUnavailableApi(tab: "devices" | "audit") {
+  const elements = new Map<string, { innerHTML: string }>();
+  const context = {
+    atob,
+    console: { error() {} },
+    document: {
+      body: { classList: { toggle() {} } },
+      getElementById(id: string) {
+        if (!elements.has(id)) elements.set(id, { innerHTML: "" });
+        return elements.get(id)!;
+      },
+      querySelector: () => null,
+    },
+    fetch: async () => ({ ok: false, status: 503 }),
+  };
+  new Script(extractBrowserScript(markup())).runInNewContext(context);
+  if (tab === "audit") new Script("switchTab('audit')").runInNewContext(context);
+  await new Promise((resolve) => setImmediate(resolve));
+  return elements;
+}
+
 describe("SSH MCP Pro brand and first-use journey", () => {
   test("the supplied product icon remains byte-identical", () => {
     const icon = readFileSync(new URL("../../assets/ssh-mcp-pro-icon.png", import.meta.url));
@@ -41,9 +72,7 @@ describe("SSH MCP Pro brand and first-use journey", () => {
       ),
       markup(),
     ]) {
-      const script = html.match(/<script>([\s\S]*?)<\/script>/u)?.[1];
-      expect(script).toBeTruthy();
-      expect(() => new Script(script!)).not.toThrow();
+      expect(() => new Script(extractBrowserScript(html))).not.toThrow();
     }
   });
 
@@ -87,26 +116,7 @@ describe("SSH MCP Pro brand and first-use journey", () => {
   });
 
   test("recovers from unavailable devices API with a working retry action", async () => {
-    const { Script } = await import("node:vm");
-    const elements = new Map<string, { innerHTML: string }>();
-    const document = {
-      body: { classList: { toggle() {} } },
-      getElementById(id: string) {
-        if (!elements.has(id)) elements.set(id, { innerHTML: "" });
-        return elements.get(id)!;
-      },
-      querySelector: () => null,
-    };
-    const context = {
-      atob,
-      console: { error() {} },
-      document,
-      fetch: async () => ({ ok: false, status: 503 }),
-    };
-    const script = markup().match(/<script>([\s\S]*?)<\/script>/u)?.[1];
-    expect(script).toBeTruthy();
-    new Script(script!).runInNewContext(context);
-    await new Promise((resolve) => setImmediate(resolve));
+    const elements = await renderWithUnavailableApi("devices");
     const body = elements.get("appRoot")?.innerHTML ?? "";
     expect(body).toContain("Could not load your devices");
     expect(body).toContain('onclick="retryDevices()"');
@@ -114,25 +124,7 @@ describe("SSH MCP Pro brand and first-use journey", () => {
   });
 
   test("shows retry instead of a false empty state when activity API fails", async () => {
-    const { Script } = await import("node:vm");
-    const elements = new Map<string, { innerHTML: string }>();
-    const context = {
-      atob,
-      console: { error() {} },
-      document: {
-        body: { classList: { toggle() {} } },
-        getElementById(id: string) {
-          if (!elements.has(id)) elements.set(id, { innerHTML: "" });
-          return elements.get(id)!;
-        },
-        querySelector: () => null,
-      },
-      fetch: async () => ({ ok: false, status: 503 }),
-    };
-    const script = markup().match(/<script>([\s\S]*?)<\/script>/u)?.[1];
-    new Script(script!).runInNewContext(context);
-    new Script("switchTab('audit')").runInNewContext(context);
-    await new Promise((resolve) => setImmediate(resolve));
+    const elements = await renderWithUnavailableApi("audit");
     const panel = elements.get("tabContent")?.innerHTML ?? "";
     expect(panel).toContain("Could not load activity");
     expect(panel).toContain('onclick="loadAudit()"');
