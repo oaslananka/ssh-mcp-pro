@@ -37,8 +37,8 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(dashboardCsp).not.toContain("http://*");
       expect(dashboardCsp).not.toContain("http://localhost:*");
       expect(res.body).toContain("ssh-mcp-pro");
-      expect(res.body).toContain("Sign in with Google");
-      expect(res.body).toContain("Sign in with GitHub");
+      expect(res.body).toContain("Continue with Google");
+      expect(res.body).toContain("Continue with GitHub");
       for (const snippetId of ["cfgClaudeRemote", "cfgClaudeCode", "cfgChatGptMcp"]) {
         expect(res.body).toContain('id="' + snippetId + '"');
       }
@@ -79,10 +79,10 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
         },
       });
       expect(res.body).toContain(".mcp.json");
-      expect(res.body).toContain('aria-label="Dashboard sections"');
-      expect(res.body).toContain("Device access is scoped to your ");
-      expect(res.body).toContain("Switching sign-in providers shows a different device list.");
-      const providerHintAt = res.body.indexOf("Device access is scoped to your ");
+      expect(res.body).toContain('aria-label="Workspace navigation"');
+      expect(res.body).toContain("Showing devices for your ");
+      expect(res.body).toContain("Other sign-in providers have separate device lists.");
+      const providerHintAt = res.body.indexOf("Showing devices for your ");
       const replaceableDevicePanelAt = res.body.indexOf('<div id="tabContent">');
       expect(providerHintAt).toBeGreaterThan(0);
       expect(providerHintAt).toBeLessThan(replaceableDevicePanelAt);
@@ -90,23 +90,23 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
         "escapeHtml(currentUser.provider === 'github' ? 'GitHub' : 'Google')",
       );
       expect(res.body).toContain(
-        "Use the same Google or GitHub sign-in to see your enrolled devices.",
+        "Already connected a device? Sign in with the same account to find it.",
       );
       for (const tab of ["devices", "add-device", "clients", "audit"]) {
-        expect(res.body).toContain('data-dashboard-tab="' + tab + '"');
+        expect(res.body).toContain("navItem('" + tab + "'");
       }
       expect(res.body).not.toContain('<div class="tab-item');
-      expect(res.body).toContain("aria-pressed=");
+      expect(res.body).toContain("aria-current=");
       expect(res.body).toContain('for="enrollAlias"');
       expect(res.body).toContain('for="enrollProfile"');
       expect(res.body).toContain('aria-label="Policy for');
       expect(res.body).toContain("minmax(min(100%, 320px), 1fr)");
-      expect(res.body).toContain('class="device-actions"');
-      expect(res.body).toContain("Local Stdio Mode (Policy-Controlled)");
+      expect(res.body).toContain('class="device-control-actions"');
+      expect(res.body).toContain("Prefer to stay local?");
       expect(res.body).toContain(".code-box > span");
       expect(res.body).toContain("escapeHtml(e.agentAlias || e.agentId || e.actionId || '-')");
-      expect(res.body).toContain(".card a { color: var(--blue);");
-      expect(res.body).toContain(".badge-gray { background: #30363d; color: #c9d1d9; }");
+      expect(res.body).toContain(".workspace-sidebar");
+      expect(res.body).toContain(".status-pill.online");
       expect(res.body).toContain('aria-label="Copy ChatGPT MCP URL"');
       expect(res.body).toContain('aria-live="polite"');
       expect(res.body).toContain("feedback('Copy failed')");

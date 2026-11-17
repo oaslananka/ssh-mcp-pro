@@ -230,6 +230,7 @@ describe("remote control plane remote-agent contracts", () => {
       expect(responseBody(protectedResource)).toEqual(
         expect.objectContaining({
           resource: "http://127.0.0.1:3000/mcp",
+          resource_name: "SSH MCP Pro",
           bearer_methods_supported: ["header"],
         }),
       );

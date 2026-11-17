@@ -11,6 +11,7 @@ import { PUBLIC_REMOTE_SCOPES } from "./types.js";
 import { jsonResponse } from "./util.js";
 import { renderDashboardHtml } from "./web-dashboard-html.js";
 import { serveLegalPage } from "./web-dashboard-legal.js";
+import { serveDashboardBrandIcon } from "./web-dashboard-brand.js";
 import { serveAgentScript } from "./web-dashboard-static.js";
 import { createDashboardClientConfigs } from "./web-dashboard-client-config.js";
 import { buildDashboardEnrollmentCommands } from "./dashboard-enrollment-commands.js";
@@ -152,6 +153,10 @@ export class WebDashboardHandler {
   }
 
   private handleScriptRoutes(req: IncomingMessage, res: ServerResponse, pathname: string): boolean {
+    if (pathname === "/brand/ssh-mcp-pro-icon.png" && req.method === "GET") {
+      serveDashboardBrandIcon(res);
+      return true;
+    }
     if ((pathname === "/privacy" || pathname === "/terms") && req.method === "GET") {
       serveLegalPage(res, pathname);
       return true;
