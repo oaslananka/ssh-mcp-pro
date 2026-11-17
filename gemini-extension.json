@@ -1,6 +1,6 @@
 {
   "name": "ssh-mcp-pro",
-  "version": "1.12.1",
+  "version": "1.12.2",
   "description": "Model Context Protocol (MCP) SSH client server for remote automation and infrastructure inspection",
   "author": {
     "name": "Osman Aslan"
