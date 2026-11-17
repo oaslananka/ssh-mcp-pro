@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.1](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.11.0...ssh-mcp-pro-v1.11.1) (2026-11-17)
+
+
+### Bug Fixes
+
+* **web:** refresh cached icon and guide offline device recovery ([#278](https://github.com/oaslananka/ssh-mcp-pro/issues/278)) ([c5b322f](https://github.com/oaslananka/ssh-mcp-pro/commit/c5b322f159fe5881a240ed8a980995cabe00e0c8))
+
 ## [1.11.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.10.0...ssh-mcp-pro-v1.11.0) (2026-11-17)
 
 
