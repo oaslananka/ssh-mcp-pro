@@ -1,11 +1,11 @@
-# Doppler secrets for hosted SSH MCP Pro
+# Doppler secrets for hosted ssh-mcp-pro
 
 Hosted deployments use **Coolify's native Doppler secret-manager integration**. The app must not require a Doppler CLI process, an extra credential in the container, or a GitHub Actions `DOPPLER_TOKEN` merely to start.
 
 ## Configure once
 
 1. In Coolify, open **Keys & Tokens → Integration Tokens** and configure a Doppler token with access only to the intended project/config. Prefer a service token scoped to one environment.
-2. Open the SSH MCP Pro application and select **Environment Variables → Secret manager**. Attach the existing Doppler integration token. If the token does not already fix a project and config, enter the correct project and config.
+2. Open the ssh-mcp-pro application and select **Environment Variables → Secret manager**. Attach the existing Doppler integration token. If the token does not already fix a project and config, enter the correct project and config.
 3. Add the following runtime environment variable **references** in Coolify. The values are placeholders resolved by Coolify at deployment; the provider secrets themselves must not be copied into GitHub or the image.
 
    ```dotenv

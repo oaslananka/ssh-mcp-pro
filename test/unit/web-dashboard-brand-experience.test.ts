@@ -95,7 +95,7 @@ function enrolledDevice(connected: boolean) {
   };
 }
 
-describe("SSH MCP Pro brand and first-use journey", () => {
+describe("ssh-mcp-pro brand and first-use journey", () => {
   test("renders the authorized AI client register without exposing callback query strings", async () => {
     const elements = await runDashboardFixture(
       async () => ({
@@ -275,11 +275,11 @@ describe("SSH MCP Pro brand and first-use journey", () => {
 
   test.each([
     {
-      area: "SSH MCP Pro identity",
+      area: "ssh-mcp-pro identity",
       markers: [
-        "<title>SSH MCP Pro",
+        "<title>ssh-mcp-pro",
         'src="/brand/ssh-mcp-pro-icon.png?v=',
-        'alt="SSH MCP Pro"',
+        'alt="ssh-mcp-pro"',
         'rel="icon"',
       ],
     },
@@ -371,7 +371,7 @@ describe("SSH MCP Pro brand and first-use journey", () => {
         expect(response.getHeader("x-content-type-options"), route).toBe("nosniff");
         if (route === "/site.webmanifest") {
           const manifest = JSON.parse(response.body);
-          expect(manifest.name).toBe("SSH MCP Pro");
+          expect(manifest.name).toBe("ssh-mcp-pro");
           expect(manifest.icons[1].sizes).toBe("512x512");
         }
       }

@@ -230,7 +230,7 @@ describe("remote control plane remote-agent contracts", () => {
       expect(responseBody(protectedResource)).toEqual(
         expect.objectContaining({
           resource: "http://127.0.0.1:3000/mcp",
-          resource_name: "SSH MCP Pro",
+          resource_name: "ssh-mcp-pro",
           bearer_methods_supported: ["header"],
         }),
       );
@@ -929,7 +929,7 @@ describe("remote control plane remote-agent contracts", () => {
           result: expect.objectContaining({
             protocolVersion: LATEST_PROTOCOL_VERSION,
             capabilities: { tools: {} },
-            serverInfo: expect.objectContaining({ name: "sshautomator-remote-agent" }),
+            serverInfo: expect.objectContaining({ name: "ssh-mcp-pro" }),
           }),
         }),
       );
@@ -960,6 +960,7 @@ describe("remote control plane remote-agent contracts", () => {
         expect.objectContaining({
           result: expect.objectContaining({
             protocolVersion: "2025-06-18",
+            serverInfo: expect.objectContaining({ name: "ssh-mcp-pro" }),
           }),
         }),
       );

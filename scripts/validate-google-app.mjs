@@ -29,4 +29,14 @@ if (!geminiExt.mcpServers?.["ssh-mcp-pro"]) {
   throw new Error("gemini-extension.json must define mcpServers['ssh-mcp-pro'].");
 }
 
+const cliServer = geminiExt.mcpServers["ssh-mcp-pro"];
+if (
+  cliServer.command !== "npx" ||
+  JSON.stringify(cliServer.args) !== JSON.stringify(["--yes", "ssh-mcp-pro@latest"]) ||
+  geminiExt.contextFileName !== "AGENTS.md" ||
+  "contextFiles" in geminiExt
+) {
+  throw new Error("Gemini CLI extension must install a published server, not a missing git dist.");
+}
+
 console.log("validate-google-app: readiness metadata and gemini-extension are consistent.");

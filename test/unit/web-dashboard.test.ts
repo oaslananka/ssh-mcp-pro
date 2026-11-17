@@ -129,7 +129,7 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
         await cp.handleHttp(request("GET", pathname), res as unknown as ServerResponse, pathname);
         expect(res.statusCode).toBe(200);
         expect(res.body).toContain("<html lang=");
-        expect(res.body).toContain("SSH MCP Pro");
+        expect(res.body).toContain("ssh-mcp-pro");
         expect(res.getHeader("content-security-policy")).toContain("frame-ancestors 'none'");
       }
       process.env.SSH_MCP_OPENAI_DOMAIN_CHALLENGE = "portal-challenge-token-2026";

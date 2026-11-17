@@ -76,7 +76,7 @@ export class OAuthHandler {
   protectedResourceMetadata(): Record<string, unknown> {
     return {
       resource: this.config.mcpResourceUrl,
-      resource_name: "SSH MCP Pro",
+      resource_name: "ssh-mcp-pro",
       authorization_servers: [this.config.publicBaseUrl],
       bearer_methods_supported: ["header"],
       scopes_supported: PUBLIC_REMOTE_SCOPES,
@@ -141,7 +141,7 @@ export class OAuthHandler {
     const client: OAuthClient = {
       id: id("clirow"),
       clientId: id("cli"),
-      clientName: asString(body.client_name) ?? "ChatGPT Connector",
+      clientName: asString(body.client_name) ?? "MCP Client",
       redirectUris,
       grantTypes,
       responseTypes: ["code"],
@@ -274,7 +274,7 @@ export class OAuthHandler {
 
     res.end(
       [
-        '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Authorize SSH MCP Pro</title>',
+        '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Authorize ssh-mcp-pro</title>',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         '<style>body{background:#0d1117;color:#e6edf3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:16px;}',
         ".card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:32px;max-width:440px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,0.5);text-align:center;}",
@@ -283,7 +283,7 @@ export class OAuthHandler {
         "</style></head><body>",
         '<div class="card">',
         '<div style="margin-bottom:16px;"><span style="font-size:32px;">🔐</span></div>',
-        "<h1>Authorize SSH MCP Pro</h1>",
+        "<h1>Authorize ssh-mcp-pro</h1>",
         '<p>Allow client at <strong style="color:#f0f6fc;">',
         hostname,
         "</strong> to request access to:</p>",
@@ -328,7 +328,7 @@ export class OAuthHandler {
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         "<title>",
         label,
-        " — SSH MCP Pro</title>",
+        " — ssh-mcp-pro</title>",
         '<meta http-equiv="refresh" content="0;url=',
         href,
         '">',

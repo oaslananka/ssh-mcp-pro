@@ -1,8 +1,8 @@
-# Terms of Service for SSH MCP Pro
+# Terms of Service for ssh-mcp-pro
 
 *Last updated: November 17, 2026*
 
-By installing or using SSH MCP Pro or its optional hosted control plane at https://ssh-mcp-pro.oaslananka.dev, you agree to these terms. Local MCP use does not require a hosted account.
+By installing or using ssh-mcp-pro or its optional hosted control plane at https://ssh-mcp-pro.oaslananka.dev, you agree to these terms. Local MCP use does not require a hosted account.
 
 ## 1. Authorized Access Only
 

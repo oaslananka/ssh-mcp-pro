@@ -10,16 +10,14 @@
   "license": "AGPL-3.0-only",
   "mcpServers": {
     "ssh-mcp-pro": {
-      "command": "node",
+      "command": "npx",
       "args": [
-        "${extensionPath}/dist/index.js"
+        "--yes",
+        "ssh-mcp-pro@latest"
       ],
       "env": {}
     }
   },
-  "contextFiles": [
-    "AGENTS.md"
-  ],
   "keywords": [
     "ssh",
     "mcp",
@@ -27,5 +25,6 @@
     "automation",
     "gemini",
     "infrastructure"
-  ]
+  ],
+  "contextFileName": "AGENTS.md"
 }

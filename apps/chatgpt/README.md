@@ -1,4 +1,4 @@
-# ChatGPT Plugin & MCP Server Integration
+# ssh-mcp-pro · ChatGPT and Codex
 
 This directory provides validation scaffolding and readiness manifests for integrating `ssh-mcp-pro` with OpenAI ChatGPT and Codex environments following the official [OpenAI Plugins & MCP Server documentation](https://developers.openai.com/plugins).
 
@@ -10,6 +10,20 @@ OpenAI has unified developer tooling around the **Model Context Protocol (MCP)**
 - **ChatGPT UI / MCP Apps**: This repository currently provides MCP tools and an independent web dashboard, not an embedded MCP Apps iframe. Embedded interactive widgets are optional future UX work, not a prerequisite for an MCP-only connector.
 - **Authentication**: Production deployment requires OAuth 2.0 with JWKS verification; local development supports bearer token authentication.
 - **Tool Profile**: The default ChatGPT connector profile (`chatgpt`) exposes read-only inspection (`ssh_hosts_list`, `ssh_host_inspect`, `connector_status`) and safe planning (`ssh_policy_explain`, `ssh_mutation_plan`). Mutation and interactive shell tools remain hidden unless explicitly allowed by operator policy.
+
+## Portable plugin package (2026 universal format)
+
+The portable package lives in [plugin/](./plugin/):
+
+- plugin/plugin.json — canonical **ssh-mcp-pro** identity and OpenAI listing metadata
+- plugin/mcp.json — remote Streamable HTTP server, OAuth via Dynamic Client Registration (DCR)
+- plugin/assets/icon-512.png — the project icon
+
+The repository-root mcp.json serves **legacy MCP registry consumers** and is deliberately not replaced. The portable bundle has no embedded secrets, hooks, or invented registered plugin IDs.
+
+For a direct connection in ChatGPT Plugins, select **Add custom MCP server** and enter https://ssh-mcp-pro.oaslananka.dev/mcp. Authenticate through remote OAuth. ChatGPT can cache an existing installed plugin's title; refresh/reconnect or update the saved title to **ssh-mcp-pro** after deployment. A server identity change does not retroactively rename a user-created ChatGPT plugin entry.
+
+This is an MCP-only plugin; an embedded MCP Apps iframe is **not yet implemented**. Do not claim an interactive inline app or an approved directory listing. A portable package does not replace testing an actual registered MCP connection.
 
 ## Security Defaults
 

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "ssh-mcp-pro",
+  "version": "1.12.0",
+  "description": "Inspect and plan policy-controlled SSH infrastructure access through an authenticated MCP connection.",
+  "author": {
+    "name": "Osman Aslan",
+    "url": "https://github.com/oaslananka"
+  },
+  "homepage": "https://ssh-mcp-pro.oaslananka.dev",
+  "repository": "https://github.com/oaslananka/ssh-mcp-pro",
+  "license": "AGPL-3.0-only",
+  "keywords": [
+    "ssh",
+    "mcp",
+    "infrastructure",
+    "developer-tools"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "ssh-mcp-pro",
+        "shortDescription": "Inspect devices and plan safe SSH operations.",
+        "longDescription": "Connect a managed computer, inspect its SSH state, and preview changes under explicit policy controls.",
+        "developerName": "Osman Aslan",
+        "category": "Productivity",
+        "capabilities": [
+          "Read"
+        ],
+        "websiteURL": "https://ssh-mcp-pro.oaslananka.dev",
+        "privacyPolicyURL": "https://ssh-mcp-pro.oaslananka.dev/privacy",
+        "termsOfServiceURL": "https://ssh-mcp-pro.oaslananka.dev/terms",
+        "logo": "./assets/icon-512.png",
+        "composerIcon": "./assets/icon-512.png",
+        "defaultPrompt": [
+          "Show my connected devices with ssh-mcp-pro.",
+          "Explain the SSH policy before changing anything."
+        ]
+      }
+    }
+  }
+}

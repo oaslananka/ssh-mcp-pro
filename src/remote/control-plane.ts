@@ -57,6 +57,9 @@ import { TOOL_CAPABILITY_MAP } from "./types.js";
 import { jsonResponse } from "./util.js";
 import { SERVER_VERSION } from "../mcp.js";
 
+/** Public MCP server identity advertised to all remote hosts. */
+export const REMOTE_MCP_SERVER_NAME = "ssh-mcp-pro";
+
 export class RemoteControlPlane {
   readonly config: RemoteConfig;
   readonly store: RemoteStore;
@@ -308,7 +311,7 @@ export class RemoteControlPlane {
         result: {
           protocolVersion: negotiateMcpProtocolVersion(body.params),
           capabilities: { tools: {} },
-          serverInfo: { name: "sshautomator-remote-agent", version: SERVER_VERSION },
+          serverInfo: { name: REMOTE_MCP_SERVER_NAME, version: SERVER_VERSION },
         },
       });
       return;
@@ -345,7 +348,7 @@ export class RemoteControlPlane {
     const handler = createMcpHandler(
       () => {
         const server = new McpServer(
-          { name: "sshautomator-remote-agent", version: SERVER_VERSION },
+          { name: REMOTE_MCP_SERVER_NAME, version: SERVER_VERSION },
           { capabilities: { tools: {} } },
         );
         server.server.setRequestHandler("tools/list", () => ({

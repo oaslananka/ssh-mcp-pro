@@ -1,8 +1,8 @@
-# Privacy Policy for SSH MCP Pro
+# Privacy Policy for ssh-mcp-pro
 
 Last updated: November 17, 2026
 
-This notice describes the hosted SSH MCP Pro service at https://ssh-mcp-pro.oaslananka.dev and its locally installed open-source server. This notice does not replace the policies of AI host platforms.
+This notice describes the hosted ssh-mcp-pro service at https://ssh-mcp-pro.oaslananka.dev and its locally installed open-source server. This notice does not replace the policies of AI host platforms.
 
 ## Data collected by the hosted service
 

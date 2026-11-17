@@ -22,8 +22,8 @@ export const DASHBOARD_BRAND_FINGERPRINT = createHash("sha256")
   .slice(0, 12);
 
 const manifest = JSON.stringify({
-  name: "SSH MCP Pro",
-  short_name: "SSH MCP Pro",
+  name: "ssh-mcp-pro",
+  short_name: "ssh-mcp-pro",
   description: "Secure access to your computers from AI assistants.",
   start_url: "/dashboard",
   scope: "/",

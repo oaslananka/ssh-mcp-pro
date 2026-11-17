@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/brand/icon-192.png" alt="SSH MCP Pro icon" width="88" height="88" /></p>
+<p align="center"><img src="assets/brand/icon-192.png" alt="ssh-mcp-pro icon" width="88" height="88" /></p>
 <h1 align="center">ssh-mcp-pro</h1>
 
 <p align="center"><strong>Policy-controlled SSH automation for MCP clients</strong></p>
@@ -79,7 +79,7 @@ for the tag policy, digest-pinned examples, and registry verification steps.
 
 ## Cloud dashboard and AI connectors
 
-The optional [SSH MCP Pro Cloud](https://ssh-mcp-pro.oaslananka.dev/) lets you sign in with Google or GitHub, enroll your own devices, and connect an OAuth-capable AI client to `https://ssh-mcp-pro.oaslananka.dev/mcp`. Your SSH private keys remain on your devices.
+The optional [ssh-mcp-pro Cloud](https://ssh-mcp-pro.oaslananka.dev/) lets you sign in with Google or GitHub, enroll your own devices, and connect an OAuth-capable AI client to `https://ssh-mcp-pro.oaslananka.dev/mcp`. Your SSH private keys remain on your devices.
 
 After installing the package, start a **local web dashboard with one command**:
 
