@@ -3,6 +3,7 @@ import { DASHBOARD_STYLES } from "./web-dashboard-styles.js";
 import { BRAND_STYLES } from "./web-dashboard-brand-styles.js";
 import { DASHBOARD_BRAND_FINGERPRINT } from "./web-dashboard-brand.js";
 import { EXPERIENCE_STYLES } from "./web-dashboard-experience-styles.js";
+import { AI_CLIENT_STYLES } from "./web-dashboard-ai-client-styles.js";
 import { DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT } from "./dashboard-enrollment-feedback-script.js";
 export function renderDashboardHtml(
   initialUserBase64: string,
@@ -26,7 +27,8 @@ export function renderDashboardHtml(
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>${DASHBOARD_STYLES}
 ${BRAND_STYLES}
-${EXPERIENCE_STYLES}</style>
+${EXPERIENCE_STYLES}
+${AI_CLIENT_STYLES}</style>
 </head>
 <body>
   <header class="public-header">
@@ -58,6 +60,11 @@ ${EXPERIENCE_STYLES}</style>
     let auditLoaded = false;
     let auditError = '';
     let usageData = null;
+    let aiClientsList = [];
+    let aiClientsLoaded = false;
+    let aiClientsError = '';
+    let aiClientNotice = '';
+
     ${DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT}
 
     function escapeHtml(value) {
@@ -95,6 +102,7 @@ ${EXPERIENCE_STYLES}</style>
         devices: { title: 'Your devices', description: 'The computers and servers you have connected to SSH MCP Pro.' },
         'add-device': { title: 'Connect a device', description: 'Add a computer you own and choose what AI can do on it.' },
         clients: { title: 'Connect an AI app', description: 'Use the same secure MCP connection in the assistant you prefer.' },
+        'ai-clients': { title: 'AI clients', description: 'Manage AI assistants authorized for your account.' },
         audit: { title: 'Activity', description: 'Review actions requested through your connected devices.' },
         usage: { title: 'Usage & Users', description: 'Owner-only activity and account statistics for this Cloud service.' },
       }[activeTab] || { title: 'Your devices', description: '' };
@@ -103,6 +111,7 @@ ${EXPERIENCE_STYLES}</style>
         devices: navSvg('<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/>'),
         'add-device': navSvg('<rect x="3" y="5" width="18" height="15" rx="3"/><path d="M12 9v7m-3.5-3.5h7"/>'),
         clients: navSvg('<path d="M12 3l1.8 6.2L20 11l-6.2 1.8L12 19l-1.8-6.2L4 11l6.2-1.8L12 3ZM19 18l.7 1.3L21 20l-1.3.7L19 22l-.7-1.3L17 20l1.3-.7L19 18Z"/>'),
+        'ai-clients': navSvg('<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/>'),
         audit: navSvg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
         usage: navSvg('<path d="M4 20V9m5 11V5m5 15v-8m5 8V3"/>'),
       };
@@ -125,6 +134,7 @@ ${EXPERIENCE_STYLES}</style>
               \${navItem('devices', 'Devices')}
               \${navItem('add-device', 'Add a device')}
               \${navItem('clients', 'AI connections')}
+              \${navItem('ai-clients', 'AI clients')}
               \${navItem('audit', 'Activity')}
               \${currentUser.serviceOwner ? navItem('usage', 'Usage & Users') : ''}
             </nav>
@@ -144,8 +154,8 @@ ${EXPERIENCE_STYLES}</style>
               <div class="workspace-top-status"><span class="live-indicator" aria-hidden="true"></span> Signed in with \${escapeHtml(currentUser.provider === 'github' ? 'GitHub' : 'Google')}</div>
             </div>
             <div class="workspace-page-heading">
-              <div><p class="eyebrow">YOUR DEVICES · YOUR CONTROL</p><h1>\${escapeHtml(pageMeta.title)}</h1><p>\${escapeHtml(pageMeta.description)}</p></div>
-              \${activeTab !== 'add-device' ? '<button class="btn btn-primary" type="button" onclick="switchTab(\\'add-device\\')"><span aria-hidden="true">+</span> Add a device</button>' : '<button class="btn btn-outline" type="button" onclick="switchTab(\\'devices\\')">Back to devices</button>'}
+              <div><p class="eyebrow">\${activeTab === 'ai-clients' ? 'AI ACCESS · YOUR CONTROL' : 'YOUR DEVICES · YOUR CONTROL'}</p><h1>\${escapeHtml(pageMeta.title)}</h1><p>\${escapeHtml(pageMeta.description)}</p></div>
+              \${activeTab === 'ai-clients' ? '' : activeTab !== 'add-device' ? '<button class="btn btn-primary" type="button" onclick="switchTab(\\'add-device\\')"><span aria-hidden="true">+</span> Add a device</button>' : '<button class="btn btn-outline" type="button" onclick="switchTab(\\'devices\\')">Back to devices</button>'}
             </div>
             \${activeTab === 'devices' ? \`
               <section class="connection-summary" aria-label="Connection overview">
@@ -163,6 +173,7 @@ ${EXPERIENCE_STYLES}</style>
       \`;
       if (activeTab === 'devices' && !devicesLoaded) loadDevices();
       if (activeTab === 'add-device') chooseInstallOS(selectedInstallOs);
+      if (activeTab === 'ai-clients') loadAiClients();
       if (activeTab === 'audit') loadAudit();
       if (activeTab === 'usage' && currentUser.serviceOwner) loadUsage();
     }
@@ -184,6 +195,7 @@ ${EXPERIENCE_STYLES}</style>
       stopEnrollmentPolling();
       if (tab === 'devices' && activeTab !== tab) { devicesLoaded = false; devicesError = ''; }
       if (tab === 'audit' && activeTab !== tab) { auditLoaded = false; auditError = ''; }
+      if (tab === 'ai-clients' && activeTab !== tab) { aiClientsLoaded = false; aiClientsError = ''; }
       activeTab = tab;
       renderApp();
       document.querySelector('[data-dashboard-tab="' + tab + '"]')?.focus({ preventScroll: true });
@@ -457,6 +469,8 @@ ${EXPERIENCE_STYLES}</style>
         \`;
       }
 
+      if (activeTab === 'ai-clients') return renderAiClientsPanel();
+
       if (activeTab === 'audit') {
         if (!auditLoaded) return '<div class="card device-loading" role="status">Loading activity…</div>';
         if (auditError) return '<div class="card feedback-error" role="alert"><h2>Could not load activity</h2><p>Recent events are unavailable. Check your connection and try again.</p><button type="button" class="btn btn-primary" onclick="loadAudit()">Try again</button></div>';
@@ -487,6 +501,75 @@ ${EXPERIENCE_STYLES}</style>
             </table>
           </div>
         \`;
+      }
+    }
+
+    function renderAiClientsPanel() {
+      if (!aiClientsLoaded) return '<div class="card device-loading" role="status">Loading AI clients…</div>';
+      if (aiClientsError) return '<div class="card feedback-error" role="alert"><h2>AI clients unavailable</h2><p>Your permissions have not changed.</p><button class="btn btn-primary" onclick="loadAiClients()">Retry</button></div>';
+      const heading = '<div class="ai-clients-intro"><div><span class="eyebrow">ACCOUNT ACCESS</span><h2>Authorized AI clients</h2><p>Assistants with renewable OAuth grants for this ' + escapeHtml(currentUser.provider === 'google' ? 'Google' : 'GitHub') + ' account.</p></div><button class="btn btn-outline btn-sm" onclick="loadAiClients()">Refresh</button></div>';
+      const notice = aiClientNotice ? '<p class="ai-client-notice" role="status">' + escapeHtml(aiClientNotice) + '</p>' : '';
+      if (!aiClientsList.length) return heading + notice + '<section class="card ai-clients-empty"><h3>No authorized AI clients yet</h3><p>Connect an AI assistant first. Its renewable OAuth grants will appear here.</p><button class="btn btn-primary" onclick="switchTab(&quot;clients&quot;)">Connect an AI app</button></section>';
+      const rows = aiClientsList.map((c, i) => {
+        const active = Number(c.activeGrants) > 0;
+        const scopes = Array.isArray(c.scopes) ? c.scopes : [];
+        const permissions = !active ? 'Disconnected' : scopes.some(s => /:write|:manage|:exec|admin/.test(s)) ? 'Elevated scopes' : 'Read scopes';
+        const when = c.lastTokenAt ? new Date(c.lastTokenAt).toLocaleString() : 'Not recorded';
+        const created = c.registeredAt ? new Date(c.registeredAt).toLocaleString() : 'Not recorded';
+        const hosts = Array.isArray(c.redirectHosts) ? c.redirectHosts.join(', ') : '';
+        const detail = 'ai-client-detail-' + i;
+        return '<tr><td data-label="Client"><strong>' + escapeHtml(c.clientName) + '</strong><small class="ai-client-id">' + escapeHtml(c.clientId) + '</small></td>' +
+          '<td data-label="Redirect host">' + escapeHtml(hosts || 'Unknown') + '</td><td data-label="Created">' + escapeHtml(created) + '</td><td data-label="Last renewal">' + escapeHtml(when) + '</td>' +
+          '<td data-label="Active grants"><span class="ai-client-grant ' + (active ? 'is-active' : '') + '">' + Number(c.activeGrants || 0) + '</span></td>' +
+          '<td data-label="Permissions">' + escapeHtml(permissions) + '</td><td data-label="Actions"><div class="ai-client-actions">' +
+          '<button type="button" class="btn btn-outline btn-sm" aria-controls="' + detail + '" aria-expanded="false" onclick="toggleAiClientDetails(' + i + ', this)">Manage access</button>' +
+          '<button type="button" class="btn btn-danger btn-sm" ' + (active ? '' : 'disabled ') + 'onclick="revokeAiClient(' + i + ')">Revoke</button></div></td></tr>' +
+          '<tr class="ai-client-details-row" id="' + detail + '" hidden><td colspan="7"><div class="ai-client-details"><strong>Granted OAuth scopes</strong><p>' +
+          escapeHtml(scopes.length ? scopes.join(' · ') : 'No active renewable scopes') + '</p><small>Registered ' + escapeHtml(created) + '. To change OAuth scopes, revoke the grant and reconnect. Device policy is enforced separately.</small></div></td></tr>';
+      }).join('');
+      return heading + notice + '<div class="ai-clients-table-wrap"><table class="ai-clients-table"><thead><tr><th>Client</th><th>Redirect host</th><th>Created</th><th>Last renewal</th><th>Active grants</th><th>Permissions</th><th>Actions</th></tr></thead><tbody>' +
+        rows + '</tbody></table></div><p class="ai-client-footnote">Shows renewable OAuth grants for this account, not all registered clients. Revocation disables future refreshes, without changing other users or shared registrations. Previously issued access tokens may remain valid until expiry. Reconnection requires a new authorization.</p>';
+    }
+
+    function toggleAiClientDetails(i, button) {
+      const details = document.getElementById('ai-client-detail-' + i);
+      if (!details) return;
+      details.hidden = !details.hidden;
+      button.setAttribute('aria-expanded', String(!details.hidden));
+    }
+
+    async function loadAiClients() {
+      try {
+        const response = await fetch('/api/dashboard/ai-clients', { cache: 'no-store' });
+        if (!response.ok) throw new Error('AI clients API unavailable');
+        const data = await response.json();
+        aiClientsList = Array.isArray(data.clients) ? data.clients : [];
+        aiClientsError = '';
+      } catch (error) {
+        aiClientsError = 'unavailable';
+        console.error('AI clients request failed', error);
+      } finally {
+        aiClientsLoaded = true;
+        const target = document.getElementById('tabContent');
+        if (activeTab === 'ai-clients' && target) target.innerHTML = renderAiClientsPanel();
+      }
+    }
+
+    async function revokeAiClient(i) {
+      const client = aiClientsList[i];
+      if (!client || Number(client.activeGrants) < 1) return;
+      if (!window.confirm('Revoke ' + client.clientName + ' refresh access for your account? Existing access tokens can remain valid until they expire.')) return;
+      try {
+        const response = await fetch('/api/dashboard/ai-clients/' + encodeURIComponent(client.clientId) + '/revoke', {
+          method: 'POST', headers: { 'X-SSH-MCP-Dashboard': '1' },
+        });
+        if (!response.ok) throw new Error('Could not revoke client');
+        aiClientNotice = 'Renewable access revoked for ' + client.clientName + '.';
+        await loadAiClients();
+      } catch (error) {
+        aiClientNotice = 'Revocation not confirmed. Retry if needed.';
+        const target = document.getElementById('tabContent');
+        if (activeTab === 'ai-clients' && target) target.innerHTML = renderAiClientsPanel();
       }
     }
 
