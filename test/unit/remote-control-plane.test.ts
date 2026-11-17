@@ -363,6 +363,117 @@ describe("remote control plane remote-agent contracts", () => {
     }
   });
 
+  test("allows an explicit read-only consent instead of elevated requested scopes", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "oauth-consent-choice-"));
+    const config = {
+      ...testConfig(dir),
+      githubClientId: "fixture-client",
+      githubClientSecret: "fixture-secret",
+    };
+    const plane = new RemoteControlPlane(config);
+    await plane.initialize();
+    try {
+      const registered = captureResponse();
+      await plane.handleHttp(
+        jsonRequest("POST", "/oauth/register", {
+          redirect_uris: ["https://chatgpt.com/oauth/callback"],
+        }),
+        registered as ServerResponse,
+        "/oauth/register",
+      );
+      const clientId = String(responseBody(registered).client_id);
+      const requested = "hosts:read agents:read status:read files:write shell:exec";
+      const limitedScopes = plane.oauth as unknown as {
+        readOnlyConsentScope(requested: string): string | undefined;
+      };
+      expect(limitedScopes.readOnlyConsentScope("hosts:read")).toBeUndefined();
+      expect(limitedScopes.readOnlyConsentScope("files:write")).toBeUndefined();
+      expect(limitedScopes.readOnlyConsentScope(requested)).toBe(
+        "hosts:read agents:read status:read",
+      );
+      for (const [mode, expected] of [
+        ["read_only", "hosts:read agents:read status:read"],
+        ["omitted", "hosts:read agents:read status:read"],
+        ["requested", requested],
+      ] as const) {
+        const params = new URLSearchParams({
+          response_type: "code",
+          client_id: clientId,
+          redirect_uri: "https://chatgpt.com/oauth/callback",
+          code_challenge: sha256Base64Url("test-verifier".repeat(6)),
+          code_challenge_method: "S256",
+          resource: config.mcpResourceUrl,
+          scope: requested,
+          state: randomToken(8),
+        });
+        const consent = captureResponse();
+        await plane.handleHttp(
+          request("GET", "/oauth/authorize?" + params),
+          consent as ServerResponse,
+          "/oauth/authorize",
+        );
+        expect(consent.body).toContain('name="grant_mode" value="read_only" checked');
+        expect(consent.body).toContain('name="grant_mode" value="requested"');
+        expect(consent.body.indexOf('<form method="post"')).toBeLessThan(
+          consent.body.indexOf('name="grant_mode"'),
+        );
+        expect(consent.body.indexOf('name="grant_mode"')).toBeLessThan(
+          consent.body.indexOf("Continue with GitHub"),
+        );
+        const transaction = /name="transaction" value="([^"]+)"/u.exec(consent.body)?.[1];
+        expect(transaction).toBeTruthy();
+        const cookie = String(consent.headers?.["Set-Cookie"]).split(";")[0];
+        const approval = captureResponse();
+        await plane.handleHttp(
+          request(
+            "POST",
+            "/oauth/approve",
+            new URLSearchParams({
+              transaction: transaction!,
+              provider: "github",
+              ...(mode !== "omitted" ? { grant_mode: mode } : {}),
+            }).toString(),
+            {
+              cookie,
+              "content-type": "application/x-www-form-urlencoded",
+            },
+          ),
+          approval as ServerResponse,
+          "/oauth/approve",
+        );
+        expect(approval.statusCode).toBe(200);
+        const grants = (
+          plane as unknown as {
+            authorizeTransactions: Map<string, { scope: string; approved?: boolean }>;
+          }
+        ).authorizeTransactions;
+        expect(grants.get(transaction!)).toMatchObject({ scope: expected, approved: true });
+        await expect(
+          plane.handleHttp(
+            request(
+              "POST",
+              "/oauth/approve",
+              new URLSearchParams({
+                transaction: transaction!,
+                provider: "github",
+                grant_mode: "requested",
+              }).toString(),
+              {
+                cookie,
+                "content-type": "application/x-www-form-urlencoded",
+              },
+            ),
+            captureResponse() as ServerResponse,
+            "/oauth/approve",
+          ),
+        ).rejects.toMatchObject({ code: "INVALID_TOKEN" });
+      }
+    } finally {
+      plane.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("allows configured Google and GitHub OAuth form redirects in Chromium CSP", async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "oauth-form-csp-"));
     const config = {
