@@ -17,6 +17,13 @@ if (
   bundle.name !== pkg.name ||
   bundle.version !== pkg.version ||
   bundle.extensions?.["com.openai"]?.interface?.displayName !== pkg.name ||
+  !bundle.extensions?.["com.openai"]?.interface?.shortDescription ||
+  bundle.extensions?.["com.openai"]?.interface?.shortDescription?.length > 30 ||
+  bundle.extensions?.["com.openai"]?.interface?.supportURL !==
+    "https://ssh-mcp-pro.oaslananka.dev/support" ||
+  bundle.extensions?.["com.openai"]?.interface?.category !== "Developer Tools" ||
+  bundle.extensions?.["com.openai"]?.review?.test_cases?.positive?.length !== 5 ||
+  bundle.extensions?.["com.openai"]?.review?.test_cases?.negative?.length !== 3 ||
   bundle.extensions?.["com.openai"]?.interface?.privacyPolicyURL !==
     "https://ssh-mcp-pro.oaslananka.dev/privacy" ||
   server?.url !== endpoint ||
