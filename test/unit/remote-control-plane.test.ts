@@ -393,6 +393,7 @@ describe("remote control plane remote-agent contracts", () => {
       );
       for (const [mode, expected] of [
         ["read_only", "hosts:read agents:read status:read"],
+        ["omitted", "hosts:read agents:read status:read"],
         ["requested", requested],
       ] as const) {
         const params = new URLSearchParams({
@@ -430,7 +431,7 @@ describe("remote control plane remote-agent contracts", () => {
             new URLSearchParams({
               transaction: transaction!,
               provider: "github",
-              grant_mode: mode,
+              ...(mode !== "omitted" ? { grant_mode: mode } : {}),
             }).toString(),
             {
               cookie,

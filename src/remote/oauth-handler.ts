@@ -389,7 +389,8 @@ export class OAuthHandler {
     if (pending.approved) {
       throw safeError("INVALID_TOKEN", "OAuth transaction is already approved", 403);
     }
-    const grantMode = form.grant_mode ?? "requested";
+    const grantMode =
+      form.grant_mode ?? (this.readOnlyConsentScope(pending.scope) ? "read_only" : "requested");
     if (grantMode === "read_only") {
       const narrowed = this.readOnlyConsentScope(pending.scope);
       if (!narrowed) {
