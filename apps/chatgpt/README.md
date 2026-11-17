@@ -23,6 +23,8 @@ The repository-root mcp.json serves **legacy MCP registry consumers** and is del
 
 For a direct connection in ChatGPT Plugins, select **Add custom MCP server** and enter https://ssh-mcp-pro.oaslananka.dev/mcp. Authenticate through remote OAuth. The portable public listing defaults to `hosts:read`, `agents:read`, `status:read` only; it does not automatically request SSH write, shell or sudo permissions. Independently configured CLI/client profiles can request additional scopes under their existing policies. ChatGPT can cache an existing installed plugin's title; refresh/reconnect or update the saved title to **ssh-mcp-pro** after deployment. A server identity change does not retroactively rename a user-created ChatGPT plugin entry.
 
+The OpenAI host may request broader scopes discovered from the remote OAuth server even when the plugin manifest defaults to read-only. During authorization, the SSH MCP Pro gateway offers an explicit **Read-only inspection (recommended)** option that restricts the token to the intersection of requested scopes and `hosts:read`, `agents:read`, `status:read`. Only selecting **All requested permissions** grants wider access. Existing grants are not automatically downgraded. To change an already-authorized client's scopes, revoke that account's grant from Cloud **AI clients** and reconnect. Existing full-capability clients continue to work when their requested scope is explicitly granted.
+
 This is an MCP-only plugin; an embedded MCP Apps iframe is **not yet implemented**. Do not claim an interactive inline app or an approved directory listing. A portable package does not replace testing an actual registered MCP connection.
 
 ## Security Defaults

@@ -36,6 +36,9 @@ import type {
 import { PUBLIC_REMOTE_SCOPES } from "./types.js";
 import { jsonResponse } from "./util.js";
 
+/** Minimal inspection grant available even when an AI client requests elevated scopes. */
+const READ_ONLY_CONSENT_SCOPES = ["hosts:read", "agents:read", "status:read"] as const;
+
 /** Pending OAuth authorization transaction. */
 export interface PendingAuthorize {
   clientId: string;
@@ -71,6 +74,15 @@ export class OAuthHandler {
     private readonly getJwtKeyPair: () => JwtKeyPair,
     private readonly audit: (event: Omit<AuditEvent, "id" | "createdAt">) => void,
   ) {}
+
+  /** A consent choice must never add scopes not requested by the client. */
+  private readOnlyConsentScope(requested: string): string | undefined {
+    const requestedScopes = scopeList(requested);
+    const readScopes = READ_ONLY_CONSENT_SCOPES.filter((entry) => requestedScopes.includes(entry));
+    return readScopes.length > 0 && readScopes.length < requestedScopes.length
+      ? readScopes.join(" ")
+      : undefined;
+  }
 
   /** GET /.well-known/oauth-protected-resource */
   protectedResourceMetadata(): Record<string, unknown> {
@@ -239,6 +251,29 @@ export class OAuthHandler {
     const transactionId = id("code");
     this.authorizeTransactions.set(transactionId, pending);
     const hostname = escapeHtml(new URL(redirectUri).hostname);
+    const readOnlyScope = this.readOnlyConsentScope(scope);
+    const permissions = readOnlyScope
+      ? [
+          '<fieldset class="permission-options"><legend>Choose access level</legend>',
+          '<label class="permission-option"><input type="radio" name="grant_mode" value="read_only" checked>',
+          '<span class="permission-copy"><strong>Read-only inspection (recommended)</strong>',
+          "<small>List hosts, connected devices, and system status. No file changes, commands, or administrator access.</small>",
+          '<small class="scope-preview">',
+          escapeHtml(readOnlyScope),
+          "</small></span></label>",
+          '<label class="permission-option"><input type="radio" name="grant_mode" value="requested">',
+          '<span class="permission-copy"><strong>All requested permissions</strong>',
+          "<small>Includes sensitive actions such as file changes and command execution when requested by the client. Grant only if you trust it.</small>",
+          '<small class="scope-preview">',
+          escapeHtml(scope),
+          "</small></span></label></fieldset>",
+        ].join("")
+      : [
+          '<p><span class="badge">',
+          escapeHtml(scope),
+          "</span></p>",
+          '<input type="hidden" name="grant_mode" value="requested">',
+        ].join("");
     // Chromium also checks form-action on the redirect after POST /oauth/approve.
     // Permit only the configured identity providers, not arbitrary OAuth clients.
     const formActions = [
@@ -280,19 +315,18 @@ export class OAuthHandler {
         ".card{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:32px;max-width:440px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,0.5);text-align:center;}",
         "h1{font-size:22px;margin:0 0 12px;color:#f0f6fc;}p{font-size:14px;color:#8b949e;line-height:1.5;margin:0 0 24px;}",
         ".badge{background:#21262d;border:1px solid #30363d;border-radius:6px;padding:4px 8px;font-family:monospace;font-size:12px;color:#58a6ff;}",
+        ".permission-options{border:0;padding:0;margin:0 0 18px;text-align:left;min-width:0;}.permission-options legend{font-size:14px;font-weight:600;color:#f0f6fc;margin-bottom:10px;}.permission-option{display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid #30363d;border-radius:8px;margin-bottom:10px;cursor:pointer;}.permission-option:focus-within{border-color:#58a6ff;}.permission-option input{accent-color:#58a6ff;margin-top:3px;}.permission-copy{display:flex;flex-direction:column;gap:5px;min-width:0;color:#e6edf3;font-size:14px;}.permission-copy small{color:#a8b4c2;font-size:12px;line-height:1.5;overflow-wrap:anywhere;}.permission-copy .scope-preview{color:#79c0ff;font-family:monospace;}",
         "</style></head><body>",
         '<div class="card">',
         '<div style="margin-bottom:16px;"><span style="font-size:32px;">🔐</span></div>',
         "<h1>Authorize ssh-mcp-pro</h1>",
         '<p>Allow client at <strong style="color:#f0f6fc;">',
         hostname,
-        "</strong> to request access to:</p>",
-        '<p><span class="badge">',
-        escapeHtml(scope),
-        "</span></p>",
+        "</strong> to access your account:</p>",
         '<form method="post" action="/oauth/approve"><input type="hidden" name="transaction" value="',
         escapeHtml(transactionId),
         '">',
+        permissions,
         buttons.join(""),
         "</form>",
         '<div style="font-size:12px;color:#484f58;margin-top:20px;">Zero-Trust SSH Model Context Protocol Gateway</div>',
@@ -351,6 +385,19 @@ export class OAuthHandler {
     const pending = this.authorizeTransactions.get(transactionId);
     if (!pending || pending.expiresAt < Date.now() || !this.matchingBrowser(req, transactionId)) {
       throw safeError("INVALID_TOKEN", "OAuth transaction is missing or expired", 403);
+    }
+    if (pending.approved) {
+      throw safeError("INVALID_TOKEN", "OAuth transaction is already approved", 403);
+    }
+    const grantMode = form.grant_mode ?? "requested";
+    if (grantMode === "read_only") {
+      const narrowed = this.readOnlyConsentScope(pending.scope);
+      if (!narrowed) {
+        throw safeError("INVALID_SCOPE", "Read-only consent is not available", 400);
+      }
+      pending.scope = narrowed;
+    } else if (grantMode !== "requested") {
+      throw safeError("INVALID_SCOPE", "Invalid access level", 400);
     }
 
     if (provider === "google") {
