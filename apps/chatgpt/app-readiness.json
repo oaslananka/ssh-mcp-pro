@@ -21,13 +21,13 @@
     "recommendedProductionTransport": "streamable-http"
   },
   "app": {
-    "name": "SSH Operations",
+    "name": "SSH MCP Pro",
     "description": "Secure SSH inspection and policy-controlled planning through MCP.",
     "categories": [
       "Developer Tools",
       "Productivity"
     ],
-    "icon": "apps/chatgpt/icon.svg",
+    "icon": "assets/brand/icon-512.png",
     "defaultProfile": "chatgpt"
   },
   "connector": {

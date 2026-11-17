@@ -36,6 +36,8 @@ pnpm run build
 pnpm run start:chatgpt
 ```
 
+The [review case draft](review-test-cases.json) contains five positive and three negative cases aligned with the read-only and explain-only tool profile. These are **prepared scenarios, not verified platform review runs**; live review evidence and demonstration recordings must be produced before submission.
+
 ## Deployment & Submission
 
 Before submitting for ChatGPT plugin review:

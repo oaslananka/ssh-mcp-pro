@@ -1,6 +1,7 @@
 import { buildDashboardBrowserEnrollmentCommand } from "./dashboard-enrollment-commands.js";
 import { DASHBOARD_STYLES } from "./web-dashboard-styles.js";
 import { BRAND_STYLES } from "./web-dashboard-brand-styles.js";
+import { EXPERIENCE_STYLES } from "./web-dashboard-experience-styles.js";
 import { DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT } from "./dashboard-enrollment-feedback-script.js";
 export function renderDashboardHtml(
   initialUserBase64: string,
@@ -13,13 +14,18 @@ export function renderDashboardHtml(
 <head>
   <meta charset="utf-8">
   <title>SSH MCP Pro · Connect your devices to AI</title>
-  <meta name="theme-color" content="#0e171b">
+  <meta name="theme-color" content="#10111F">
   <meta name="description" content="Connect your own devices to ChatGPT, Claude and Gemini with controlled SSH MCP access.">
-  <link rel="icon" type="image/png" href="/brand/ssh-mcp-pro-icon.png">
-  <link rel="apple-touch-icon" href="/brand/ssh-mcp-pro-icon.png">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/brand/icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>${DASHBOARD_STYLES}
-${BRAND_STYLES}</style>
+${BRAND_STYLES}
+${EXPERIENCE_STYLES}</style>
 </head>
 <body>
   <header class="public-header">
@@ -91,10 +97,18 @@ ${BRAND_STYLES}</style>
         audit: { title: 'Activity', description: 'Review actions requested through your connected devices.' },
         usage: { title: 'Usage & Users', description: 'Owner-only activity and account statistics for this Cloud service.' },
       }[activeTab] || { title: 'Your devices', description: '' };
-      const navItem = (tab, icon, title) => \`
+      const navSvg = paths => '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + '</svg>';
+      const navIcons = {
+        devices: navSvg('<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/>'),
+        'add-device': navSvg('<rect x="3" y="5" width="18" height="15" rx="3"/><path d="M12 9v7m-3.5-3.5h7"/>'),
+        clients: navSvg('<path d="M12 3l1.8 6.2L20 11l-6.2 1.8L12 19l-1.8-6.2L4 11l6.2-1.8L12 3ZM19 18l.7 1.3L21 20l-1.3.7L19 22l-.7-1.3L17 20l1.3-.7L19 18Z"/>'),
+        audit: navSvg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+        usage: navSvg('<path d="M4 20V9m5 11V5m5 15v-8m5 8V3"/>'),
+      };
+      const navItem = (tab, title) => \`
         <button type="button" data-dashboard-tab="\${tab}" aria-current="\${activeTab === tab ? 'page' : 'false'}"
           class="workspace-nav-item \${activeTab === tab ? 'active' : ''}" onclick="switchTab('\${tab}')">
-          <span class="workspace-nav-icon" aria-hidden="true">\${icon}</span><span>\${title}</span>
+          <span class="workspace-nav-icon" aria-hidden="true">\${navIcons[tab]}</span><span>\${title}</span>
         </button>\`;
       const online = devicesList.filter(d => d.isLiveConnected).length;
       const total = devicesList.length;
@@ -107,11 +121,11 @@ ${BRAND_STYLES}</style>
             </a>
             <p class="sidebar-label">WORKSPACE</p>
             <nav class="workspace-nav" aria-label="Workspace navigation">
-              \${navItem('devices', '▤', 'Devices')}
-              \${navItem('add-device', '+', 'Add a device')}
-              \${navItem('clients', '✦', 'AI connections')}
-              \${navItem('audit', '◷', 'Activity')}
-              \${currentUser.serviceOwner ? navItem('usage', '▥', 'Usage & Users') : ''}
+              \${navItem('devices', 'Devices')}
+              \${navItem('add-device', 'Add a device')}
+              \${navItem('clients', 'AI connections')}
+              \${navItem('audit', 'Activity')}
+              \${currentUser.serviceOwner ? navItem('usage', 'Usage & Users') : ''}
             </nav>
             <div class="sidebar-bottom">
               <div class="sidebar-help"><span class="live-indicator" aria-hidden="true"></span><span>Cloud connection active</span></div>
@@ -129,7 +143,7 @@ ${BRAND_STYLES}</style>
               <div class="workspace-top-status"><span class="live-indicator" aria-hidden="true"></span> Signed in with \${escapeHtml(currentUser.provider === 'github' ? 'GitHub' : 'Google')}</div>
             </div>
             <div class="workspace-page-heading">
-              <div><p class="eyebrow">MANAGE YOUR CONNECTION</p><h1>\${escapeHtml(pageMeta.title)}</h1><p>\${escapeHtml(pageMeta.description)}</p></div>
+              <div><p class="eyebrow">YOUR DEVICES · YOUR CONTROL</p><h1>\${escapeHtml(pageMeta.title)}</h1><p>\${escapeHtml(pageMeta.description)}</p></div>
               \${activeTab !== 'add-device' ? '<button class="btn btn-primary" type="button" onclick="switchTab(\\'add-device\\')"><span aria-hidden="true">+</span> Add a device</button>' : '<button class="btn btn-outline" type="button" onclick="switchTab(\\'devices\\')">Back to devices</button>'}
             </div>
             \${activeTab === 'devices' ? \`
@@ -180,8 +194,8 @@ ${BRAND_STYLES}</style>
           <section class="landing-hero">
             <div class="landing-copy">
               <div class="eyebrow"><span class="mini-spark" aria-hidden="true"></span> YOUR OWN MACHINES · ANY AI ASSISTANT</div>
-              <h1>Connect your computers to <em>ChatGPT, Claude & Gemini.</em></h1>
-              <p>Use AI with the computers and servers you already own. Sign in, connect a device, and choose what your assistant is allowed to access.</p>
+              <h1>Your machines. <em>Inside your AI chat.</em></h1>
+              <p>Connect your own computers and servers to ChatGPT, Claude or Gemini. Choose which devices — and which actions — your assistant can use.</p>
               <div class="auth-buttons">
                 <a href="/auth/login/google" class="auth-btn auth-btn-google">
                   <span class="google-icon" aria-hidden="true">G</span> Continue with Google
@@ -193,24 +207,39 @@ ${BRAND_STYLES}</style>
               <p class="landing-small-note">Already connected a device? Sign in with the same account to find it.</p>
               <p id="providerSetup" class="device-scope-note" role="status" hidden>Local sign-in is not configured yet. Configure a supported OAuth provider or use the <a href="https://ssh-mcp-pro.oaslananka.dev/">hosted dashboard</a>.</p>
             </div>
-            <div class="landing-illustration" aria-label="How SSH MCP Pro connects an AI assistant to your own computer">
-              <div class="flow-card flow-assistant"><span class="flow-overline">YOUR ASSISTANT</span><strong>ChatGPT <span>·</span> Claude <span>·</span> Gemini</strong><small>The AI app you prefer</small></div>
-              <div class="flow-line"><span></span><div class="flow-flow-icon" aria-hidden="true">↓</div><span></span></div>
-              <div class="flow-card flow-gateway"><img src="/brand/ssh-mcp-pro-icon.png" width="48" height="48" alt="" aria-hidden="true"><div><strong>SSH MCP Pro</strong><small>Permission-controlled connection</small></div></div>
-              <div class="flow-line"><span></span><div class="flow-flow-icon" aria-hidden="true">↓</div><span></span></div>
-              <div class="flow-card flow-computer"><span class="flow-computer-icon" aria-hidden="true">▣</span><div><strong>Your computer</strong><small>Your files, terminal and services stay on your machine</small></div></div>
-              <div class="flow-caption"><span class="mini-spark" aria-hidden="true"></span> YOUR DEVICE · YOUR ACCESS RULES</div>
+            <div class="product-stage" aria-label="Illustration of SSH MCP Pro connecting AI clients to your device. Not a live session.">
+              <div class="stage-overline">WORK WITH YOUR FAVORITE ASSISTANT</div>
+              <div class="stage-clients">
+                <div class="assistant-chip"><span class="assistant-mark gpt-mark" aria-hidden="true">✳</span> ChatGPT</div>
+                <div class="assistant-chip"><span class="assistant-mark claude-mark" aria-hidden="true">✺</span> Claude</div>
+                <div class="assistant-chip"><span class="assistant-mark gemini-mark" aria-hidden="true">✦</span> Gemini</div>
+              </div>
+              <div class="stage-connector" aria-hidden="true"><span></span><i></i><span></span></div>
+              <div class="stage-gateway">
+                <img src="/brand/ssh-mcp-pro-icon.png" width="64" height="64" alt="" aria-hidden="true">
+                <div><strong>SSH MCP Pro</strong><small>One secure connection. Your rules.</small></div>
+                <span class="stage-shield" aria-label="Policy controlled">✓</span>
+              </div>
+              <div class="stage-connector short" aria-hidden="true"><span></span><i></i><span></span></div>
+              <div class="terminal-preview">
+                <div class="terminal-titlebar"><span><i></i> Your computer</span><span class="terminal-sample">Illustrative preview</span></div>
+                <div class="terminal-content">
+                  <div class="terminal-line"><span class="terminal-dollar" aria-hidden="true">›</span> ssh_hosts_list</div>
+                  <div class="terminal-result"><span class="mini-spark" aria-hidden="true"></span> Connected devices and allowed actions</div>
+                  <div class="terminal-caption">Run only what your access policy allows.</div>
+                </div>
+              </div>
             </div>
           </section>
           <section class="onboarding-section" aria-labelledby="start-heading">
-            <div class="onboarding-section-head"><p class="eyebrow">GET STARTED</p><h2 id="start-heading">Three steps. You're in control.</h2><p>Go from your first sign-in to a working AI connection.</p></div>
+            <div class="onboarding-section-head"><p class="eyebrow">GET STARTED</p><h2 id="start-heading">Quick start: three steps to connected.</h2><p>Go from your first sign-in to a working AI connection.</p></div>
             <div class="onboarding-steps">
               <article><span class="step-number">01</span><h3>Sign in</h3><p>Use Google or GitHub to create your private workspace.</p></article>
               <article><span class="step-number">02</span><h3>Connect a device</h3><p>Install the lightweight agent on your computer or server. You choose its permissions.</p></article>
               <article><span class="step-number">03</span><h3>Connect an AI app</h3><p>Use the secure MCP endpoint from ChatGPT, Claude or Gemini and start working.</p></article>
             </div>
           </section>
-          <section class="landing-local"><div><span class="landing-local-symbol" aria-hidden="true">⌘</span><div><h2>Prefer to stay local?</h2><p>Run SSH MCP Pro with your own SSH configuration. No Cloud account required.</p></div></div><code>npx ssh-mcp-pro</code></section>
+          <section class="landing-local"><div><span class="landing-local-symbol" aria-hidden="true">⌘</span><div><h2>Prefer to stay local?</h2><p>Start your own local dashboard. Sign-in requires a Google or GitHub OAuth provider.</p></div></div><code>npx -y ssh-mcp-pro web</code></section>
         </div>
       \`;
     }
@@ -268,6 +297,15 @@ ${BRAND_STYLES}</style>
             </article>
           \`).join('')}
           </div>
+        </section>
+        <section class="assistant-next-step" aria-label="Next step: connect an AI assistant">
+          <div class="assistant-next-copy">
+            <span class="eyebrow">NEXT STEP</span>
+            <h2>Bring these devices into your AI chat.</h2>
+            <p>Connect ChatGPT, Claude or Gemini using your SSH MCP Pro endpoint. The same device permissions apply.</p>
+            <div class="assistant-next-badges"><span>ChatGPT</span><span>Claude</span><span>Gemini</span></div>
+          </div>
+          <button class="btn btn-primary" type="button" onclick="switchTab('clients')">Set up an AI connection <span aria-hidden="true">→</span></button>
         </section>\`;
       }
 
