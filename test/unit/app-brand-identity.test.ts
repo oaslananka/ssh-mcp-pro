@@ -1,6 +1,8 @@
 import { describe, expect, test } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { listRemoteToolDescriptors } from "../../src/remote/mcp-tools.js";
+import { capabilitiesFromScopes } from "../../src/remote/scopes.js";
 
 describe("Cross-platform MCP app identity", () => {
   test("prepares exactly five safe positive and three negative MCP review cases", () => {
@@ -10,15 +12,15 @@ describe("Cross-platform MCP app identity", () => {
     const cases = JSON.parse(readFileSync(path, "utf8"));
     expect(cases.positive).toHaveLength(5);
     expect(cases.negative).toHaveLength(3);
-    const manifestPath = fileURLToPath(
-      new URL("../../apps/chatgpt/app-readiness.json", import.meta.url),
-    );
-    const profile = JSON.parse(readFileSync(manifestPath, "utf8")).toolProfiles[0];
+    const hostedReadTools = listRemoteToolDescriptors(
+      capabilitiesFromScopes(["hosts:read", "agents:read", "status:read"]),
+    ).map((tool) => tool.name);
+    expect(hostedReadTools).toEqual(["list_hosts", "list_agents", "get_system_status"]);
     for (const c of cases.positive) {
       expect(c.prompt).toBeTruthy();
       expect(c.expected_behavior).toBeTruthy();
       expect(c.tools_triggered.length).toBeGreaterThan(0);
-      for (const tool of c.tools_triggered) expect(profile.tools).toContain(tool);
+      for (const tool of c.tools_triggered) expect(hostedReadTools).toContain(tool);
     }
     for (const c of cases.negative) {
       expect(c.prompt).toBeTruthy();
@@ -38,12 +40,33 @@ describe("Cross-platform MCP app identity", () => {
     expect(interfaceMetadata.supportURL).toBe("https://ssh-mcp-pro.oaslananka.dev/support");
     expect(interfaceMetadata.category).toBe("Developer Tools");
     const cases = plugin.extensions["com.openai"].review.test_cases;
+    const draftPath = fileURLToPath(
+      new URL("../../apps/chatgpt/review-test-cases.json", import.meta.url),
+    );
+    const draft = JSON.parse(readFileSync(draftPath, "utf8"));
     expect(cases.positive).toHaveLength(5);
     expect(cases.negative).toHaveLength(3);
-    for (const positive of cases.positive) {
-      expect(positive.tools_triggered).toBeTypeOf("string");
-      expect(positive.expected_behavior).toBeTruthy();
-    }
+    expect(cases.positive).toEqual(
+      draft.positive.map(
+        (entry: {
+          description: string;
+          prompt: string;
+          tools_triggered: string[];
+          expected_behavior: string;
+        }) => ({
+          description: entry.description,
+          prompt: entry.prompt,
+          tools_triggered: entry.tools_triggered.join(", "),
+          expected_behavior: entry.expected_behavior,
+        }),
+      ),
+    );
+    expect(cases.negative).toEqual(
+      draft.negative.map((entry: { description: string; prompt: string }) => ({
+        description: entry.description,
+        prompt: entry.prompt,
+      })),
+    );
     expect(mcp.mcpServers["ssh-mcp-pro"]).toMatchObject({
       type: "streamable-http",
       url: "https://ssh-mcp-pro.oaslananka.dev/mcp",

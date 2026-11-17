@@ -52,7 +52,7 @@ pnpm run build
 pnpm run start:chatgpt
 ```
 
-The [review case draft](review-test-cases.json) contains five positive and three negative cases aligned with the read-only and explain-only tool profile. These are **prepared scenarios, not verified platform review runs**; live review evidence and demonstration recordings must be produced before submission.
+The [OpenAI review cases](review-test-cases.json) contain five positive and three negative cases for the **hosted Cloud MCP** read-only tool set (`list_hosts`, `list_agents`, `get_system_status`). This differs from the local/stdio ChatGPT connector profile (`connector_status`, `ssh_hosts_list`, `ssh_policy_explain` and related tools). These are **prepared scenarios, not verified platform review runs**; live review evidence and demonstration recordings must be produced before submission.
 
 ## Deployment & Submission
 
