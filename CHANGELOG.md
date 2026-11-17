@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.11.2...ssh-mcp-pro-v1.12.0) (2026-11-17)
+
+
+### Features
+
+* **web:** show and revoke account-scoped AI OAuth grants ([#284](https://github.com/oaslananka/ssh-mcp-pro/issues/284)) ([e8bce8c](https://github.com/oaslananka/ssh-mcp-pro/commit/e8bce8c2286a0a30674539f17c2e8194f092e45f))
+
+
+### Bug Fixes
+
+* **security:** scope temporary dev-only picomatch advisory exception ([#283](https://github.com/oaslananka/ssh-mcp-pro/issues/283)) ([9852f11](https://github.com/oaslananka/ssh-mcp-pro/commit/9852f11ee38da6d554f5389bc4fd4d9bfe6f2724))
+
 ## [1.11.2](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.11.1...ssh-mcp-pro-v1.11.2) (2026-11-17)
 
 
