@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.10.0...ssh-mcp-pro-v1.11.0) (2026-11-17)
+
+
+### Features
+
+* **web:** premium SSH MCP Pro branding, favicon set and first-use UX ([#275](https://github.com/oaslananka/ssh-mcp-pro/issues/275)) ([34b8919](https://github.com/oaslananka/ssh-mcp-pro/commit/34b89199f31d9ddd13767b9f258a532ef175ed3e))
+
 ## [1.10.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.9.0...ssh-mcp-pro-v1.10.0) (2026-11-17)
 
 
