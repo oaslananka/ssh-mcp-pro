@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.5](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.12.4...ssh-mcp-pro-v1.12.5) (2026-11-17)
+
+
+### Bug Fixes
+
+* **plugin:** align public review cases with hosted MCP tools ([#295](https://github.com/oaslananka/ssh-mcp-pro/issues/295)) ([b210e8d](https://github.com/oaslananka/ssh-mcp-pro/commit/b210e8d882c9972a3789dd36376a11e20bd2bb1f))
+
 ## [1.12.4](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.12.3...ssh-mcp-pro-v1.12.4) (2026-11-17)
 
 
