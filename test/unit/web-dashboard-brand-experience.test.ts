@@ -49,7 +49,7 @@ function extractBrowserScript(html: string): string {
 
 async function runDashboardFixture(
   respond: () => Promise<unknown>,
-  activeTab: "devices" | "audit" = "devices",
+  activeTab: "devices" | "audit" | "ai-clients" = "devices",
 ) {
   const elements = new Map<string, { innerHTML: string }>();
   const context = {
@@ -66,7 +66,8 @@ async function runDashboardFixture(
     fetch: respond,
   };
   new Script(extractBrowserScript(markup())).runInNewContext(context);
-  if (activeTab === "audit") new Script("switchTab('audit')").runInNewContext(context);
+  if (activeTab !== "devices")
+    new Script("switchTab('" + activeTab + "')").runInNewContext(context);
   await new Promise((resolve) => setImmediate(resolve));
   return elements;
 }
@@ -95,6 +96,37 @@ function enrolledDevice(connected: boolean) {
 }
 
 describe("SSH MCP Pro brand and first-use journey", () => {
+  test("renders the authorized AI client register without exposing callback query strings", async () => {
+    const elements = await runDashboardFixture(
+      async () => ({
+        ok: true,
+        json: async () => ({
+          clients: [
+            {
+              clientId: "client_test",
+              clientName: "<script>alert(1)</script>",
+              redirectHosts: ["chatgpt.com"],
+              lastTokenAt: "2026-11-17T16:00:00Z",
+              registeredAt: "2026-11-16T16:00:00Z",
+              activeGrants: 2,
+              scopes: ["hosts:read", "files:write"],
+            },
+          ],
+        }),
+      }),
+      "ai-clients",
+    );
+    const page = elements.get("tabContent")?.innerHTML ?? "";
+    expect(page).toContain("Authorized AI clients");
+    expect(page).toContain("chatgpt.com");
+    expect(page).toContain("Manage access");
+    expect(page).toContain("Revoke");
+    expect(page).toContain("Elevated scopes");
+    expect(page).not.toContain("<script>alert(1)</script>");
+    expect(page).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(page).toContain("Previously issued access tokens may remain valid until expiry");
+  });
+
   test("new icon contents automatically invalidate old browser caches", async () => {
     const original = readFileSync(new URL("../../assets/ssh-mcp-pro-icon.png", import.meta.url));
     const fingerprint = createHash("sha256").update(original).digest("hex").slice(0, 12);
