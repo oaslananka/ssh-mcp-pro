@@ -47,7 +47,10 @@ function extractBrowserScript(html: string): string {
   return script;
 }
 
-async function renderWithUnavailableApi(tab: "devices" | "audit") {
+async function runDashboardFixture(
+  respond: () => Promise<unknown>,
+  activeTab: "devices" | "audit" = "devices",
+) {
   const elements = new Map<string, { innerHTML: string }>();
   const context = {
     atob,
@@ -60,35 +63,35 @@ async function renderWithUnavailableApi(tab: "devices" | "audit") {
       },
       querySelector: () => null,
     },
-    fetch: async () => ({ ok: false, status: 503 }),
+    fetch: respond,
   };
   new Script(extractBrowserScript(markup())).runInNewContext(context);
-  if (tab === "audit") new Script("switchTab('audit')").runInNewContext(context);
+  if (activeTab === "audit") new Script("switchTab('audit')").runInNewContext(context);
   await new Promise((resolve) => setImmediate(resolve));
   return elements;
 }
 
+async function renderWithUnavailableApi(tab: "devices" | "audit") {
+  return runDashboardFixture(async () => ({ ok: false, status: 503 }), tab);
+}
+
 async function renderWithDeviceList(devices: unknown[]): Promise<string> {
-  const elements = new Map<string, { innerHTML: string }>();
-  const context = {
-    atob,
-    console: { error() {} },
-    document: {
-      body: { classList: { toggle() {} } },
-      getElementById(id: string) {
-        if (!elements.has(id)) elements.set(id, { innerHTML: "" });
-        return elements.get(id)!;
-      },
-      querySelector: () => null,
-    },
-    fetch: async () => ({
-      ok: true,
-      json: async () => ({ devices }),
-    }),
-  };
-  new Script(extractBrowserScript(markup())).runInNewContext(context);
-  await new Promise((resolve) => setImmediate(resolve));
+  const elements = await runDashboardFixture(async () => ({
+    ok: true,
+    json: async () => ({ devices }),
+  }));
   return elements.get("appRoot")?.innerHTML ?? "";
+}
+
+function enrolledDevice(connected: boolean) {
+  return {
+    id: "agent-1",
+    alias: "Workstation",
+    status: connected ? "online" : "offline",
+    isLiveConnected: connected,
+    profile: "read-only",
+    host_metadata: { os: "Windows", hostname: "Workstation", platform: "win32" },
+  };
 }
 
 describe("SSH MCP Pro brand and first-use journey", () => {
@@ -129,32 +132,14 @@ describe("SSH MCP Pro brand and first-use journey", () => {
   });
 
   test("offline devices prioritize reconnection before AI setup", async () => {
-    const body = await renderWithDeviceList([
-      {
-        id: "agent-1",
-        alias: "Workstation",
-        status: "offline",
-        isLiveConnected: false,
-        profile: "read-only",
-        host_metadata: { os: "Windows", hostname: "Workstation", platform: "win32" },
-      },
-    ]);
+    const body = await renderWithDeviceList([enrolledDevice(false)]);
     expect(body).toContain("Reconnect your device");
     expect(body).toContain('onclick="loadDevices()"');
     expect(body).not.toContain("Bring these devices into your AI chat.");
   });
 
   test("online devices present the working AI connection next step", async () => {
-    const body = await renderWithDeviceList([
-      {
-        id: "agent-1",
-        alias: "Workstation",
-        status: "online",
-        isLiveConnected: true,
-        profile: "read-only",
-        host_metadata: { os: "Windows", hostname: "Workstation", platform: "win32" },
-      },
-    ]);
+    const body = await renderWithDeviceList([enrolledDevice(true)]);
     expect(body).toContain("Bring these devices into your AI chat.");
     expect(body).toContain("onclick=\"switchTab('clients')\"");
     expect(body).not.toContain("Reconnect your device");
