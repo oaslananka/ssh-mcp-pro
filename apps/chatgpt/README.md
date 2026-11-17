@@ -7,7 +7,7 @@ OpenAI has unified developer tooling around the **Model Context Protocol (MCP)**
 ## Architecture & Integration Paths
 
 - **MCP Server Connection**: ChatGPT connects to `ssh-mcp-pro` using the Streamable HTTP transport at `https://<public-host>/mcp` or via local stdio runners (see [OpenAI MCP Server Guide](https://developers.openai.com/plugins/build/mcp-server) and [Quickstart](https://developers.openai.com/plugins/quickstart)).
-- **ChatGPT UI / MCP Apps**: Interactive iframe UI widgets for host status, tunnel visualization, and mutation approvals conform to [ChatGPT UI development guidelines](https://developers.openai.com/plugins/build/chatgpt-ui).
+- **ChatGPT UI / MCP Apps**: This repository currently provides MCP tools and an independent web dashboard, not an embedded MCP Apps iframe. Embedded interactive widgets are optional future UX work, not a prerequisite for an MCP-only connector.
 - **Authentication**: Production deployment requires OAuth 2.0 with JWKS verification; local development supports bearer token authentication.
 - **Tool Profile**: The default ChatGPT connector profile (`chatgpt`) exposes read-only inspection (`ssh_hosts_list`, `ssh_host_inspect`, `connector_status`) and safe planning (`ssh_policy_explain`, `ssh_mutation_plan`). Mutation and interactive shell tools remain hidden unless explicitly allowed by operator policy.
 
@@ -38,9 +38,12 @@ pnpm run start:chatgpt
 
 ## Deployment & Submission
 
-Before submitting to the ChatGPT plugin store:
+Before submitting for ChatGPT plugin review:
 
 1. Deploy the Streamable HTTP server behind HTTPS with a verified public domain per [Plugin Packaging](https://developers.openai.com/plugins/build/plugins).
 2. Configure dedicated HTTPS Privacy Policy and Terms of Service endpoints.
 3. Review submission checklist and compliance with [OpenAI Plugin Review Guidelines](https://developers.openai.com/plugins/deploy/app-review) and [Plugin Guidelines](https://developers.openai.com/plugins/plugin-guidelines).
 4. Update `app-readiness.json` with domain verification proof and set `publishReady` to `true`.
+
+
+**Publication status (November 17, 2026):** Connector and OAuth metadata validate locally, but publisher verification, public domain ownership attestation, client-side acceptance, review screenshots, privacy review, and platform review are not independently confirmed. The manifest intentionally keeps `publishReady: false`. The server provides the challenge endpoint only when `SSH_MCP_OPENAI_DOMAIN_CHALLENGE` is set to the exact portal-provided value. Do not claim approval or enable public enrollment merely to pass review.

@@ -22,6 +22,7 @@ const ToolProfileSchema = z.enum([
   "remote-safe",
   "chatgpt",
   "claude",
+  "gemini",
   "remote-readonly",
   "remote-broker",
 ]);

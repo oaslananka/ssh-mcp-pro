@@ -11,7 +11,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { applyHttpCliEnvironment, parseArgs } from "./cli.js";
+import { applyHttpCliEnvironment, applyWebCliEnvironment, parseArgs } from "./cli.js";
 import { createContainer, type AppContainer } from "./container.js";
 import { SERVER_VERSION, SSHMCPServer } from "./mcp.js";
 import { logger } from "./logging.js";
@@ -41,6 +41,7 @@ function printHelp() {
     "  ssh-mcp-pro             Start MCP server over stdio (default)",
     "  ssh-mcp-pro stdio       Start MCP server over stdio",
     "  ssh-mcp-pro http        Start Streamable HTTP server",
+    "  ssh-mcp-pro web         Start the local dashboard at http://127.0.0.1:3000",
     "  ssh-mcp-pro --transport=http Start Streamable HTTP server",
     "  ssh-mcp-pro-agent enroll --server <url> --token <token> --alias <alias>",
     "  ssh-mcp-pro-agent run        Run the no-custody outbound agent",
@@ -98,7 +99,18 @@ async function main() {
   }
 
   if (opts.transport === "http") {
-    applyHttpCliEnvironment(opts);
+    if (opts.webDashboard) {
+      applyWebCliEnvironment(opts);
+      process.stderr.write(
+        "Local dashboard: " +
+          process.env.PUBLIC_BASE_URL +
+          "/dashboard\n" +
+          "Sign-in requires a configured Google or GitHub OAuth provider. " +
+          "The local shortcut is never publicly exposed.\n",
+      );
+    } else {
+      applyHttpCliEnvironment(opts);
+    }
     const { startHttpServer } = await import("./server-http.js");
     httpRuntime = await startHttpServer({ registerSignalHandlers: false });
     return;

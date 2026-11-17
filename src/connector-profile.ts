@@ -19,6 +19,7 @@ export const TOOL_PROFILES = [
   "remote-safe",
   "chatgpt",
   "claude",
+  "gemini",
   "remote-readonly",
   "remote-broker",
 ] as const;
@@ -62,6 +63,7 @@ export const PROFILE_TOOL_SETS: Record<ToolProfile, Set<string>> = {
   "remote-safe": createRemoteConnectorToolSet(),
   chatgpt: createRemoteConnectorToolSet(),
   claude: createRemoteConnectorToolSet(),
+  gemini: createRemoteConnectorToolSet(),
   "remote-readonly": createRemoteConnectorToolSet(),
   "remote-broker": createRemoteConnectorToolSet(),
 };

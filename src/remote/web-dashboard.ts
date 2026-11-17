@@ -10,6 +10,7 @@ import type { AuditEvent, RemoteAgentRecord, RemoteConfig, RemotePrincipal } fro
 import { PUBLIC_REMOTE_SCOPES } from "./types.js";
 import { jsonResponse } from "./util.js";
 import { renderDashboardHtml } from "./web-dashboard-html.js";
+import { serveLegalPage } from "./web-dashboard-legal.js";
 import { serveAgentScript } from "./web-dashboard-static.js";
 import { createDashboardClientConfigs } from "./web-dashboard-client-config.js";
 import { buildDashboardEnrollmentCommands } from "./dashboard-enrollment-commands.js";
@@ -42,6 +43,28 @@ export class WebDashboardHandler {
   >();
 
   constructor(private readonly deps: WebDashboardDependencies) {}
+
+  /** Service-wide metrics are opt-in; an ordinary tenant must never see others' accounts. */
+  private isUsageOwner(principal: RemotePrincipal): boolean {
+    const githubLogins = new Set(
+      (process.env.SSH_MCP_DASHBOARD_OWNER_GITHUB_LOGINS ?? "")
+        .split(",")
+        .map((login) => login.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    const googleEmails = new Set(
+      (process.env.SSH_MCP_DASHBOARD_OWNER_GOOGLE_EMAILS ?? "")
+        .split(",")
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean),
+    );
+    return (
+      (principal.provider === "github" && githubLogins.has(principal.githubLogin.toLowerCase())) ||
+      (principal.provider === "google" &&
+        !!principal.email &&
+        googleEmails.has(principal.email.toLowerCase()))
+    );
+  }
 
   private readonly sessionCookieName = "ssh_mcp_web_session";
 
@@ -129,6 +152,22 @@ export class WebDashboardHandler {
   }
 
   private handleScriptRoutes(req: IncomingMessage, res: ServerResponse, pathname: string): boolean {
+    if ((pathname === "/privacy" || pathname === "/terms") && req.method === "GET") {
+      serveLegalPage(res, pathname);
+      return true;
+    }
+    if (pathname === "/.well-known/openai-apps-challenge" && req.method === "GET") {
+      const challenge = process.env.SSH_MCP_OPENAI_DOMAIN_CHALLENGE?.trim();
+      if (challenge && /^[A-Za-z0-9._-]{8,2048}$/u.test(challenge)) {
+        res.writeHead(200, {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Content-Type-Options": "nosniff",
+        });
+        res.end(challenge);
+        return true;
+      }
+    }
     // 1. Static installation scripts
     if (pathname === "/install-agent.sh" && req.method === "GET") {
       serveAgentScript(res, "scripts/install-agent.sh", "text/x-shellscript; charset=utf-8");
@@ -191,6 +230,10 @@ export class WebDashboardHandler {
     // 3. Web Dashboard REST APIs
     if (pathname === "/api/dashboard/me" && req.method === "GET") {
       this.handleApiMe(req, res);
+      return true;
+    }
+    if (pathname === "/api/dashboard/usage" && req.method === "GET") {
+      this.handleApiUsage(req, res);
       return true;
     }
     if (await this.handleDashboardDeviceRoutes(req, res, pathname)) return true;
@@ -397,6 +440,19 @@ export class WebDashboardHandler {
     this.completeWebAuth(res, user.id, "/oauth");
   }
 
+  private handleApiUsage(req: IncomingMessage, res: ServerResponse): void {
+    const principal = this.getPrincipalFromSession(req);
+    if (!principal) {
+      jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
+      return;
+    }
+    if (!this.isUsageOwner(principal)) {
+      jsonResponse(res, 403, { error: "Service owner access required" }, addNoStore());
+      return;
+    }
+    jsonResponse(res, 200, this.deps.store.getServiceUsage(), addNoStore());
+  }
+
   private handleApiMe(req: IncomingMessage, res: ServerResponse): void {
     const principal = this.getPrincipalFromSession(req);
     if (!principal) {
@@ -415,6 +471,7 @@ export class WebDashboardHandler {
           email: user?.email ?? principal.email,
           provider: user?.provider ?? principal.provider ?? "github",
           scopes: principal.scopes,
+          serviceOwner: this.isUsageOwner(principal),
         },
       },
       addNoStore(),
@@ -571,6 +628,7 @@ export class WebDashboardHandler {
             displayName: user?.displayName ?? principal.displayName ?? principal.githubLogin,
             email: user?.email ?? principal.email,
             provider: user?.provider ?? principal.provider ?? "github",
+            serviceOwner: this.isUsageOwner(principal),
           }
         : null,
     );
@@ -597,6 +655,16 @@ export class WebDashboardHandler {
       "X-Content-Type-Options": "nosniff",
     });
 
-    res.end(renderDashboardHtml(initialUserBase64, mcpUrlJson, publicUrlJson));
+    res.end(
+      renderDashboardHtml(
+        initialUserBase64,
+        mcpUrlJson,
+        publicUrlJson,
+        JSON.stringify({
+          github: Boolean(this.deps.config.githubClientId && this.deps.config.githubClientSecret),
+          google: Boolean(this.deps.config.googleClientId && this.deps.config.googleClientSecret),
+        }),
+      ),
+    );
   }
 }

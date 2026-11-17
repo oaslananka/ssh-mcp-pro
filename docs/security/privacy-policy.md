@@ -1,30 +1,25 @@
-# Privacy Policy for ssh-mcp-pro
+# Privacy Policy for SSH MCP Pro
 
-*Last updated: November 17, 2026*
+Last updated: November 17, 2026
 
-This Privacy Policy explains how `ssh-mcp-pro` handles data when used as a Model Context Protocol (MCP) server, connector, or plugin with AI host platforms including OpenAI ChatGPT, Anthropic Claude, Google Gemini, and standalone MCP clients.
+This notice describes the hosted SSH MCP Pro service at https://ssh-mcp-pro.oaslananka.dev and its locally installed open-source server. This notice does not replace the policies of AI host platforms.
 
-## 1. Zero Credential Exfiltration
+## Data collected by the hosted service
 
-- **SSH Keys and Credentials**: `ssh-mcp-pro` never collects, stores, or transmits your private SSH keys, passwords, passphrases, or bearer tokens to any AI model or external third-party server.
-- **Local Key Isolation**: Key negotiation and authentication occur strictly between the local SSH client runtime and the target remote SSH server.
+- Accounts: GitHub and Google account identifiers, display names, login names and email addresses where provided through authentication.
+- Devices: Enrolled agent identifiers, aliases, public keys, device profiles, operating-system metadata, connection state and timestamps. SSH private keys remain on the user's device.
+- Operations: Authorized agent requests, tool names, timestamps, status, request arguments, operation results, and security/audit event metadata. These records may contain command output or file metadata despite redaction of selected sensitive fields; avoid transmitting secrets in requests or outputs. These records are kept in the hosted database for troubleshooting, access control and security auditing.
+- Authentication: Hashed dashboard sessions, OAuth client registrations, token hashes and related metadata needed to maintain sessions and revoke access.
+- Diagnostics: Limited security events, request counts, failures and latencies may be processed to protect and operate the service.
 
-## 2. Command Output and Telemetry
+## Data handling and sharing
 
-- **Redaction**: Built-in redaction filters mask known secret patterns, private keys, authorization tokens, and credentials in command stdout/stderr and audit logs before results are returned to the client.
-- **Diagnostics**: Operational telemetry (such as OpenTelemetry metrics and error codes) records request counts, latencies, and error codes without capturing remote command content or sensitive file contents.
+SSH private keys, passwords, passphrases and API tokens should not be entered into AI chats. SSH authentication happens on the agent's own device. Tool output, including command and file content you explicitly request, may be returned to the AI platform you connected. Such platforms apply their own data policies. The service uses tenant-based access rules, capability checks and sanitization. The service owner can access limited account and usage information for administration.
 
-## 3. Hosted OAuth and Control Plane
+## Retention and removal
 
-- When using the optional remote control plane (`ssh-mcp-pro` remote-agent or hosted dashboard):
-  - Identity verification uses standard OAuth 2.0 / OIDC protocols (GitHub, Google).
-  - Only authenticated user identifiers, device IDs, and policy profile names are stored.
-  - No remote command histories or SSH session payloads are retained on central servers.
+Account, action and audit records are retained while needed for operation and security; do not assume automatic deletion after a fixed period. Removing a device revokes its access and removes its device record, but historical security audit events may remain. Logging out deletes the web session. Complete account removal is not currently self-service. For removal or retention requests, contact the maintainer through the project's GitHub Issues or private Security Advisories.
 
-## 4. Third-Party Platforms
+## Your choices and contact
 
-When interacting through host platforms (such as OpenAI, Anthropic, or Google), tool calls and outputs returned to the AI assistant are governed by the respective platform's privacy policy and data retention agreements.
-
-## 5. Contact and Security Disclosures
-
-For security vulnerabilities or privacy inquiries, please report via [GitHub Security Advisories](https://github.com/oaslananka/ssh-mcp-pro/security/advisories/new) or contact the maintainers via [GitHub Issues](https://github.com/oaslananka/ssh-mcp-pro/issues).
+Connection and device enrollment are voluntary. You may revoke devices and disconnect your MCP connection through the AI client. Only connect systems you own or are authorized to manage. Privacy questions: https://github.com/oaslananka/ssh-mcp-pro/issues . Security reports: https://github.com/oaslananka/ssh-mcp-pro/security/advisories/new .
