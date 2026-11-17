@@ -9,7 +9,14 @@ export async function exchangeGoogleIdentity(
   if (!config.googleClientId || !config.googleClientSecret) {
     throw safeError("FORBIDDEN", "Google OAuth is not configured", 503);
   }
-  const { tokenPayload } = await requestGoogleOAuthToken(config, code, config.googleCallbackUrl);
+  const { tokenPayload, responseOk } = await requestGoogleOAuthToken(
+    config,
+    code,
+    config.googleCallbackUrl,
+  );
+  if (!responseOk) {
+    throw safeError("INVALID_TOKEN", "Google OAuth token exchange failed", 502);
+  }
   const accessToken = asString(tokenPayload.access_token);
   if (!accessToken) {
     throw safeError("INVALID_TOKEN", "Google OAuth token exchange failed", 502);
@@ -17,12 +24,15 @@ export async function exchangeGoogleIdentity(
   const userResponse = await fetch("https://openidconnect.googleapis.com/v1/userinfo", {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
+  if (!userResponse.ok) {
+    throw safeError("INVALID_TOKEN", "Google OAuth UserInfo request failed", 502);
+  }
   const userPayload = (await userResponse.json()) as Record<string, unknown>;
   const googleSub = asString(userPayload.sub);
   const email = asString(userPayload.email);
   const name = asString(userPayload.name) ?? email ?? "Google User";
   const picture = asString(userPayload.picture);
-  if (!googleSub || !email) {
+  if (!googleSub || !email || userPayload.email_verified !== true) {
     throw safeError("INVALID_TOKEN", "Google OAuth user response missing valid identity", 502);
   }
   return { id: googleSub, email, name, picture };
