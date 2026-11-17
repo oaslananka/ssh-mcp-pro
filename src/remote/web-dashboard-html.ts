@@ -45,8 +45,11 @@ ${BRAND_STYLES}</style>
     let activeTab = 'devices';
     let devicesList = [];
     let devicesLoaded = false;
+    let devicesError = '';
     let selectedInstallOs = 'windows';
     let auditList = [];
+    let auditLoaded = false;
+    let auditError = '';
     let usageData = null;
     ${DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT}
 
@@ -132,8 +135,8 @@ ${BRAND_STYLES}</style>
             \${activeTab === 'devices' ? \`
               <section class="connection-summary" aria-label="Connection overview">
                 <div class="connection-summary-primary"><span class="summary-pulse" aria-hidden="true"></span><div>
-                  <strong>\${!devicesLoaded ? 'Checking your devices…' : online > 0 ? "You're ready to work" : total > 0 ? 'Your devices are offline' : 'Connect your first device'}</strong>
-                  <span>\${!devicesLoaded ? 'Loading live connection status' : online > 0 ? online + ' connected device' + (online === 1 ? '' : 's') + ' · Connect an AI app to start' : total > 0 ? 'Check the agent on your computer to reconnect' : 'Your AI assistant needs a connected computer to get started'}</span>
+                  <strong>\${devicesError ? 'Device status unavailable' : !devicesLoaded ? 'Checking your devices…' : online > 0 ? "You're ready to work" : total > 0 ? 'Your devices are offline' : 'Connect your first device'}</strong>
+                  <span>\${devicesError ? 'Please retry to check the current device status' : !devicesLoaded ? 'Loading live connection status' : online > 0 ? online + ' connected device' + (online === 1 ? '' : 's') + ' · Connect an AI app to start' : total > 0 ? 'Check the agent on your computer to reconnect' : 'Your AI assistant needs a connected computer to get started'}</span>
                 </div></div>
                 <button class="btn btn-soft" type="button" onclick="switchTab('\${total > 0 ? 'clients' : 'add-device'}')">\${total > 0 ? 'Connect an AI app' : 'Connect a device'} <span aria-hidden="true">→</span></button>
               </section>
@@ -164,7 +167,8 @@ ${BRAND_STYLES}</style>
 
     function switchTab(tab) {
       stopEnrollmentPolling();
-      if (tab === 'devices' && activeTab !== tab) devicesLoaded = false;
+      if (tab === 'devices' && activeTab !== tab) { devicesLoaded = false; devicesError = ''; }
+      if (tab === 'audit' && activeTab !== tab) { auditLoaded = false; auditError = ''; }
       activeTab = tab;
       renderApp();
       document.querySelector('[data-dashboard-tab="' + tab + '"]')?.focus({ preventScroll: true });
@@ -217,6 +221,9 @@ ${BRAND_STYLES}</style>
       if (activeTab === 'devices') {
         if (!devicesLoaded) {
           return '<div class="card device-loading" role="status">Loading your connected devices…</div>';
+        }
+        if (devicesError) {
+          return '<div class="card feedback-error" role="alert"><h2>Could not load your devices</h2><p>Check your internet connection and try again. Your existing devices and permissions have not been changed.</p><button type="button" class="btn btn-primary" onclick="retryDevices()">Try again</button></div>';
         }
         if (devicesList.length === 0) {
           return \`<div class="card empty-box onboarding-empty">
@@ -420,6 +427,8 @@ ${BRAND_STYLES}</style>
       }
 
       if (activeTab === 'audit') {
+        if (!auditLoaded) return '<div class="card device-loading" role="status">Loading activity…</div>';
+        if (auditError) return '<div class="card feedback-error" role="alert"><h2>Could not load activity</h2><p>Recent events are unavailable. Check your connection and try again.</p><button type="button" class="btn btn-primary" onclick="loadAudit()">Try again</button></div>';
         if (auditList.length === 0) {
           return '<div class="card empty-box">No audit events recorded yet.</div>';
         }
@@ -478,33 +487,44 @@ ${BRAND_STYLES}</style>
       }
     }
 
+    function retryDevices() {
+      devicesLoaded = false;
+      devicesError = '';
+      if (activeTab === 'devices') renderApp();
+    }
+
     async function loadDevices() {
       try {
-        const res = await fetch('/api/dashboard/devices');
-        if (res.ok) {
-          const data = await res.json();
-          devicesList = data.devices || [];
-          devicesLoaded = true;
-          if (activeTab === 'devices') renderApp();
-        }
+        const res = await fetch('/api/dashboard/devices', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Device API unavailable');
+        const data = await res.json();
+        devicesList = Array.isArray(data.devices) ? data.devices : [];
+        devicesError = '';
       } catch (e) {
+        devicesError = 'unavailable';
         console.error('Failed to load devices', e);
+      } finally {
+        devicesLoaded = true;
+        if (activeTab === 'devices') renderApp();
       }
     }
 
     async function loadAudit() {
+      auditLoaded = false;
+      auditError = '';
+      const target = document.getElementById('tabContent');
+      if (activeTab === 'audit' && target) target.innerHTML = renderTabContent();
       try {
-        const res = await fetch('/api/dashboard/audit');
-        if (res.ok) {
-          const data = await res.json();
-          auditList = data.events || [];
-          const tabContent = document.getElementById('tabContent');
-          if (activeTab === 'audit' && tabContent) {
-            tabContent.innerHTML = renderTabContent();
-          }
-        }
+        const res = await fetch('/api/dashboard/audit', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Activity API unavailable');
+        const data = await res.json();
+        auditList = Array.isArray(data.events) ? data.events : [];
       } catch (e) {
+        auditError = 'unavailable';
         console.error('Failed to load audit events', e);
+      } finally {
+        auditLoaded = true;
+        if (activeTab === 'audit' && target) target.innerHTML = renderTabContent();
       }
     }
 

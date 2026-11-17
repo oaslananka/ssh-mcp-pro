@@ -142,6 +142,9 @@ body{background:#101719;color:var(--text-main);font-family:Inter,ui-sans-serif,s
 .device-control-actions{display:flex;gap:9px;flex-wrap:wrap}
 .device-offline-tip{padding:12px 25px;background:#343432;color:#e0d3bd;border-top:1px solid #465454;font-size:12px}
 .device-offline-tip a{color:#a2e7ee}
+.feedback-error{padding:33px;border-color:#99616b;background:linear-gradient(115deg,#32262d,#222b30)}
+.feedback-error h2{font-size:21px;letter-spacing:-.03em;margin-bottom:8px}
+.feedback-error p{color:#ebcfd0;font-size:13px;margin-bottom:20px;max-width:650px}
 .device-loading{min-height:123px;display:grid;place-items:center;color:#bbd3d2}
 .onboarding-empty{padding:55px 20px;text-align:center}
 .onboarding-empty h2{font-size:25px;letter-spacing:-.03em;margin-bottom:12px}

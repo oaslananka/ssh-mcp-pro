@@ -86,6 +86,59 @@ describe("SSH MCP Pro brand and first-use journey", () => {
     expect(html).toContain(":focus-visible");
   });
 
+  test("recovers from unavailable devices API with a working retry action", async () => {
+    const { Script } = await import("node:vm");
+    const elements = new Map<string, { innerHTML: string }>();
+    const document = {
+      body: { classList: { toggle() {} } },
+      getElementById(id: string) {
+        if (!elements.has(id)) elements.set(id, { innerHTML: "" });
+        return elements.get(id)!;
+      },
+      querySelector: () => null,
+    };
+    const context = {
+      atob,
+      console: { error() {} },
+      document,
+      fetch: async () => ({ ok: false, status: 503 }),
+    };
+    const script = markup().match(/<script>([\s\S]*?)<\/script>/u)?.[1];
+    expect(script).toBeTruthy();
+    new Script(script!).runInNewContext(context);
+    await new Promise((resolve) => setImmediate(resolve));
+    const body = elements.get("appRoot")?.innerHTML ?? "";
+    expect(body).toContain("Could not load your devices");
+    expect(body).toContain('onclick="retryDevices()"');
+    expect(body).not.toContain("Loading your connected devices…");
+  });
+
+  test("shows retry instead of a false empty state when activity API fails", async () => {
+    const { Script } = await import("node:vm");
+    const elements = new Map<string, { innerHTML: string }>();
+    const context = {
+      atob,
+      console: { error() {} },
+      document: {
+        body: { classList: { toggle() {} } },
+        getElementById(id: string) {
+          if (!elements.has(id)) elements.set(id, { innerHTML: "" });
+          return elements.get(id)!;
+        },
+        querySelector: () => null,
+      },
+      fetch: async () => ({ ok: false, status: 503 }),
+    };
+    const script = markup().match(/<script>([\s\S]*?)<\/script>/u)?.[1];
+    new Script(script!).runInNewContext(context);
+    new Script("switchTab('audit')").runInNewContext(context);
+    await new Promise((resolve) => setImmediate(resolve));
+    const panel = elements.get("tabContent")?.innerHTML ?? "";
+    expect(panel).toContain("Could not load activity");
+    expect(panel).toContain('onclick="loadAudit()"');
+    expect(panel).not.toContain("No audit events recorded yet.");
+  });
+
   test("serves the exact supplied PNG as a versioned public brand asset", async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "brand-assets-"));
     const plane = new RemoteControlPlane(testConfig(dir));
