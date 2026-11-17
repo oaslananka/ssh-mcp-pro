@@ -124,13 +124,17 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
     await cp.initialize();
     const previous = process.env.SSH_MCP_OPENAI_DOMAIN_CHALLENGE;
     try {
-      for (const pathname of ["/privacy", "/terms"] as const) {
+      for (const pathname of ["/privacy", "/terms", "/support"] as const) {
         const res = captureResponse();
         await cp.handleHttp(request("GET", pathname), res as unknown as ServerResponse, pathname);
         expect(res.statusCode).toBe(200);
         expect(res.body).toContain("<html lang=");
         expect(res.body).toContain("ssh-mcp-pro");
         expect(res.getHeader("content-security-policy")).toContain("frame-ancestors 'none'");
+        if (pathname === "/support") {
+          expect(res.body).toContain("ssh-mcp-pro Help and Support");
+          expect(res.body).toContain("github.com/oaslananka/ssh-mcp-pro/issues");
+        }
       }
       process.env.SSH_MCP_OPENAI_DOMAIN_CHALLENGE = "portal-challenge-token-2026";
       const challenge = captureResponse();

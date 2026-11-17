@@ -156,7 +156,10 @@ export class WebDashboardHandler {
     if (req.method === "GET" && serveDashboardBrandAsset(res, pathname)) {
       return true;
     }
-    if ((pathname === "/privacy" || pathname === "/terms") && req.method === "GET") {
+    if (
+      (pathname === "/privacy" || pathname === "/terms" || pathname === "/support") &&
+      req.method === "GET"
+    ) {
       serveLegalPage(res, pathname);
       return true;
     }

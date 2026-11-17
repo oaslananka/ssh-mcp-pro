@@ -32,6 +32,18 @@ describe("Cross-platform MCP app identity", () => {
     const mcp = JSON.parse(readFileSync(fileURLToPath(new URL("mcp.json", base)), "utf8"));
     expect(plugin.name).toBe("ssh-mcp-pro");
     expect(plugin.extensions["com.openai"].interface.displayName).toBe("ssh-mcp-pro");
+    const interfaceMetadata = plugin.extensions["com.openai"].interface;
+    expect(interfaceMetadata.shortDescription.length).toBeLessThanOrEqual(30);
+    expect(interfaceMetadata.shortDescription).toBe("Inspect SSH devices safely");
+    expect(interfaceMetadata.supportURL).toBe("https://ssh-mcp-pro.oaslananka.dev/support");
+    expect(interfaceMetadata.category).toBe("Developer Tools");
+    const cases = plugin.extensions["com.openai"].review.test_cases;
+    expect(cases.positive).toHaveLength(5);
+    expect(cases.negative).toHaveLength(3);
+    for (const positive of cases.positive) {
+      expect(positive.tools_triggered).toBeTypeOf("string");
+      expect(positive.expected_behavior).toBeTruthy();
+    }
     expect(mcp.mcpServers["ssh-mcp-pro"]).toMatchObject({
       type: "streamable-http",
       url: "https://ssh-mcp-pro.oaslananka.dev/mcp",

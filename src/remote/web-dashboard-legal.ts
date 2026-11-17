@@ -5,10 +5,14 @@ import type { ServerResponse } from "node:http";
 const pages = {
   "/privacy": { file: "privacy-policy.md", title: "Privacy policy" },
   "/terms": { file: "terms-of-service.md", title: "Terms of service" },
+  "/support": { file: "support.md", title: "Help and support" },
 } as const;
 
 /** The hosted legal pages derive from the shipped source docs, not a second copy. */
-export function serveLegalPage(res: ServerResponse, pathname: "/privacy" | "/terms"): void {
+export function serveLegalPage(
+  res: ServerResponse,
+  pathname: "/privacy" | "/terms" | "/support",
+): void {
   const page = pages[pathname];
   const path = fileURLToPath(new URL("../../docs/security/" + page.file, import.meta.url));
   const content = readFileSync(path, "utf8");
@@ -41,6 +45,6 @@ export function serveLegalPage(res: ServerResponse, pathname: "/privacy" | "/ter
       page.title +
       ' — ssh-mcp-pro</title><style>:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:#0b1020;color:#e8edf8;font:16px/1.8 system-ui,sans-serif}.shell{width:min(100% - 36px,780px);margin:48px auto 80px}a{color:#8edcd2}h1{font-size:clamp(32px,5vw,48px);letter-spacing:-.04em;line-height:1.12}h2{font-size:21px;margin-top:38px;line-height:1.3}p{color:#b9c6d8}.item{padding-left:18px;border-left:2px solid #4fc1ab}.brand{font-size:13px;color:#80c7bd;text-transform:uppercase;letter-spacing:.2em}footer{margin-top:52px;padding-top:20px;border-top:1px solid #243149;color:#98a8bd}</style></head><body><main class="shell"><div class="brand">ssh-mcp-pro · Trust Center</div>' +
       body +
-      '<footer><a href="/">Back to dashboard</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a></footer></main></body></html>',
+      '<footer><a href="/">Back to dashboard</a> · <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/support">Support</a></footer></main></body></html>',
   );
 }
