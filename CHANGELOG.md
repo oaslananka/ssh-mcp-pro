@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.2](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.8.1...ssh-mcp-pro-v1.8.2) (2026-11-17)
+
+
+### Bug Fixes
+
+* **oauth:** reject unverified Google UserInfo identities ([#268](https://github.com/oaslananka/ssh-mcp-pro/issues/268)) ([fbf1d3f](https://github.com/oaslananka/ssh-mcp-pro/commit/fbf1d3fb622eadcf83a259c4e72c557ec7182477))
+
 ## [1.8.1](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.8.0...ssh-mcp-pro-v1.8.1) (2026-11-17)
 
 
