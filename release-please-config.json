@@ -50,6 +50,11 @@
         },
         {
           "type": "json",
+          "path": ".claude-plugin/plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
           "path": "apps/google/gemini-app-readiness.json",
           "jsonpath": "$.mcp.version"
         },
