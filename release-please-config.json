@@ -35,6 +35,11 @@
         },
         {
           "type": "json",
+          "path": "apps/chatgpt/plugin/plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
           "path": "apps/chatgpt/app-readiness.json",
           "jsonpath": "$.mcp.version"
         },
