@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.3](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.12.2...ssh-mcp-pro-v1.12.3) (2026-11-17)
+
+
+### Bug Fixes
+
+* **plugin:** default public OAuth scopes to read-only ([#291](https://github.com/oaslananka/ssh-mcp-pro/issues/291)) ([f4fdbb7](https://github.com/oaslananka/ssh-mcp-pro/commit/f4fdbb7032c234236d7519613af8d534cd76fa35))
+
 ## [1.12.2](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.12.1...ssh-mcp-pro-v1.12.2) (2026-11-17)
 
 
