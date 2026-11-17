@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { ServerResponse } from "node:http";
@@ -13,6 +14,13 @@ const assets = new Map<string, Asset>([
   ["/brand/icon-512.png", { path: "brand/icon-512.png", mime: "image/png" }],
 ]);
 
+export const DASHBOARD_BRAND_FINGERPRINT = createHash("sha256")
+  .update(
+    readFileSync(fileURLToPath(new URL("../../assets/ssh-mcp-pro-icon.png", import.meta.url))),
+  )
+  .digest("hex")
+  .slice(0, 12);
+
 const manifest = JSON.stringify({
   name: "SSH MCP Pro",
   short_name: "SSH MCP Pro",
@@ -23,8 +31,18 @@ const manifest = JSON.stringify({
   background_color: "#10111F",
   theme_color: "#10111F",
   icons: [
-    { src: "/brand/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-    { src: "/brand/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+    {
+      src: "/brand/icon-192.png?v=" + DASHBOARD_BRAND_FINGERPRINT,
+      sizes: "192x192",
+      type: "image/png",
+      purpose: "any",
+    },
+    {
+      src: "/brand/icon-512.png?v=" + DASHBOARD_BRAND_FINGERPRINT,
+      sizes: "512x512",
+      type: "image/png",
+      purpose: "any",
+    },
   ],
 });
 

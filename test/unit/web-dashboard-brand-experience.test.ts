@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { createHash } from "node:crypto";
 import { Script } from "node:vm";
 import { parse as parseHtml } from "parse5";
 import type { DefaultTreeAdapterMap } from "parse5";
@@ -46,7 +47,10 @@ function extractBrowserScript(html: string): string {
   return script;
 }
 
-async function renderWithUnavailableApi(tab: "devices" | "audit") {
+async function runDashboardFixture(
+  respond: () => Promise<unknown>,
+  activeTab: "devices" | "audit" = "devices",
+) {
   const elements = new Map<string, { innerHTML: string }>();
   const context = {
     atob,
@@ -59,15 +63,88 @@ async function renderWithUnavailableApi(tab: "devices" | "audit") {
       },
       querySelector: () => null,
     },
-    fetch: async () => ({ ok: false, status: 503 }),
+    fetch: respond,
   };
   new Script(extractBrowserScript(markup())).runInNewContext(context);
-  if (tab === "audit") new Script("switchTab('audit')").runInNewContext(context);
+  if (activeTab === "audit") new Script("switchTab('audit')").runInNewContext(context);
   await new Promise((resolve) => setImmediate(resolve));
   return elements;
 }
 
+async function renderWithUnavailableApi(tab: "devices" | "audit") {
+  return runDashboardFixture(async () => ({ ok: false, status: 503 }), tab);
+}
+
+async function renderWithDeviceList(devices: unknown[]): Promise<string> {
+  const elements = await runDashboardFixture(async () => ({
+    ok: true,
+    json: async () => ({ devices }),
+  }));
+  return elements.get("appRoot")?.innerHTML ?? "";
+}
+
+function enrolledDevice(connected: boolean) {
+  return {
+    id: "agent-1",
+    alias: "Workstation",
+    status: connected ? "online" : "offline",
+    isLiveConnected: connected,
+    profile: "read-only",
+    host_metadata: { os: "Windows", hostname: "Workstation", platform: "win32" },
+  };
+}
+
 describe("SSH MCP Pro brand and first-use journey", () => {
+  test("new icon contents automatically invalidate old browser caches", async () => {
+    const original = readFileSync(new URL("../../assets/ssh-mcp-pro-icon.png", import.meta.url));
+    const fingerprint = createHash("sha256").update(original).digest("hex").slice(0, 12);
+    const html = markup();
+    for (const route of [
+      "/favicon.ico",
+      "/brand/favicon-32.png",
+      "/brand/apple-touch-icon.png",
+      "/brand/ssh-mcp-pro-icon.png",
+      "/brand/icon-192.png",
+      "/site.webmanifest",
+    ]) {
+      expect(html).toContain(route + "?v=" + fingerprint);
+    }
+    expect(html).not.toContain('src="/brand/ssh-mcp-pro-icon.png"');
+    const dir = mkdtempSync(path.join(os.tmpdir(), "brand-fingerprint-"));
+    const plane = new RemoteControlPlane(testConfig(dir));
+    await plane.initialize();
+    try {
+      const response = captureResponse();
+      expect(
+        await plane.handleHttp(
+          request("GET", "/site.webmanifest?v=" + fingerprint),
+          response as unknown as ServerResponse,
+          "/site.webmanifest",
+        ),
+      ).toBe(true);
+      const manifest = JSON.parse(response.body);
+      expect(manifest.icons[0].src).toContain("?v=" + fingerprint);
+      expect(manifest.icons[1].src).toContain("?v=" + fingerprint);
+    } finally {
+      plane.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("offline devices prioritize reconnection before AI setup", async () => {
+    const body = await renderWithDeviceList([enrolledDevice(false)]);
+    expect(body).toContain("Reconnect your device");
+    expect(body).toContain('onclick="loadDevices()"');
+    expect(body).not.toContain("Bring these devices into your AI chat.");
+  });
+
+  test("online devices present the working AI connection next step", async () => {
+    const body = await renderWithDeviceList([enrolledDevice(true)]);
+    expect(body).toContain("Bring these devices into your AI chat.");
+    expect(body).toContain("onclick=\"switchTab('clients')\"");
+    expect(body).not.toContain("Reconnect your device");
+  });
+
   test("ships recognizable, correctly sized icons across browser, Apple and Android surfaces", () => {
     for (const [asset, expectedSize] of [
       ["favicon-16.png", 16],
@@ -156,7 +233,7 @@ describe("SSH MCP Pro brand and first-use journey", () => {
       area: "SSH MCP Pro identity",
       markers: [
         "<title>SSH MCP Pro",
-        'src="/brand/ssh-mcp-pro-icon.png"',
+        'src="/brand/ssh-mcp-pro-icon.png?v=',
         'alt="SSH MCP Pro"',
         'rel="icon"',
       ],
