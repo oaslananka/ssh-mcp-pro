@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { Script } from "node:vm";
+import { parse as parseHtml } from "parse5";
+import type { DefaultTreeAdapterMap } from "parse5";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { renderDashboardHtml } from "../../src/remote/web-dashboard-html.js";
@@ -24,14 +26,25 @@ const markup = () =>
     JSON.stringify("https://example.test"),
   );
 
+type HtmlNode = DefaultTreeAdapterMap["node"];
+
 function extractBrowserScript(html: string): string {
-  const startTag = "<script>";
-  const endTag = "</script>";
-  const start = html.indexOf(startTag);
-  if (start < 0) throw new Error("Dashboard is missing a browser script");
-  const end = html.indexOf(endTag, start + startTag.length);
-  if (end < 0) throw new Error("Dashboard browser script was not terminated");
-  return html.slice(start + startTag.length, end);
+  const visit = (node: HtmlNode): string | undefined => {
+    if ("tagName" in node && node.tagName === "script") {
+      const text = node.childNodes.find((child) => child.nodeName === "#text");
+      if (text && "value" in text) return text.value;
+    }
+    if ("childNodes" in node) {
+      for (const child of node.childNodes) {
+        const result = visit(child);
+        if (result !== undefined) return result;
+      }
+    }
+    return undefined;
+  };
+  const script = visit(parseHtml(html));
+  if (script === undefined) throw new Error("Dashboard browser script is missing");
+  return script;
 }
 
 async function renderWithUnavailableApi(tab: "devices" | "audit") {
@@ -76,43 +89,59 @@ describe("SSH MCP Pro brand and first-use journey", () => {
     }
   });
 
-  test("uses the supplied SSH icon and a consistent product identity", () => {
+  test.each([
+    {
+      area: "SSH MCP Pro identity",
+      markers: [
+        "<title>SSH MCP Pro",
+        'src="/brand/ssh-mcp-pro-icon.png"',
+        'alt="SSH MCP Pro"',
+        'rel="icon"',
+      ],
+    },
+    {
+      area: "task-first workspace navigation",
+      markers: [
+        'aria-label="Workspace navigation"',
+        'class="workspace-shell"',
+        "Connect a device",
+        "Connect an AI app",
+        "You're ready to work",
+        "Open activity",
+        "navItem('usage', '▥', 'Usage & Users')",
+        "Advanced device controls",
+      ],
+    },
+    {
+      area: "operating-system-specific enrollment",
+      markers: [
+        'aria-label="Choose device operating system"',
+        'data-install-os="windows"',
+        'data-install-os="linux"',
+        'data-install-os="macos"',
+        'data-os-section="windows"',
+        'data-os-section="linux"',
+      ],
+    },
+    {
+      area: "responsive and accessible presentation",
+      markers: [
+        ".workspace-sidebar",
+        "@media (max-width: 860px)",
+        "prefers-reduced-motion",
+        ":focus-visible",
+      ],
+    },
+  ])("renders $area", ({ markers }) => {
     const html = markup();
-    expect(html).toContain("<title>SSH MCP Pro");
-    expect(html).toContain('src="/brand/ssh-mcp-pro-icon.png"');
-    expect(html).toContain('alt="SSH MCP Pro"');
-    expect(html).toContain('rel="icon"');
-    expect(html).not.toMatch(/SSH Automator|SSH Automater|ssh-automator/iu);
+    for (const marker of markers) expect(html).toContain(marker);
   });
 
-  test("offers task-first entry and real destinations in the workspace", () => {
+  test("does not expose any outdated SSH Automator identity", () => {
     const html = markup();
-    expect(html).toContain('aria-label="Workspace navigation"');
-    expect(html).toContain('class="workspace-shell"');
-    expect(html).toContain("Connect a device");
-    expect(html).toContain("Connect an AI app");
-    expect(html).toContain("You're ready to work");
-    expect(html).toContain("Open activity");
-    expect(html).toContain("navItem('usage', '▥', 'Usage & Users')");
-    expect(html).toContain("Advanced device controls");
-  });
-
-  test("guides device enrollment by operating system instead of mixing commands", () => {
-    const html = markup();
-    expect(html).toContain('aria-label="Choose device operating system"');
-    expect(html).toContain('data-install-os="windows"');
-    expect(html).toContain('data-install-os="linux"');
-    expect(html).toContain('data-install-os="macos"');
-    expect(html).toContain('data-os-section="windows"');
-    expect(html).toContain('data-os-section="linux"');
-  });
-
-  test("uses a responsive sidebar, accessible focus and reduced-motion styles", () => {
-    const html = markup();
-    expect(html).toContain(".workspace-sidebar");
-    expect(html).toContain("@media (max-width: 860px)");
-    expect(html).toContain("prefers-reduced-motion");
-    expect(html).toContain(":focus-visible");
+    for (const oldName of ["SSH Automator", "SSH Automater", "ssh-automator"]) {
+      expect(html).not.toContain(oldName);
+    }
   });
 
   test("recovers from unavailable devices API with a working retry action", async () => {
