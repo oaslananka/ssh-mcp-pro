@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.8.2...ssh-mcp-pro-v1.9.0) (2026-11-17)
+
+
+### Features
+
+* **web:** prepare secure cross-platform connector publishing ([#271](https://github.com/oaslananka/ssh-mcp-pro/issues/271)) ([b8a54f8](https://github.com/oaslananka/ssh-mcp-pro/commit/b8a54f8d8015d2f80bfdaa9575f210320587dbbc))
+
 ## [1.8.2](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.8.1...ssh-mcp-pro-v1.8.2) (2026-11-17)
 
 
