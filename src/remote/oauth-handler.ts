@@ -76,7 +76,7 @@ export class OAuthHandler {
   protectedResourceMetadata(): Record<string, unknown> {
     return {
       resource: this.config.mcpResourceUrl,
-      resource_name: "SshAutomator MCP",
+      resource_name: "SSH MCP Pro",
       authorization_servers: [this.config.publicBaseUrl],
       bearer_methods_supported: ["header"],
       scopes_supported: PUBLIC_REMOTE_SCOPES,

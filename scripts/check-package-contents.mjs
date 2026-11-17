@@ -16,6 +16,10 @@ for (const file of packageJson.files ?? []) {
   ) {
     continue;
   }
+  if (file === "assets") {
+    requiredFiles.push("assets/ssh-mcp-pro-icon.png");
+    continue;
+  }
   requiredFiles.push(file);
 }
 

@@ -1,5 +1,6 @@
 import { buildDashboardBrowserEnrollmentCommand } from "./dashboard-enrollment-commands.js";
 import { DASHBOARD_STYLES } from "./web-dashboard-styles.js";
+import { BRAND_STYLES } from "./web-dashboard-brand-styles.js";
 import { DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT } from "./dashboard-enrollment-feedback-script.js";
 export function renderDashboardHtml(
   initialUserBase64: string,
@@ -11,19 +12,21 @@ export function renderDashboardHtml(
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>ssh-mcp-pro | Secure SSH MCP Platform</title>
+  <title>SSH MCP Pro · Connect your devices to AI</title>
+  <meta name="theme-color" content="#0e171b">
+  <meta name="description" content="Connect your own devices to ChatGPT, Claude and Gemini with controlled SSH MCP access.">
+  <link rel="icon" type="image/png" href="/brand/ssh-mcp-pro-icon.png">
+  <link rel="apple-touch-icon" href="/brand/ssh-mcp-pro-icon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>${DASHBOARD_STYLES}</style>
+  <style>${DASHBOARD_STYLES}
+${BRAND_STYLES}</style>
 </head>
 <body>
-  <header>
-    <div class="logo-area">
-      <div class="logo-icon" aria-hidden="true">⌘</div>
-      <div>
-        <div class="brand-title">ssh-mcp-pro</div>
-        <div class="brand-sub">Model Context Protocol SSH Gateway</div>
-      </div>
-    </div>
+  <header class="public-header">
+    <a class="logo-area" href="/" aria-label="SSH MCP Pro home">
+      <img class="brand-mark" src="/brand/ssh-mcp-pro-icon.png" width="46" height="46" alt="SSH MCP Pro">
+      <span><span class="brand-title">SSH MCP Pro</span><span class="brand-sub">Your computers, connected to AI</span></span>
+    </a>
     <div class="user-area" id="headerUserArea"></div>
   </header>
 
@@ -41,6 +44,8 @@ export function renderDashboardHtml(
     let currentUser = INITIAL_USER;
     let activeTab = 'devices';
     let devicesList = [];
+    let devicesLoaded = false;
+    let selectedInstallOs = 'windows';
     let auditList = [];
     let usageData = null;
     ${DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT}
@@ -54,21 +59,18 @@ export function renderDashboardHtml(
     function renderHeader() {
       const container = document.getElementById('headerUserArea');
       if (currentUser) {
-        container.innerHTML = \`
-          <span class="badge badge-green">Connected</span>
-          <span style="font-size: 14px; font-weight: 600;">\${escapeHtml(currentUser.displayName || currentUser.id)}</span>
-          <span class="badge badge-blue">\${escapeHtml(currentUser.provider)}</span>
-          <a href="/auth/logout" class="btn btn-outline btn-sm">Sign out</a>
-        \`;
+        container.innerHTML = '<a class="btn btn-outline btn-sm" href="/dashboard">Open workspace</a>';
+      } else if (AUTH_PROVIDERS.google || AUTH_PROVIDERS.github) {
+        container.innerHTML = '<a href="' + (AUTH_PROVIDERS.google ? '/auth/login/google' : '/auth/login/github') +
+          '" class="btn btn-primary btn-sm">Open workspace</a>';
       } else {
-        container.innerHTML = \`
-          <a href="/auth/login/google" class="btn btn-outline btn-sm">Sign In</a>
-        \`;
+        container.innerHTML = '<span class="badge badge-gray">Local setup</span>';
       }
     }
 
     function renderApp() {
       const root = document.getElementById('appRoot');
+      document.body?.classList?.toggle('workspace-active', !!currentUser);
       if (!currentUser) {
         root.innerHTML = renderLanding();
         if (!AUTH_PROVIDERS.google && !AUTH_PROVIDERS.github) {
@@ -79,42 +81,90 @@ export function renderDashboardHtml(
         if (!AUTH_PROVIDERS.github) document.querySelector('.auth-btn-github')?.setAttribute('hidden', '');
         return;
       }
-
+      const pageMeta = {
+        devices: { title: 'Your devices', description: 'The computers and servers you have connected to SSH MCP Pro.' },
+        'add-device': { title: 'Connect a device', description: 'Add a computer you own and choose what AI can do on it.' },
+        clients: { title: 'Connect an AI app', description: 'Use the same secure MCP connection in the assistant you prefer.' },
+        audit: { title: 'Activity', description: 'Review actions requested through your connected devices.' },
+        usage: { title: 'Usage & Users', description: 'Owner-only activity and account statistics for this Cloud service.' },
+      }[activeTab] || { title: 'Your devices', description: '' };
+      const navItem = (tab, icon, title) => \`
+        <button type="button" data-dashboard-tab="\${tab}" aria-current="\${activeTab === tab ? 'page' : 'false'}"
+          class="workspace-nav-item \${activeTab === tab ? 'active' : ''}" onclick="switchTab('\${tab}')">
+          <span class="workspace-nav-icon" aria-hidden="true">\${icon}</span><span>\${title}</span>
+        </button>\`;
+      const online = devicesList.filter(d => d.isLiveConnected).length;
+      const total = devicesList.length;
       root.innerHTML = \`
-        <div class="card" style="margin-bottom: 24px; background: linear-gradient(90deg, #161b22 0%, #1f242c 100%);">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
-            <div>
-              <div style="font-size:12px; text-transform:uppercase; font-weight:700; color:var(--blue); margin-bottom:4px;">Remote MCP Endpoint</div>
-              <div style="font-family:var(--font-mono); font-size:15px; color:#fff; font-weight:600; overflow-wrap:anywhere;">\${MCP_URL}</div>
-              <div style="font-size:13px; color:var(--text-muted); margin-top:4px;">Transport: Streamable HTTP • Auth: OAuth 2.1 PKCE (RFC 9728 & RFC 8414)</div>
+        <div class="workspace-shell">
+          <aside class="workspace-sidebar">
+            <a href="/dashboard" class="sidebar-brand" aria-label="SSH MCP Pro workspace">
+              <img src="/brand/ssh-mcp-pro-icon.png" alt="SSH MCP Pro" width="46" height="46" class="brand-mark">
+              <span><strong>SSH MCP Pro</strong><small>Cloud workspace</small></span>
+            </a>
+            <p class="sidebar-label">WORKSPACE</p>
+            <nav class="workspace-nav" aria-label="Workspace navigation">
+              \${navItem('devices', '▤', 'Devices')}
+              \${navItem('add-device', '+', 'Add a device')}
+              \${navItem('clients', '✦', 'AI connections')}
+              \${navItem('audit', '◷', 'Activity')}
+              \${currentUser.serviceOwner ? navItem('usage', '▥', 'Usage & Users') : ''}
+            </nav>
+            <div class="sidebar-bottom">
+              <div class="sidebar-help"><span class="live-indicator" aria-hidden="true"></span><span>Cloud connection active</span></div>
+              <div class="sidebar-account">
+                <span class="account-avatar" aria-hidden="true">\${escapeHtml((currentUser.displayName || currentUser.id || 'S').slice(0, 1).toUpperCase())}</span>
+                <span class="sidebar-account-text"><strong>\${escapeHtml(currentUser.displayName || 'Signed in')}</strong><small>\${escapeHtml(currentUser.provider === 'github' ? 'GitHub account' : 'Google account')}</small></span>
+                <a href="/auth/logout" class="sidebar-signout" aria-label="Sign out" title="Sign out">Sign out</a>
+              </div>
+              <div class="sidebar-links"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://github.com/oaslananka/ssh-mcp-pro/issues" rel="noopener noreferrer">Help</a></div>
             </div>
-            <button class="btn btn-primary" onclick="switchTab('add-device')">➕ Add New Device</button>
-          </div>
-        </div>
-
-        <nav class="tabs" aria-label="Dashboard sections">
-          <button type="button" data-dashboard-tab="devices" aria-pressed="\${activeTab === 'devices'}" class="tab-item \${activeTab === 'devices' ? 'active' : ''}" onclick="switchTab('devices')">Devices</button>
-          <button type="button" data-dashboard-tab="add-device" aria-pressed="\${activeTab === 'add-device'}" class="tab-item \${activeTab === 'add-device' ? 'active' : ''}" onclick="switchTab('add-device')">Add Device</button>
-          <button type="button" data-dashboard-tab="clients" aria-pressed="\${activeTab === 'clients'}" class="tab-item \${activeTab === 'clients' ? 'active' : ''}" onclick="switchTab('clients')">AI Integrations</button>
-          <button type="button" data-dashboard-tab="audit" aria-pressed="\${activeTab === 'audit'}" class="tab-item \${activeTab === 'audit' ? 'active' : ''}" onclick="switchTab('audit')">Activity log</button>
-          <button type="button" id="usageTab" hidden data-dashboard-tab="usage" aria-label="Service usage and accounts" class="tab-item" onclick="switchTab('usage')">Usage & Users</button>
-        </nav>
-
-        \${activeTab === 'devices' ? '<p class="device-scope-note" role="note">Device access is scoped to your <strong>' + escapeHtml(currentUser.provider === 'github' ? 'GitHub' : 'Google') + '</strong> sign-in. Switching sign-in providers shows a different device list.</p>' : ''}
-        <div id="tabContent">
-          \${renderTabContent()}
+          </aside>
+          <main class="workspace-main" id="mainContent">
+            <div class="workspace-topbar">
+              <span class="workspace-breadcrumb">Workspace <span aria-hidden="true">/</span> \${escapeHtml(pageMeta.title)}</span>
+              <div class="workspace-top-status"><span class="live-indicator" aria-hidden="true"></span> Signed in with \${escapeHtml(currentUser.provider === 'github' ? 'GitHub' : 'Google')}</div>
+            </div>
+            <div class="workspace-page-heading">
+              <div><p class="eyebrow">MANAGE YOUR CONNECTION</p><h1>\${escapeHtml(pageMeta.title)}</h1><p>\${escapeHtml(pageMeta.description)}</p></div>
+              \${activeTab !== 'add-device' ? '<button class="btn btn-primary" type="button" onclick="switchTab(\\'add-device\\')"><span aria-hidden="true">+</span> Add a device</button>' : '<button class="btn btn-outline" type="button" onclick="switchTab(\\'devices\\')">Back to devices</button>'}
+            </div>
+            \${activeTab === 'devices' ? \`
+              <section class="connection-summary" aria-label="Connection overview">
+                <div class="connection-summary-primary"><span class="summary-pulse" aria-hidden="true"></span><div>
+                  <strong>\${!devicesLoaded ? 'Checking your devices…' : online > 0 ? "You're ready to work" : total > 0 ? 'Your devices are offline' : 'Connect your first device'}</strong>
+                  <span>\${!devicesLoaded ? 'Loading live connection status' : online > 0 ? online + ' connected device' + (online === 1 ? '' : 's') + ' · Connect an AI app to start' : total > 0 ? 'Check the agent on your computer to reconnect' : 'Your AI assistant needs a connected computer to get started'}</span>
+                </div></div>
+                <button class="btn btn-soft" type="button" onclick="switchTab('\${total > 0 ? 'clients' : 'add-device'}')">\${total > 0 ? 'Connect an AI app' : 'Connect a device'} <span aria-hidden="true">→</span></button>
+              </section>
+              \${!devicesLoaded ? '' : total > 0 ? '<p class="device-scope-note" role="note">Showing devices for your ' + escapeHtml(currentUser.provider === 'github' ? 'GitHub' : 'Google') + ' account. Other sign-in providers have separate device lists.</p>' : ''}
+            \` : ''}
+            <div id="tabContent">\${renderTabContent()}</div>
+          </main>
         </div>
       \`;
-
-      if (activeTab === 'devices') loadDevices();
+      if (activeTab === 'devices' && !devicesLoaded) loadDevices();
+      if (activeTab === 'add-device') chooseInstallOS(selectedInstallOs);
       if (activeTab === 'audit') loadAudit();
       if (activeTab === 'usage' && currentUser.serviceOwner) loadUsage();
-      const ownerTab = document.getElementById('usageTab');
-      if (ownerTab && currentUser.serviceOwner) { ownerTab.hidden = false; ownerTab.setAttribute('aria-pressed', String(activeTab === 'usage')); ownerTab.classList.toggle('active', activeTab === 'usage'); }
+    }
+
+    function chooseInstallOS(os) {
+      if (!['windows', 'linux', 'macos'].includes(os)) return;
+      selectedInstallOs = os;
+      document.querySelectorAll?.('[data-install-os]').forEach(button => {
+        const selected = button.getAttribute('data-install-os') === os;
+        button.setAttribute('aria-pressed', String(selected));
+        button.classList.toggle('active', selected);
+      });
+      document.querySelectorAll?.('[data-os-section]').forEach(section => {
+        section.hidden = section.getAttribute('data-os-section') !== os;
+      });
     }
 
     function switchTab(tab) {
       stopEnrollmentPolling();
+      if (tab === 'devices' && activeTab !== tab) devicesLoaded = false;
       activeTab = tab;
       renderApp();
       document.querySelector('[data-dashboard-tab="' + tab + '"]')?.focus({ preventScroll: true });
@@ -122,35 +172,41 @@ export function renderDashboardHtml(
 
     function renderLanding() {
       return \`
-        <div class="hero">
-          <div class="eyebrow">Secure remote operations · MCP</div>
-          <h1>Your infrastructure, connected.</h1>
-          <p>Connect your own servers and workstations to your AI tools with clear device permissions and one-step enrollment.</p>
-          <div class="auth-buttons">
-            <a href="/auth/login/google" class="auth-btn auth-btn-google">
-              <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.7 0 3 .7 3.9 1.5l2.9-2.9C17 2 14.7 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2c0 2.8.7 5.5 1.9 7.8l3.7-2.9z"/><path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.5C3.7 20.3 7.5 23.5 12 23.5z"/></svg>
-              Sign in with Google
-            </a>
-            <a href="/auth/login/github" class="auth-btn auth-btn-github">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
-              Sign in with GitHub
-            </a>
-          </div>
-          <p class="device-scope-note" style="text-align:center; margin-top:12px;">Use the same Google or GitHub sign-in to see your enrolled devices.</p>
-          <p id="providerSetup" class="device-scope-note" role="status" hidden>Sign-in is not configured on this local instance yet. Set up a GitHub or Google OAuth application to sign in, or use the <a href="https://ssh-mcp-pro.oaslananka.dev/">hosted Cloud dashboard</a>.</p>
-        </div>
-
-        <div class="grid-2">
-          <div class="card">
-            <h3 style="margin-bottom:8px; color:var(--blue);">🌐 Remote Streamable HTTP (OAuth 2.1)</h3>
-            <p style="font-size:14px; color:var(--text-muted); margin-bottom:12px;">Connect supported MCP clients (ChatGPT plugins, Claude connectors, Gemini) through the HTTPS endpoint with OAuth policy enforcement.</p>
-            <div class="code-box">\${MCP_URL}</div>
-          </div>
-          <div class="card">
-            <h3 style="margin-bottom:8px; color:#7ee787;">💻 Local Stdio Mode (Policy-Controlled)</h3>
-            <p style="font-size:14px; color:var(--text-muted); margin-bottom:12px;">Run ssh-mcp-pro locally with your own OpenSSH keys and host policy. No cloud account required.</p>
-            <div class="code-box">npx ssh-mcp-pro</div>
-          </div>
+        <div class="landing-shell">
+          <section class="landing-hero">
+            <div class="landing-copy">
+              <div class="eyebrow"><span class="mini-spark" aria-hidden="true"></span> YOUR OWN MACHINES · ANY AI ASSISTANT</div>
+              <h1>Connect your computers to <em>ChatGPT, Claude & Gemini.</em></h1>
+              <p>Use AI with the computers and servers you already own. Sign in, connect a device, and choose what your assistant is allowed to access.</p>
+              <div class="auth-buttons">
+                <a href="/auth/login/google" class="auth-btn auth-btn-google">
+                  <span class="google-icon" aria-hidden="true">G</span> Continue with Google
+                </a>
+                <a href="/auth/login/github" class="auth-btn auth-btn-github">
+                  <span class="github-icon" aria-hidden="true">⌘</span> Continue with GitHub
+                </a>
+              </div>
+              <p class="landing-small-note">Already connected a device? Sign in with the same account to find it.</p>
+              <p id="providerSetup" class="device-scope-note" role="status" hidden>Local sign-in is not configured yet. Configure a supported OAuth provider or use the <a href="https://ssh-mcp-pro.oaslananka.dev/">hosted dashboard</a>.</p>
+            </div>
+            <div class="landing-illustration" aria-label="How SSH MCP Pro connects an AI assistant to your own computer">
+              <div class="flow-card flow-assistant"><span class="flow-overline">YOUR ASSISTANT</span><strong>ChatGPT <span>·</span> Claude <span>·</span> Gemini</strong><small>The AI app you prefer</small></div>
+              <div class="flow-line"><span></span><div class="flow-flow-icon" aria-hidden="true">↓</div><span></span></div>
+              <div class="flow-card flow-gateway"><img src="/brand/ssh-mcp-pro-icon.png" width="48" height="48" alt="" aria-hidden="true"><div><strong>SSH MCP Pro</strong><small>Permission-controlled connection</small></div></div>
+              <div class="flow-line"><span></span><div class="flow-flow-icon" aria-hidden="true">↓</div><span></span></div>
+              <div class="flow-card flow-computer"><span class="flow-computer-icon" aria-hidden="true">▣</span><div><strong>Your computer</strong><small>Your files, terminal and services stay on your machine</small></div></div>
+              <div class="flow-caption"><span class="mini-spark" aria-hidden="true"></span> YOUR DEVICE · YOUR ACCESS RULES</div>
+            </div>
+          </section>
+          <section class="onboarding-section" aria-labelledby="start-heading">
+            <div class="onboarding-section-head"><p class="eyebrow">GET STARTED</p><h2 id="start-heading">Three steps. You're in control.</h2><p>Go from your first sign-in to a working AI connection.</p></div>
+            <div class="onboarding-steps">
+              <article><span class="step-number">01</span><h3>Sign in</h3><p>Use Google or GitHub to create your private workspace.</p></article>
+              <article><span class="step-number">02</span><h3>Connect a device</h3><p>Install the lightweight agent on your computer or server. You choose its permissions.</p></article>
+              <article><span class="step-number">03</span><h3>Connect an AI app</h3><p>Use the secure MCP endpoint from ChatGPT, Claude or Gemini and start working.</p></article>
+            </div>
+          </section>
+          <section class="landing-local"><div><span class="landing-local-symbol" aria-hidden="true">⌘</span><div><h2>Prefer to stay local?</h2><p>Run SSH MCP Pro with your own SSH configuration. No Cloud account required.</p></div></div><code>npx ssh-mcp-pro</code></section>
         </div>
       \`;
     }
@@ -159,53 +215,81 @@ export function renderDashboardHtml(
       if (activeTab === 'usage' && currentUser.serviceOwner) return renderUsagePanel();
 
       if (activeTab === 'devices') {
-        if (devicesList.length === 0) {
-          return \`
-            <div class="card empty-box">
-              <div style="font-size:40px; margin-bottom:12px;">🖥️</div>
-              <h3 style="margin-bottom:8px;">No devices enrolled yet</h3>
-              <p style="margin-bottom:20px;">Enroll your first server, VM, or local workstation to control it safely through MCP.</p>
-              <button class="btn btn-primary" onclick="switchTab('add-device')">Enroll a Device</button>
-            </div>
-          \`;
+        if (!devicesLoaded) {
+          return '<div class="card device-loading" role="status">Loading your connected devices…</div>';
         }
-        return devicesList.map(dev => \`
-          <div class="card">
-            <div class="device-row">
-              <div class="device-info">
-                <div class="device-icon">\${dev.host_metadata?.platform === 'win32' ? '🪟' : (dev.host_metadata?.platform === 'darwin' ? '🍎' : '🐧')}</div>
-                <div>
-                  <div class="device-name">
-                    \${escapeHtml(dev.alias)}
-                    <span class="badge \${dev.isLiveConnected ? 'badge-green' : 'badge-gray'}">\${escapeHtml(dev.isLiveConnected ? '🟢 Live Online' : dev.status)}</span>
-                    <span class="badge badge-blue">\${escapeHtml(dev.profile)}</span>
-                  </div>
-                  <div class="device-meta">
-                    Host: \${escapeHtml(dev.host_metadata?.hostname || 'Not reported')} | OS: \${escapeHtml(dev.host_metadata?.os || 'Not reported')} | Arch: \${escapeHtml(dev.host_metadata?.arch || 'Not reported')} | Policy v\${escapeHtml(dev.policy_version ?? '—')}
-                  </div>
+        if (devicesList.length === 0) {
+          return \`<div class="card empty-box onboarding-empty">
+            <div class="empty-art" aria-hidden="true"><span>▣</span><span class="empty-plus">+</span></div>
+            <h2>Let's connect your first computer.</h2>
+            <p>Add your own desktop, laptop or server. You decide what your AI assistant can do.</p>
+            <button class="btn btn-primary" type="button" onclick="switchTab('add-device')">Connect a device <span aria-hidden="true">→</span></button>
+            <div class="empty-next-step">Next: <strong>Connect an AI app</strong> after the device is online.</div>
+          </div>\`;
+        }
+        return \`<section class="device-list-card card" aria-label="Your enrolled devices">
+          <div class="device-list-heading"><div><h2>Your devices</h2><p>\${devicesList.length} enrolled · \${devicesList.filter(d => d.isLiveConnected).length} online</p></div><div class="device-list-tools"><button class="btn btn-outline btn-sm" type="button" onclick="switchTab('audit')">Open activity</button> <button class="btn btn-outline btn-sm" type="button" onclick="loadDevices()">Refresh</button></div></div>
+          <div class="device-list-body">
+          \${devicesList.map(dev => \`
+            <article class="device-entry">
+              <div class="device-row">
+                <div class="device-info">
+                  <div class="device-icon" aria-hidden="true">\${dev.host_metadata?.platform === 'win32' ? '▣' : dev.host_metadata?.platform === 'darwin' ? '⌘' : '⌁'}</div>
+                  <div class="device-ident"><div class="device-name">\${escapeHtml(dev.alias)}</div>
+                  <div class="device-meta">\${escapeHtml(dev.host_metadata?.os || dev.host_metadata?.platform || 'Computer')} · \${escapeHtml(dev.host_metadata?.hostname || 'Device')} · \${escapeHtml(dev.profile)}</div></div>
+                </div>
+                <div class="device-row-status"><span class="status-pill \${dev.isLiveConnected ? 'online' : 'offline'}"><span aria-hidden="true"></span>\${dev.isLiveConnected ? 'Online' : dev.status === 'revoked' ? 'Access revoked' : 'Offline'}</span>
+                  <details class="device-controls">
+                    <summary>Manage <span aria-hidden="true">⌄</span></summary>
+                    <div class="device-control-panel">
+                      <h3>Advanced device controls</h3>
+                      <p>Permission changes affect what this device can do. You can revoke or remove it at any time.</p>
+                      <p class="device-technical-meta">Host: \${escapeHtml(dev.host_metadata?.hostname || 'Not reported')} · OS: \${escapeHtml(dev.host_metadata?.os || 'Not reported')} · Architecture: \${escapeHtml(dev.host_metadata?.arch || 'Not reported')} · Platform: \${escapeHtml(dev.host_metadata?.platform || 'Not reported')} · Policy v\${escapeHtml(dev.policy_version ?? '—')}</p>
+                      <label for="profile-\${escapeHtml(dev.id)}">Permission profile</label>
+                      <select id="profile-\${escapeHtml(dev.id)}" aria-label="Policy for \${escapeHtml(dev.alias)}" class="btn btn-outline btn-sm" onchange="changePolicy('\${dev.id}', this.value)" \${dev.status === 'revoked' ? 'disabled' : ''}>
+                        <option value="read-only" \${dev.profile === 'read-only' ? 'selected' : ''}>Read only</option>
+                        <option value="operations" \${dev.profile === 'operations' ? 'selected' : ''}>Operations</option>
+                        <option value="full-admin" \${dev.profile === 'full-admin' ? 'selected' : ''}>Full admin</option>
+                      </select>
+                      <div class="device-control-actions"><button class="btn btn-outline btn-sm" type="button" onclick="revokeDevice('\${dev.id}')" \${dev.status === 'revoked' ? 'disabled' : ''}>\${dev.status === 'revoked' ? 'Revoked' : 'Revoke access'}</button>
+                      <button class="btn btn-danger btn-sm" type="button" onclick="removeDevice('\${dev.id}')">Remove device</button></div>
+                    </div>
+                  </details>
                 </div>
               </div>
-              <div class="device-actions">
-                <select aria-label="Policy for \${escapeHtml(dev.alias)}" class="btn btn-outline btn-sm" onchange="changePolicy('\${dev.id}', this.value)" \${dev.status === 'revoked' ? 'disabled' : ''}>
-                  <option value="read-only" \${dev.profile === 'read-only' ? 'selected' : ''}>Profile: Read-Only</option>
-                  <option value="operations" \${dev.profile === 'operations' ? 'selected' : ''}>Profile: Operations</option>
-                  <option value="full-admin" \${dev.profile === 'full-admin' ? 'selected' : ''}>Profile: Full Admin</option>
-                </select>
-                <button class="btn btn-outline btn-sm" onclick="revokeDevice('\${dev.id}')" \${dev.status === 'revoked' ? 'disabled' : ''}>\${dev.status === 'revoked' ? 'Revoked' : 'Revoke access'}</button>
-                <button class="btn btn-danger btn-sm" onclick="removeDevice('\${dev.id}')">Remove device</button>
-              </div>
-            </div>
+              \${!dev.isLiveConnected && dev.status !== 'revoked' ? '<div class="device-offline-tip">Agent offline — start SSH MCP Pro Agent on this computer to reconnect. <a href="https://github.com/oaslananka/ssh-mcp-pro/blob/main/docs/adding-a-device.md" target="_blank" rel="noopener noreferrer">Connection help</a></div>' : ''}
+            </article>
+          \`).join('')}
           </div>
-        \`).join('');
+        </section>\`;
       }
 
       if (activeTab === 'add-device') {
         return \`
+          <section class="setup-intro">
+            <p class="eyebrow">DEVICE SETUP</p>
+            <h2>Set up your computer in three steps</h2>
+            <p>Choose the computer you want to connect, start its agent, then confirm it is online.</p>
+            <div class="setup-steps" aria-label="Setup stages">
+              <span><strong>01</strong> Choose access</span>
+              <span><strong>02</strong> Run setup</span>
+              <span><strong>03</strong> Confirm online</span>
+            </div>
+          </section>
+
           <div class="card">
-            <h2 style="margin-bottom:12px;">Enroll New Device</h2>
-            <p style="color:var(--text-muted); font-size:14px; margin-bottom:24px;">\${localBrowserLink ? 'Approve the local agent waiting in your terminal. The one-time credential stays inside your browser and device; do not copy it into chat.' : 'Generate a one-time install command and run it on your target device.'}</p>
+            <h2 style="margin-bottom:12px;">Connect a new computer</h2>
+            <p style="color:var(--text-muted); font-size:14px; margin-bottom:24px;">\${localBrowserLink ? 'Approve the local agent waiting in your terminal. The one-time credential stays inside your browser and device; do not copy it into chat.' : 'Choose a name and access level. Setup commands are provided for your computer.'}</p>
             \${localBrowserLink ? '<p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">Chrome may ask to access other apps and services on this device. Bring this browser window to the front and choose Allow for this trusted site. If the prompt is hidden, check Chrome’s address bar; the connection check stops after one minute so you can retry.</p>' : ''}
-            <div style="display:\${localBrowserLink ? 'none' : 'block'}; margin-bottom:20px; padding:14px; border:1px solid var(--card-border); border-radius:8px;">
+            <div class="os-chooser" aria-label="Choose device operating system" role="group">
+              <span>Which operating system?</span>
+              <div class="os-chooser-options">
+                <button type="button" class="os-choice active" data-install-os="windows" aria-pressed="true" onclick="chooseInstallOS('windows')">Windows</button>
+                <button type="button" class="os-choice" data-install-os="linux" aria-pressed="false" onclick="chooseInstallOS('linux')">Linux / WSL</button>
+                <button type="button" class="os-choice" data-install-os="macos" aria-pressed="false" onclick="chooseInstallOS('macos')">macOS</button>
+              </div>
+            </div>
+            <div data-os-section="linux" style="display:\${localBrowserLink ? 'none' : 'block'}; margin-bottom:20px; padding:14px; border:1px solid var(--card-border); border-radius:8px;">
               <h3 style="margin-bottom:8px;">Linux / WSL: Set up with your browser</h3>
               <p style="color:var(--text-muted); font-size:13px; margin-bottom:12px;">Copy this command to the device you want to enroll. Open the URL printed in its terminal in a browser on that same device, sign in and approve. No token copying or sudo required.</p>
               <div class="code-box">
@@ -215,11 +299,11 @@ export function renderDashboardHtml(
             </div>
             <div style="display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap;">
               <div style="flex:1; min-width:240px;">
-                <label for="enrollAlias" style="display:block; font-size:13px; font-weight:600; margin-bottom:6px;">Device Alias</label>
+                <label for="enrollAlias" style="display:block; font-size:13px; font-weight:600; margin-bottom:6px;">Device name</label>
                 <input id="enrollAlias" type="text" placeholder="e.g. production-bastion, home-server" style="width:100%; padding:10px; border-radius:6px; background:#090d13; border:1px solid var(--card-border); color:#fff; font-size:14px;">
               </div>
               <div style="flex:1; min-width:240px;">
-                <label for="enrollProfile" style="display:block; font-size:13px; font-weight:600; margin-bottom:6px;">Initial Policy Profile</label>
+                <label for="enrollProfile" style="display:block; font-size:13px; font-weight:600; margin-bottom:6px;">Access level</label>
                 <select id="enrollProfile" style="width:100%; padding:10px; border-radius:6px; background:#090d13; border:1px solid var(--card-border); color:#fff; font-size:14px;">
                   <option value="read-only" selected>Read-Only (Status, Logs, Read Files)</option>
                   <option value="operations">Operations (Restart Services, Docker, Safe Shell)</option>
@@ -227,16 +311,16 @@ export function renderDashboardHtml(
                 </select>
               </div>
             </div>
-            <button id="generateEnrollmentButton" type="button" class="btn btn-primary" onclick="generateEnrollment()">\${localBrowserLink ? 'Approve This Device' : 'Generate Install Command'}</button>
+            <button id="generateEnrollmentButton" type="button" class="btn btn-primary" onclick="generateEnrollment()">\${localBrowserLink ? 'Approve This Device' : 'Generate setup commands'}</button>
             <p id="enrollError" role="alert" hidden style="color:var(--danger, #f85149); margin-top:12px;"></p>
 
             <div id="enrollOutput" style="margin-top:24px; display:none;">
               <p id="enrollStatus" role="status" aria-live="polite" style="margin-bottom:12px; color:var(--text-muted);"></p>
               <button id="enrollViewDevice" type="button" class="btn btn-primary" hidden style="display:none; margin-bottom:16px;" onclick="switchTab('devices')">View connected device</button>
               <div id="manualInstallCommands" style="display:\${localBrowserLink ? 'none' : 'block'};">
-              <h3 style="margin-bottom:12px; color:#fff;">One-Liner Installation Commands:</h3>
+              <h3 style="margin-bottom:12px; color:#fff;">Step 2 — Run the setup command for your system:</h3>
 
-              <div style="margin-bottom:16px;">
+              <div data-os-section="linux" style="margin-bottom:16px;">
                 <div style="font-weight:600; font-size:13px; color:var(--blue); margin-bottom:4px;">🐧 Linux (systemd)</div>
                 <div class="code-box">
                   <button type="button" class="copy-btn" aria-live="polite" aria-label="Copy Linux install command" onclick="copySnippet('cmdLinux')">Copy</button>
@@ -244,7 +328,7 @@ export function renderDashboardHtml(
                 </div>
               </div>
 
-              <div style="margin-bottom:16px;">
+              <div data-os-section="windows" style="margin-bottom:16px;">
                 <div style="font-weight:600; font-size:13px; color:var(--blue); margin-bottom:4px;">🪟 Windows (PowerShell)</div>
                 <div class="code-box">
                   <button type="button" class="copy-btn" aria-live="polite" aria-label="Copy Windows install command" onclick="copySnippet('cmdWindows')">Copy</button>
@@ -252,7 +336,7 @@ export function renderDashboardHtml(
                 </div>
               </div>
 
-              <div>
+              <div data-os-section="macos">
                 <div style="font-weight:600; font-size:13px; color:var(--blue); margin-bottom:4px;">📦 Manual Node CLI (foreground)</div>
                 <p style="font-size:12px; color:var(--text-muted); margin-bottom:6px;">Advanced Linux/macOS fallback: the terminal must stay open. Use an OS service installer for automatic restart.</p>
                 <div class="code-box">
@@ -268,7 +352,21 @@ export function renderDashboardHtml(
 
       if (activeTab === 'clients') {
         return \`
-          <div class="grid-2">
+          <section class="integration-feature">
+            <p class="eyebrow">ONE SECURE CONNECTION</p>
+            <h2>Connect your favorite AI assistant</h2>
+            <p>Copy this MCP server URL into the app you use, then sign in with the same account as your devices.</p>
+            <div class="code-box connection-url"><button type="button" class="copy-btn" aria-live="polite" aria-label="Copy MCP server URL" onclick="copySnippet('sharedMcpUrl')">Copy URL</button><span id="sharedMcpUrl">\${MCP_URL}</span></div>
+          </section>
+          <div class="platform-grid" aria-label="AI app connection instructions">
+            <article class="platform-card"><span class="platform-symbol chatgpt" aria-hidden="true">✳</span><h3>ChatGPT</h3><p>In a supported workspace, open Plugins and add a custom MCP server. Paste the URL above and authorize access.</p><small>ChatGPT Work · OAuth connection</small></article>
+            <article class="platform-card"><span class="platform-symbol claude" aria-hidden="true">✴</span><h3>Claude</h3><p>Open Customize → Connectors → Add custom connector. Paste the URL and sign in.</p><small>Claude Web · Custom connector</small></article>
+            <article class="platform-card"><span class="platform-symbol gemini" aria-hidden="true">✦</span><h3>Gemini</h3><p>Eligible Developer Mode users can add the MCP server. Google registration and review are separate.</p><small>Gemini Web · Developer Mode</small></article>
+          </div>
+          <div class="integration-next"><span class="live-indicator" aria-hidden="true"></span><p>Choose an online device in your AI chat after connecting. Available tools depend on your account and its permissions.</p></div>
+          <details class="advanced-integrations">
+            <summary>Advanced setup and configuration examples <span aria-hidden="true">⌄</span></summary>
+            <div class="grid-2">
             <div class="card">
               <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
                 <span style="font-size:24px;">🤖</span>
@@ -317,6 +415,7 @@ export function renderDashboardHtml(
               <div class="code-box"><button type="button" class="copy-btn" aria-live="polite" aria-label="Copy Windsurf MCP config" onclick="copySnippet('cfgWindsurf')">Copy</button><span id="cfgWindsurf">{\\n  "mcpServers": {\\n    "ssh-mcp-pro": {\\n      "serverUrl": "\${MCP_URL}"\\n    }\\n  }\\n}</span></div>
             </div>
           </div>
+          </details>
         \`;
       }
 
@@ -360,7 +459,7 @@ export function renderDashboardHtml(
         ['Tool calls · 7 days', usageData.actionsLast7Days, 'Recorded agent actions'],
         ['Tool calls · all time', usageData.totalActions, 'Not OAuth clients or login events']
       ];
-      return '<section class="usage-head"><div><div class="eyebrow">Owner workspace</div><h2>Usage & Users</h2><p>Live, read-only service statistics. Account totals do not imply unique individuals.</p></div><button class="btn btn-outline" onclick="loadUsage()">Refresh statistics</button></section>' +
+      return '<section class="usage-head"><div><div class="eyebrow">Owner workspace</div><h2>Service overview</h2><p>Live, read-only service statistics. Account totals do not imply unique individuals.</p></div><button class="btn btn-outline" onclick="loadUsage()">Refresh statistics</button></section>' +
         '<div class="usage-grid">' + metrics.map(item => '<div class="usage-stat"><div class="stat-label">' + escapeHtml(item[0]) + '</div><strong>' + n(item[1]) + '</strong><small>' + escapeHtml(item[2]) + '</small></div>').join('') + '</div>' +
         '<section class="card"><h3>Registered accounts</h3><p class="device-scope-note">Visible only to explicitly configured service owners. AI providers and OAuth clients are not additional users.</p><div class="usage-table-wrap"><table class="usage-table"><thead><tr><th>Account</th><th>Provider</th><th>Devices</th><th>Tool calls</th><th>Last action</th></tr></thead><tbody>' +
         usageData.accounts.map(a => '<tr><td>' + escapeHtml(a.label || 'Account') + '</td><td>' + escapeHtml(a.provider) + '</td><td>' + n(a.agents) + '</td><td>' + n(a.actions) + '</td><td>' + escapeHtml(a.lastActionAt ? new Date(a.lastActionAt).toLocaleString() : 'No actions') + '</td></tr>').join('') +
@@ -385,10 +484,8 @@ export function renderDashboardHtml(
         if (res.ok) {
           const data = await res.json();
           devicesList = data.devices || [];
-          const tabContent = document.getElementById('tabContent');
-          if (activeTab === 'devices' && tabContent) {
-            tabContent.innerHTML = renderTabContent();
-          }
+          devicesLoaded = true;
+          if (activeTab === 'devices') renderApp();
         }
       } catch (e) {
         console.error('Failed to load devices', e);
