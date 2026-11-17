@@ -92,6 +92,7 @@ describe("app publication readiness guard", () => {
     const result = runValidation(fixture, (r) => {
       r.publishReady = true;
       r.submission.privacyPolicyReviewed = true;
+      (r as Readiness & { privacyUrl: string }).privacyUrl = "";
     });
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("privacyUrl must link to a dedicated HTTPS policy document");

@@ -336,6 +336,40 @@ describe("remote-agent MCP real HTTP authorization boundary", () => {
     }
   });
 
+  test("accepts the Google Connected Apps 2025-11-25 HTTP initialize protocol", async () => {
+    const harness = await startHarness();
+    const token = await issueToken(harness, "hosts:read");
+    const initialized = await invoke(
+      harness,
+      "initialize",
+      {
+        protocolVersion: "2025-11-25",
+        capabilities: {},
+        clientInfo: { name: "google-connected-apps", version: "1.0.0" },
+      },
+      token,
+    );
+    expect(initialized.status).toBe(200);
+    expect((initialized.body.result as { protocolVersion: string }).protocolVersion).toBe(
+      "2025-11-25",
+    );
+    const tools = await invoke(harness, "tools/list", {}, token);
+    expect(tools.status).toBe(200);
+    const names = (tools.body.result as { tools: Array<{ name: string }> }).tools.map(
+      (t) => t.name,
+    );
+    expect(names).toContain("list_hosts");
+    expect(names).not.toContain("run_shell");
+    const result = await invoke(
+      harness,
+      "tools/call",
+      { name: "list_hosts", arguments: {} },
+      token,
+    );
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({ result: { structuredContent: { hosts: [] } } });
+  });
+
   test("modern SDK clients cannot read or revoke another owner's agents", async () => {
     const harness = await startHarness();
     const policy = createAgentPolicy("read-only");

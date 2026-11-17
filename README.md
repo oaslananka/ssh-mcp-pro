@@ -76,6 +76,22 @@ Git tag aliases. Production deployments should prefer the digest-pinned
 reference recorded by the release workflow. See [Docker Usage](docs/docker.md)
 for the tag policy, digest-pinned examples, and registry verification steps.
 
+## Cloud dashboard and AI connectors
+
+The optional [SSH MCP Pro Cloud](https://ssh-mcp-pro.oaslananka.dev/) lets you sign in with Google or GitHub, enroll your own devices, and connect an OAuth-capable AI client to `https://ssh-mcp-pro.oaslananka.dev/mcp`. Your SSH private keys remain on your devices.
+
+After installing the package, start a **local web dashboard with one command**:
+
+```bash
+ssh-mcp-pro web
+```
+
+The shortcut binds only to `http://127.0.0.1:3000/dashboard` and does not publish a privileged server to your network. Signing in requires your own configured GitHub or Google OAuth application. For hosted, multi-user operation use the production control plane configuration; the localhost command is for local development and testing.
+
+The hosted service serves [Privacy](https://ssh-mcp-pro.oaslananka.dev/privacy) and [Terms](https://ssh-mcp-pro.oaslananka.dev/terms). Operators may enable an owner-only **Usage & Users** tab by setting `SSH_MCP_DASHBOARD_OWNER_GITHUB_LOGINS` and/or `SSH_MCP_DASHBOARD_OWNER_GOOGLE_EMAILS`; global usage access is disabled by default.
+
+See [Web publication readiness](docs/development/web-publication-readiness.md) for ChatGPT, Claude, and Gemini connection steps and independent acceptance requirements. Manifest validation alone does **not** mean any platform has approved the plugin.
+
 ## Quickstart
 
 Generic stdio MCP config:

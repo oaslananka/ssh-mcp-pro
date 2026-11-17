@@ -58,3 +58,6 @@ Before submitting to the [Claude Directory](https://claude.ai/directory/manage):
    ```bash
    pnpm run validate:claude-connector
    ```
+
+
+**Publication status (November 17, 2026):** `connector-readiness.json` remains unpublished until actual Claude Web authentication and tenant-safe MCP tool acceptance, hosted policy review, and directory submission are verified. The Claude CLI/desktop local stdio path is separate from publishing the hosted remote connector. Do not equate metadata validation with a Claude Directory listing.

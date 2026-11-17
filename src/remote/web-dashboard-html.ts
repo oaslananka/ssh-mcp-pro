@@ -5,6 +5,7 @@ export function renderDashboardHtml(
   initialUserBase64: string,
   mcpUrlJson: string,
   publicUrlJson: string,
+  authProvidersJson = '{"google":true,"github":true}',
 ): string {
   return `<!doctype html>
 <html lang="en">
@@ -17,7 +18,7 @@ export function renderDashboardHtml(
 <body>
   <header>
     <div class="logo-area">
-      <div class="logo-icon">⚡</div>
+      <div class="logo-icon" aria-hidden="true">⌘</div>
       <div>
         <div class="brand-title">ssh-mcp-pro</div>
         <div class="brand-sub">Model Context Protocol SSH Gateway</div>
@@ -33,6 +34,7 @@ export function renderDashboardHtml(
   <script>
     const INITIAL_USER = JSON.parse(atob("${initialUserBase64}"));
     const MCP_URL = ${mcpUrlJson};
+    const AUTH_PROVIDERS = ${authProvidersJson};
     const PUBLIC_URL = ${publicUrlJson};
     const BROWSER_LINUX_COMMAND = ${JSON.stringify(buildDashboardBrowserEnrollmentCommand(JSON.parse(publicUrlJson) as string))};
 
@@ -40,6 +42,7 @@ export function renderDashboardHtml(
     let activeTab = 'devices';
     let devicesList = [];
     let auditList = [];
+    let usageData = null;
     ${DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT}
 
     function escapeHtml(value) {
@@ -68,6 +71,12 @@ export function renderDashboardHtml(
       const root = document.getElementById('appRoot');
       if (!currentUser) {
         root.innerHTML = renderLanding();
+        if (!AUTH_PROVIDERS.google && !AUTH_PROVIDERS.github) {
+          const warning = document.getElementById('providerSetup');
+          if (warning) warning.hidden = false;
+        }
+        if (!AUTH_PROVIDERS.google) document.querySelector('.auth-btn-google')?.setAttribute('hidden', '');
+        if (!AUTH_PROVIDERS.github) document.querySelector('.auth-btn-github')?.setAttribute('hidden', '');
         return;
       }
 
@@ -84,10 +93,11 @@ export function renderDashboardHtml(
         </div>
 
         <nav class="tabs" aria-label="Dashboard sections">
-          <button type="button" data-dashboard-tab="devices" aria-pressed="\${activeTab === 'devices'}" class="tab-item \${activeTab === 'devices' ? 'active' : ''}" onclick="switchTab('devices')">🖥️ Enrolled Devices</button>
-          <button type="button" data-dashboard-tab="add-device" aria-pressed="\${activeTab === 'add-device'}" class="tab-item \${activeTab === 'add-device' ? 'active' : ''}" onclick="switchTab('add-device')">➕ Add Device</button>
-          <button type="button" data-dashboard-tab="clients" aria-pressed="\${activeTab === 'clients'}" class="tab-item \${activeTab === 'clients' ? 'active' : ''}" onclick="switchTab('clients')">🤖 AI Integrations</button>
-          <button type="button" data-dashboard-tab="audit" aria-pressed="\${activeTab === 'audit'}" class="tab-item \${activeTab === 'audit' ? 'active' : ''}" onclick="switchTab('audit')">📜 Audit Log</button>
+          <button type="button" data-dashboard-tab="devices" aria-pressed="\${activeTab === 'devices'}" class="tab-item \${activeTab === 'devices' ? 'active' : ''}" onclick="switchTab('devices')">Devices</button>
+          <button type="button" data-dashboard-tab="add-device" aria-pressed="\${activeTab === 'add-device'}" class="tab-item \${activeTab === 'add-device' ? 'active' : ''}" onclick="switchTab('add-device')">Add Device</button>
+          <button type="button" data-dashboard-tab="clients" aria-pressed="\${activeTab === 'clients'}" class="tab-item \${activeTab === 'clients' ? 'active' : ''}" onclick="switchTab('clients')">AI Integrations</button>
+          <button type="button" data-dashboard-tab="audit" aria-pressed="\${activeTab === 'audit'}" class="tab-item \${activeTab === 'audit' ? 'active' : ''}" onclick="switchTab('audit')">Activity log</button>
+          <button type="button" id="usageTab" hidden data-dashboard-tab="usage" aria-label="Service usage and accounts" class="tab-item" onclick="switchTab('usage')">Usage & Users</button>
         </nav>
 
         \${activeTab === 'devices' ? '<p class="device-scope-note" role="note">Device access is scoped to your <strong>' + escapeHtml(currentUser.provider === 'github' ? 'GitHub' : 'Google') + '</strong> sign-in. Switching sign-in providers shows a different device list.</p>' : ''}
@@ -98,6 +108,9 @@ export function renderDashboardHtml(
 
       if (activeTab === 'devices') loadDevices();
       if (activeTab === 'audit') loadAudit();
+      if (activeTab === 'usage' && currentUser.serviceOwner) loadUsage();
+      const ownerTab = document.getElementById('usageTab');
+      if (ownerTab && currentUser.serviceOwner) { ownerTab.hidden = false; ownerTab.setAttribute('aria-pressed', String(activeTab === 'usage')); ownerTab.classList.toggle('active', activeTab === 'usage'); }
     }
 
     function switchTab(tab) {
@@ -110,9 +123,9 @@ export function renderDashboardHtml(
     function renderLanding() {
       return \`
         <div class="hero">
-          <div style="font-size: 48px; margin-bottom: 12px;">🛡️⚡</div>
-          <h1>ssh-mcp-pro Gateway</h1>
-          <p>Zero-Trust Model Context Protocol SSH Gateway with policy controls, OAuth 2.1 authentication, and dual local/remote agent support.</p>
+          <div class="eyebrow">Secure remote operations · MCP</div>
+          <h1>Your infrastructure, connected.</h1>
+          <p>Connect your own servers and workstations to your AI tools with clear device permissions and one-step enrollment.</p>
           <div class="auth-buttons">
             <a href="/auth/login/google" class="auth-btn auth-btn-google">
               <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.7 0 3 .7 3.9 1.5l2.9-2.9C17 2 14.7 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2c0 2.8.7 5.5 1.9 7.8l3.7-2.9z"/><path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.5C3.7 20.3 7.5 23.5 12 23.5z"/></svg>
@@ -124,6 +137,7 @@ export function renderDashboardHtml(
             </a>
           </div>
           <p class="device-scope-note" style="text-align:center; margin-top:12px;">Use the same Google or GitHub sign-in to see your enrolled devices.</p>
+          <p id="providerSetup" class="device-scope-note" role="status" hidden>Sign-in is not configured on this local instance yet. Set up a GitHub or Google OAuth application to sign in, or use the <a href="https://ssh-mcp-pro.oaslananka.dev/">hosted Cloud dashboard</a>.</p>
         </div>
 
         <div class="grid-2">
@@ -142,6 +156,8 @@ export function renderDashboardHtml(
     }
 
     function renderTabContent() {
+      if (activeTab === 'usage' && currentUser.serviceOwner) return renderUsagePanel();
+
       if (activeTab === 'devices') {
         if (devicesList.length === 0) {
           return \`
@@ -335,6 +351,34 @@ export function renderDashboardHtml(
       }
     }
 
+    function renderUsagePanel() {
+      if (!usageData) return '<div class="card" role="status">Loading service usage…</div>';
+      const n = value => new Intl.NumberFormat('en-US').format(Number(value || 0));
+      const metrics = [
+        ['Registered accounts', usageData.registeredUsers, 'Accounts are not unique people'],
+        ['Enrolled devices', usageData.registeredAgents, 'Online and offline agents'],
+        ['Tool calls · 7 days', usageData.actionsLast7Days, 'Recorded agent actions'],
+        ['Tool calls · all time', usageData.totalActions, 'Not OAuth clients or login events']
+      ];
+      return '<section class="usage-head"><div><div class="eyebrow">Owner workspace</div><h2>Usage & Users</h2><p>Live, read-only service statistics. Account totals do not imply unique individuals.</p></div><button class="btn btn-outline" onclick="loadUsage()">Refresh statistics</button></section>' +
+        '<div class="usage-grid">' + metrics.map(item => '<div class="usage-stat"><div class="stat-label">' + escapeHtml(item[0]) + '</div><strong>' + n(item[1]) + '</strong><small>' + escapeHtml(item[2]) + '</small></div>').join('') + '</div>' +
+        '<section class="card"><h3>Registered accounts</h3><p class="device-scope-note">Visible only to explicitly configured service owners. AI providers and OAuth clients are not additional users.</p><div class="usage-table-wrap"><table class="usage-table"><thead><tr><th>Account</th><th>Provider</th><th>Devices</th><th>Tool calls</th><th>Last action</th></tr></thead><tbody>' +
+        usageData.accounts.map(a => '<tr><td>' + escapeHtml(a.label || 'Account') + '</td><td>' + escapeHtml(a.provider) + '</td><td>' + n(a.agents) + '</td><td>' + n(a.actions) + '</td><td>' + escapeHtml(a.lastActionAt ? new Date(a.lastActionAt).toLocaleString() : 'No actions') + '</td></tr>').join('') +
+        '</tbody></table></div></section>';
+    }
+
+    async function loadUsage() {
+      const target = document.getElementById('tabContent');
+      try {
+        const response = await fetch('/api/dashboard/usage', { cache: 'no-store' });
+        if (!response.ok) throw new Error('Usage data unavailable or access denied');
+        usageData = await response.json();
+        if (activeTab === 'usage' && target) target.innerHTML = renderUsagePanel();
+      } catch (error) {
+        if (activeTab === 'usage' && target) target.innerHTML = '<div class="card" role="alert">Could not load usage. Check owner authorization and retry.</div>';
+      }
+    }
+
     async function loadDevices() {
       try {
         const res = await fetch('/api/dashboard/devices');
@@ -448,6 +492,7 @@ export function renderDashboardHtml(
     renderHeader();
     renderApp();
   </script>
+  <footer class="site-footer"><span>SSH MCP Pro · Designed for controlled remote operations</span><span><a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="https://github.com/oaslananka/ssh-mcp-pro/issues" rel="noopener noreferrer">Support</a></span></footer>
 </body>
 </html>`;
 }

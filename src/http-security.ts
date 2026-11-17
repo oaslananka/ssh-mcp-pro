@@ -31,7 +31,7 @@ function publicUnsafeToolNames(toolNames: string[]): string[] {
 function validateRemoteToolProfile(profile: ToolProfile): void {
   if (profile === "full") {
     throw new Error(
-      "Refusing non-loopback HTTP MCP binding with full tool profile. Set SSH_MCP_TOOL_PROFILE=remote-safe, chatgpt, claude, remote-readonly, or remote-broker.",
+      "Refusing non-loopback HTTP MCP binding with full tool profile. Set SSH_MCP_TOOL_PROFILE=remote-safe, chatgpt, claude, gemini, remote-readonly, or remote-broker.",
     );
   }
 

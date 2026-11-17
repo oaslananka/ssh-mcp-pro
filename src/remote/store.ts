@@ -99,6 +99,60 @@ export class RemoteStore {
     this.db.close();
   }
 
+  /** Read-only, bounded usage aggregates for explicitly configured service owners. */
+  getServiceUsage(): {
+    registeredUsers: number;
+    registeredAgents: number;
+    totalActions: number;
+    actionsLast7Days: number;
+    actionsLast30Days: number;
+    completedActions: number;
+    failedActions: number;
+    accounts: Array<{
+      provider: string;
+      label: string;
+      agents: number;
+      actions: number;
+      lastActionAt: string | null;
+    }>;
+  } {
+    const count = (sql: string): number => Number((this.db.prepare(sql).get() as { n: number }).n);
+    const accounts = this.db
+      .prepare(
+        `SELECT u.provider,
+              CASE WHEN u.provider = 'github' THEN u.github_login
+                   ELSE COALESCE(u.email, 'Google account') END AS label,
+              (SELECT COUNT(*) FROM agents a WHERE a.user_id = u.id) AS agents,
+              (SELECT COUNT(*) FROM actions ac WHERE ac.user_id = u.id) AS actions,
+              (SELECT MAX(ac.issued_at) FROM actions ac WHERE ac.user_id = u.id) AS lastActionAt
+       FROM users u
+       ORDER BY u.created_at DESC LIMIT 100`,
+      )
+      .all() as Array<{
+      provider: string;
+      label: string;
+      agents: number;
+      actions: number;
+      lastActionAt: string | null;
+    }>;
+    return {
+      registeredUsers: count("SELECT COUNT(*) AS n FROM users"),
+      registeredAgents: count("SELECT COUNT(*) AS n FROM agents"),
+      totalActions: count("SELECT COUNT(*) AS n FROM actions"),
+      actionsLast7Days: count(
+        "SELECT COUNT(*) AS n FROM actions WHERE issued_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-7 days')",
+      ),
+      actionsLast30Days: count(
+        "SELECT COUNT(*) AS n FROM actions WHERE issued_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days')",
+      ),
+      completedActions: count("SELECT COUNT(*) AS n FROM actions WHERE status = 'completed'"),
+      failedActions: count(
+        "SELECT COUNT(*) AS n FROM actions WHERE status IN ('error', 'timeout')",
+      ),
+      accounts,
+    };
+  }
+
   /**
    * Reclaim expired credentials and unclaimed device placeholders. Real
    * devices, accounts, actions and security audit history are preserved.

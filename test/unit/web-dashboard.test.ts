@@ -118,6 +118,111 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
     }
   });
 
+  test("legal documents and optional domain challenge are served safely", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "legal-pages-test-"));
+    const cp = new RemoteControlPlane(testConfig(dir));
+    await cp.initialize();
+    const previous = process.env.SSH_MCP_OPENAI_DOMAIN_CHALLENGE;
+    try {
+      for (const pathname of ["/privacy", "/terms"] as const) {
+        const res = captureResponse();
+        await cp.handleHttp(request("GET", pathname), res as unknown as ServerResponse, pathname);
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toContain("<html lang=");
+        expect(res.body).toContain("SSH MCP Pro");
+        expect(res.getHeader("content-security-policy")).toContain("frame-ancestors 'none'");
+      }
+      process.env.SSH_MCP_OPENAI_DOMAIN_CHALLENGE = "portal-challenge-token-2026";
+      const challenge = captureResponse();
+      await cp.handleHttp(
+        request("GET", "/.well-known/openai-apps-challenge"),
+        challenge as unknown as ServerResponse,
+        "/.well-known/openai-apps-challenge",
+      );
+      expect(challenge.statusCode).toBe(200);
+      expect(challenge.body).toBe("portal-challenge-token-2026");
+      expect(challenge.getHeader("content-type")).toContain("text/plain");
+    } finally {
+      if (previous === undefined) delete process.env.SSH_MCP_OPENAI_DOMAIN_CHALLENGE;
+      else process.env.SSH_MCP_OPENAI_DOMAIN_CHALLENGE = previous;
+      cp.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("service usage is denied to anonymous and ordinary tenants and allowed to the owner", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "usage-admin-test-"));
+    const original = {
+      id: process.env.SSHAUTOMATOR_TEST_GOOGLE_ID,
+      email: process.env.SSHAUTOMATOR_TEST_GOOGLE_EMAIL,
+      name: process.env.SSHAUTOMATOR_TEST_GOOGLE_NAME,
+      owners: process.env.SSH_MCP_DASHBOARD_OWNER_GOOGLE_EMAILS,
+    };
+    process.env.SSHAUTOMATOR_TEST_GOOGLE_ID = "usage-google-test";
+    process.env.SSHAUTOMATOR_TEST_GOOGLE_EMAIL = "operator@example.test";
+    process.env.SSHAUTOMATOR_TEST_GOOGLE_NAME = "Test Operator";
+    delete process.env.SSH_MCP_DASHBOARD_OWNER_GOOGLE_EMAILS;
+    const cp = new RemoteControlPlane(testConfig(dir));
+    await cp.initialize();
+    try {
+      const anonymous = captureResponse();
+      await cp.handleHttp(
+        request("GET", "/api/dashboard/usage"),
+        anonymous as unknown as ServerResponse,
+        "/api/dashboard/usage",
+      );
+      expect(anonymous.statusCode).toBe(401);
+      const login = captureResponse();
+      await cp.handleHttp(
+        request("GET", "/auth/login/google"),
+        login as unknown as ServerResponse,
+        "/auth/login/google",
+      );
+      const cookie = String(login.getHeader("set-cookie")).split(";")[0]!;
+      const unauthorized = captureResponse();
+      await cp.handleHttp(
+        request("GET", "/api/dashboard/usage", { cookie }),
+        unauthorized as unknown as ServerResponse,
+        "/api/dashboard/usage",
+      );
+      expect(unauthorized.statusCode).toBe(403);
+      process.env.SSH_MCP_DASHBOARD_OWNER_GOOGLE_EMAILS = "operator@example.test";
+      const authorized = captureResponse();
+      await cp.handleHttp(
+        request("GET", "/api/dashboard/usage", { cookie }),
+        authorized as unknown as ServerResponse,
+        "/api/dashboard/usage",
+      );
+      expect(authorized.statusCode).toBe(200);
+      expect(authorized.getHeader("cache-control")).toContain("no-store");
+      expect(JSON.parse(authorized.body)).toMatchObject({
+        registeredUsers: 1,
+        registeredAgents: 0,
+        totalActions: 0,
+        accounts: [{ provider: "google", label: "operator@example.test", agents: 0 }],
+      });
+      const me = captureResponse();
+      await cp.handleHttp(
+        request("GET", "/api/dashboard/me", { cookie }),
+        me as unknown as ServerResponse,
+        "/api/dashboard/me",
+      );
+      expect(JSON.parse(me.body).user.serviceOwner).toBe(true);
+    } finally {
+      for (const [env, old] of [
+        ["SSHAUTOMATOR_TEST_GOOGLE_ID", original.id],
+        ["SSHAUTOMATOR_TEST_GOOGLE_EMAIL", original.email],
+        ["SSHAUTOMATOR_TEST_GOOGLE_NAME", original.name],
+        ["SSH_MCP_DASHBOARD_OWNER_GOOGLE_EMAILS", original.owners],
+      ] as const) {
+        if (old === undefined) delete process.env[env];
+        else process.env[env] = old;
+      }
+      cp.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("serves install scripts via HTTP", async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "scripts-test-"));
     const cp = new RemoteControlPlane(testConfig(dir));

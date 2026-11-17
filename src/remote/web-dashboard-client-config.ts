@@ -25,7 +25,7 @@ export function createDashboardClientConfigs(publicUrl: string, mcpUrl: string) 
       },
       chatgptMcpPlugin: {
         serverUrl: mcpUrl,
-        setup: "ChatGPT > Plugins > Add custom MCP server",
+        setup: "ChatGPT Work > Plugins > Connect MCP server",
         authentication: "OAuth via server metadata discovery",
       },
       // Retain the legacy metadata fields for existing API consumers.

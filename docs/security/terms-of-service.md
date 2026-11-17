@@ -1,8 +1,8 @@
-# Terms of Service for ssh-mcp-pro
+# Terms of Service for SSH MCP Pro
 
 *Last updated: November 17, 2026*
 
-By installing, deploying, or using `ssh-mcp-pro` (the "Software"), you agree to these Terms of Service.
+By installing or using SSH MCP Pro or its optional hosted control plane at https://ssh-mcp-pro.oaslananka.dev, you agree to these terms. Local MCP use does not require a hosted account.
 
 ## 1. Authorized Access Only
 
@@ -26,3 +26,15 @@ By installing, deploying, or using `ssh-mcp-pro` (the "Software"), you agree to 
 ## 5. Contact
 
 For questions regarding these terms, open an issue on the [GitHub Repository](https://github.com/oaslananka/ssh-mcp-pro/issues).
+
+
+## 6. Hosted accounts and AI connectors
+
+- The hosted service may require a supported GitHub or Google identity. Access depends on the user's agent permissions and service enrollment rules.
+- Remote commands, file modifications and service changes can affect real systems. Review the device, target host, requested action and permission scope before authorizing changes through an AI client.
+- Availability and access are not guaranteed. Accounts or devices may be restricted when necessary to protect the service and users.
+- Any separately chosen AI platform has its own terms and potential charges. Refer to the Privacy Policy at https://ssh-mcp-pro.oaslananka.dev/privacy for hosted data handling.
+
+## 7. Changes
+
+The date at the top of the policy marks the latest revision. Questions may be submitted through project GitHub Issues; report vulnerabilities using GitHub's private Security Advisories.

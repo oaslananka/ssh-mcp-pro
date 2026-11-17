@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { applyHttpCliEnvironment, parseArgs } from "../../src/cli.js";
+import { applyHttpCliEnvironment, applyWebCliEnvironment, parseArgs } from "../../src/cli.js";
 
 describe("parseArgs", () => {
   test("returns stdio defaults with optional values unset", () => {
@@ -27,6 +27,25 @@ describe("parseArgs", () => {
 
   test("-v alias sets version true", () => {
     expect(parseArgs(["-v"])).toMatchObject({ version: true });
+  });
+
+  test("one-command local web mode is loopback only and leaves ordinary http unchanged", () => {
+    expect(parseArgs(["web"])).toMatchObject({ transport: "http", webDashboard: true });
+    const env: NodeJS.ProcessEnv = {};
+    applyWebCliEnvironment(parseArgs(["web"]), env);
+    expect(env.SSH_MCP_REMOTE_AGENT_CONTROL_PLANE).toBe("true");
+    expect(env.SSH_MCP_HTTP_HOST).toBe("127.0.0.1");
+    expect(env.SSH_MCP_TOOL_PROFILE).toBe("remote-safe");
+    expect(env.PUBLIC_BASE_URL).toBe("http://127.0.0.1:3000");
+    const ordinary: NodeJS.ProcessEnv = {};
+    applyWebCliEnvironment(parseArgs(["http"]), ordinary);
+    expect(ordinary).toEqual({});
+    expect(() => applyWebCliEnvironment(parseArgs(["web", "--host", "0.0.0.0"]), {})).toThrow(
+      "loopback-only",
+    );
+    expect(() => applyWebCliEnvironment(parseArgs(["web", "--port", "invalid"]), {})).toThrow(
+      "valid local web port",
+    );
   });
 
   test("http positional sets http transport", () => {

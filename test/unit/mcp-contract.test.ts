@@ -11,6 +11,7 @@ const EXPECTED_TOOL_COUNTS: Record<ToolProfile, number> = {
   "remote-safe": 5,
   chatgpt: 5,
   claude: 5,
+  gemini: 5,
   "remote-readonly": 5,
   "remote-broker": 5,
 };

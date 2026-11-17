@@ -11,6 +11,7 @@ export interface CliOptions {
   connectorCredentialProvider?: string;
   unsupportedNoStdio: boolean;
   agentArgs?: string[];
+  webDashboard?: boolean;
 }
 
 const VALUE_OPTIONS = new Map<
@@ -49,6 +50,10 @@ export function parseArgs(argv: string[]): CliOptions {
       case "agent":
         opts.agentArgs = argv.slice(index + 1);
         return opts;
+      case "web":
+        opts.transport = "http";
+        opts.webDashboard = true;
+        break;
       case "http":
         opts.transport = "http";
         break;
@@ -89,6 +94,29 @@ export function parseArgs(argv: string[]): CliOptions {
 }
 
 // Apply HTTP CLI overrides without changing values omitted by the caller.
+export function applyWebCliEnvironment(
+  opts: CliOptions,
+  env: NodeJS.ProcessEnv = process.env,
+): void {
+  if (!opts.webDashboard) return;
+  const host = opts.host ?? "127.0.0.1";
+  if (!["127.0.0.1", "localhost", "::1"].includes(host)) {
+    throw new Error(
+      "The web shortcut is loopback-only. Use the secured http configuration for remote hosting.",
+    );
+  }
+  const port = opts.port ?? "3000";
+  if (!/^\d{1,5}$/u.test(port) || Number(port) < 1 || Number(port) > 65535) {
+    throw new Error("A valid local web port is required.");
+  }
+  env.SSH_MCP_REMOTE_AGENT_CONTROL_PLANE = "true";
+  env.SSH_MCP_HTTP_HOST = host;
+  env.SSH_MCP_HTTP_PORT = port;
+  env.PUBLIC_BASE_URL = "http://127.0.0.1:" + port;
+  env.MCP_RESOURCE_URL = env.PUBLIC_BASE_URL + "/mcp";
+  env.SSH_MCP_TOOL_PROFILE = "remote-safe";
+}
+
 export function applyHttpCliEnvironment(
   opts: CliOptions,
   env: NodeJS.ProcessEnv = process.env,

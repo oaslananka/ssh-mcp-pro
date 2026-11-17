@@ -5,8 +5,8 @@
   "automationRepository": "https://github.com/oaslananka/ssh-mcp-pro",
   "supportUrl": "https://github.com/oaslananka/ssh-mcp-pro/issues",
   "securityUrl": "https://github.com/oaslananka/ssh-mcp-pro/security/advisories/new",
-  "privacyUrl": "",
-  "termsUrl": "",
+  "privacyUrl": "https://ssh-mcp-pro.oaslananka.dev/privacy",
+  "termsUrl": "https://ssh-mcp-pro.oaslananka.dev/terms",
   "mcp": {
     "serverName": "io.github.oaslananka/ssh-mcp-pro",
     "packageName": "ssh-mcp-pro",
@@ -19,7 +19,7 @@
     "recommendedProductionTransport": "streamable-http"
   },
   "app": {
-    "name": "ssh-mcp-pro",
+    "name": "SSH Operations",
     "description": "Secure SSH automation and infrastructure inspection for Gemini and Vertex AI agents.",
     "categories": [
       "Developer Tools",
