@@ -336,6 +336,101 @@ export class RemoteStore {
       .run(JSON.stringify(redirectUris), clientId);
   }
 
+  /** List only OAuth clients granted by this specific dashboard account. */
+  listUserOAuthClients(
+    userId: string,
+    now: string,
+  ): Array<{
+    clientId: string;
+    clientName: string;
+    redirectHosts: string[];
+    registeredAt: string;
+    lastTokenAt: string;
+    activeGrants: number;
+    scopes: string[];
+  }> {
+    const rows = this.db
+      .prepare(
+        "SELECT c.client_id AS clientId, c.client_name AS clientName, " +
+          "c.redirect_uris AS redirectUris, c.created_at AS registeredAt, " +
+          "MAX(t.created_at) AS lastTokenAt, " +
+          "COUNT(DISTINCT CASE WHEN t.revoked_at IS NULL AND t.used_at IS NULL " +
+          "AND t.expires_at > ? THEN t.family_id END) AS activeGrants, " +
+          "GROUP_CONCAT(DISTINCT CASE WHEN t.revoked_at IS NULL AND t.used_at IS NULL " +
+          "AND t.expires_at > ? THEN t.scope END) AS activeScopes " +
+          "FROM oauth_clients c JOIN oauth_refresh_tokens t ON t.client_id = c.client_id " +
+          "WHERE t.user_id = ? GROUP BY c.client_id " +
+          "ORDER BY MAX(t.created_at) DESC LIMIT 100",
+      )
+      .all(now, now, userId) as Array<{
+      clientId: string;
+      clientName: string | null;
+      redirectUris: string;
+      registeredAt: string;
+      lastTokenAt: string;
+      activeGrants: number;
+      activeScopes: string | null;
+    }>;
+    return rows.map((row) => ({
+      clientId: row.clientId,
+      clientName: row.clientName?.trim() ? row.clientName : "Unnamed AI client",
+      redirectHosts: [
+        ...new Set(
+          parseJson<string[]>(row.redirectUris).flatMap((uri) => {
+            try {
+              return [new URL(uri).hostname];
+            } catch {
+              return [];
+            }
+          }),
+        ),
+      ],
+      registeredAt: row.registeredAt,
+      lastTokenAt: row.lastTokenAt,
+      activeGrants: Number(row.activeGrants),
+      scopes: [
+        ...new Set(
+          (row.activeScopes ?? "")
+            .split(",")
+            .flatMap((scope) => scope.split(/\s+/u))
+            .filter(Boolean),
+        ),
+      ],
+    }));
+  }
+
+  /** Account-scoped disconnection: retain global DCR records and other users' grants. */
+  revokeUserOAuthClientGrants(userId: string, clientId: string, now: string): number | undefined {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const known = this.db
+        .prepare("SELECT 1 FROM oauth_refresh_tokens WHERE user_id = ? AND client_id = ? LIMIT 1")
+        .get(userId, clientId);
+      if (!known) {
+        this.db.exec("COMMIT");
+        return undefined;
+      }
+      const result = this.db
+        .prepare(
+          "UPDATE oauth_refresh_tokens SET revoked_at = ? " +
+            "WHERE user_id = ? AND client_id = ? AND revoked_at IS NULL",
+        )
+        .run(now, userId, clientId);
+      // Invalidate unredeemed authorization codes from the same account.
+      this.db
+        .prepare(
+          "UPDATE oauth_authorization_codes SET used_at = ? " +
+            "WHERE user_id = ? AND client_id = ? AND used_at IS NULL",
+        )
+        .run(now, userId, clientId);
+      this.db.exec("COMMIT");
+      return Number(result.changes);
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   countOAuthClients(): number {
     const row = this.db.prepare("SELECT COUNT(*) AS count FROM oauth_clients").get() as
       Record<string, unknown> | undefined;
