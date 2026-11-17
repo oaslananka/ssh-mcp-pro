@@ -21,7 +21,7 @@ The portable package lives in [plugin/](./plugin/):
 
 The repository-root mcp.json serves **legacy MCP registry consumers** and is deliberately not replaced. The portable bundle has no embedded secrets, hooks, or invented registered plugin IDs.
 
-For a direct connection in ChatGPT Plugins, select **Add custom MCP server** and enter https://ssh-mcp-pro.oaslananka.dev/mcp. Authenticate through remote OAuth. ChatGPT can cache an existing installed plugin's title; refresh/reconnect or update the saved title to **ssh-mcp-pro** after deployment. A server identity change does not retroactively rename a user-created ChatGPT plugin entry.
+For a direct connection in ChatGPT Plugins, select **Add custom MCP server** and enter https://ssh-mcp-pro.oaslananka.dev/mcp. Authenticate through remote OAuth. The portable public listing defaults to `hosts:read`, `agents:read`, `status:read` only; it does not automatically request SSH write, shell or sudo permissions. Independently configured CLI/client profiles can request additional scopes under their existing policies. ChatGPT can cache an existing installed plugin's title; refresh/reconnect or update the saved title to **ssh-mcp-pro** after deployment. A server identity change does not retroactively rename a user-created ChatGPT plugin entry.
 
 This is an MCP-only plugin; an embedded MCP Apps iframe is **not yet implemented**. Do not claim an interactive inline app or an approved directory listing. A portable package does not replace testing an actual registered MCP connection.
 

@@ -47,7 +47,15 @@ describe("Cross-platform MCP app identity", () => {
     expect(mcp.mcpServers["ssh-mcp-pro"]).toMatchObject({
       type: "streamable-http",
       url: "https://ssh-mcp-pro.oaslananka.dev/mcp",
-      extensions: { "com.openai": { auth: { type: "oauth", client: { mode: "dcr" } } } },
+      extensions: {
+        "com.openai": {
+          auth: {
+            type: "oauth",
+            client: { mode: "dcr" },
+            defaultScopes: ["hosts:read", "agents:read", "status:read"],
+          },
+        },
+      },
     });
   });
 
