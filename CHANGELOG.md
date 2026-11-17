@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.2](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.11.1...ssh-mcp-pro-v1.11.2) (2026-11-17)
+
+
+### Bug Fixes
+
+* **web:** show one contextual action per device state ([#280](https://github.com/oaslananka/ssh-mcp-pro/issues/280)) ([14e08b3](https://github.com/oaslananka/ssh-mcp-pro/commit/14e08b3101e7e3c9204daf47da15f9ede2d084c8))
+
 ## [1.11.1](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.11.0...ssh-mcp-pro-v1.11.1) (2026-11-17)
 
 
