@@ -1,10 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { isAbsolute } from "node:path";
+import pkg from "../package.json" with { type: "json" };
 
 const advisoryId = "GHSA-fc5q-39xc-vjpf";
 const expiry = "2026-12-17T00:00:00.000Z";
-const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 
 function audit(args) {
   // Reuse the exact pnpm entrypoint that launched this script, not a PATH lookup.
