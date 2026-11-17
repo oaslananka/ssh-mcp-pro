@@ -272,18 +272,6 @@ body {
 .landing-copy{max-width:700px}
 .landing-copy h1{font-size:clamp(42px,5.1vw,69px);line-height:1.07;max-width:660px}
 .landing-copy>p{max-width:555px}
-.assistant-next-step{
-  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:25px;
-  margin-top:22px;padding:26px 29px;background:linear-gradient(115deg,#18233e,#171d2d);
-  border:1px solid #314a75;border-radius:16px
-}
-.assistant-next-copy{max-width:580px}
-.assistant-next-copy .eyebrow{margin-bottom:6px;font-size:10px}
-.assistant-next-copy h2{font-size:20px;letter-spacing:-.035em;line-height:1.3}
-.assistant-next-copy p{font-size:12px;color:#aebdd5;margin-top:7px;line-height:1.65}
-.assistant-next-badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}
-.assistant-next-badges span{border:1px solid #3c557d;background:#1d3151;color:#cfddf4;font-size:11px;font-weight:750;padding:5px 10px;border-radius:8px}
-.assistant-next-step>.btn{flex-shrink:0}
 @media(max-width:1100px){
   .landing-hero{display:grid;grid-template-columns:minmax(0,1fr);max-width:850px;margin:0 auto;gap:42px}
   .landing-copy{width:100%;max-width:none;min-width:0}
@@ -297,7 +285,5 @@ body {
   .stage-gateway img{height:54px;width:54px}
   .terminal-content{font-size:11px}
   .terminal-sample{font-size:9px}
-  .assistant-next-step{padding:21px 18px}
-  .assistant-next-step>.btn{width:100%}
 }
 `;

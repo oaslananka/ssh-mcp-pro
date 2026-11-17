@@ -131,18 +131,37 @@ describe("SSH MCP Pro brand and first-use journey", () => {
     }
   });
 
-  test("offline devices prioritize reconnection before AI setup", async () => {
+  test("offline devices show one contextual connection action instead of duplicate banners", async () => {
     const body = await renderWithDeviceList([enrolledDevice(false)]);
-    expect(body).toContain("Reconnect your device");
-    expect(body).toContain('onclick="loadDevices()"');
-    expect(body).not.toContain("Bring these devices into your AI chat.");
+    expect(body).toContain("Your devices are offline");
+    expect(body.match(/>Check connection <span/g)).toHaveLength(1);
+    expect(body).toContain('onclick="retryDevices()"');
+    expect(body).not.toContain('class="assistant-next-step"');
+    expect(body).not.toContain(">Connect an AI app <span");
   });
 
-  test("online devices present the working AI connection next step", async () => {
+  test("online devices show one AI setup action and not an extra next-step card", async () => {
     const body = await renderWithDeviceList([enrolledDevice(true)]);
-    expect(body).toContain("Bring these devices into your AI chat.");
+    expect(body).toContain("You're ready to work");
+    expect(body.match(/>Connect an AI app <span/g)).toHaveLength(1);
     expect(body).toContain("onclick=\"switchTab('clients')\"");
-    expect(body).not.toContain("Reconnect your device");
+    expect(body).not.toContain('class="assistant-next-step"');
+    expect(body).not.toContain(">Check connection <span");
+  });
+
+  test("the empty state owns its setup button without a second summary button", async () => {
+    const body = await renderWithDeviceList([]);
+    expect(body).toContain("Let's connect your first computer.");
+    expect(body.match(/>Connect a device <span/g)).toHaveLength(1);
+    expect(body).not.toContain('class="assistant-next-step"');
+  });
+
+  test("connection errors present one retry in the error card", async () => {
+    const elements = await renderWithUnavailableApi("devices");
+    const body = elements.get("appRoot")?.innerHTML ?? "";
+    expect(body).toContain("Device status unavailable");
+    expect(body.match(/>Try again</g)).toHaveLength(1);
+    expect(body).not.toContain(">Connect a device <span");
   });
 
   test("ships recognizable, correctly sized icons across browser, Apple and Android surfaces", () => {
@@ -197,12 +216,6 @@ describe("SSH MCP Pro brand and first-use journey", () => {
     expect(html).toContain('stroke-width="1.8"');
     expect(html).not.toContain("navItem('devices', '▤'");
     expect(html).not.toContain("navItem('clients', '✦'");
-  });
-
-  test("offers assistant next steps from the device screen, not only a separate settings tab", () => {
-    const html = markup();
-    expect(html).toContain('class="assistant-next-step"');
-    expect(html).toContain("Set up an AI connection");
   });
 
   test("uses a distinctive ink-blue visual identity and separates actions from status", () => {
