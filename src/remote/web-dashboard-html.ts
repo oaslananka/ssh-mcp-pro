@@ -1,6 +1,7 @@
 import { buildDashboardBrowserEnrollmentCommand } from "./dashboard-enrollment-commands.js";
 import { DASHBOARD_STYLES } from "./web-dashboard-styles.js";
 import { BRAND_STYLES } from "./web-dashboard-brand-styles.js";
+import { DASHBOARD_BRAND_FINGERPRINT } from "./web-dashboard-brand.js";
 import { EXPERIENCE_STYLES } from "./web-dashboard-experience-styles.js";
 import { DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT } from "./dashboard-enrollment-feedback-script.js";
 export function renderDashboardHtml(
@@ -16,12 +17,12 @@ export function renderDashboardHtml(
   <title>SSH MCP Pro · Connect your devices to AI</title>
   <meta name="theme-color" content="#10111F">
   <meta name="description" content="Connect your own devices to ChatGPT, Claude and Gemini with controlled SSH MCP access.">
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
-  <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
-  <link rel="icon" type="image/png" sizes="192x192" href="/brand/icon-192.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon.png">
-  <link rel="manifest" href="/site.webmanifest">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=${DASHBOARD_BRAND_FINGERPRINT}">
+  <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png?v=${DASHBOARD_BRAND_FINGERPRINT}">
+  <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png?v=${DASHBOARD_BRAND_FINGERPRINT}">
+  <link rel="icon" type="image/png" sizes="192x192" href="/brand/icon-192.png?v=${DASHBOARD_BRAND_FINGERPRINT}">
+  <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon.png?v=${DASHBOARD_BRAND_FINGERPRINT}">
+  <link rel="manifest" href="/site.webmanifest?v=${DASHBOARD_BRAND_FINGERPRINT}">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>${DASHBOARD_STYLES}
 ${BRAND_STYLES}
@@ -30,7 +31,7 @@ ${EXPERIENCE_STYLES}</style>
 <body>
   <header class="public-header">
     <a class="logo-area" href="/" aria-label="SSH MCP Pro home">
-      <img class="brand-mark" src="/brand/ssh-mcp-pro-icon.png" width="46" height="46" alt="SSH MCP Pro">
+      <img class="brand-mark" src="/brand/ssh-mcp-pro-icon.png?v=${DASHBOARD_BRAND_FINGERPRINT}" width="46" height="46" alt="SSH MCP Pro">
       <span><span class="brand-title">SSH MCP Pro</span><span class="brand-sub">Your computers, connected to AI</span></span>
     </a>
     <div class="user-area" id="headerUserArea"></div>
@@ -116,7 +117,7 @@ ${EXPERIENCE_STYLES}</style>
         <div class="workspace-shell">
           <aside class="workspace-sidebar">
             <a href="/dashboard" class="sidebar-brand" aria-label="SSH MCP Pro workspace">
-              <img src="/brand/ssh-mcp-pro-icon.png" alt="SSH MCP Pro" width="46" height="46" class="brand-mark">
+              <img src="/brand/ssh-mcp-pro-icon.png?v=${DASHBOARD_BRAND_FINGERPRINT}" alt="SSH MCP Pro" width="46" height="46" class="brand-mark">
               <span><strong>SSH MCP Pro</strong><small>Cloud workspace</small></span>
             </a>
             <p class="sidebar-label">WORKSPACE</p>
@@ -152,7 +153,7 @@ ${EXPERIENCE_STYLES}</style>
                   <strong>\${devicesError ? 'Device status unavailable' : !devicesLoaded ? 'Checking your devices…' : online > 0 ? "You're ready to work" : total > 0 ? 'Your devices are offline' : 'Connect your first device'}</strong>
                   <span>\${devicesError ? 'Please retry to check the current device status' : !devicesLoaded ? 'Loading live connection status' : online > 0 ? online + ' connected device' + (online === 1 ? '' : 's') + ' · Connect an AI app to start' : total > 0 ? 'Check the agent on your computer to reconnect' : 'Your AI assistant needs a connected computer to get started'}</span>
                 </div></div>
-                <button class="btn btn-soft" type="button" onclick="switchTab('\${total > 0 ? 'clients' : 'add-device'}')">\${total > 0 ? 'Connect an AI app' : 'Connect a device'} <span aria-hidden="true">→</span></button>
+                <button class="btn btn-soft" type="button" onclick="\${online > 0 ? "switchTab('clients')" : total > 0 ? 'retryDevices()' : "switchTab('add-device')"}">\${online > 0 ? 'Connect an AI app' : total > 0 ? 'Check connection' : 'Connect a device'} <span aria-hidden="true">→</span></button>
               </section>
               \${!devicesLoaded ? '' : total > 0 ? '<p class="device-scope-note" role="note">Showing devices for your ' + escapeHtml(currentUser.provider === 'github' ? 'GitHub' : 'Google') + ' account. Other sign-in providers have separate device lists.</p>' : ''}
             \` : ''}
@@ -216,7 +217,7 @@ ${EXPERIENCE_STYLES}</style>
               </div>
               <div class="stage-connector" aria-hidden="true"><span></span><i></i><span></span></div>
               <div class="stage-gateway">
-                <img src="/brand/ssh-mcp-pro-icon.png" width="64" height="64" alt="" aria-hidden="true">
+                <img src="/brand/ssh-mcp-pro-icon.png?v=${DASHBOARD_BRAND_FINGERPRINT}" width="64" height="64" alt="" aria-hidden="true">
                 <div><strong>SSH MCP Pro</strong><small>One secure connection. Your rules.</small></div>
                 <span class="stage-shield" aria-label="Policy controlled">✓</span>
               </div>
@@ -263,6 +264,7 @@ ${EXPERIENCE_STYLES}</style>
             <div class="empty-next-step">Next: <strong>Connect an AI app</strong> after the device is online.</div>
           </div>\`;
         }
+        const hasLiveDevice = devicesList.some(d => d.isLiveConnected);
         return \`<section class="device-list-card card" aria-label="Your enrolled devices">
           <div class="device-list-heading"><div><h2>Your devices</h2><p>\${devicesList.length} enrolled · \${devicesList.filter(d => d.isLiveConnected).length} online</p></div><div class="device-list-tools"><button class="btn btn-outline btn-sm" type="button" onclick="switchTab('audit')">Open activity</button> <button class="btn btn-outline btn-sm" type="button" onclick="loadDevices()">Refresh</button></div></div>
           <div class="device-list-body">
@@ -301,11 +303,11 @@ ${EXPERIENCE_STYLES}</style>
         <section class="assistant-next-step" aria-label="Next step: connect an AI assistant">
           <div class="assistant-next-copy">
             <span class="eyebrow">NEXT STEP</span>
-            <h2>Bring these devices into your AI chat.</h2>
-            <p>Connect ChatGPT, Claude or Gemini using your SSH MCP Pro endpoint. The same device permissions apply.</p>
-            <div class="assistant-next-badges"><span>ChatGPT</span><span>Claude</span><span>Gemini</span></div>
+            <h2>\${hasLiveDevice ? 'Bring these devices into your AI chat.' : 'Reconnect your device'}</h2>
+            <p>\${hasLiveDevice ? 'Connect ChatGPT, Claude or Gemini using your SSH MCP Pro endpoint. The same device permissions apply.' : 'Start SSH MCP Pro Agent on an enrolled device, then check its connection before using AI.'}</p>
+            <div class="assistant-next-badges" \${hasLiveDevice ? '' : 'hidden'}><span>ChatGPT</span><span>Claude</span><span>Gemini</span></div>
           </div>
-          <button class="btn btn-primary" type="button" onclick="switchTab('clients')">Set up an AI connection <span aria-hidden="true">→</span></button>
+          <button class="btn btn-primary" type="button" onclick="\${hasLiveDevice ? "switchTab('clients')" : 'loadDevices()'}">\${hasLiveDevice ? 'Set up an AI connection' : 'Check connection'} <span aria-hidden="true">→</span></button>
         </section>\`;
       }
 
