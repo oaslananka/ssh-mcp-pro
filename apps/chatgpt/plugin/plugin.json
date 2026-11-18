@@ -19,7 +19,7 @@
   "extensions": {
     "com.openai": {
       "interface": {
-        "displayName": "ssh-mcp-pro",
+        "displayName": "SSH Device Inspector",
         "shortDescription": "Inspect SSH devices safely",
         "longDescription": "Connect a managed computer, inspect its SSH state, and preview changes under explicit policy controls.",
         "developerName": "Osman Aslan",

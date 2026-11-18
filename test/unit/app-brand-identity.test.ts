@@ -33,8 +33,10 @@ describe("Cross-platform MCP app identity", () => {
     const plugin = JSON.parse(readFileSync(fileURLToPath(new URL("plugin.json", base)), "utf8"));
     const mcp = JSON.parse(readFileSync(fileURLToPath(new URL("mcp.json", base)), "utf8"));
     expect(plugin.name).toBe("ssh-mcp-pro");
-    expect(plugin.extensions["com.openai"].interface.displayName).toBe("ssh-mcp-pro");
     const interfaceMetadata = plugin.extensions["com.openai"].interface;
+    expect(interfaceMetadata.displayName).toBe("SSH Device Inspector");
+    expect(interfaceMetadata.displayName).not.toMatch(/\bmcp\b/i);
+    expect(interfaceMetadata.displayName.length).toBeLessThanOrEqual(30);
     expect(interfaceMetadata.shortDescription.length).toBeLessThanOrEqual(30);
     expect(interfaceMetadata.shortDescription).toBe("Inspect SSH devices safely");
     expect(interfaceMetadata.supportURL).toBe("https://ssh-mcp-pro.oaslananka.dev/support");

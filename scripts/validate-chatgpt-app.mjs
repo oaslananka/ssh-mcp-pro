@@ -45,7 +45,9 @@ if (
 if (
   bundle.name !== pkg.name ||
   bundle.version !== pkg.version ||
-  bundle.extensions?.["com.openai"]?.interface?.displayName !== pkg.name ||
+  bundle.extensions?.["com.openai"]?.interface?.displayName !== "SSH Device Inspector" ||
+  bundle.extensions?.["com.openai"]?.interface?.displayName?.length > 30 ||
+  /\bmcp\b/iu.test(bundle.extensions?.["com.openai"]?.interface?.displayName ?? "") ||
   !bundle.extensions?.["com.openai"]?.interface?.shortDescription ||
   bundle.extensions?.["com.openai"]?.interface?.shortDescription?.length > 30 ||
   bundle.extensions?.["com.openai"]?.interface?.supportURL !==
