@@ -2,16 +2,17 @@ import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { migrateRemoteStoreSchema } from "./store-schema.js";
-import type {
-  ActionRecord,
-  AgentEnrollmentTokenRecord,
-  AuditEvent,
-  GitHubUser,
-  GoogleUser,
-  OAuthAuthorizationCode,
-  OAuthRefreshTokenRecord,
-  OAuthClient,
-  RemoteAgentRecord,
+import {
+  REVIEWER_DEMO_USER_ID,
+  type ActionRecord,
+  type AgentEnrollmentTokenRecord,
+  type AuditEvent,
+  type GitHubUser,
+  type GoogleUser,
+  type OAuthAuthorizationCode,
+  type OAuthRefreshTokenRecord,
+  type OAuthClient,
+  type RemoteAgentRecord,
 } from "./types.js";
 
 type SqlValue = string | number | null;
@@ -126,6 +127,7 @@ export class RemoteStore {
               (SELECT COUNT(*) FROM actions ac WHERE ac.user_id = u.id) AS actions,
               (SELECT MAX(ac.issued_at) FROM actions ac WHERE ac.user_id = u.id) AS lastActionAt
        FROM users u
+       WHERE u.provider <> 'demo'
        ORDER BY u.created_at DESC LIMIT 100`,
       )
       .all() as Array<{
@@ -136,7 +138,7 @@ export class RemoteStore {
       lastActionAt: string | null;
     }>;
     return {
-      registeredUsers: count("SELECT COUNT(*) AS n FROM users"),
+      registeredUsers: count("SELECT COUNT(*) AS n FROM users WHERE provider <> 'demo'"),
       registeredAgents: count("SELECT COUNT(*) AS n FROM agents"),
       totalActions: count("SELECT COUNT(*) AS n FROM actions"),
       actionsLast7Days: count(
@@ -213,6 +215,19 @@ export class RemoteStore {
       .run(user.internalId, user.id, user.login, user.login, user.now, user.now);
   }
 
+  upsertReviewerUser(now: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO users (id, display_name, provider, created_at, updated_at)
+         VALUES (?, 'OpenAI Reviewer (Sample Tenant)', 'demo', ?, ?)
+         ON CONFLICT(id) DO NOTHING`,
+      )
+      .run(REVIEWER_DEMO_USER_ID, now, now);
+    if (this.getUserById(REVIEWER_DEMO_USER_ID)?.provider !== "demo") {
+      throw new Error("Reserved reviewer identity is already owned by another provider");
+    }
+  }
+
   upsertGoogleUser(user: GoogleUser & { internalId: string; now: string }): void {
     this.db
       .prepare(
@@ -270,7 +285,7 @@ export class RemoteStore {
         googleId?: string | undefined;
         email?: string | undefined;
         displayName: string;
-        provider: "github" | "google";
+        provider: "github" | "google" | "demo";
       }
     | undefined {
     const row = this.db.prepare("SELECT * FROM users WHERE id = ?").get(id) as
@@ -278,6 +293,7 @@ export class RemoteStore {
     if (!row) {
       return undefined;
     }
+    const provider = optionalRowString(row, "provider");
     return {
       id: rowString(row, "id"),
       githubId: optionalRowString(row, "github_id"),
@@ -289,7 +305,7 @@ export class RemoteStore {
         optionalRowString(row, "github_login") ??
         optionalRowString(row, "email") ??
         "User",
-      provider: optionalRowString(row, "provider") === "google" ? "google" : "github",
+      provider: provider === "google" || provider === "demo" ? provider : "github",
     };
   }
 

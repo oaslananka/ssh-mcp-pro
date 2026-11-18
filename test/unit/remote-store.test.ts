@@ -4,12 +4,39 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, test } from "vitest";
 import { hashSecret, randomToken } from "../../src/remote/crypto.js";
+import { REVIEWER_DEMO_USER_ID } from "../../src/remote/types.js";
 import { createAgentPolicy } from "../../src/remote/policy.js";
 import { RemoteStore } from "../../src/remote/store.js";
 
 const now = "2026-01-01T00:00:00.000Z";
 
 describe("remote durable store", () => {
+  test("keeps the isolated reviewer identity out of owner account and usage aggregates", () => {
+    const store = new RemoteStore(":memory:");
+    try {
+      store.upsertUser({ internalId: "github:43", id: "43", login: "owner-account", now });
+      store.upsertReviewerUser(now);
+
+      expect(store.getUserById(REVIEWER_DEMO_USER_ID)).toMatchObject({
+        id: REVIEWER_DEMO_USER_ID,
+        displayName: "OpenAI Reviewer (Sample Tenant)",
+        provider: "demo",
+        githubId: undefined,
+        githubLogin: undefined,
+        googleId: undefined,
+        email: undefined,
+      });
+      expect(store.getServiceUsage()).toMatchObject({
+        registeredUsers: 1,
+        accounts: [
+          { provider: "github", label: "owner-account", agents: 0, actions: 0, lastActionAt: null },
+        ],
+      });
+    } finally {
+      store.close();
+    }
+  });
+
   test("persists only hashed rotating refresh credentials through SQLite restart and revocation", () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "ssh-mcp-refresh-store-"));
     const databasePath = path.join(dir, "tokens.db");

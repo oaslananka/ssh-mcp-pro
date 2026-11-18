@@ -27,7 +27,8 @@ import {
   readJson,
   sanitizeAgent,
 } from "./http-util.js";
-import { listRemoteToolDescriptors } from "./mcp-tools.js";
+import { listRemoteToolDescriptors, REVIEWER_DEMO_TOOL_NAMES } from "./mcp-tools.js";
+import { reviewerDemoToolResult } from "./reviewer-demo-fixtures.js";
 import { mergeCustomPolicy } from "./policy.js";
 import { safeStoredActionArgs } from "./action-record-sanitize.js";
 import { parseAgentHostMetadata } from "./schemas.js";
@@ -53,7 +54,7 @@ import type {
   RemoteToolName,
   PolicyUpdateEnvelope,
 } from "./types.js";
-import { TOOL_CAPABILITY_MAP } from "./types.js";
+import { REVIEWER_DEMO_USER_ID, TOOL_CAPABILITY_MAP } from "./types.js";
 import { jsonResponse } from "./util.js";
 import { SERVER_VERSION } from "../mcp.js";
 
@@ -158,56 +159,40 @@ export class RemoteControlPlane {
     await this.oauth.handleGoogleCallback(req, res);
   }
 
-  /** Keep credential-exchange routes together without inflating OAuth dispatch complexity. */
-  private async handleOAuthGrantRequest(
-    req: IncomingMessage,
-    res: ServerResponse,
-    pathname: string,
-  ): Promise<boolean> {
-    if (pathname === "/oauth/token" && req.method === "POST") {
-      await this.oauth.handleToken(req, res);
-      return true;
-    }
-    if (pathname === "/oauth/revoke" && req.method === "POST") {
-      await this.oauth.handleRevoke(req, res);
-      return true;
-    }
-    return false;
-  }
-
   private async handleOAuthRequest(
     req: IncomingMessage,
     res: ServerResponse,
     pathname: string,
   ): Promise<boolean> {
-    if (pathname === "/oauth/register" && req.method === "POST") {
-      await this.oauth.handleRegister(req, res);
-      return true;
-    }
-    if (pathname === "/oauth/authorize" && req.method === "GET") {
-      await this.oauth.handleAuthorize(req, res);
-      return true;
-    }
-    if (pathname === "/oauth/approve" && req.method === "POST") {
-      await this.oauth.handleApprove(req, res);
-      return true;
-    }
-    if (pathname === "/oauth/callback/github" && req.method === "GET") {
-      await this.oauth.handleGitHubCallback(req, res);
-      return true;
-    }
-    if (pathname === "/oauth/callback/google" && req.method === "GET") {
-      await this.handleGoogleOAuthCallback(req, res);
-      return true;
-    }
-    if (await this.handleOAuthGrantRequest(req, res, pathname)) {
-      return true;
-    }
-    if (pathname === "/oauth/jwks.json" && req.method === "GET") {
-      await this.oauth.handleJwks(res);
-      return true;
-    }
-    return false;
+    // Route lookup makes allowed HTTP methods explicit without nesting authorization logic.
+    const routes: Record<string, { methods: readonly string[]; handle: () => Promise<void> }> = {
+      "/oauth/reviewer/login": {
+        methods: ["GET", "POST"],
+        handle: () => this.oauth.handleReviewerLogin(req, res),
+      },
+      "/oauth/reviewer/logout": {
+        methods: ["POST"],
+        handle: () => this.oauth.handleReviewerLogout(req, res),
+      },
+      "/oauth/register": { methods: ["POST"], handle: () => this.oauth.handleRegister(req, res) },
+      "/oauth/authorize": { methods: ["GET"], handle: () => this.oauth.handleAuthorize(req, res) },
+      "/oauth/approve": { methods: ["POST"], handle: () => this.oauth.handleApprove(req, res) },
+      "/oauth/callback/github": {
+        methods: ["GET"],
+        handle: () => this.oauth.handleGitHubCallback(req, res),
+      },
+      "/oauth/callback/google": {
+        methods: ["GET"],
+        handle: () => this.handleGoogleOAuthCallback(req, res),
+      },
+      "/oauth/token": { methods: ["POST"], handle: () => this.oauth.handleToken(req, res) },
+      "/oauth/revoke": { methods: ["POST"], handle: () => this.oauth.handleRevoke(req, res) },
+      "/oauth/jwks.json": { methods: ["GET"], handle: () => this.oauth.handleJwks(res) },
+    };
+    const route = routes[pathname];
+    if (!route?.methods.includes(req.method ?? "")) return false;
+    await route.handle();
+    return true;
   }
 
   async handleHttp(req: IncomingMessage, res: ServerResponse, pathname: string): Promise<boolean> {
@@ -320,7 +305,7 @@ export class RemoteControlPlane {
       jsonResponse(res, 200, {
         jsonrpc: "2.0",
         id: rpcId,
-        result: { tools: listRemoteToolDescriptors(principal.capabilities) },
+        result: { tools: listRemoteToolDescriptors(principal.capabilities, principal.provider) },
       });
       return;
     }
@@ -352,7 +337,7 @@ export class RemoteControlPlane {
           { capabilities: { tools: {} } },
         );
         server.server.setRequestHandler("tools/list", () => ({
-          tools: listRemoteToolDescriptors(principal.capabilities).map(
+          tools: listRemoteToolDescriptors(principal.capabilities, principal.provider).map(
             ({ capability: _capability, ...tool }) => ({
               ...tool,
               inputSchema: { ...tool.inputSchema, type: "object" as const },
@@ -563,11 +548,15 @@ export class RemoteControlPlane {
 
   private async authenticate(req: IncomingMessage): Promise<RemotePrincipal> {
     try {
-      return await verifyRemoteAccessToken(
+      const principal = await verifyRemoteAccessToken(
         req.headers.authorization,
         this.config,
         this.requireJwtKeyPair(),
       );
+      if (principal.provider === "demo" && !this.oauth.isReviewerEnabled()) {
+        throw safeError("UNAUTHORIZED", "Missing or invalid bearer token", 401);
+      }
+      return principal;
     } catch {
       this.audit({
         eventType: "token_validation_failure",
@@ -589,11 +578,39 @@ export class RemoteControlPlane {
     );
   }
 
+  private callReviewerTool(
+    principal: RemotePrincipal,
+    tool: RemoteToolName,
+    args: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (
+      !this.oauth.isReviewerEnabled() ||
+      principal.provider !== "demo" ||
+      principal.userId !== REVIEWER_DEMO_USER_ID ||
+      !REVIEWER_DEMO_TOOL_NAMES.has(tool)
+    ) {
+      throw safeError(
+        "INVALID_SCOPE",
+        "Reviewer sandbox only supports synthetic read-only tools",
+        403,
+      );
+    }
+    const capability = TOOL_CAPABILITY_MAP[tool];
+    if (!hasCapability(principal.capabilities, capability)) {
+      throw safeError("INVALID_SCOPE", `Scope does not grant ${capability}`, 403);
+    }
+    return reviewerDemoToolResult(tool, args);
+  }
+
   private async callRemoteTool(
     principal: RemotePrincipal,
     tool: RemoteToolName,
     args: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
+    if (principal.provider === "demo" || principal.userId === REVIEWER_DEMO_USER_ID) {
+      return this.callReviewerTool(principal, tool, args);
+    }
+
     const capability = TOOL_CAPABILITY_MAP[tool];
     if (!hasCapability(principal.capabilities, capability)) {
       throw safeError("INVALID_SCOPE", `Scope does not grant ${capability}`, 403);

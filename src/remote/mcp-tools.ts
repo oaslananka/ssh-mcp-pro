@@ -1,4 +1,4 @@
-import type { RemoteCapability, RemoteToolName } from "./types.js";
+import type { RemoteCapability, RemotePrincipal, RemoteToolName } from "./types.js";
 import { REMOTE_TOOLS, TOOL_CAPABILITY_MAP } from "./types.js";
 
 export interface ToolAnnotations {
@@ -18,7 +18,8 @@ interface RemoteToolDescriptor {
 
 const agentSelector = {
   type: "string",
-  description: "Agent ID or alias owned by the authenticated user.",
+  description:
+    "Agent ID or alias visible to the authenticated account; reviewer sandbox uses sample aliases.",
 };
 
 const limitSchema = {
@@ -37,16 +38,32 @@ const ACTION_OUTPUT_SCHEMA: Record<string, unknown> = {
   required: ["action"],
 };
 
+const SYNTHETIC_OUTPUT_PROPERTIES = {
+  sample_data: { type: "boolean" },
+  source: { type: "string", enum: ["synthetic"] },
+};
+
 const REMOTE_OUTPUT_SCHEMAS: Partial<Record<RemoteToolName, Record<string, unknown>>> = {
   list_hosts: {
     type: "object",
-    properties: { hosts: { type: "array", items: { type: "object" } } },
+    properties: {
+      hosts: { type: "array", items: { type: "object" } },
+      ...SYNTHETIC_OUTPUT_PROPERTIES,
+    },
     required: ["hosts"],
   },
   list_agents: {
     type: "object",
-    properties: { agents: { type: "array", items: { type: "object" } } },
+    properties: {
+      agents: { type: "array", items: { type: "object" } },
+      ...SYNTHETIC_OUTPUT_PROPERTIES,
+    },
     required: ["agents"],
+  },
+  get_system_status: {
+    type: "object",
+    properties: { action: { type: "object" }, ...SYNTHETIC_OUTPUT_PROPERTIES },
+    required: ["action"],
   },
   create_enrollment_token: {
     type: "object",
@@ -90,11 +107,13 @@ const descriptors: Record<
   Omit<RemoteToolDescriptor, "name" | "capability" | "outputSchema">
 > = {
   list_hosts: {
-    description: "List enrolled host aliases available through outbound agents.",
+    description:
+      "List host aliases visible to the authenticated account; reviewer sandbox returns synthetic sample hosts.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   list_agents: {
-    description: "List enrolled agents and their connection state.",
+    description:
+      "List agents visible to the authenticated account; reviewer sandbox returns synthetic sample devices.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   create_enrollment_token: {
@@ -124,7 +143,8 @@ const descriptors: Record<
     },
   },
   get_system_status: {
-    description: "Collect basic OS, uptime, load, and disk status from an online agent.",
+    description:
+      "Collect basic OS, uptime, load, and disk status from an online agent; reviewer sandbox returns synthetic sample status.",
     inputSchema: {
       type: "object",
       required: ["agent_id_or_alias"],
@@ -518,12 +538,21 @@ const LEGACY_APP_SPECIFIC_TOOL_NAMES = new Set<RemoteToolName>([
   "docker_restart",
 ]);
 
+export const REVIEWER_DEMO_TOOL_NAMES: ReadonlySet<RemoteToolName> = new Set([
+  "list_hosts",
+  "list_agents",
+  "get_system_status",
+]);
+
 export function listRemoteToolDescriptors(
   capabilities: readonly RemoteCapability[],
+  provider?: RemotePrincipal["provider"],
 ): RemoteToolDescriptor[] {
   const allowed = new Set(capabilities);
+  const reviewerOnly = provider === "demo";
   return REMOTE_TOOLS.filter(
     (name) =>
+      (!reviewerOnly || REVIEWER_DEMO_TOOL_NAMES.has(name)) &&
       !LEGACY_APP_SPECIFIC_TOOL_NAMES.has(name) &&
       allowed.has(TOOL_CAPABILITY_MAP[name]) &&
       (name !== "file_replace" || allowed.has("files.read")),

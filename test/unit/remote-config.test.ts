@@ -11,6 +11,8 @@ function resetRemoteEnv(): void {
   delete process.env.MCP_RESOURCE_URL;
   delete process.env.AUTH_ALLOWED_GITHUB_LOGINS;
   delete process.env.AUTH_ALLOWED_GITHUB_IDS;
+  delete process.env.SSH_MCP_REVIEWER_USERNAME;
+  delete process.env.SSH_MCP_REVIEWER_PASSWORD_HASH;
   delete process.env.ACCESS_TOKEN_TTL_SECONDS;
   delete process.env.AGENT_WS_HELLO_TIMEOUT_MS;
   delete process.env.AGENT_WS_HEARTBEAT_INTERVAL_MS;
@@ -26,6 +28,18 @@ describe("loadRemoteConfig", () => {
 
   afterAll(() => {
     process.env = SAVED_ENV;
+  });
+
+  test("loads the optional reviewer username and scrypt password hash", () => {
+    process.env.SSH_MCP_REVIEWER_USERNAME = "openai-reviewer";
+    process.env.SSH_MCP_REVIEWER_PASSWORD_HASH = "scrypt$16384$8$1$example-salt$example-key";
+
+    expect(loadRemoteConfig()).toEqual(
+      expect.objectContaining({
+        reviewerUsername: "openai-reviewer",
+        reviewerPasswordHash: "scrypt$16384$8$1$example-salt$example-key",
+      }),
+    );
   });
 
   test("enables the remote control plane with the ssh-mcp env name", () => {

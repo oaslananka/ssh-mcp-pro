@@ -80,6 +80,8 @@ export function loadRemoteConfig(): RemoteConfig {
       `${publicBaseUrl}/oauth/callback/github`,
     googleClientId: process.env.GOOGLE_CLIENT_ID,
     googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    reviewerUsername: process.env.SSH_MCP_REVIEWER_USERNAME?.trim(),
+    reviewerPasswordHash: process.env.SSH_MCP_REVIEWER_PASSWORD_HASH,
     googleCallbackUrl:
       process.env.GOOGLE_CALLBACK_URL ??
       process.env.SSHAUTOMATOR_GOOGLE_CALLBACK_URL ??

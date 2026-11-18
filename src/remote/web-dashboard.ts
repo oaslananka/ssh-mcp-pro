@@ -123,7 +123,7 @@ export class WebDashboardHandler {
     const session = this.deps.store.getDashboardSession(tokenHash, new Date().toISOString());
     if (!session) return undefined;
     const user = this.deps.store.getUserById(session.userId);
-    if (!user) return undefined;
+    if (!user || user.provider === "demo") return undefined;
     const scopes = [...PUBLIC_REMOTE_SCOPES];
     return {
       userId: user.id,

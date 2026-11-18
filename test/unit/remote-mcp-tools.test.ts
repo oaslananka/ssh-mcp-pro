@@ -77,6 +77,46 @@ describe("remote MCP tool descriptors", () => {
     }
   });
 
+  test("limits reviewer descriptors to the three synthetic read-only tools even with broader capabilities", () => {
+    const tools = listRemoteToolDescriptors(REMOTE_CAPABILITIES, "demo");
+
+    expect(tools.map((tool) => tool.name)).toEqual([
+      "list_hosts",
+      "list_agents",
+      "get_system_status",
+    ]);
+    for (const tool of tools) {
+      expect(tool.outputSchema.properties).toEqual(
+        expect.objectContaining({
+          sample_data: { type: "boolean" },
+          source: { type: "string", enum: ["synthetic"] },
+        }),
+      );
+    }
+    const ajv = new Ajv();
+    expect(
+      ajv.validate(tools.find((tool) => tool.name === "list_hosts")?.outputSchema, {
+        hosts: [],
+        sample_data: true,
+        source: "synthetic",
+      }),
+    ).toBe(true);
+    expect(
+      ajv.validate(tools.find((tool) => tool.name === "list_agents")?.outputSchema, {
+        agents: [],
+        sample_data: true,
+        source: "synthetic",
+      }),
+    ).toBe(true);
+    expect(
+      ajv.validate(tools.find((tool) => tool.name === "get_system_status")?.outputSchema, {
+        action: { status: "ok" },
+        sample_data: true,
+        source: "synthetic",
+      }),
+    ).toBe(true);
+  });
+
   test("returns no descriptors when no capabilities are granted", () => {
     expect(listRemoteToolDescriptors([])).toEqual([]);
   });

@@ -5,7 +5,8 @@ import type { ServerResponse } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
-import { hashSecret } from "../../src/remote/crypto.js";
+import { hashSecret, randomToken } from "../../src/remote/crypto.js";
+import { REVIEWER_DEMO_USER_ID } from "../../src/remote/types.js";
 import {
   captureResponse,
   jsonRequest,
@@ -112,6 +113,36 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
       expect(res.body).toContain("feedback('Copy failed')");
       expect(res.body).not.toContain("alert('Copied to clipboard!')");
       expect(res.body).not.toContain("Local Stdio Mode (Unrestricted)");
+    } finally {
+      cp.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("does not treat a reviewer sample session as a normal dashboard identity", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "reviewer-dashboard-isolation-"));
+    const cp = new RemoteControlPlane(testConfig(dir));
+    await cp.initialize();
+    try {
+      const now = new Date().toISOString();
+      const token = randomToken(32);
+      cp.store.upsertReviewerUser(now);
+      cp.store.createDashboardSession(
+        hashSecret(token),
+        REVIEWER_DEMO_USER_ID,
+        new Date(Date.now() + 60_000).toISOString(),
+        now,
+      );
+
+      const response = captureResponse();
+      await cp.handleHttp(
+        request("GET", "/api/dashboard/me", { cookie: `ssh_mcp_web_session=${token}` }),
+        response as unknown as ServerResponse,
+        "/api/dashboard/me",
+      );
+
+      expect(response.statusCode).toBe(200);
+      expect(JSON.parse(response.body)).toEqual({ authenticated: false });
     } finally {
       cp.close();
       rmSync(dir, { recursive: true, force: true });
