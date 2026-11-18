@@ -90,6 +90,53 @@ describe("OpenAI reviewer sandbox browser authentication", () => {
     }
   });
 
+  test("allows opaque-Origin reviewer POSTs only with same-origin Fetch Metadata", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "reviewer-null-origin-"));
+    const controlPlane = createControlPlane(dir);
+    try {
+      const page = await reviewerLoginPage(controlPlane);
+      const csrf = csrfFromPage(page.response.body);
+      const csrfCookie = setCookie(page.response, "ssh_mcp_reviewer_csrf")!;
+      const credentials = { csrf, username: REVIEWER_USERNAME, password: REVIEWER_PASSWORD };
+      const missingFetchMetadata = await dispatch(
+        controlPlane,
+        formRequest("POST", "/oauth/reviewer/login", credentials, {
+          origin: "null",
+          cookie: csrfCookie,
+        }),
+        "/oauth/reviewer/login",
+      );
+      expect(missingFetchMetadata.response.statusCode).toBe(403);
+
+      const crossSite = await dispatch(
+        controlPlane,
+        formRequest("POST", "/oauth/reviewer/login", credentials, {
+          origin: "null",
+          "sec-fetch-site": "cross-site",
+          cookie: csrfCookie,
+        }),
+        "/oauth/reviewer/login",
+      );
+      expect(crossSite.response.statusCode).toBe(403);
+
+      const sameOrigin = await dispatch(
+        controlPlane,
+        formRequest("POST", "/oauth/reviewer/login", credentials, {
+          origin: "null",
+          "sec-fetch-site": "same-origin",
+          cookie: csrfCookie,
+        }),
+        "/oauth/reviewer/login",
+      );
+      expect(sameOrigin.response.statusCode).toBe(200);
+      expect(sameOrigin.response.body).toContain("Reviewer session ready");
+      expect(setCookie(sameOrigin.response, "ssh_mcp_reviewer_session")).toBeTruthy();
+    } finally {
+      controlPlane.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("returns to the original OAuth consent request after reviewer login without allowing open redirects", async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "reviewer-login-return-to-"));
     const controlPlane = createControlPlane(dir);
