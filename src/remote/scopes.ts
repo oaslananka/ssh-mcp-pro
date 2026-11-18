@@ -41,6 +41,6 @@ export function isReviewerScopeSubset(scopes: readonly RemoteScope[]): boolean {
   return (
     scopes.length > 0 &&
     new Set(scopes).size === scopes.length &&
-    scopes.every((scope) => REVIEWER_DEMO_SCOPES.some((allowed) => allowed === scope))
+    scopes.every((scope) => (REVIEWER_DEMO_SCOPES as readonly string[]).includes(scope))
   );
 }

@@ -264,6 +264,16 @@ export class OAuthHandler {
       pending.scope = reviewerScope;
     }
 
+    if (this.maybeAuthorizeTestIdentity(pending, res, redirectUri, state)) return;
+    this.renderAuthorizeConsent(res, url, pending, reviewerSession, scope, redirectUri);
+  }
+
+  private maybeAuthorizeTestIdentity(
+    pending: PendingAuthorize,
+    res: ServerResponse,
+    redirectUri: string,
+    state: string,
+  ): boolean {
     const testUser = this.testGitHubUser();
     if (testUser) {
       const user = this.upsertGitHubUser(testUser);
@@ -275,7 +285,7 @@ export class OAuthHandler {
         destination.searchParams.set("state", state);
       }
       redirect(res, destination.toString());
-      return;
+      return true;
     }
 
     const testGoogle = this.testGoogleUser();
@@ -289,9 +299,61 @@ export class OAuthHandler {
         destination.searchParams.set("state", state);
       }
       redirect(res, destination.toString());
-      return;
+      return true;
     }
 
+    return false;
+  }
+
+  private consentPermissions(
+    reviewerSession: boolean,
+    pendingScope: string,
+    readOnlyScope: string | undefined,
+    scope: string,
+  ): string {
+    if (reviewerSession) {
+      return [
+        '<p><span class="badge">Review sandbox — synthetic data only</span></p>',
+        "<p>Only sample devices and synthetic system status are available. Real devices and actions are inaccessible.</p>",
+        '<p><span class="scope-preview">',
+        escapeHtml(pendingScope),
+        "</span></p>",
+        '<input type="hidden" name="grant_mode" value="read_only">',
+      ].join("");
+    }
+    if (readOnlyScope) {
+      return [
+        '<fieldset class="permission-options"><legend>Choose access level</legend>',
+        '<label class="permission-option"><input type="radio" name="grant_mode" value="read_only" checked>',
+        '<span class="permission-copy"><strong>Read-only inspection (recommended)</strong>',
+        "<small>List hosts, connected devices, and system status. No file changes, commands, or administrator access.</small>",
+        '<small class="scope-preview">',
+        escapeHtml(readOnlyScope),
+        "</small></span></label>",
+        '<label class="permission-option"><input type="radio" name="grant_mode" value="requested">',
+        '<span class="permission-copy"><strong>All requested permissions</strong>',
+        "<small>Includes sensitive actions such as file changes and command execution when requested by the client. Grant only if you trust it.</small>",
+        '<small class="scope-preview">',
+        escapeHtml(scope),
+        "</small></span></label></fieldset>",
+      ].join("");
+    }
+    return [
+      '<p><span class="badge">',
+      escapeHtml(scope),
+      "</span></p>",
+      '<input type="hidden" name="grant_mode" value="requested">',
+    ].join("");
+  }
+
+  private renderAuthorizeConsent(
+    res: ServerResponse,
+    url: URL,
+    pending: PendingAuthorize,
+    reviewerSession: boolean,
+    scope: string,
+    redirectUri: string,
+  ): void {
     const hasGitHub = Boolean(this.config.githubClientId && this.config.githubClientSecret);
     const hasGoogle = Boolean(this.config.googleClientId && this.config.googleClientSecret);
 
@@ -307,37 +369,12 @@ export class OAuthHandler {
     this.authorizeTransactions.set(transactionId, pending);
     const hostname = escapeHtml(new URL(redirectUri).hostname);
     const readOnlyScope = reviewerSession ? pending.scope : this.readOnlyConsentScope(scope);
-    const permissions = reviewerSession
-      ? [
-          '<p><span class="badge">Review sandbox — synthetic data only</span></p>',
-          "<p>Only sample devices and synthetic system status are available. Real devices and actions are inaccessible.</p>",
-          '<p><span class="scope-preview">',
-          escapeHtml(pending.scope),
-          "</span></p>",
-          '<input type="hidden" name="grant_mode" value="read_only">',
-        ].join("")
-      : readOnlyScope
-        ? [
-            '<fieldset class="permission-options"><legend>Choose access level</legend>',
-            '<label class="permission-option"><input type="radio" name="grant_mode" value="read_only" checked>',
-            '<span class="permission-copy"><strong>Read-only inspection (recommended)</strong>',
-            "<small>List hosts, connected devices, and system status. No file changes, commands, or administrator access.</small>",
-            '<small class="scope-preview">',
-            escapeHtml(readOnlyScope),
-            "</small></span></label>",
-            '<label class="permission-option"><input type="radio" name="grant_mode" value="requested">',
-            '<span class="permission-copy"><strong>All requested permissions</strong>',
-            "<small>Includes sensitive actions such as file changes and command execution when requested by the client. Grant only if you trust it.</small>",
-            '<small class="scope-preview">',
-            escapeHtml(scope),
-            "</small></span></label></fieldset>",
-          ].join("")
-        : [
-            '<p><span class="badge">',
-            escapeHtml(scope),
-            "</span></p>",
-            '<input type="hidden" name="grant_mode" value="requested">',
-          ].join("");
+    const permissions = this.consentPermissions(
+      reviewerSession,
+      pending.scope,
+      readOnlyScope,
+      scope,
+    );
     // Chromium also checks form-action on the redirect after POST /oauth/approve.
     // Permit only the configured identity providers, not arbitrary OAuth clients.
     const formActions = [
@@ -377,8 +414,9 @@ export class OAuthHandler {
     if (!reviewerSession && this.isReviewerEnabled()) {
       const reviewerLoginUrl = new URL("/oauth/reviewer/login", this.config.publicBaseUrl);
       reviewerLoginUrl.searchParams.set("return_to", `${url.pathname}${url.search}`);
+      const loginHref = escapeHtml(reviewerLoginUrl.pathname + reviewerLoginUrl.search);
       buttons.push(
-        `<p><a href="${escapeHtml(`${reviewerLoginUrl.pathname}${reviewerLoginUrl.search}`)}">Sign in to the OpenAI reviewer sandbox</a></p>`,
+        ['<p><a href="', loginHref, '">Sign in to the OpenAI reviewer sandbox</a></p>'].join(""),
       );
     }
 
@@ -465,25 +503,7 @@ export class OAuthHandler {
       throw safeError("INVALID_TOKEN", "OAuth transaction is already approved", 403);
     }
     if (provider === "reviewer_demo") {
-      const userId = this.reviewerSessions.getUserId(req);
-      if (
-        userId !== REVIEWER_DEMO_USER_ID ||
-        req.headers.origin !== new URL(this.config.publicBaseUrl).origin
-      ) {
-        throw safeError("FORBIDDEN", "Reviewer session is missing or expired", 403);
-      }
-      const reviewerScope = this.reviewerConsentScope(pending.scope);
-      if (!reviewerScope) {
-        throw safeError(
-          "INVALID_SCOPE",
-          "Reviewer sandbox only supports read-only inspection scopes",
-          403,
-        );
-      }
-      pending.scope = reviewerScope;
-      pending.approved = true;
-      this.completeOAuthCallback(res, pending, userId);
-      this.authorizeTransactions.delete(transactionId);
+      this.approveReviewerConsent(req, res, pending, transactionId);
       return;
     }
     const grantMode =
@@ -523,6 +543,33 @@ export class OAuthHandler {
     githubUrl.searchParams.set("scope", "read:user");
     githubUrl.searchParams.set("state", transactionId);
     this.continueBrowserNavigation(res, githubUrl, "GitHub");
+  }
+
+  private approveReviewerConsent(
+    req: IncomingMessage,
+    res: ServerResponse,
+    pending: PendingAuthorize,
+    transactionId: string,
+  ): void {
+    const userId = this.reviewerSessions.getUserId(req);
+    if (
+      userId !== REVIEWER_DEMO_USER_ID ||
+      req.headers.origin !== new URL(this.config.publicBaseUrl).origin
+    ) {
+      throw safeError("FORBIDDEN", "Reviewer session is missing or expired", 403);
+    }
+    const reviewerScope = this.reviewerConsentScope(pending.scope);
+    if (!reviewerScope) {
+      throw safeError(
+        "INVALID_SCOPE",
+        "Reviewer sandbox only supports read-only inspection scopes",
+        403,
+      );
+    }
+    pending.scope = reviewerScope;
+    pending.approved = true;
+    this.completeOAuthCallback(res, pending, userId);
+    this.authorizeTransactions.delete(transactionId);
   }
 
   private validateAuthorizeParams(

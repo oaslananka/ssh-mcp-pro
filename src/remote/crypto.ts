@@ -238,12 +238,14 @@ function principalFromPayload(payload: JWTPayload): RemotePrincipal {
   const githubLogin = typeof payload.github_login === "string" ? payload.github_login : "";
   const email = typeof payload.email === "string" ? payload.email : undefined;
   const displayName = typeof payload.display_name === "string" ? payload.display_name : undefined;
-  const provider =
-    payload.provider === "demo"
-      ? "demo"
-      : payload.provider === "google" || payload.provider === "github"
-        ? payload.provider
-        : undefined;
+  let provider: "demo" | "google" | "github" | undefined;
+  if (
+    payload.provider === "demo" ||
+    payload.provider === "google" ||
+    payload.provider === "github"
+  ) {
+    provider = payload.provider;
+  }
   if (
     (provider === "demo" &&
       (payload.sub !== REVIEWER_DEMO_USER_ID ||

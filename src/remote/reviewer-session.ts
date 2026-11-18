@@ -52,16 +52,24 @@ export class ReviewerSessionHandler {
       return;
     }
     if (req.method === "GET") {
-      const url = new URL(req.url ?? "/oauth/reviewer/login", this.config.publicBaseUrl);
-      const returnTo = this.parseReturnTo(url.searchParams.get("return_to") ?? undefined);
-      if (this.getUserId(req)) {
-        if (returnTo) this.redirectTo(res, returnTo);
-        else this.writeReadyPage(res);
-      } else {
-        this.writeLoginPage(res, 200, undefined, {}, returnTo);
-      }
+      this.handleLoginPage(req, res);
       return;
     }
+    await this.handleLoginSubmission(req, res);
+  }
+
+  private handleLoginPage(req: IncomingMessage, res: ServerResponse): void {
+    const url = new URL(req.url ?? "/oauth/reviewer/login", this.config.publicBaseUrl);
+    const returnTo = this.parseReturnTo(url.searchParams.get("return_to") ?? undefined);
+    if (this.getUserId(req)) {
+      if (returnTo) this.redirectTo(res, returnTo);
+      else this.writeReadyPage(res);
+    } else {
+      this.writeLoginPage(res, 200, undefined, {}, returnTo);
+    }
+  }
+
+  private async handleLoginSubmission(req: IncomingMessage, res: ServerResponse): Promise<void> {
     if (req.method !== "POST") throw safeError("FORBIDDEN", "Method not allowed", 405);
     this.assertSameOrigin(req);
     this.assertFormRequest(req);
@@ -88,10 +96,8 @@ export class ReviewerSessionHandler {
       );
       return;
     }
-    const usernameMatches = this.constantTimeStringEqual(
-      username.trim(),
-      this.config.reviewerUsername ?? "",
-    );
+    // Usernames are identifiers, not passwords; password comparison uses scrypt below.
+    const usernameMatches = username.trim() === this.config.reviewerUsername;
     const passwordMatches = await verifyReviewerPassword(
       password,
       this.config.reviewerPasswordHash ?? "",
@@ -232,7 +238,8 @@ export class ReviewerSessionHandler {
 
   private loginAttemptKey(req: IncomingMessage, username: string): string {
     const peer = req.socket?.remoteAddress ?? "unknown";
-    return `${peer}:${hashSecret(username.trim().toLowerCase())}`;
+    // In-memory only, never persisted or logged. Avoid treating a username as a password hash.
+    return `${peer}:${username.trim().toLowerCase()}`;
   }
 
   private isRateLimited(key: string): boolean {
@@ -260,10 +267,6 @@ export class ReviewerSessionHandler {
       if (typeof oldest !== "string") return;
       map.delete(oldest);
     }
-  }
-
-  private constantTimeStringEqual(left: string, right: string): boolean {
-    return timingSafeEqual(Buffer.from(hashSecret(left)), Buffer.from(hashSecret(right)));
   }
 
   private sessionCookie(value: string, maxAge = SESSION_TTL_MS / 1_000): string {
@@ -305,7 +308,9 @@ export class ReviewerSessionHandler {
     returnTo?: string,
   ): void {
     const csrf = this.issueCsrfToken();
-    const errorMarkup = error ? `<p class="error" role="alert">${error}</p>` : "";
+    const errorMarkup = error
+      ? ['<p class="error" role="alert">', escapeHtml(error), "</p>"].join("")
+      : "";
     this.writeHtml(
       res,
       status,
@@ -322,9 +327,9 @@ export class ReviewerSessionHandler {
         '<p class="eyebrow">Review sandbox — synthetic data only</p>',
         errorMarkup,
         '<form method="post" action="/oauth/reviewer/login">',
-        `<input type="hidden" name="csrf" value="${csrf}">`,
+        ['<input type="hidden" name="csrf" value="', csrf, '">'].join(""),
         ...(returnTo
-          ? [`<input type="hidden" name="return_to" value="${escapeHtml(returnTo)}">`]
+          ? [['<input type="hidden" name="return_to" value="', escapeHtml(returnTo), '">'].join("")]
           : []),
         '<div class="field"><label for="username">Username</label><input id="username" name="username" type="text" autocomplete="username" required maxlength="128"></div>',
         '<div class="field"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required></div>',
@@ -353,7 +358,7 @@ export class ReviewerSessionHandler {
         "<p>The OpenAI review sandbox is ready. Return to ChatGPT to continue reviewing SSH Device Inspector.</p>",
         "<p><strong>Only synthetic sample data is available.</strong> No production account, real device, or command execution is accessible.</p>",
         '<form method="post" action="/oauth/reviewer/logout">',
-        `<input type="hidden" name="csrf" value="${csrf}">`,
+        ['<input type="hidden" name="csrf" value="', csrf, '">'].join(""),
         '<button class="button" type="submit">Sign out</button></form>',
         "</main></body></html>",
       ].join(""),

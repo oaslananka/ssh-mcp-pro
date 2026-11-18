@@ -305,7 +305,7 @@ export class RemoteStore {
         optionalRowString(row, "github_login") ??
         optionalRowString(row, "email") ??
         "User",
-      provider: provider === "google" ? "google" : provider === "demo" ? "demo" : "github",
+      provider: provider === "google" || provider === "demo" ? provider : "github",
     };
   }
 
