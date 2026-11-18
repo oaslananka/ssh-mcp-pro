@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { escape as escapeHtml } from "html-escaper";
 import { hashSecret, nowIso, randomToken } from "./crypto.js";
 import { addNoStore, readJsonOrForm, safeError } from "./http-util.js";
 import { isValidReviewerPasswordHash, verifyReviewerPassword } from "./reviewer-auth.js";
@@ -51,8 +52,14 @@ export class ReviewerSessionHandler {
       return;
     }
     if (req.method === "GET") {
-      if (this.getUserId(req)) this.writeReadyPage(res);
-      else this.writeLoginPage(res, 200);
+      const url = new URL(req.url ?? "/oauth/reviewer/login", this.config.publicBaseUrl);
+      const returnTo = this.parseReturnTo(url.searchParams.get("return_to") ?? undefined);
+      if (this.getUserId(req)) {
+        if (returnTo) this.redirectTo(res, returnTo);
+        else this.writeReadyPage(res);
+      } else {
+        this.writeLoginPage(res, 200, undefined, {}, returnTo);
+      }
       return;
     }
     if (req.method !== "POST") throw safeError("FORBIDDEN", "Method not allowed", 405);
@@ -63,13 +70,22 @@ export class ReviewerSessionHandler {
       throw safeError("FORBIDDEN", "Reviewer login request could not be verified", 403);
     }
 
+    const returnToValue = form.return_to ?? "";
+    const returnTo = this.parseReturnTo(returnToValue || undefined);
+    if (returnToValue && !returnTo) {
+      throw safeError("INVALID_CLIENT", "Reviewer return target is invalid", 400);
+    }
     const username = form.username ?? "";
     const password = form.password ?? "";
     const attemptKey = this.loginAttemptKey(req, username);
     if (this.isRateLimited(attemptKey)) {
-      this.writeLoginPage(res, 429, "Too many sign-in attempts. Try again later.", {
-        "Retry-After": String(LOGIN_WINDOW_MS / 1_000),
-      });
+      this.writeLoginPage(
+        res,
+        429,
+        "Too many sign-in attempts. Try again later.",
+        { "Retry-After": String(LOGIN_WINDOW_MS / 1_000) },
+        returnTo,
+      );
       return;
     }
     const usernameMatches = this.constantTimeStringEqual(
@@ -82,7 +98,7 @@ export class ReviewerSessionHandler {
     );
     if (!usernameMatches || !passwordMatches) {
       this.recordFailedAttempt(attemptKey);
-      this.writeLoginPage(res, 401, "Invalid username or password.");
+      this.writeLoginPage(res, 401, "Invalid username or password.", {}, returnTo);
       return;
     }
 
@@ -96,7 +112,11 @@ export class ReviewerSessionHandler {
       new Date(Date.now() + SESSION_TTL_MS).toISOString(),
       now,
     );
-    this.writeReadyPage(res, [this.sessionCookie(sessionToken)]);
+    if (returnTo) {
+      this.redirectTo(res, returnTo, [this.sessionCookie(sessionToken), this.csrfCookie("", 0)]);
+    } else {
+      this.writeReadyPage(res, [this.sessionCookie(sessionToken)]);
+    }
   }
 
   async handleLogout(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -123,6 +143,33 @@ export class ReviewerSessionHandler {
       Location: "/oauth/reviewer/login",
       "Referrer-Policy": "no-referrer",
       "Set-Cookie": [this.sessionCookie("", 0), this.csrfCookie("", 0)],
+    });
+    res.end();
+  }
+
+  private parseReturnTo(value: string | undefined): string | undefined {
+    if (!value || value.length > 4_096) return undefined;
+    try {
+      const target = new URL(value, this.config.publicBaseUrl);
+      if (
+        target.origin !== new URL(this.config.publicBaseUrl).origin ||
+        target.pathname !== "/oauth/authorize" ||
+        target.hash
+      ) {
+        return undefined;
+      }
+      return `${target.pathname}${target.search}`;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private redirectTo(res: ServerResponse, location: string, cookies: string[] = []): void {
+    res.writeHead(303, {
+      ...addNoStore(),
+      Location: location,
+      "Referrer-Policy": "no-referrer",
+      ...(cookies.length > 0 ? { "Set-Cookie": cookies } : {}),
     });
     res.end();
   }
@@ -255,6 +302,7 @@ export class ReviewerSessionHandler {
     status: number,
     error?: string,
     extraHeaders: Record<string, string> = {},
+    returnTo?: string,
   ): void {
     const csrf = this.issueCsrfToken();
     const errorMarkup = error ? `<p class="error" role="alert">${error}</p>` : "";
@@ -275,6 +323,9 @@ export class ReviewerSessionHandler {
         errorMarkup,
         '<form method="post" action="/oauth/reviewer/login">',
         `<input type="hidden" name="csrf" value="${csrf}">`,
+        ...(returnTo
+          ? [`<input type="hidden" name="return_to" value="${escapeHtml(returnTo)}">`]
+          : []),
         '<div class="field"><label for="username">Username</label><input id="username" name="username" type="text" autocomplete="username" required maxlength="128"></div>',
         '<div class="field"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required></div>',
         '<button class="button" type="submit">Continue to sample environment</button>',

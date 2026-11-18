@@ -375,8 +375,10 @@ export class OAuthHandler {
       );
     }
     if (!reviewerSession && this.isReviewerEnabled()) {
+      const reviewerLoginUrl = new URL("/oauth/reviewer/login", this.config.publicBaseUrl);
+      reviewerLoginUrl.searchParams.set("return_to", `${url.pathname}${url.search}`);
       buttons.push(
-        '<p><a href="/oauth/reviewer/login">Sign in to the OpenAI reviewer sandbox</a></p>',
+        `<p><a href="${escapeHtml(`${reviewerLoginUrl.pathname}${reviewerLoginUrl.search}`)}">Sign in to the OpenAI reviewer sandbox</a></p>`,
       );
     }
 

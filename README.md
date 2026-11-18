@@ -89,7 +89,7 @@ ssh-mcp-pro web
 
 The shortcut binds only to `http://127.0.0.1:3000/dashboard` and does not publish a privileged server to your network. Signing in requires your own configured GitHub or Google OAuth application. For hosted, multi-user operation use the production control plane configuration; the localhost command is for local development and testing.
 
-The hosted service serves [Privacy](https://ssh-mcp-pro.oaslananka.dev/privacy) and [Terms](https://ssh-mcp-pro.oaslananka.dev/terms). Operators may enable an owner-only **Usage & Users** tab by setting `SSH_MCP_DASHBOARD_OWNER_GITHUB_LOGINS` and/or `SSH_MCP_DASHBOARD_OWNER_GOOGLE_EMAILS`; global usage access is disabled by default.
+The hosted service serves [Privacy](https://ssh-mcp-pro.oaslananka.dev/privacy) and [Terms](https://ssh-mcp-pro.oaslananka.dev/terms). Operators may enable an owner-only **Usage & Users** tab by setting `SSH_MCP_DASHBOARD_OWNER_GITHUB_LOGINS` and/or `SSH_MCP_DASHBOARD_OWNER_GOOGLE_EMAILS`; global usage access is disabled by default. The separately gated [OpenAI reviewer sandbox](docs/openai-reviewer-sandbox.md) uses a dedicated sample-only identity and is not a general sign-in method.
 
 See [Web publication readiness](docs/development/web-publication-readiness.md) for ChatGPT, Claude, and Gemini connection steps and independent acceptance requirements. Manifest validation alone does **not** mean any platform has approved the plugin.
 
@@ -251,6 +251,8 @@ All `SSH_MCP_*` environment variables parsed by `src/config.ts` are listed below
 | `SSH_MCP_OAUTH_RESOURCE` | unset | OAuth protected resource identifier. |
 | `SSH_MCP_OAUTH_REQUIRED_SCOPES` | `ssh-mcp-pro.read` | Required OAuth scopes. |
 | `SSH_MCP_OAUTH_ALLOWED_ALGORITHMS` | unset | Optional comma-separated JWT algorithm allowlist, for example `RS256,ES256`. When unset, the built-in OAuth verifier defaults are used. |
+| `SSH_MCP_REVIEWER_USERNAME` | unset | Optional dedicated OpenAI reviewer username. Reviewer access remains disabled unless the matching scrypt hash is also configured. |
+| `SSH_MCP_REVIEWER_PASSWORD_HASH` | unset | Optional scrypt hash for the dedicated OpenAI reviewer account; never store the plaintext password here. See [OpenAI Reviewer Sandbox](docs/openai-reviewer-sandbox.md). |
 | `SSH_MCP_REMOTE_AGENT_MCP_PASSTHROUGH` | unset | When enabled with `1`, `true`, `yes`, or `on`, lets `/mcp` requests bypass the remote control plane and reach the Streamable HTTP MCP handler. Use only for connector routing migrations. |
 
 The parser also accepts non-`SSH_MCP_*` compatibility aliases `PORT`, `KNOWN_HOSTS_PATH`, and `STRICT_HOST_KEY_CHECKING`.

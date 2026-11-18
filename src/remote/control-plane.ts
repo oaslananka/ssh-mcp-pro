@@ -27,7 +27,8 @@ import {
   readJson,
   sanitizeAgent,
 } from "./http-util.js";
-import { listRemoteToolDescriptors } from "./mcp-tools.js";
+import { listRemoteToolDescriptors, REVIEWER_DEMO_TOOL_NAMES } from "./mcp-tools.js";
+import { reviewerDemoToolResult } from "./reviewer-demo-fixtures.js";
 import { mergeCustomPolicy } from "./policy.js";
 import { safeStoredActionArgs } from "./action-record-sanitize.js";
 import { parseAgentHostMetadata } from "./schemas.js";
@@ -53,7 +54,7 @@ import type {
   RemoteToolName,
   PolicyUpdateEnvelope,
 } from "./types.js";
-import { TOOL_CAPABILITY_MAP } from "./types.js";
+import { REVIEWER_DEMO_USER_ID, TOOL_CAPABILITY_MAP } from "./types.js";
 import { jsonResponse } from "./util.js";
 import { SERVER_VERSION } from "../mcp.js";
 
@@ -328,7 +329,7 @@ export class RemoteControlPlane {
       jsonResponse(res, 200, {
         jsonrpc: "2.0",
         id: rpcId,
-        result: { tools: listRemoteToolDescriptors(principal.capabilities) },
+        result: { tools: listRemoteToolDescriptors(principal.capabilities, principal.provider) },
       });
       return;
     }
@@ -360,7 +361,7 @@ export class RemoteControlPlane {
           { capabilities: { tools: {} } },
         );
         server.server.setRequestHandler("tools/list", () => ({
-          tools: listRemoteToolDescriptors(principal.capabilities).map(
+          tools: listRemoteToolDescriptors(principal.capabilities, principal.provider).map(
             ({ capability: _capability, ...tool }) => ({
               ...tool,
               inputSchema: { ...tool.inputSchema, type: "object" as const },
@@ -606,6 +607,28 @@ export class RemoteControlPlane {
     tool: RemoteToolName,
     args: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
+    const reviewerIdentity =
+      principal.provider === "demo" || principal.userId === REVIEWER_DEMO_USER_ID;
+    if (reviewerIdentity) {
+      if (
+        !this.oauth.isReviewerEnabled() ||
+        principal.provider !== "demo" ||
+        principal.userId !== REVIEWER_DEMO_USER_ID ||
+        !REVIEWER_DEMO_TOOL_NAMES.has(tool)
+      ) {
+        throw safeError(
+          "INVALID_SCOPE",
+          "Reviewer sandbox only supports synthetic read-only tools",
+          403,
+        );
+      }
+      const reviewerCapability = TOOL_CAPABILITY_MAP[tool];
+      if (!hasCapability(principal.capabilities, reviewerCapability)) {
+        throw safeError("INVALID_SCOPE", `Scope does not grant ${reviewerCapability}`, 403);
+      }
+      return reviewerDemoToolResult(tool, args);
+    }
+
     const capability = TOOL_CAPABILITY_MAP[tool];
     if (!hasCapability(principal.capabilities, capability)) {
       throw safeError("INVALID_SCOPE", `Scope does not grant ${capability}`, 403);

@@ -6,8 +6,16 @@ import path from "node:path";
 import { Readable } from "node:stream";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
+import { createAgentPolicy } from "../../src/remote/policy.js";
 import { hashSecret, randomToken } from "../../src/remote/crypto.js";
-import { REVIEWER_DEMO_USER_ID } from "../../src/remote/types.js";
+import {
+  REMOTE_CAPABILITIES,
+  REMOTE_SCOPES,
+  REVIEWER_DEMO_USER_ID,
+  type RemoteAgentRecord,
+  type RemotePrincipal,
+  type RemoteToolName,
+} from "../../src/remote/types.js";
 import {
   captureResponse,
   jsonRequest,
@@ -215,6 +223,102 @@ describe("OpenAI reviewer sandbox browser authentication", () => {
     }
   });
 
+  test("returns to the original OAuth consent request after reviewer login without allowing open redirects", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "reviewer-login-return-to-"));
+    const controlPlane = createControlPlane(dir);
+    try {
+      const registered = await dispatch(
+        controlPlane,
+        jsonRequest("POST", "/oauth/register", {
+          client_name: "Reviewer Return-To Test",
+          redirect_uris: ["http://localhost/reviewer-return-callback"],
+        }),
+        "/oauth/register",
+      );
+      const clientId = String(JSON.parse(registered.response.body).client_id);
+      const authorizeUrl = authorizationUrl(
+        clientId,
+        "http://localhost/reviewer-return-callback",
+        "hosts:read agents:read status:read shell:exec",
+      );
+      const authorize = await dispatch(
+        controlPlane,
+        request("GET", authorizeUrl),
+        "/oauth/authorize",
+      );
+      const loginHref = /href="([^"]*oauth\/reviewer\/login[^"]*)"/u.exec(
+        authorize.response.body,
+      )?.[1];
+      if (!loginHref) throw new Error("OAuth consent page did not link to reviewer login");
+      const loginUrl = new URL(loginHref.replaceAll("&amp;", "&"), PUBLIC_BASE_URL);
+      const returnTo = loginUrl.searchParams.get("return_to");
+      expect(returnTo).toBe(authorizeUrl);
+
+      const loginPage = await dispatch(
+        controlPlane,
+        request("GET", `${loginUrl.pathname}${loginUrl.search}`),
+        "/oauth/reviewer/login",
+      );
+      expect(loginPage.response.body).toContain('name="return_to"');
+      const csrf = csrfFromPage(loginPage.response.body);
+      const csrfCookie = setCookie(loginPage.response, "ssh_mcp_reviewer_csrf")!;
+      const invalidReturnTo = await dispatch(
+        controlPlane,
+        formRequest(
+          "POST",
+          "/oauth/reviewer/login",
+          {
+            csrf,
+            username: REVIEWER_USERNAME,
+            password: REVIEWER_PASSWORD,
+            return_to: "https://attacker.example/oauth/authorize?client_id=evil",
+          },
+          { origin: PUBLIC_BASE_URL, cookie: csrfCookie },
+        ),
+        "/oauth/reviewer/login",
+      );
+      expect(invalidReturnTo.response.statusCode).toBe(400);
+
+      const retryPage = await dispatch(
+        controlPlane,
+        request("GET", `${loginUrl.pathname}${loginUrl.search}`),
+        "/oauth/reviewer/login",
+      );
+      const retryCsrf = csrfFromPage(retryPage.response.body);
+      const retryCsrfCookie = setCookie(retryPage.response, "ssh_mcp_reviewer_csrf")!;
+      const signedIn = await dispatch(
+        controlPlane,
+        formRequest(
+          "POST",
+          "/oauth/reviewer/login",
+          {
+            csrf: retryCsrf,
+            username: REVIEWER_USERNAME,
+            password: REVIEWER_PASSWORD,
+            return_to: returnTo!,
+          },
+          { origin: PUBLIC_BASE_URL, cookie: retryCsrfCookie },
+        ),
+        "/oauth/reviewer/login",
+      );
+      expect(signedIn.response.statusCode).toBe(303);
+      expect(signedIn.response.getHeader("location")).toBe(returnTo);
+      const sessionCookie = setCookie(signedIn.response, "ssh_mcp_reviewer_session")!;
+      const resumedAuthorize = await dispatch(
+        controlPlane,
+        request("GET", returnTo!, { cookie: sessionCookie }),
+        "/oauth/authorize",
+      );
+      expect(resumedAuthorize.response.statusCode).toBe(200);
+      expect(resumedAuthorize.response.body).toContain("Review sandbox — synthetic data only");
+      expect(resumedAuthorize.response.body).toContain("Continue with reviewer sandbox");
+      expect(resumedAuthorize.response.body).not.toContain("shell:exec");
+    } finally {
+      controlPlane.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("uses generic credential errors, bounds failed attempts, and stores only a hashed session", async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "reviewer-login-session-"));
     const controlPlane = createControlPlane(dir);
@@ -371,6 +475,200 @@ describe("OpenAI reviewer sandbox browser authentication", () => {
       expect(result.response.body).toContain('name="password"');
       expect(result.response.body).not.toContain("Reviewer session ready");
     } finally {
+      controlPlane.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("serves only synthetic reviewer devices and status without touching production agents or dispatch", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "reviewer-synthetic-mcp-"));
+    const controlPlane = createControlPlane(dir);
+    try {
+      await controlPlane.initialize();
+      const loginResult = await login(controlPlane);
+      const sessionCookie = setCookie(loginResult.response, "ssh_mcp_reviewer_session")!;
+      const registered = await dispatch(
+        controlPlane,
+        jsonRequest("POST", "/oauth/register", {
+          client_name: "Reviewer Synthetic MCP",
+          redirect_uris: ["http://localhost/reviewer-synthetic-callback"],
+        }),
+        "/oauth/register",
+      );
+      const clientId = String(JSON.parse(registered.response.body).client_id);
+      const redirectUri = "http://localhost/reviewer-synthetic-callback";
+      const authorize = await dispatch(
+        controlPlane,
+        request(
+          "GET",
+          authorizationUrl(clientId, redirectUri, "hosts:read agents:read status:read"),
+          { cookie: sessionCookie },
+        ),
+        "/oauth/authorize",
+      );
+      const transactionCookie = setCookie(authorize.response, "ssh_mcp_oauth_tx")!;
+      const transaction = transactionCookie.slice("ssh_mcp_oauth_tx=".length);
+      const approved = await dispatch(
+        controlPlane,
+        formRequest(
+          "POST",
+          "/oauth/approve",
+          { transaction, provider: "reviewer_demo" },
+          { origin: PUBLIC_BASE_URL, cookie: `${sessionCookie}; ${transactionCookie}` },
+        ),
+        "/oauth/approve",
+      );
+      const callbackHref = /href="([^"]+)"/u.exec(approved.response.body)?.[1];
+      if (!callbackHref) throw new Error("Reviewer approval did not return an authorization code");
+      const code = new URL(callbackHref.replaceAll("&amp;", "&")).searchParams.get("code") ?? "";
+      const tokenResult = await dispatch(
+        controlPlane,
+        formRequest("POST", "/oauth/token", {
+          grant_type: "authorization_code",
+          client_id: clientId,
+          code,
+          redirect_uri: redirectUri,
+          code_verifier: "reviewer-pkce-verifier",
+        }),
+        "/oauth/token",
+      );
+      expect(tokenResult.response.statusCode).toBe(200);
+      const accessToken = String(JSON.parse(tokenResult.response.body).access_token);
+      const authorization = { authorization: `Bearer ${accessToken}` };
+
+      const ownerId = "github:reviewer-synthetic-owner";
+      const now = new Date().toISOString();
+      controlPlane.store.upsertUser({
+        internalId: ownerId,
+        id: "reviewer-synthetic-owner",
+        login: "reviewer-synthetic-owner",
+        now,
+      });
+      const ownerAgent: RemoteAgentRecord = {
+        id: "owner-production-agent",
+        userId: ownerId,
+        alias: "owner-production-device",
+        status: "online",
+        profile: "read-only",
+        policy: createAgentPolicy("read-only"),
+        policyVersion: 1,
+        hostMetadata: {
+          hostname: "owner-production-device",
+          os: "Ubuntu 24.04 LTS",
+          arch: "x86_64",
+          platform: "linux",
+        },
+        createdAt: now,
+        updatedAt: now,
+      };
+      controlPlane.store.insertAgent(ownerAgent);
+
+      const listAgentsSpy = vi.spyOn(controlPlane.store, "listAgents");
+      const getAgentByAliasSpy = vi.spyOn(controlPlane.store, "getAgentByAlias");
+      const listAuditSpy = vi.spyOn(controlPlane.store, "listAudit");
+      const insertActionSpy = vi.spyOn(controlPlane.store, "insertAction");
+      const insertAuditSpy = vi.spyOn(controlPlane.store, "insertAudit");
+      const dispatchActionSpy = vi.spyOn(
+        controlPlane as unknown as { dispatchAction: (...args: unknown[]) => Promise<unknown> },
+        "dispatchAction",
+      );
+
+      const mcpCall = async (method: string, params?: Record<string, unknown>) => {
+        const result = await dispatch(
+          controlPlane,
+          jsonBodyRequest(
+            "POST",
+            "/mcp",
+            { jsonrpc: "2.0", id: randomToken(6), method, ...(params ? { params } : {}) },
+            authorization,
+          ),
+          "/mcp",
+        );
+        return JSON.parse(result.response.body) as Record<string, unknown>;
+      };
+
+      const toolList = await mcpCall("tools/list");
+      const tools = (toolList.result as { tools: Array<{ name: string }> }).tools;
+      expect(tools.map((tool) => tool.name)).toEqual([
+        "list_hosts",
+        "list_agents",
+        "get_system_status",
+      ]);
+
+      const hostsCall = await mcpCall("tools/call", { name: "list_hosts", arguments: {} });
+      const hosts = (hostsCall.result as { structuredContent: Record<string, unknown> })
+        .structuredContent;
+      expect(hosts).toMatchObject({ sample_data: true, source: "synthetic" });
+      expect(hosts.hosts).toHaveLength(2);
+      expect(JSON.stringify(hosts)).not.toContain("owner-production-device");
+
+      const agentsCall = await mcpCall("tools/call", { name: "list_agents", arguments: {} });
+      const agents = (agentsCall.result as { structuredContent: Record<string, unknown> })
+        .structuredContent;
+      expect(agents).toMatchObject({ sample_data: true, source: "synthetic" });
+      expect(agents.agents).toHaveLength(2);
+      expect(JSON.stringify(agents)).not.toContain("owner-production-device");
+
+      const statusCall = await mcpCall("tools/call", {
+        name: "get_system_status",
+        arguments: { agent_id_or_alias: "reviewer-linux-online" },
+      });
+      const status = (statusCall.result as { structuredContent: Record<string, unknown> })
+        .structuredContent;
+      expect(status).toMatchObject({ sample_data: true, source: "synthetic" });
+      expect(status.action).toMatchObject({ status: "ok", exit_code: 0, synthetic: true });
+      expect((status.action as { stdout: string }).stdout).toContain("SYNTHETIC SAMPLE DATA");
+
+      const offline = await mcpCall("tools/call", {
+        name: "get_system_status",
+        arguments: { agent_id_or_alias: "reviewer-linux-offline" },
+      });
+      expect((offline.error as { data: { code: string } }).data.code).toBe("AGENT_OFFLINE");
+      const unknown = await mcpCall("tools/call", {
+        name: "get_system_status",
+        arguments: { agent_id_or_alias: "not-a-sample-device" },
+      });
+      expect((unknown.error as { data: { code: string } }).data.code).toBe("AGENT_NOT_FOUND");
+      const deniedTool = await mcpCall("tools/call", {
+        name: "run_shell",
+        arguments: { agent_id_or_alias: "owner-production-device", command: "id" },
+      });
+      expect((deniedTool.error as { data: { code: string } }).data.code).toBe("INVALID_SCOPE");
+
+      const overScopedPrincipal: RemotePrincipal = {
+        userId: REVIEWER_DEMO_USER_ID,
+        provider: "demo",
+        tokenId: "reviewer-over-scoped-test",
+        githubId: "",
+        githubLogin: "",
+        scopes: [...REMOTE_SCOPES],
+        capabilities: [...REMOTE_CAPABILITIES],
+      };
+      const directControlPlane = controlPlane as unknown as {
+        callRemoteTool: (
+          principal: RemotePrincipal,
+          tool: RemoteToolName,
+          args: Record<string, unknown>,
+        ) => Promise<Record<string, unknown>>;
+      };
+      await expect(
+        directControlPlane.callRemoteTool(overScopedPrincipal, "run_shell", {
+          agent_id_or_alias: "owner-production-device",
+          command: "id",
+        }),
+      ).rejects.toMatchObject({ code: "INVALID_SCOPE" });
+
+      expect(listAgentsSpy).not.toHaveBeenCalled();
+      expect(getAgentByAliasSpy).not.toHaveBeenCalled();
+      expect(listAuditSpy).not.toHaveBeenCalled();
+      expect(insertActionSpy).not.toHaveBeenCalled();
+      expect(insertAuditSpy).not.toHaveBeenCalled();
+      expect(dispatchActionSpy).not.toHaveBeenCalled();
+      vi.restoreAllMocks();
+      expect(controlPlane.store.listAgents(ownerId)).toHaveLength(1);
+      expect(controlPlane.store.listAgents(REVIEWER_DEMO_USER_ID)).toEqual([]);
+    } finally {
+      vi.restoreAllMocks();
       controlPlane.close();
       rmSync(dir, { recursive: true, force: true });
     }
