@@ -23,6 +23,7 @@ import {
   scopeList,
 } from "./http-util.js";
 import { RemoteStore } from "./store.js";
+import { ReviewerSessionHandler } from "./reviewer-session.js";
 import { exchangeGitHubIdentity, exchangeGoogleIdentity } from "./oauth-provider-exchange.js";
 import type {
   AuditEvent,
@@ -33,11 +34,11 @@ import type {
   OAuthRefreshTokenRecord,
   RemoteConfig,
 } from "./types.js";
-import { PUBLIC_REMOTE_SCOPES } from "./types.js";
+import { PUBLIC_REMOTE_SCOPES, REVIEWER_DEMO_SCOPES, REVIEWER_DEMO_USER_ID } from "./types.js";
 import { jsonResponse } from "./util.js";
 
 /** Minimal inspection grant available even when an AI client requests elevated scopes. */
-const READ_ONLY_CONSENT_SCOPES = ["hosts:read", "agents:read", "status:read"] as const;
+const READ_ONLY_CONSENT_SCOPES = REVIEWER_DEMO_SCOPES;
 
 /** Pending OAuth authorization transaction. */
 export interface PendingAuthorize {
@@ -55,6 +56,7 @@ export interface PendingAuthorize {
 export class OAuthHandler {
   private readonly registrationAttempts = new Map<string, { count: number; expiresAt: number }>();
   private readonly refreshTokenResponseField = "refresh_token";
+  private readonly reviewerSessions: ReviewerSessionHandler;
 
   private transactionCookie(value: string): string {
     const secure = this.config.publicBaseUrl.startsWith("https://") ? "; Secure" : "";
@@ -73,7 +75,21 @@ export class OAuthHandler {
     private readonly authorizeTransactions: Map<string, PendingAuthorize>,
     private readonly getJwtKeyPair: () => JwtKeyPair,
     private readonly audit: (event: Omit<AuditEvent, "id" | "createdAt">) => void,
-  ) {}
+  ) {
+    this.reviewerSessions = new ReviewerSessionHandler(config, store);
+  }
+
+  isReviewerEnabled(): boolean {
+    return this.reviewerSessions.isEnabled();
+  }
+
+  handleReviewerLogin(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    return this.reviewerSessions.handleLogin(req, res);
+  }
+
+  handleReviewerLogout(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    return this.reviewerSessions.handleLogout(req, res);
+  }
 
   /** A consent choice must never add scopes not requested by the client. */
   private readOnlyConsentScope(requested: string): string | undefined {
@@ -82,6 +98,12 @@ export class OAuthHandler {
     return readScopes.length > 0 && readScopes.length < requestedScopes.length
       ? readScopes.join(" ")
       : undefined;
+  }
+
+  private reviewerConsentScope(requested: string): string | undefined {
+    const requestedScopes = scopeList(requested);
+    const reviewerScopes = REVIEWER_DEMO_SCOPES.filter((entry) => requestedScopes.includes(entry));
+    return reviewerScopes.length > 0 ? reviewerScopes.join(" ") : undefined;
   }
 
   /** GET /.well-known/oauth-protected-resource */
@@ -203,6 +225,8 @@ export class OAuthHandler {
       scope,
     );
 
+    const reviewerUserId = this.reviewerSessions.getUserId(req);
+    const reviewerSession = reviewerUserId === REVIEWER_DEMO_USER_ID;
     const pending: PendingAuthorize = {
       clientId,
       redirectUri,
@@ -212,6 +236,17 @@ export class OAuthHandler {
       state,
       expiresAt: Date.now() + this.config.authCodeTtlSeconds * 1000,
     };
+    if (reviewerSession) {
+      const reviewerScope = this.reviewerConsentScope(scope);
+      if (!reviewerScope) {
+        throw safeError(
+          "INVALID_SCOPE",
+          "Reviewer sandbox only supports read-only inspection scopes",
+          403,
+        );
+      }
+      pending.scope = reviewerScope;
+    }
 
     const testUser = this.testGitHubUser();
     if (testUser) {
@@ -244,42 +279,55 @@ export class OAuthHandler {
     const hasGitHub = Boolean(this.config.githubClientId && this.config.githubClientSecret);
     const hasGoogle = Boolean(this.config.googleClientId && this.config.googleClientSecret);
 
-    if (!hasGitHub && !hasGoogle) {
-      throw safeError("FORBIDDEN", "Neither GitHub nor Google OAuth is configured", 503);
+    if (!hasGitHub && !hasGoogle && !reviewerSession && !this.isReviewerEnabled()) {
+      throw safeError(
+        "FORBIDDEN",
+        "Neither GitHub nor Google OAuth nor reviewer access is configured",
+        503,
+      );
     }
 
     const transactionId = id("code");
     this.authorizeTransactions.set(transactionId, pending);
     const hostname = escapeHtml(new URL(redirectUri).hostname);
-    const readOnlyScope = this.readOnlyConsentScope(scope);
-    const permissions = readOnlyScope
+    const readOnlyScope = reviewerSession ? pending.scope : this.readOnlyConsentScope(scope);
+    const permissions = reviewerSession
       ? [
-          '<fieldset class="permission-options"><legend>Choose access level</legend>',
-          '<label class="permission-option"><input type="radio" name="grant_mode" value="read_only" checked>',
-          '<span class="permission-copy"><strong>Read-only inspection (recommended)</strong>',
-          "<small>List hosts, connected devices, and system status. No file changes, commands, or administrator access.</small>",
-          '<small class="scope-preview">',
-          escapeHtml(readOnlyScope),
-          "</small></span></label>",
-          '<label class="permission-option"><input type="radio" name="grant_mode" value="requested">',
-          '<span class="permission-copy"><strong>All requested permissions</strong>',
-          "<small>Includes sensitive actions such as file changes and command execution when requested by the client. Grant only if you trust it.</small>",
-          '<small class="scope-preview">',
-          escapeHtml(scope),
-          "</small></span></label></fieldset>",
-        ].join("")
-      : [
-          '<p><span class="badge">',
-          escapeHtml(scope),
+          '<p><span class="badge">Review sandbox — synthetic data only</span></p>',
+          "<p>Only sample devices and synthetic system status are available. Real devices and actions are inaccessible.</p>",
+          '<p><span class="scope-preview">',
+          escapeHtml(pending.scope),
           "</span></p>",
-          '<input type="hidden" name="grant_mode" value="requested">',
-        ].join("");
+          '<input type="hidden" name="grant_mode" value="read_only">',
+        ].join("")
+      : readOnlyScope
+        ? [
+            '<fieldset class="permission-options"><legend>Choose access level</legend>',
+            '<label class="permission-option"><input type="radio" name="grant_mode" value="read_only" checked>',
+            '<span class="permission-copy"><strong>Read-only inspection (recommended)</strong>',
+            "<small>List hosts, connected devices, and system status. No file changes, commands, or administrator access.</small>",
+            '<small class="scope-preview">',
+            escapeHtml(readOnlyScope),
+            "</small></span></label>",
+            '<label class="permission-option"><input type="radio" name="grant_mode" value="requested">',
+            '<span class="permission-copy"><strong>All requested permissions</strong>',
+            "<small>Includes sensitive actions such as file changes and command execution when requested by the client. Grant only if you trust it.</small>",
+            '<small class="scope-preview">',
+            escapeHtml(scope),
+            "</small></span></label></fieldset>",
+          ].join("")
+        : [
+            '<p><span class="badge">',
+            escapeHtml(scope),
+            "</span></p>",
+            '<input type="hidden" name="grant_mode" value="requested">',
+          ].join("");
     // Chromium also checks form-action on the redirect after POST /oauth/approve.
     // Permit only the configured identity providers, not arbitrary OAuth clients.
     const formActions = [
       "'self'",
-      ...(hasGoogle ? ["https://accounts.google.com"] : []),
-      ...(hasGitHub ? ["https://github.com"] : []),
+      ...(!reviewerSession && hasGoogle ? ["https://accounts.google.com"] : []),
+      ...(!reviewerSession && hasGitHub ? ["https://github.com"] : []),
     ].join(" ");
     res.writeHead(200, {
       "Content-Type": "text/html; charset=utf-8",
@@ -290,7 +338,11 @@ export class OAuthHandler {
     });
 
     const buttons = [];
-    if (hasGoogle) {
+    if (reviewerSession) {
+      buttons.push(
+        '<button type="submit" name="provider" value="reviewer_demo" style="display:flex;align-items:center;justify-content:center;width:100%;padding:12px;margin-bottom:10px;background:#3978d6;color:#ffffff;border:none;border-radius:8px;font-weight:600;font-size:15px;cursor:pointer;">Continue with reviewer sandbox</button>',
+      );
+    } else if (hasGoogle) {
       buttons.push(
         `<button type="submit" name="provider" value="google" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:12px;margin-bottom:10px;background:#ffffff;color:#1f2937;border:1px solid #d1d5db;border-radius:8px;font-weight:600;font-size:15px;cursor:pointer;">
           <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.7 0 3 .7 3.9 1.5l2.9-2.9C17 2 14.7 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2c0 2.8.7 5.5 1.9 7.8l3.7-2.9z"/><path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.5C3.7 20.3 7.5 23.5 12 23.5z"/></svg>
@@ -298,12 +350,17 @@ export class OAuthHandler {
         </button>`,
       );
     }
-    if (hasGitHub) {
+    if (!reviewerSession && hasGitHub) {
       buttons.push(
         `<button type="submit" name="provider" value="github" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:12px;margin-bottom:10px;background:#24292f;color:#ffffff;border:none;border-radius:8px;font-weight:600;font-size:15px;cursor:pointer;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
           Continue with GitHub
         </button>`,
+      );
+    }
+    if (!reviewerSession && this.isReviewerEnabled()) {
+      buttons.push(
+        '<p><a href="/oauth/reviewer/login">Sign in to the OpenAI reviewer sandbox</a></p>',
       );
     }
 
@@ -388,6 +445,28 @@ export class OAuthHandler {
     }
     if (pending.approved) {
       throw safeError("INVALID_TOKEN", "OAuth transaction is already approved", 403);
+    }
+    if (provider === "reviewer_demo") {
+      const userId = this.reviewerSessions.getUserId(req);
+      if (
+        userId !== REVIEWER_DEMO_USER_ID ||
+        req.headers.origin !== new URL(this.config.publicBaseUrl).origin
+      ) {
+        throw safeError("FORBIDDEN", "Reviewer session is missing or expired", 403);
+      }
+      const reviewerScope = this.reviewerConsentScope(pending.scope);
+      if (!reviewerScope) {
+        throw safeError(
+          "INVALID_SCOPE",
+          "Reviewer sandbox only supports read-only inspection scopes",
+          403,
+        );
+      }
+      pending.scope = reviewerScope;
+      pending.approved = true;
+      this.completeOAuthCallback(res, pending, userId);
+      this.authorizeTransactions.delete(transactionId);
+      return;
     }
     const grantMode =
       form.grant_mode ?? (this.readOnlyConsentScope(pending.scope) ? "read_only" : "requested");

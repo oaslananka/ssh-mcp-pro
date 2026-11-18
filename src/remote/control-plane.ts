@@ -180,6 +180,14 @@ export class RemoteControlPlane {
     res: ServerResponse,
     pathname: string,
   ): Promise<boolean> {
+    if (pathname === "/oauth/reviewer/login" && (req.method === "GET" || req.method === "POST")) {
+      await this.oauth.handleReviewerLogin(req, res);
+      return true;
+    }
+    if (pathname === "/oauth/reviewer/logout" && req.method === "POST") {
+      await this.oauth.handleReviewerLogout(req, res);
+      return true;
+    }
     if (pathname === "/oauth/register" && req.method === "POST") {
       await this.oauth.handleRegister(req, res);
       return true;
