@@ -182,11 +182,14 @@ export class ReviewerSessionHandler {
 
   private assertSameOrigin(req: IncomingMessage): void {
     const expectedOrigin = new URL(this.config.publicBaseUrl).origin;
+    const origin = req.headers.origin;
     const fetchSite = req.headers["sec-fetch-site"];
-    if (
-      req.headers.origin !== expectedOrigin ||
-      (fetchSite !== undefined && fetchSite !== "same-origin")
-    ) {
+    // Chromium can serialize a same-origin form POST as Origin: null when
+    // Referrer-Policy is no-referrer. Accept that case only with same-origin
+    // Fetch Metadata; the one-time CSRF cookie/token is still required below.
+    const trustedOrigin =
+      origin === expectedOrigin || (origin === "null" && fetchSite === "same-origin");
+    if (!trustedOrigin || (fetchSite !== undefined && fetchSite !== "same-origin")) {
       throw safeError("FORBIDDEN", "Cross-origin reviewer authentication is not allowed", 403);
     }
   }
