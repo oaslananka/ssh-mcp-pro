@@ -3,7 +3,8 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { Readable } from "node:stream";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
 import { randomToken } from "../../src/remote/crypto.js";
-import { captureResponse, jsonRequest, request, testConfig } from "./web-dashboard-fixture.js";
+import { captureResponse, request, testConfig } from "./web-dashboard-fixture.js";
+export { jsonRequest as jsonBodyRequest } from "./web-dashboard-fixture.js";
 import { writeTestHttpError } from "./http-error.js";
 
 export const REVIEWER_USERNAME = "openai-reviewer";
@@ -15,8 +16,6 @@ export function reviewerPasswordHash(password: string): string {
   const key = scryptSync(password, salt, 64, { N: 16_384, r: 8, p: 1 });
   return `scrypt$16384$8$1$${salt.toString("base64url")}$${key.toString("base64url")}`;
 }
-
-export const jsonBodyRequest = jsonRequest;
 
 export function formRequest(
   method: string,
@@ -63,7 +62,9 @@ export function setCookie(
   name: string,
 ): string | undefined {
   const header = response.getHeader("set-cookie");
-  const lines = Array.isArray(header) ? header : header ? [header] : [];
+  let lines: string[] = [];
+  if (Array.isArray(header)) lines = header;
+  else if (header) lines = [header];
   const prefix = `${name}=`;
   const line = lines.find((value) => value.startsWith(prefix));
   return line?.split(";")[0];

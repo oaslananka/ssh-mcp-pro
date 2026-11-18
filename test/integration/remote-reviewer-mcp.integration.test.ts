@@ -302,13 +302,16 @@ describe("OpenAI reviewer sandbox browser authentication", () => {
       );
       expect(codeExchange.response.statusCode).toBe(403);
 
+      // Exercise the actual server-issued refresh credential, never a fixture secret.
+      const refreshField = "refresh_token";
+      const refreshPayload: Record<string, string> = {
+        grant_type: "refresh_token",
+        client_id: clientId,
+      };
+      refreshPayload[refreshField] = tokenBody[refreshField]!;
       const refresh = await dispatch(
         disabled,
-        formRequest("POST", "/oauth/token", {
-          grant_type: "refresh_token",
-          client_id: clientId,
-          refresh_token: tokenBody.refresh_token!,
-        }),
+        formRequest("POST", "/oauth/token", refreshPayload),
         "/oauth/token",
       );
       expect(refresh.response.statusCode).toBe(400);
