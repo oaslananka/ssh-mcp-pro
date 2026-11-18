@@ -850,7 +850,7 @@ export class OAuthHandler {
     googleId?: string | undefined;
     email?: string | undefined;
     displayName?: string | undefined;
-    provider?: "github" | "google" | undefined;
+    provider?: "github" | "google" | "demo" | undefined;
   } {
     if (userId.startsWith("github:")) {
       const githubId = userId.slice("github:".length);

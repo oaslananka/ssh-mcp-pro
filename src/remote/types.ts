@@ -32,6 +32,13 @@ export const REMOTE_SCOPES = [
 
 export type RemoteScope = (typeof REMOTE_SCOPES)[number];
 
+export const REVIEWER_DEMO_USER_ID = "demo:openai-reviewer";
+export const REVIEWER_DEMO_SCOPES = [
+  "hosts:read",
+  "agents:read",
+  "status:read",
+] as const satisfies readonly RemoteScope[];
+
 // Public discovery avoids vendor/application-specific grants. Legacy scopes are
 // still accepted for already connected v1.x clients until the next major release.
 export const PUBLIC_REMOTE_SCOPES: readonly RemoteScope[] = REMOTE_SCOPES.filter(
@@ -325,7 +332,7 @@ export interface RemotePrincipal {
   githubLogin: string;
   email?: string | undefined;
   displayName?: string | undefined;
-  provider?: "github" | "google" | undefined;
+  provider?: "github" | "google" | "demo" | undefined;
   scopes: RemoteScope[];
   capabilities: RemoteCapability[];
   tokenId: string;
@@ -342,6 +349,8 @@ export interface RemoteConfig {
   googleClientId?: string | undefined;
   googleClientSecret?: string | undefined;
   googleCallbackUrl: string;
+  reviewerUsername?: string | undefined;
+  reviewerPasswordHash?: string | undefined;
   allowAllUsers: boolean;
   allowedGitHubLogins: string[];
   allowedGitHubIds: string[];

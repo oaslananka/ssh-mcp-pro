@@ -152,7 +152,7 @@ export interface TokenUserIdentity {
   googleId?: string | undefined;
   email?: string | undefined;
   displayName?: string | undefined;
-  provider?: "github" | "google" | undefined;
+  provider?: "github" | "google" | "demo" | undefined;
 }
 
 export async function issueAccessToken(
