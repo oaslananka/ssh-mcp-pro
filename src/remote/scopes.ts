@@ -1,5 +1,6 @@
 import {
   REMOTE_SCOPES,
+  REVIEWER_DEMO_SCOPES,
   SCOPE_CAPABILITY_MAP,
   type RemoteCapability,
   type RemoteScope,
@@ -34,4 +35,12 @@ export function hasCapability(
 
 export function allRemoteScopes(): RemoteScope[] {
   return [...REMOTE_SCOPES];
+}
+
+export function isReviewerScopeSubset(scopes: readonly RemoteScope[]): boolean {
+  return (
+    scopes.length > 0 &&
+    new Set(scopes).size === scopes.length &&
+    scopes.every((scope) => REVIEWER_DEMO_SCOPES.some((allowed) => allowed === scope))
+  );
 }

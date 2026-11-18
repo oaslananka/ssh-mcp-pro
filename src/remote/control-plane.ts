@@ -571,11 +571,15 @@ export class RemoteControlPlane {
 
   private async authenticate(req: IncomingMessage): Promise<RemotePrincipal> {
     try {
-      return await verifyRemoteAccessToken(
+      const principal = await verifyRemoteAccessToken(
         req.headers.authorization,
         this.config,
         this.requireJwtKeyPair(),
       );
+      if (principal.provider === "demo" && !this.oauth.isReviewerEnabled()) {
+        throw safeError("UNAUTHORIZED", "Missing or invalid bearer token", 401);
+      }
+      return principal;
     } catch {
       this.audit({
         eventType: "token_validation_failure",

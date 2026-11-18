@@ -12,8 +12,13 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { exportJWK, importPKCS8, importSPKI, jwtVerify, SignJWT, type JWTPayload } from "jose";
 import { extractBearerToken } from "../auth.js";
-import type { RemoteConfig, RemotePrincipal, RemoteScope } from "./types.js";
-import { capabilitiesFromScopes } from "./scopes.js";
+import {
+  REVIEWER_DEMO_USER_ID,
+  type RemoteConfig,
+  type RemotePrincipal,
+  type RemoteScope,
+} from "./types.js";
+import { capabilitiesFromScopes, isReviewerScopeSubset } from "./scopes.js";
 
 export interface PemKeyPair {
   publicKeyPem: string;
@@ -164,25 +169,27 @@ export async function issueAccessToken(
   const issuedAt = Math.floor(Date.now() / 1000);
   const expiresAtSeconds = issuedAt + config.accessTokenTtlSeconds;
   const tokenId = id("tok");
-  const githubLogin = user.githubLogin ?? user.displayName ?? user.email ?? user.id;
-  const githubId = user.githubId ?? user.googleId ?? user.id;
-  const claims: Record<string, unknown> = {
-    scope: scopes.join(" "),
-    github_login: githubLogin,
-    github_id: githubId,
-  };
-  if (user.googleId) {
-    claims.google_id = user.googleId;
+  if (
+    (user.provider === "demo" &&
+      (user.id !== REVIEWER_DEMO_USER_ID ||
+        user.githubId !== undefined ||
+        user.githubLogin !== undefined ||
+        user.googleId !== undefined ||
+        user.email !== undefined ||
+        !isReviewerScopeSubset(scopes))) ||
+    (user.id === REVIEWER_DEMO_USER_ID && user.provider !== "demo")
+  ) {
+    throw new TypeError("Invalid reviewer identity or scopes");
   }
-  if (user.email) {
-    claims.email = user.email;
+  const claims: Record<string, unknown> = { scope: scopes.join(" ") };
+  if (user.provider !== "demo") {
+    claims.github_login = user.githubLogin ?? user.displayName ?? user.email ?? user.id;
+    claims.github_id = user.githubId ?? user.googleId ?? user.id;
+    if (user.googleId) claims.google_id = user.googleId;
+    if (user.email) claims.email = user.email;
   }
-  if (user.displayName) {
-    claims.display_name = user.displayName;
-  }
-  if (user.provider) {
-    claims.provider = user.provider;
-  }
+  if (user.displayName) claims.display_name = user.displayName;
+  if (user.provider) claims.provider = user.provider;
   const token = await new SignJWT(claims)
     .setProtectedHeader({ alg: "EdDSA", kid: keyId(keyPair.publicKeyPem) })
     .setIssuer(config.publicBaseUrl)
@@ -232,7 +239,20 @@ function principalFromPayload(payload: JWTPayload): RemotePrincipal {
   const email = typeof payload.email === "string" ? payload.email : undefined;
   const displayName = typeof payload.display_name === "string" ? payload.display_name : undefined;
   const provider =
-    payload.provider === "google" || payload.provider === "github" ? payload.provider : undefined;
+    payload.provider === "demo"
+      ? "demo"
+      : payload.provider === "google" || payload.provider === "github"
+        ? payload.provider
+        : undefined;
+  if (
+    (provider === "demo" &&
+      (payload.sub !== REVIEWER_DEMO_USER_ID ||
+        !isReviewerScopeSubset(scopes as RemoteScope[]) ||
+        ["github_id", "github_login", "google_id", "email"].some((claim) => claim in payload))) ||
+    (payload.sub === REVIEWER_DEMO_USER_ID && provider !== "demo")
+  ) {
+    throw new TypeError("Invalid reviewer identity claims");
+  }
   return {
     userId: String(payload.sub),
     githubId,

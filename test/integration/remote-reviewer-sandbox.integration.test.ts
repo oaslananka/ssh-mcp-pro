@@ -26,6 +26,19 @@ function reviewerPasswordHash(password: string): string {
   return `scrypt$16384$8$1$${salt.toString("base64url")}$${key.toString("base64url")}`;
 }
 
+function jsonBodyRequest(
+  method: string,
+  url: string,
+  body: Record<string, unknown>,
+  headers: Record<string, string> = {},
+): IncomingMessage {
+  const raw = JSON.stringify(body);
+  return Object.assign(
+    Readable.from([Buffer.from(raw)]),
+    request(method, url, { "content-type": "application/json", ...headers }),
+  ) as IncomingMessage;
+}
+
 function formRequest(
   method: string,
   url: string,
@@ -359,6 +372,119 @@ describe("OpenAI reviewer sandbox browser authentication", () => {
       expect(result.response.body).not.toContain("Reviewer session ready");
     } finally {
       controlPlane.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("rejects reviewer authorization-code exchange, refresh, and bearer access when disabled", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "reviewer-disabled-token-boundary-"));
+    const enabled = createControlPlane(dir);
+    let enabledClosed = false;
+    let disabled: RemoteControlPlane | undefined;
+    try {
+      await enabled.initialize();
+      const loginResult = await login(enabled);
+      const sessionCookie = setCookie(loginResult.response, "ssh_mcp_reviewer_session")!;
+      const registered = await dispatch(
+        enabled,
+        jsonRequest("POST", "/oauth/register", {
+          client_name: "Reviewer Token Boundary",
+          redirect_uris: ["http://localhost/reviewer-token-callback"],
+        }),
+        "/oauth/register",
+      );
+      const clientId = String(JSON.parse(registered.response.body).client_id);
+      const redirectUri = "http://localhost/reviewer-token-callback";
+      const issueCode = async () => {
+        const authorize = await dispatch(
+          enabled,
+          request(
+            "GET",
+            authorizationUrl(clientId, redirectUri, "hosts:read agents:read status:read"),
+            { cookie: sessionCookie },
+          ),
+          "/oauth/authorize",
+        );
+        const transactionCookie = setCookie(authorize.response, "ssh_mcp_oauth_tx")!;
+        const transaction = transactionCookie.slice("ssh_mcp_oauth_tx=".length);
+        const approved = await dispatch(
+          enabled,
+          formRequest(
+            "POST",
+            "/oauth/approve",
+            { transaction, provider: "reviewer_demo" },
+            { origin: PUBLIC_BASE_URL, cookie: `${sessionCookie}; ${transactionCookie}` },
+          ),
+          "/oauth/approve",
+        );
+        const callbackHref = /href="([^"]+)"/u.exec(approved.response.body)?.[1];
+        if (!callbackHref)
+          throw new Error("Reviewer approval did not return an authorization code");
+        return new URL(callbackHref.replaceAll("&amp;", "&")).searchParams.get("code") ?? "";
+      };
+
+      const codeForToken = await issueCode();
+      const tokenResult = await dispatch(
+        enabled,
+        formRequest("POST", "/oauth/token", {
+          grant_type: "authorization_code",
+          client_id: clientId,
+          code: codeForToken,
+          redirect_uri: redirectUri,
+          code_verifier: "reviewer-pkce-verifier",
+        }),
+        "/oauth/token",
+      );
+      expect(tokenResult.response.statusCode).toBe(200);
+      const tokenBody = JSON.parse(tokenResult.response.body) as Record<string, string>;
+      expect(tokenBody.scope).toBe("hosts:read agents:read status:read");
+      expect(tokenBody.refresh_token).toBeTruthy();
+      const codeAfterDisable = await issueCode();
+
+      enabled.close();
+      enabledClosed = true;
+      disabled = createControlPlane(dir, false);
+      await disabled.initialize();
+
+      const codeExchange = await dispatch(
+        disabled,
+        formRequest("POST", "/oauth/token", {
+          grant_type: "authorization_code",
+          client_id: clientId,
+          code: codeAfterDisable,
+          redirect_uri: redirectUri,
+          code_verifier: "reviewer-pkce-verifier",
+        }),
+        "/oauth/token",
+      );
+      expect(codeExchange.response.statusCode).toBe(403);
+
+      const refresh = await dispatch(
+        disabled,
+        formRequest("POST", "/oauth/token", {
+          grant_type: "refresh_token",
+          client_id: clientId,
+          refresh_token: tokenBody.refresh_token!,
+        }),
+        "/oauth/token",
+      );
+      expect(refresh.response.statusCode).toBe(400);
+      expect(JSON.parse(refresh.response.body)).toEqual({ error: "invalid_grant" });
+
+      const mcp = await dispatch(
+        disabled,
+        jsonBodyRequest(
+          "POST",
+          "/mcp",
+          { jsonrpc: "2.0", id: 1, method: "tools/list" },
+          { authorization: `Bearer ${tokenBody.access_token}` },
+        ),
+        "/mcp",
+      );
+      expect(mcp.response.statusCode).toBe(401);
+    } finally {
+      if (!enabledClosed) enabled.close();
+      disabled?.close();
       rmSync(dir, { recursive: true, force: true });
     }
   });

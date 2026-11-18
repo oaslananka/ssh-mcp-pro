@@ -24,6 +24,7 @@ import {
 } from "./http-util.js";
 import { RemoteStore } from "./store.js";
 import { ReviewerSessionHandler } from "./reviewer-session.js";
+import { isReviewerScopeSubset } from "./scopes.js";
 import { exchangeGitHubIdentity, exchangeGoogleIdentity } from "./oauth-provider-exchange.js";
 import type {
   AuditEvent,
@@ -32,6 +33,7 @@ import type {
   OAuthAuthorizationCode,
   OAuthClient,
   OAuthRefreshTokenRecord,
+  RemoteScope,
   RemoteConfig,
 } from "./types.js";
 import { PUBLIC_REMOTE_SCOPES, REVIEWER_DEMO_SCOPES, REVIEWER_DEMO_USER_ID } from "./types.js";
@@ -104,6 +106,20 @@ export class OAuthHandler {
     const requestedScopes = scopeList(requested);
     const reviewerScopes = REVIEWER_DEMO_SCOPES.filter((entry) => requestedScopes.includes(entry));
     return reviewerScopes.length > 0 ? reviewerScopes.join(" ") : undefined;
+  }
+
+  private isReviewerGrantAllowed(
+    user: { id: string; provider?: "github" | "google" | "demo" | undefined },
+    scopes: readonly RemoteScope[],
+  ): boolean {
+    const reviewerIdentity = user.id === REVIEWER_DEMO_USER_ID || user.provider === "demo";
+    return (
+      !reviewerIdentity ||
+      (user.id === REVIEWER_DEMO_USER_ID &&
+        user.provider === "demo" &&
+        this.isReviewerEnabled() &&
+        isReviewerScopeSubset(scopes))
+    );
   }
 
   /** GET /.well-known/oauth-protected-resource */
@@ -813,6 +829,9 @@ export class OAuthHandler {
     const jwtKeyPair = this.getJwtKeyPair();
     const user = this.userFromId(codeRecord.userId);
     const scopes = scopeList(codeRecord.scope);
+    if (!this.isReviewerGrantAllowed(user, scopes)) {
+      throw safeError("INVALID_TOKEN", "Reviewer authorization is no longer valid", 403);
+    }
     try {
       this.store.markAuthorizationCodeUsed(codeRecord.codeHash, nowIso());
     } catch {
@@ -892,6 +911,10 @@ export class OAuthHandler {
       return;
     }
     const scopes = scopeList(old.scope);
+    if (!this.isReviewerGrantAllowed(user, scopes)) {
+      invalidGrant();
+      return;
+    }
     const token = await issueAccessToken(this.config, this.getJwtKeyPair(), user, scopes);
     const newRaw = randomToken(32);
     const successor: OAuthRefreshTokenRecord = {

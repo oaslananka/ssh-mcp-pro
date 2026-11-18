@@ -17,7 +17,11 @@ import {
   verifyEnvelope,
   verifyRemoteAccessToken,
 } from "../../src/remote/crypto.js";
-import type { RemoteConfig } from "../../src/remote/types.js";
+import {
+  REVIEWER_DEMO_SCOPES,
+  REVIEWER_DEMO_USER_ID,
+  type RemoteConfig,
+} from "../../src/remote/types.js";
 
 function testConfig(dir: string): RemoteConfig {
   return {
@@ -149,6 +153,94 @@ describe("remote crypto helpers", () => {
     await expect(verifyRemoteAccessToken("Bearer " + token, config, keyPair)).rejects.toThrow(
       "Invalid GitHub identity claims",
     );
+  });
+
+  test("issues a reviewer token without GitHub or Google identity claims", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-reviewer-token-"));
+    const config = testConfig(dir);
+    const keyPair = await loadJwtKeyPair(config.jwtSigningKeyPath);
+    const token = await issueAccessToken(
+      config,
+      keyPair,
+      {
+        id: REVIEWER_DEMO_USER_ID,
+        provider: "demo",
+        displayName: "OpenAI Reviewer (Sample Tenant)",
+      },
+      [...REVIEWER_DEMO_SCOPES],
+    );
+    const claims = JSON.parse(
+      Buffer.from(token.token.split(".")[1] ?? "", "base64url").toString("utf8"),
+    ) as Record<string, unknown>;
+    const principal = await verifyRemoteAccessToken(`Bearer ${token.token}`, config, keyPair);
+
+    expect(claims).toMatchObject({ sub: REVIEWER_DEMO_USER_ID, provider: "demo" });
+    expect(claims).not.toHaveProperty("github_id");
+    expect(claims).not.toHaveProperty("github_login");
+    expect(claims).not.toHaveProperty("google_id");
+    expect(claims).not.toHaveProperty("email");
+    expect(principal).toMatchObject({
+      userId: REVIEWER_DEMO_USER_ID,
+      provider: "demo",
+      scopes: [...REVIEWER_DEMO_SCOPES],
+      githubId: "",
+      githubLogin: "",
+    });
+  });
+
+  test("refuses to issue reviewer tokens for another subject, external identity, or elevated scopes", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-reviewer-token-boundary-"));
+    const config = testConfig(dir);
+    const keyPair = await loadJwtKeyPair(config.jwtSigningKeyPath);
+
+    await expect(
+      issueAccessToken(config, keyPair, { id: REVIEWER_DEMO_USER_ID, provider: "demo" }, [
+        "files:write",
+      ]),
+    ).rejects.toThrow("Invalid reviewer identity or scopes");
+    await expect(
+      issueAccessToken(config, keyPair, { id: "demo:another-user", provider: "demo" }, [
+        "hosts:read",
+      ]),
+    ).rejects.toThrow("Invalid reviewer identity or scopes");
+    await expect(
+      issueAccessToken(
+        config,
+        keyPair,
+        { id: REVIEWER_DEMO_USER_ID, provider: "demo", githubId: "123" },
+        ["hosts:read"],
+      ),
+    ).rejects.toThrow("Invalid reviewer identity or scopes");
+  });
+
+  test("rejects signed reviewer JWTs with elevated scopes, external identities, or another subject", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-reviewer-jwt-validation-"));
+    const config = testConfig(dir);
+    const keyPair = await loadJwtKeyPair(config.jwtSigningKeyPath);
+    const invalidClaims = [
+      { scope: "hosts:read shell:exec", subject: REVIEWER_DEMO_USER_ID },
+      { scope: "hosts:read", subject: "demo:another-user" },
+      { scope: "hosts:read", subject: REVIEWER_DEMO_USER_ID, github_id: "123" },
+      { scope: "", subject: REVIEWER_DEMO_USER_ID },
+      { scope: "hosts:read hosts:read", subject: REVIEWER_DEMO_USER_ID },
+      { scope: "hosts:read", subject: REVIEWER_DEMO_USER_ID, provider: "github", github_id: "123" },
+    ];
+
+    for (const claims of invalidClaims) {
+      const { subject, provider = "demo", ...payload } = claims;
+      const token = await new SignJWT({ ...payload, provider })
+        .setProtectedHeader({ alg: "EdDSA" })
+        .setIssuer(config.publicBaseUrl)
+        .setAudience(config.mcpResourceUrl)
+        .setSubject(subject)
+        .setJti("reviewer-invalid-claims")
+        .setIssuedAt()
+        .setExpirationTime("5m")
+        .sign(keyPair.privateKey);
+      await expect(verifyRemoteAccessToken(`Bearer ${token}`, config, keyPair)).rejects.toThrow(
+        "Invalid reviewer identity claims",
+      );
+    }
   });
 
   test("rejects missing remote bearer tokens", async () => {
