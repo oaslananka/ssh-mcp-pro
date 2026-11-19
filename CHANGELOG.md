@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.1](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.15.0...ssh-mcp-pro-v1.15.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* **ci:** honor explicitly opt-in SSH forwarding tests ([#316](https://github.com/oaslananka/ssh-mcp-pro/issues/316)) ([0eedfd4](https://github.com/oaslananka/ssh-mcp-pro/commit/0eedfd4691676d57221710969ee8139bf0965a5a))
+
 ## [1.15.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.14.0...ssh-mcp-pro-v1.15.0) (2026-11-19)
 
 
