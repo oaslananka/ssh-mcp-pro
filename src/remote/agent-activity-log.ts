@@ -161,6 +161,37 @@ function consolePreview(value: string, max = 160): string {
   return obscured.slice(0, max) + (obscured.length > max ? "…" : "");
 }
 
+/** Build diagnostics without retaining command arguments or output text. */
+function actionResultFields(
+  action: AgentAction,
+  result: AgentResult,
+  durationMs: number,
+): string[] {
+  const nonZeroExit = typeof result.exit_code === "number" && result.exit_code !== 0;
+  const outcome = result.status === "error" ? "ERROR" : nonZeroExit ? "NONZERO EXIT" : "OK";
+  const fields = [outcome, "in " + durationLabel(durationMs)];
+  if (typeof result.exit_code === "number" && Number.isFinite(result.exit_code)) {
+    fields.push("exit=" + result.exit_code);
+  }
+  fields.push(...safeProcessProgress(action, result));
+  if (action.tool !== "process_read" || result.status !== "ok") {
+    fields.push(
+      "stdout=" + lineCount(result.stdout) + " lines",
+      "stderr=" + lineCount(result.stderr) + " lines",
+    );
+  }
+  if (result.truncated) fields.push("truncated");
+  if (result.error_code && /^[A-Z_]{1,48}$/u.test(result.error_code)) {
+    fields.push(result.error_code);
+  }
+  return fields;
+}
+
+function resultEventLevel(result: AgentResult): AgentActivityLevel {
+  if (result.status === "error") return "error";
+  return typeof result.exit_code === "number" && result.exit_code !== 0 ? "warn" : "ok";
+}
+
 /** Local, bounded diagnostics. Never record shell arguments, outputs, keys or tokens. */
 export function agentActivityLogPath(agentConfigPath: string): string {
   return path.join(path.dirname(agentConfigPath), "logs", "agent-activity.jsonl");
@@ -275,43 +306,25 @@ export class AgentActivityLog {
   }
 
   actionFinished(action: AgentAction, result: AgentResult, durationMs: number): void {
-    const label = actionLabel(action);
-    const nonZeroExit = typeof result.exit_code === "number" && result.exit_code !== 0;
-    const outcome = result.status === "error" ? "ERROR" : nonZeroExit ? "NONZERO EXIT" : "OK";
-    const fields = [
-      outcome,
-      "in " + durationLabel(durationMs),
-      ...(typeof result.exit_code === "number" && Number.isFinite(result.exit_code)
-        ? ["exit=" + result.exit_code]
-        : []),
-      ...safeProcessProgress(action, result),
-      ...(action.tool === "process_read" && result.status === "ok"
-        ? []
-        : [
-            "stdout=" + lineCount(result.stdout) + " lines",
-            "stderr=" + lineCount(result.stderr) + " lines",
-          ]),
-      ...(result.truncated ? ["truncated"] : []),
-      ...(result.error_code && /^[A-Z_]{1,48}$/u.test(result.error_code)
-        ? [result.error_code]
-        : []),
-    ];
     this.event(
-      result.status === "error" ? "error" : nonZeroExit ? "warn" : "ok",
+      resultEventLevel(result),
       "action_finished",
-      label + "  " + fields.join("  ·  "),
+      actionLabel(action) + "  " + actionResultFields(action, result, durationMs).join("  ·  "),
     );
+    this.showResultPreviews(result);
+  }
+
+  private showResultPreviews(result: AgentResult): void {
     const detail =
       this.options.detail ??
       (process.env.SSHAUTOMATOR_AGENT_LOG_DETAIL === "verbose" ? "verbose" : "compact");
     const showOutput = this.options.showOutput ?? process.env.SSHAUTOMATOR_AGENT_LOG_OUTPUT === "1";
-    if (detail === "verbose" && showOutput) {
-      if (result.stdout) {
-        process.stdout.write("    stdout preview: " + consolePreview(result.stdout) + "\n");
-      }
-      if (result.stderr) {
-        process.stdout.write("    stderr preview: " + consolePreview(result.stderr) + "\n");
-      }
+    if (detail !== "verbose" || !showOutput) return;
+    if (result.stdout) {
+      process.stdout.write("    stdout preview: " + consolePreview(result.stdout) + "\n");
+    }
+    if (result.stderr) {
+      process.stdout.write("    stderr preview: " + consolePreview(result.stderr) + "\n");
     }
   }
 
