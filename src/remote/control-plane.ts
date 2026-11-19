@@ -439,7 +439,7 @@ export class RemoteControlPlane {
         throw safeError("INVALID_SCOPE", "agents:read scope is required", 403);
       }
       jsonResponse(res, 200, {
-        agents: this.store.listAgents(principal.userId).map(sanitizeAgent),
+        agents: this.visibleAgents(principal).map(sanitizeAgent),
       });
       return;
     }
@@ -452,7 +452,12 @@ export class RemoteControlPlane {
       }
       const url = new URL(req.url ?? "/api/audit", this.config.publicBaseUrl);
       const limit = Number(url.searchParams.get("limit") ?? 50);
-      jsonResponse(res, 200, { events: this.store.listAudit(principal.userId, undefined, limit) });
+      const allowed = new Set(this.visibleAgents(principal).map((agent) => agent.id));
+      jsonResponse(res, 200, {
+        events: this.store
+          .listAudit(principal.userId, undefined, limit)
+          .filter((event) => !!event.agentId && allowed.has(event.agentId)),
+      });
       return;
     }
     jsonResponse(res, 404, { error: "Not found" });
@@ -470,6 +475,7 @@ export class RemoteControlPlane {
       if (!agent) {
         throw safeError("AGENT_NOT_FOUND", "Agent not found", 404);
       }
+      this.requireVisibleAgent(principal, agent);
       if (!agentMatch[2] && req.method === "GET") {
         if (!hasCapability(principal.capabilities, "agents.read")) {
           throw safeError("INVALID_SCOPE", "agents:read scope is required", 403);
@@ -556,6 +562,20 @@ export class RemoteControlPlane {
       if (principal.provider === "demo" && !this.oauth.isReviewerEnabled()) {
         throw safeError("UNAUTHORIZED", "Missing or invalid bearer token", 401);
       }
+      if (principal.provider !== "demo") {
+        const connection = principal.connectionId
+          ? this.store.getOAuthConnection(principal.userId, principal.connectionId)
+          : undefined;
+        if (
+          principal.connectionId
+            ? !connection ||
+              connection.clientId !== principal.clientId ||
+              connection.status !== "active"
+            : this.store.isStrictVisibilityEnabled(principal.userId)
+        ) {
+          throw safeError("UNAUTHORIZED", "AI connection is not authorized", 401);
+        }
+      }
       return principal;
     } catch {
       this.audit({
@@ -602,6 +622,38 @@ export class RemoteControlPlane {
     return reviewerDemoToolResult(tool, args);
   }
 
+  private mayAccessAgent(principal: RemotePrincipal, agent: RemoteAgentRecord): boolean {
+    if (agent.userId !== principal.userId) return false;
+    if (principal.connectionId) {
+      const connection = this.store.getOAuthConnection(principal.userId, principal.connectionId);
+      return (
+        connection?.status === "active" &&
+        connection.clientId === principal.clientId &&
+        this.store.isDeviceGranted(principal.userId, principal.connectionId, agent.id)
+      );
+    }
+    return !this.store.isStrictVisibilityEnabled(principal.userId);
+  }
+
+  private visibleAgents(principal: RemotePrincipal): RemoteAgentRecord[] {
+    return this.store
+      .listAgents(principal.userId)
+      .filter((agent) => this.mayAccessAgent(principal, agent));
+  }
+
+  private requireVisibleAgent(principal: RemotePrincipal, agent: RemoteAgentRecord): void {
+    if (!this.mayAccessAgent(principal, agent)) {
+      this.audit({
+        userId: principal.userId,
+        agentId: agent.id,
+        eventType: "device_access_denied",
+        severity: "warn",
+        metadata: { connection_id: principal.connectionId ?? "legacy" },
+      });
+      throw safeError("AGENT_NOT_FOUND", "Device not available to this AI connection", 404);
+    }
+  }
+
   private async callRemoteTool(
     principal: RemotePrincipal,
     tool: RemoteToolName,
@@ -627,7 +679,7 @@ export class RemoteControlPlane {
 
     if (tool === "list_hosts") {
       return {
-        hosts: this.store.listAgents(principal.userId).map((agent) => ({
+        hosts: this.visibleAgents(principal).map((agent) => ({
           id: agent.id,
           alias: agent.alias,
           status: agent.status,
@@ -636,31 +688,36 @@ export class RemoteControlPlane {
       };
     }
     if (tool === "list_agents") {
-      return { agents: this.store.listAgents(principal.userId).map(sanitizeAgent) };
+      return { agents: this.visibleAgents(principal).map(sanitizeAgent) };
     }
     if (tool === "create_enrollment_token") {
       return this.enrollment.createEnrollmentToken(principal, args);
     }
     if (tool === "get_agent_install_command") {
-      const agent = this.requireAgent(principal.userId, args);
+      const agent = this.requireAgent(principal, args);
       return this.enrollment.installCommand(agent, undefined);
     }
     if (tool === "update_agent_policy") {
-      const agent = this.requireAgent(principal.userId, args);
+      const agent = this.requireAgent(principal, args);
       return { agent: sanitizeAgent(this.updateAgentPolicy(principal, agent, args.policy)) };
     }
     if (tool === "revoke_agent") {
-      const agent = this.requireAgent(principal.userId, args);
+      const agent = this.requireAgent(principal, args);
       return { agent: sanitizeAgent(this.revokeAgent(principal, agent)) };
     }
     if (tool === "get_audit_events") {
       const agentId = asString(args.agent_id_or_alias)
-        ? this.resolveAgent(principal.userId, String(args.agent_id_or_alias))?.id
+        ? this.requireAgent(principal, args).id
         : undefined;
-      return { events: this.store.listAudit(principal.userId, agentId, Number(args.limit ?? 50)) };
+      const allowed = new Set(this.visibleAgents(principal).map((agent) => agent.id));
+      return {
+        events: this.store
+          .listAudit(principal.userId, agentId, Number(args.limit ?? 50))
+          .filter((event) => !!event.agentId && allowed.has(event.agentId)),
+      };
     }
 
-    const agent = this.requireAgent(principal.userId, args);
+    const agent = this.requireAgent(principal, args);
     if (!agent.policy.capabilities[capability]) {
       this.audit({
         userId: principal.userId,
@@ -871,11 +928,15 @@ export class RemoteControlPlane {
     return result;
   }
 
-  private requireAgent(userId: string, args: Record<string, unknown>): RemoteAgentRecord {
-    const agent = this.resolveAgent(userId, asString(args.agent_id_or_alias) ?? "");
+  private requireAgent(
+    principal: RemotePrincipal,
+    args: Record<string, unknown>,
+  ): RemoteAgentRecord {
+    const agent = this.resolveAgent(principal.userId, asString(args.agent_id_or_alias) ?? "");
     if (!agent) {
       throw safeError("AGENT_NOT_FOUND", "Agent not found", 404);
     }
+    this.requireVisibleAgent(principal, agent);
     return agent;
   }
 

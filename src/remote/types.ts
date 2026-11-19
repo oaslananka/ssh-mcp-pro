@@ -100,6 +100,7 @@ export interface OAuthClient {
 
 /** Persist only the hash of a rotating OAuth refresh credential. */
 export interface OAuthRefreshTokenRecord {
+  connectionId?: string | undefined;
   tokenHash: string;
   familyId: string;
   clientId: string;
@@ -113,6 +114,7 @@ export interface OAuthRefreshTokenRecord {
 }
 
 export interface OAuthAuthorizationCode {
+  connectionId?: string | undefined;
   id: string;
   codeHash: string;
   clientId: string;
@@ -327,6 +329,8 @@ export interface PolicyUpdateEnvelope {
 }
 
 export interface RemotePrincipal {
+  connectionId?: string | undefined;
+  clientId?: string | undefined;
   userId: string;
   githubId: string;
   githubLogin: string;

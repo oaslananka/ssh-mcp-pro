@@ -1,4 +1,5 @@
 import { mkdirSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { migrateRemoteStoreSchema } from "./store-schema.js";
@@ -352,6 +353,181 @@ export class RemoteStore {
       .run(JSON.stringify(redirectUris), clientId);
   }
 
+  /** Authorization identity is connection-specific, not the shared OAuth registration. */
+  createOAuthConnection(userId: string, clientId: string, now: string): string {
+    const connectionId = "con_" + randomUUID().replaceAll("-", "");
+    this.db
+      .prepare(
+        "INSERT INTO oauth_connections (id, user_id, client_id, status, created_at) " +
+          "VALUES (?, ?, ?, 'active', ?)",
+      )
+      .run(connectionId, userId, clientId, now);
+    return connectionId;
+  }
+
+  getOAuthConnection(
+    userId: string,
+    connectionId: string,
+  ): { id: string; clientId: string; status: string } | undefined {
+    return this.db
+      .prepare(
+        "SELECT id, client_id AS clientId, status FROM oauth_connections WHERE user_id = ? AND id = ?",
+      )
+      .get(userId, connectionId) as { id: string; clientId: string; status: string } | undefined;
+  }
+
+  isStrictVisibilityEnabled(userId: string): boolean {
+    return !!this.db.prepare("SELECT 1 FROM oauth_visibility_users WHERE user_id = ?").get(userId);
+  }
+
+  listGrantedDevices(userId: string, connectionId: string): string[] {
+    return (
+      this.db
+        .prepare(
+          "SELECT d.agent_id AS id FROM oauth_connection_devices d " +
+            "JOIN oauth_connections c ON c.id = d.connection_id " +
+            "JOIN agents a ON a.id = d.agent_id " +
+            "WHERE c.user_id = ? AND c.id = ? AND c.status = 'active' " +
+            "AND a.user_id = ? AND a.status <> 'revoked' ORDER BY d.agent_id",
+        )
+        .all(userId, connectionId, userId) as Array<{ id: string }>
+    ).map((row) => row.id);
+  }
+
+  isDeviceGranted(userId: string, connectionId: string, agentId: string): boolean {
+    return !!this.db
+      .prepare(
+        "SELECT 1 FROM oauth_connection_devices d " +
+          "JOIN oauth_connections c ON c.id = d.connection_id " +
+          "JOIN agents a ON a.id = d.agent_id " +
+          "WHERE c.user_id = ? AND c.id = ? AND c.status = 'active' " +
+          "AND d.agent_id = ? AND a.user_id = ? AND a.status <> 'revoked'",
+      )
+      .get(userId, connectionId, agentId, userId);
+  }
+
+  /** Atomic account-owned update. First selection also ends acceptance of unbound legacy tokens. */
+  setOAuthConnectionDevices(
+    userId: string,
+    connectionId: string,
+    agentIds: string[],
+    now: string,
+  ): void {
+    if (
+      agentIds.length > 100 ||
+      new Set(agentIds).size !== agentIds.length ||
+      agentIds.some(
+        (deviceId) => typeof deviceId !== "string" || !/^agt_[A-Za-z0-9_-]{1,100}$/.test(deviceId),
+      )
+    ) {
+      throw new TypeError("Invalid device selection");
+    }
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const connection = this.getOAuthConnection(userId, connectionId);
+      if (connection?.status !== "active") {
+        throw new Error("AI connection is not available");
+      }
+      for (const agentId of agentIds) {
+        if (
+          !this.db
+            .prepare("SELECT 1 FROM agents WHERE id = ? AND user_id = ? AND status <> 'revoked'")
+            .get(agentId, userId)
+        ) {
+          throw new Error("Device does not belong to this account");
+        }
+      }
+      this.db
+        .prepare("DELETE FROM oauth_connection_devices WHERE connection_id = ?")
+        .run(connectionId);
+      const insert = this.db.prepare(
+        "INSERT INTO oauth_connection_devices (connection_id, agent_id) VALUES (?, ?)",
+      );
+      for (const agentId of agentIds) insert.run(connectionId, agentId);
+      this.db
+        .prepare("INSERT OR IGNORE INTO oauth_visibility_users (user_id, enabled_at) VALUES (?, ?)")
+        .run(userId, now);
+      // Once strict visibility is enabled, unbound legacy credentials must reauthorize.
+      this.db
+        .prepare(
+          "UPDATE oauth_refresh_tokens SET revoked_at = ? " +
+            "WHERE user_id = ? AND connection_id IS NULL AND revoked_at IS NULL",
+        )
+        .run(now, userId);
+      this.db
+        .prepare(
+          "UPDATE oauth_authorization_codes SET used_at = ? " +
+            "WHERE user_id = ? AND connection_id IS NULL AND used_at IS NULL",
+        )
+        .run(now, userId);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  revokeOAuthConnection(userId: string, connectionId: string, now: string): boolean {
+    const updated = this.db
+      .prepare(
+        "UPDATE oauth_connections SET status = 'revoked', revoked_at = ? " +
+          "WHERE id = ? AND user_id = ? AND status = 'active'",
+      )
+      .run(now, connectionId, userId);
+    this.db
+      .prepare(
+        "UPDATE oauth_refresh_tokens SET revoked_at = ? " +
+          "WHERE user_id = ? AND connection_id = ? AND revoked_at IS NULL",
+      )
+      .run(now, userId, connectionId);
+    return Number(updated.changes) === 1;
+  }
+
+  listUserOAuthConnections(userId: string): Array<{
+    id: string;
+    clientId: string;
+    clientName: string;
+    status: string;
+    createdAt: string;
+    deviceIds: string[];
+    redirectHosts: string[];
+  }> {
+    const records = this.db
+      .prepare(
+        "SELECT c.id, c.client_id AS clientId, c.status, c.created_at AS createdAt, " +
+          "o.client_name AS clientName, o.redirect_uris AS redirectUris " +
+          "FROM oauth_connections c JOIN oauth_clients o ON o.client_id = c.client_id " +
+          "WHERE c.user_id = ? ORDER BY c.created_at DESC LIMIT 100",
+      )
+      .all(userId) as Array<{
+      id: string;
+      clientId: string;
+      status: string;
+      createdAt: string;
+      clientName: string | null;
+      redirectUris: string;
+    }>;
+    return records.map((record) => ({
+      id: record.id,
+      clientId: record.clientId,
+      clientName: record.clientName?.trim() ?? "AI connection",
+      status: record.status,
+      createdAt: record.createdAt,
+      deviceIds: this.listGrantedDevices(userId, record.id),
+      redirectHosts: [
+        ...new Set(
+          parseJson<string[]>(record.redirectUris).flatMap((uri) => {
+            try {
+              return [new URL(uri).hostname];
+            } catch {
+              return [];
+            }
+          }),
+        ),
+      ],
+    }));
+  }
+
   /** List only OAuth clients granted by this specific dashboard account. */
   listUserOAuthClients(
     userId: string,
@@ -432,6 +608,12 @@ export class RemoteStore {
             "WHERE user_id = ? AND client_id = ? AND revoked_at IS NULL",
         )
         .run(now, userId, clientId);
+      this.db
+        .prepare(
+          "UPDATE oauth_connections SET status = 'revoked', revoked_at = ? " +
+            "WHERE user_id = ? AND client_id = ? AND status = 'active'",
+        )
+        .run(now, userId, clientId);
       // Invalidate unredeemed authorization codes from the same account.
       this.db
         .prepare(
@@ -457,8 +639,8 @@ export class RemoteStore {
     this.db
       .prepare(
         "INSERT INTO oauth_refresh_tokens " +
-          "(token_hash, family_id, client_id, user_id, resource, scope, expires_at, used_at, revoked_at, created_at) " +
-          "VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)",
+          "(token_hash, family_id, client_id, user_id, resource, scope, expires_at, used_at, revoked_at, created_at, connection_id) " +
+          "VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)",
       )
       .run(
         token.tokenHash,
@@ -469,6 +651,7 @@ export class RemoteStore {
         token.scope,
         token.expiresAt,
         token.createdAt,
+        token.connectionId ?? null,
       );
   }
 
@@ -480,6 +663,7 @@ export class RemoteStore {
     return {
       tokenHash: rowString(row, "token_hash"),
       familyId: rowString(row, "family_id"),
+      connectionId: optionalRowString(row, "connection_id"),
       clientId: rowString(row, "client_id"),
       userId: rowString(row, "user_id"),
       resource: rowString(row, "resource"),
@@ -511,6 +695,7 @@ export class RemoteStore {
         previous.scope !== successor.scope ||
         previous.userId !== successor.userId ||
         previous.familyId !== successor.familyId ||
+        previous.connectionId !== successor.connectionId ||
         previous.revokedAt ||
         previous.expiresAt <= now
       ) {
@@ -559,8 +744,8 @@ export class RemoteStore {
     this.db
       .prepare(
         `INSERT INTO oauth_authorization_codes
-         (id, code_hash, client_id, user_id, redirect_uri, code_challenge, code_challenge_method, resource, scope, expires_at, used_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, code_hash, client_id, user_id, redirect_uri, code_challenge, code_challenge_method, resource, scope, expires_at, used_at, created_at, connection_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         code.id,
@@ -575,6 +760,7 @@ export class RemoteStore {
         code.expiresAt,
         code.usedAt ?? null,
         code.createdAt,
+        code.connectionId ?? null,
       );
   }
 
@@ -593,6 +779,7 @@ export class RemoteStore {
       redirectUri: rowString(row, "redirect_uri"),
       codeChallenge: rowString(row, "code_challenge"),
       codeChallengeMethod: "S256",
+      connectionId: optionalRowString(row, "connection_id"),
       resource: rowString(row, "resource"),
       scope: rowString(row, "scope"),
       expiresAt: rowString(row, "expires_at"),
