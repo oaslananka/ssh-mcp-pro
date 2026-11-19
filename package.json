@@ -85,7 +85,7 @@
     "review:threads": "node scripts/check-review-threads.mjs",
     "release:state": "node scripts/release-state.mjs",
     "check:npm-name": "node scripts/check-npm-name.mjs ssh-mcp-pro",
-    "audit": "node scripts/check-temporary-security-exception.mjs",
+    "audit": "pnpm audit --audit-level moderate",
     "audit:packed": "node scripts/check-packed-consumer-audit.mjs",
     "licenses:check": "node scripts/check-licenses.mjs",
     "reuse:lint": "reuse lint",

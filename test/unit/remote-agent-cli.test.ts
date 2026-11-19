@@ -655,8 +655,8 @@ describe("remote agent CLI", () => {
       stdout.restore();
     }
     expect(stdout.read()).toContain("Agent connected: agt_online");
-    expect(stdout.read()).toContain("Request received: run_shell");
-    expect(stdout.read()).toContain("Request run_shell completed: ok");
+    expect(stdout.read()).toContain("RUN_SHELL");
+    expect(stdout.read()).toContain("exit=0");
     const events = readAgentActivity(configPath, 20);
     expect(events.map((item) => item.event)).toEqual(
       expect.arrayContaining([

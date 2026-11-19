@@ -17,14 +17,30 @@ ssh-mcp-pro-agent logs --tail 80
 ssh-mcp-pro-agent status
 ```
 
-During `ssh-mcp-pro-agent run`, the console also displays a compact connection panel and continuously appends activity. The **transport-open** event means the WebSocket opened, while **agent-ready** appears only after the control plane acknowledges the agent identity. Policy updates, request start/completion, rejected or expired requests, connection errors and disconnects have distinct INFO / OK / WARN / ERROR labels.
+During `ssh-mcp-pro-agent run`, the console also displays a compact connection panel and continuously appends activity. Each operation has a matching short request ID, operation name, safe command or file summary, duration, result, exit code (when applicable), and stdout/stderr line counts. The console highlights INFO, OK, WARN and ERROR with color when supported by the terminal; plain-text environments remain readable.
+
+For richer diagnostics in a trusted **local console**, use:
+
+```shell
+ssh-mcp-pro-agent run --verbose
+```
+
+To additionally see bounded, best-effort redacted command, working-directory and output previews, opt in explicitly:
+
+```shell
+ssh-mcp-pro-agent run --verbose --show-commands --show-output
+```
+
+These two preview flags affect **only the currently running console**. They never put raw commands or output in the rotating JSONL history, but unknown secrets inside arbitrary commands/output cannot be reliably detected by a redactor. Use the preview flags only on a trusted, private terminal without screen-sharing or automatic terminal capture.
+
+For a Windows Scheduled Task or other supervisor that invokes `run` without flags, the equivalent startup environment settings are `SSHAUTOMATOR_AGENT_LOG_DETAIL=verbose`, `SSHAUTOMATOR_AGENT_LOG_COMMANDS=1` and `SSHAUTOMATOR_AGENT_LOG_OUTPUT=1`. Restart the agent for changes to take effect. The default compact format intentionally displays only an allowlisted harmless command, a safe executable name, or an obscured command summary; sensitive file paths and arbitrary arguments remain hidden. The `logs --follow` viewer shows the safe persisted summaries, not raw preview data. The **transport-open** event means the WebSocket opened, while **agent-ready** appears only after the control plane acknowledges the agent identity. Policy updates, request start/completion, rejected or expired requests, connection errors and disconnects have distinct INFO / OK / WARN / ERROR labels.
 
 ## Log storage and privacy
 
 - Windows: `%USERPROFILE%\.sshautomator\logs\agent-activity.jsonl` for the Scheduled Task's user.
 - Linux/macOS: `~/.sshautomator/logs/agent-activity.jsonl` for the systemd or launchd user.
 - Log files rotate at 512 KiB with two older archives (`.1` and `.2`), preventing indefinite growth. On Unix, the log directory and files are created with restrictive permissions.
-- Records contain only timestamps, event types and safe diagnostic descriptions. **No command arguments, command output, SSH passwords, private keys, OAuth access tokens, enrollment tokens or raw server error messages** are recorded.
+- Records contain timestamps, event types and constrained safe descriptions (including a short request ID, a narrowly allowlisted harmless command or safe filename, and numeric result counts). **Arbitrary shell arguments, raw command output, SSH passwords, private keys, OAuth tokens, enrollment tokens and raw server error messages are never persisted.**
 - The viewer reads only this local file. There is no log upload, remote log streaming endpoint or new background service. To troubleshoot a connection, inspect its recent events and the agent supervisor's own logs as needed.
 
 ## Windows Scheduled Task

@@ -330,11 +330,15 @@ export interface AgentRuntimeState {
   seenPolicyUpdateNonces?: Map<string, number>;
 }
 
-async function runAgent(state?: AgentRuntimeState): Promise<void> {
+async function runAgent(state?: AgentRuntimeState, flags: string[] = []): Promise<void> {
   const config = requireConfig();
   const WebSocketCtor = runtimeWebSocket();
   const executor = new AgentExecutor(config.policy, config.privateKeyPem);
-  const activity = new AgentActivityLog(configPath());
+  const activity = new AgentActivityLog(configPath(), {
+    detail: flags.includes("--verbose") ? "verbose" : undefined,
+    showCommands: flags.includes("--show-commands") ? true : undefined,
+    showOutput: flags.includes("--show-output") ? true : undefined,
+  });
   activity.banner(config.alias, config.policy.profile, config.policy.version);
   activity.event("info", "agent_starting", "Agent starting. Preparing outbound connection.");
   const seenActions = state?.seenActions ?? new Map<string, number>();
@@ -429,20 +433,10 @@ async function runAgent(state?: AgentRuntimeState): Promise<void> {
         }
         rememberAction(action.action_id, action.deadline);
         const startedAt = Date.now();
-        activity.event("info", "action_started", "Request received: " + action.tool);
+        activity.actionStarted(action);
         const result = await executor.execute(action);
         ws.send(JSON.stringify(result));
-        activity.event(
-          result.status === "ok" ? "ok" : "warn",
-          "action_finished",
-          "Request " +
-            action.tool +
-            " completed: " +
-            result.status +
-            " (" +
-            (Date.now() - startedAt) +
-            " ms)",
-        );
+        activity.actionFinished(action, result, Date.now() - startedAt);
       })().catch(() => {
         // Never print command/output/provider error text: it can contain credentials.
         activity.event("error", "action_failed", "Action processing failed; details withheld.");
@@ -536,7 +530,8 @@ function printAgentUsage(): void {
   output("Usage:");
   output("  ssh-mcp-pro-agent enroll --server <url> --token <token> --alias <alias>");
   output("  ssh-mcp-pro-agent enroll --server <url> --browser --alias <alias>");
-  output("  ssh-mcp-pro-agent run");
+  output("  ssh-mcp-pro-agent run [--verbose] [--show-commands] [--show-output]");
+  output("    Command/output previews are console-only and require trusted local use.");
   output("  ssh-mcp-pro-agent status");
   output("  ssh-mcp-pro-agent logs [--tail 60] [--follow]");
   output("  ssh-mcp-pro-agent install-service");
@@ -565,7 +560,7 @@ export async function runAgentCli(argv: string[], state?: AgentRuntimeState): Pr
       await enroll(argv.slice(1));
       break;
     case "run":
-      await runAgent(state);
+      await runAgent(state, argv.slice(1));
       break;
     case "status":
       status();

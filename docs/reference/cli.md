@@ -40,7 +40,7 @@ Source of truth: [src/remote/agent-cli.ts](../../src/remote/agent-cli.ts).
 | (no args), `help`, `--help`, `-h` | Print usage and exit successfully |
 | `--version`, `-v` | Print the installed package version and exit |
 | `enroll --server <url> --token <token> [--alias <alias>]` | Exchange a one-time enrollment token and save agent credentials |
-| `run` | Connect the enrolled outbound agent to its control plane |
+| `run [--verbose] [--show-commands] [--show-output]` | Connect the agent; optional console-only, best-effort redacted diagnostic previews (see [Agent Activity Monitor](../agent-activity-monitor.md)) |
 | `status` | Show local enrollment and current policy, not live connectivity |
 | `logs [--tail 60] [--follow]` | Read agent activity logs; `--follow` streams updates |
 | `install-service` | Print platform service setup guidance; does not install anything |
