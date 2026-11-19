@@ -55,6 +55,41 @@ function parseTestSuites(xml) {
   }));
 }
 
+// The standard fixture deliberately disables SSH forwarding. Only the two
+// named opt-in forwarding tests may be skipped; all other fixture cases must run.
+const localForwardingCase =
+  "opens real SSH local forwarding and releases the port with a connected TCP client";
+const remoteForwardingCase = "closes actual remote SSH forwarding and releases the remote listener";
+
+function skippedCaseNames(xml, suiteName) {
+  return [...xml.matchAll(/<testcase\b[^>]*>[\s\S]*?<\/testcase>/gu)]
+    .filter(([caseXml]) => /<skipped(?:\s|\/|>)/u.test(caseXml))
+    .flatMap(([caseXml]) => {
+      const tag = caseXml.slice(0, caseXml.indexOf(">") + 1);
+      const className = (attribute(tag, "classname") ?? "").replaceAll("\\", "/");
+      const inSuite = className === suiteName || className.endsWith("/" + suiteName);
+      return inSuite ? [attribute(tag, "name") ?? "unnamed test"] : [];
+    });
+}
+
+function allowedFixtureSkips(xml, suiteName, skippedCount) {
+  if (suiteName !== "test/integration/session.integration.test.ts") return false;
+  const names = skippedCaseNames(xml, suiteName);
+  if (names.length !== skippedCount) {
+    fail(suiteName + " reported " + skippedCount + " skipped test(s) without matching JUnit cases");
+  }
+  const allowed = [
+    ...(process.env.RUN_SSH_TUNNEL_INTEGRATION === "1" ? [] : [localForwardingCase]),
+    ...(process.env.RUN_SSH_REMOTE_TUNNEL_INTEGRATION === "1" ? [] : [remoteForwardingCase]),
+  ];
+  for (const name of names) {
+    if (!allowed.some((title) => name.endsWith(title))) {
+      fail(suiteName + " reported " + skippedCount + " skipped test(s): " + name);
+    }
+  }
+  return true;
+}
+
 const [suiteName, reportPath = "test-results/junit.xml"] = process.argv.slice(2);
 const suite = suites[suiteName];
 if (!suite) {
@@ -90,8 +125,8 @@ for (const expectedName of suite.expected) {
   if (suiteExecuted <= 0) {
     fail(`${expectedName} did not execute any tests`);
   }
-  if (result.skipped > 0) {
-    fail(`${expectedName} reported ${result.skipped} skipped test(s)`);
+  if (result.skipped > 0 && !allowedFixtureSkips(xml, expectedName, result.skipped)) {
+    fail(expectedName + " reported " + result.skipped + " skipped test(s)");
   }
   executed += suiteExecuted;
 }

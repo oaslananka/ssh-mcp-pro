@@ -73,6 +73,73 @@ describe("fixture-backed JUnit execution guard", () => {
     expect(result.stdout).toContain("integration: 5 fixture-backed test(s) executed");
   });
 
+  test("permits only explicitly disabled forwarding cases while every ordinary SSH fixture case runs", () => {
+    const result = runCheck(
+      "integration",
+      [
+        '<testsuites tests="7" failures="0" errors="0" skipped="2">',
+        '<testsuite name="test/integration/mcp.integration.test.ts" tests="2" failures="0" errors="0" skipped="0">',
+        '<testcase classname="test/integration/mcp.integration.test.ts" name="MCP tool one"></testcase>',
+        '<testcase classname="test/integration/mcp.integration.test.ts" name="MCP tool two"></testcase>',
+        "</testsuite>",
+        '<testsuite name="test/integration/session.integration.test.ts" tests="5" failures="0" errors="0" skipped="2">',
+        '<testcase classname="test/integration/session.integration.test.ts" name="SSH integration tests &gt; ordinary fixture one"></testcase>',
+        '<testcase classname="test/integration/session.integration.test.ts" name="SSH integration tests &gt; ordinary fixture two"></testcase>',
+        '<testcase classname="test/integration/session.integration.test.ts" name="SSH integration tests &gt; opens real SSH local forwarding and releases the port with a connected TCP client"><skipped/></testcase>',
+        '<testcase classname="test/integration/session.integration.test.ts" name="SSH integration tests &gt; closes actual remote SSH forwarding and releases the remote listener"><skipped/></testcase>',
+        '<testcase classname="test/integration/session.integration.test.ts" name="SSH integration tests &gt; ordinary fixture three"></testcase>',
+        "</testsuite>",
+        "</testsuites>",
+      ].join("\n"),
+      {
+        RUN_SSH_INTEGRATION: "1",
+        RUN_SSH_TUNNEL_INTEGRATION: "0",
+        RUN_SSH_REMOTE_TUNNEL_INTEGRATION: "0",
+      },
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("integration: 5 fixture-backed test(s) executed");
+  });
+
+  test("rejects other skipped fixture cases even when two known optional tests are skipped", () => {
+    const xml = [
+      '<testsuites tests="6" failures="0" errors="0" skipped="3">',
+      '<testsuite name="test/integration/mcp.integration.test.ts" tests="2" failures="0" errors="0" skipped="0">',
+      '<testcase classname="test/integration/mcp.integration.test.ts" name="first"></testcase>',
+      '<testcase classname="test/integration/mcp.integration.test.ts" name="second"></testcase>',
+      "</testsuite>",
+      '<testsuite name="test/integration/session.integration.test.ts" tests="4" failures="0" errors="0" skipped="3">',
+      '<testcase classname="test/integration/session.integration.test.ts" name="unexpected skip"><skipped/></testcase>',
+      '<testcase classname="test/integration/session.integration.test.ts" name="opens real SSH local forwarding and releases the port with a connected TCP client"><skipped/></testcase>',
+      '<testcase classname="test/integration/session.integration.test.ts" name="closes actual remote SSH forwarding and releases the remote listener"><skipped/></testcase>',
+      '<testcase classname="test/integration/session.integration.test.ts" name="ordinary"></testcase>',
+      "</testsuite></testsuites>",
+    ].join("\n");
+    const result = runCheck("integration", xml, { RUN_SSH_INTEGRATION: "1" });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("unexpected skip");
+  });
+
+  test("requires opt-in forwarding tests to run when their corresponding flag is enabled", () => {
+    const xml = [
+      '<testsuites tests="4" skipped="1">',
+      '<testsuite name="test/integration/mcp.integration.test.ts" tests="2" skipped="0">',
+      '<testcase classname="test/integration/mcp.integration.test.ts" name="one"></testcase>',
+      '<testcase classname="test/integration/mcp.integration.test.ts" name="two"></testcase>',
+      "</testsuite>",
+      '<testsuite name="test/integration/session.integration.test.ts" tests="2" skipped="1">',
+      '<testcase classname="test/integration/session.integration.test.ts" name="opens real SSH local forwarding and releases the port with a connected TCP client"><skipped/></testcase>',
+      '<testcase classname="test/integration/session.integration.test.ts" name="ordinary"></testcase>',
+      "</testsuite></testsuites>",
+    ].join("\n");
+    const result = runCheck("integration", xml, {
+      RUN_SSH_INTEGRATION: "1",
+      RUN_SSH_TUNNEL_INTEGRATION: "1",
+    });
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("reported 1 skipped test");
+  });
+
   test("rejects partially skipped fixture suites", () => {
     const result = runCheck(
       "e2e",
