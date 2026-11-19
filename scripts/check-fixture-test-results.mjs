@@ -57,16 +57,9 @@ function parseTestSuites(xml) {
 
 // The standard fixture deliberately disables SSH forwarding. Only the two
 // named opt-in forwarding tests may be skipped; all other fixture cases must run.
-const optInForwardingTests = new Map([
-  [
-    "opens real SSH local forwarding and releases the port with a connected TCP client",
-    "RUN_SSH_TUNNEL_INTEGRATION",
-  ],
-  [
-    "closes actual remote SSH forwarding and releases the remote listener",
-    "RUN_SSH_REMOTE_TUNNEL_INTEGRATION",
-  ],
-]);
+const localForwardingCase =
+  "opens real SSH local forwarding and releases the port with a connected TCP client";
+const remoteForwardingCase = "closes actual remote SSH forwarding and releases the remote listener";
 
 function skippedCaseNames(xml, suiteName) {
   return [...xml.matchAll(/<testcase\b[^>]*>[\s\S]*?<\/testcase>/gu)]
@@ -85,9 +78,12 @@ function allowedFixtureSkips(xml, suiteName, skippedCount) {
   if (names.length !== skippedCount) {
     fail(suiteName + " reported " + skippedCount + " skipped test(s) without matching JUnit cases");
   }
+  const allowed = [
+    ...(process.env.RUN_SSH_TUNNEL_INTEGRATION === "1" ? [] : [localForwardingCase]),
+    ...(process.env.RUN_SSH_REMOTE_TUNNEL_INTEGRATION === "1" ? [] : [remoteForwardingCase]),
+  ];
   for (const name of names) {
-    const optInFlag = [...optInForwardingTests].find(([title]) => name.endsWith(title))?.[1];
-    if (!optInFlag || process.env[optInFlag] === "1") {
+    if (!allowed.some((title) => name.endsWith(title))) {
       fail(suiteName + " reported " + skippedCount + " skipped test(s): " + name);
     }
   }
