@@ -365,20 +365,49 @@ describe("OAuth PKCE HTTP flow", () => {
         updatedAt: now,
       });
       const callListHosts = async (token: string) => {
-        const res = await fetch(harness.baseUrl + "/mcp", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + token,
-          },
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: 71,
-            method: "tools/call",
-            params: { name: "list_hosts", arguments: {} },
-          }),
+        // Do not forward dynamically constructed URLs to an HTTP client:
+        // this fixture only talks to its own validated loopback listener.
+        const port = loopbackTestPort(harness.baseUrl);
+        const payload = JSON.stringify({
+          jsonrpc: "2.0",
+          id: 71,
+          method: "tools/call",
+          params: { name: "list_hosts", arguments: {} },
         });
-        return { response: res, body: await readJson(res) };
+        return new Promise<{ response: { status: number }; body: Record<string, unknown> }>(
+          (resolve, reject) => {
+            const req = httpRequest(
+              {
+                hostname: "127.0.0.1",
+                port,
+                method: "POST",
+                path: "/mcp",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Content-Length": Buffer.byteLength(payload),
+                  Authorization: "Bearer " + token,
+                },
+              },
+              (res) => {
+                void (async () => {
+                  const chunks: Buffer[] = [];
+                  for await (const chunk of res) {
+                    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+                  }
+                  resolve({
+                    response: { status: res.statusCode ?? 0 },
+                    body: JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<
+                      string,
+                      unknown
+                    >,
+                  });
+                })().catch(reject);
+              },
+            );
+            req.on("error", reject);
+            req.end(payload);
+          },
+        );
       };
       const firstList = await callListHosts(String(first.access_token));
       expect(firstList.response.status).toBe(200);
