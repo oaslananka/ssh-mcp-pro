@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.2](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.15.1...ssh-mcp-pro-v1.15.2) (2026-11-19)
+
+
+### Bug Fixes
+
+* **security:** update Alpine OpenSSL libraries in runtime images ([#319](https://github.com/oaslananka/ssh-mcp-pro/issues/319)) ([2bf9a66](https://github.com/oaslananka/ssh-mcp-pro/commit/2bf9a663f5b5e8a389d3904184161e08233a5ee2))
+
 ## [1.15.1](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.15.0...ssh-mcp-pro-v1.15.1) (2026-11-19)
 
 
