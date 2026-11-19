@@ -11,7 +11,7 @@ import {
   type RemotePrincipal,
   type RemoteToolName,
 } from "../../src/remote/types.js";
-import { captureResponse, jsonRequest, request } from "../helpers/web-dashboard-fixture.js";
+import { jsonRequest, request } from "../helpers/web-dashboard-fixture.js";
 import { describe, expect, test, vi } from "vitest";
 import {
   PUBLIC_BASE_URL,

@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { hashSecret, randomToken } from "../../src/remote/crypto.js";
 import { REVIEWER_DEMO_USER_ID } from "../../src/remote/types.js";
-import { captureResponse, jsonRequest, request } from "../helpers/web-dashboard-fixture.js";
+import { jsonRequest, request } from "../helpers/web-dashboard-fixture.js";
 import {
   REVIEWER_USERNAME,
   REVIEWER_PASSWORD,
