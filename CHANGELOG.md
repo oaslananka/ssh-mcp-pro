@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug Fixes
 
+* **ssh:** improve SSH tunnel and session cleanup, including concurrent shutdown and retry handling.
 * **ci:** honor explicitly opt-in SSH forwarding tests ([#316](https://github.com/oaslananka/ssh-mcp-pro/issues/316)) ([0eedfd4](https://github.com/oaslananka/ssh-mcp-pro/commit/0eedfd4691676d57221710969ee8139bf0965a5a))
 
 ## [1.15.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.14.0...ssh-mcp-pro-v1.15.0) (2026-11-19)
