@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.14.0...ssh-mcp-pro-v1.15.0) (2026-11-19)
+
+
+### Features
+
+* **cloud:** manage device access per AI OAuth connection ([#313](https://github.com/oaslananka/ssh-mcp-pro/issues/313)) ([0de039a](https://github.com/oaslananka/ssh-mcp-pro/commit/0de039a34e9ba2e955c94330d0e652d21a611209))
+
 ## [1.14.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.13.1...ssh-mcp-pro-v1.14.0) (2026-11-19)
 
 
