@@ -165,6 +165,7 @@ export async function issueAccessToken(
   keyPair: JwtKeyPair,
   user: TokenUserIdentity,
   scopes: RemoteScope[],
+  connection?: { clientId: string; connectionId: string },
 ): Promise<{ token: string; tokenId: string; expiresAt: string }> {
   const issuedAt = Math.floor(Date.now() / 1000);
   const expiresAtSeconds = issuedAt + config.accessTokenTtlSeconds;
@@ -181,7 +182,12 @@ export async function issueAccessToken(
   ) {
     throw new TypeError("Invalid reviewer identity or scopes");
   }
-  const claims: Record<string, unknown> = { scope: scopes.join(" ") };
+  const claims: Record<string, unknown> = {
+    scope: scopes.join(" "),
+    ...(connection
+      ? { client_id: connection.clientId, connection_id: connection.connectionId }
+      : {}),
+  };
   if (user.provider !== "demo") {
     claims.github_login = user.githubLogin ?? user.displayName ?? user.email ?? user.id;
     claims.github_id = user.githubId ?? user.googleId ?? user.id;
@@ -230,7 +236,10 @@ function principalFromPayload(payload: JWTPayload): RemotePrincipal {
     typeof payload.scope === "string" ? payload.scope.split(/\s+/u).filter(Boolean) : [];
   if (
     ("github_id" in payload && typeof payload.github_id !== "string") ||
-    ("github_login" in payload && typeof payload.github_login !== "string")
+    ("github_login" in payload && typeof payload.github_login !== "string") ||
+    ("client_id" in payload && typeof payload.client_id !== "string") ||
+    ("connection_id" in payload && typeof payload.connection_id !== "string") ||
+    "client_id" in payload !== "connection_id" in payload
   ) {
     throw new TypeError("Invalid GitHub identity claims");
   }
@@ -256,6 +265,8 @@ function principalFromPayload(payload: JWTPayload): RemotePrincipal {
     throw new TypeError("Invalid reviewer identity claims");
   }
   return {
+    connectionId: typeof payload.connection_id === "string" ? payload.connection_id : undefined,
+    clientId: typeof payload.client_id === "string" ? payload.client_id : undefined,
     userId: String(payload.sub),
     githubId,
     githubLogin,

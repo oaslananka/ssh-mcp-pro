@@ -348,6 +348,15 @@ describe("remote control plane and outbound agent flow", () => {
         expectedStatus: 200,
       });
       const agentId = String(enrollResponse.agent_id);
+      // New OAuth connections have no device visibility until explicitly shared.
+      const connection = controlPlane.store.listUserOAuthConnections("github:169144131")[0];
+      expect(connection).toBeDefined();
+      controlPlane.store.setOAuthConnectionDevices(
+        "github:169144131",
+        connection!.id,
+        [agentId],
+        nowIso(),
+      );
       const controlPlanePublicKey = String(enrollResponse.control_plane_public_key);
       let policy = enrollResponse.policy as AgentPolicy;
       const executor = new AgentExecutor(policy, agentKeys.privateKeyPem);
@@ -484,6 +493,15 @@ describe("remote control plane and outbound agent flow", () => {
       }
       expect(JSON.stringify(allowedShell)).toContain("allowed");
 
+      const audit = await jsonFetch(`${baseUrl}/api/audit`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        expectedStatus: 200,
+      });
+      expect(JSON.stringify(audit)).toContain("enrollment_token_created");
+      expect(JSON.stringify(audit)).toContain("agent_connected");
+      expect(JSON.stringify(audit)).toContain("action_requested");
+      expect(JSON.stringify(audit)).toContain("action_allowed");
+      expect(JSON.stringify(audit)).toContain("action_denied");
       await jsonFetch(`${baseUrl}/api/agents/${agentId}/revoke`, {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -502,17 +520,7 @@ describe("remote control plane and outbound agent flow", () => {
       });
       // Revoked-agent calls are reported as JSON-RPC errors (HTTP 200) too.
       expect(revokedResult.result).toBeUndefined();
-      expect(JSON.stringify(revokedResult)).toContain("AGENT_REVOKED");
-
-      const audit = await jsonFetch(`${baseUrl}/api/audit`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-        expectedStatus: 200,
-      });
-      expect(JSON.stringify(audit)).toContain("enrollment_token_created");
-      expect(JSON.stringify(audit)).toContain("agent_connected");
-      expect(JSON.stringify(audit)).toContain("action_requested");
-      expect(JSON.stringify(audit)).toContain("action_allowed");
-      expect(JSON.stringify(audit)).toContain("action_denied");
+      expect(JSON.stringify(revokedResult)).toContain("AGENT_NOT_FOUND");
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
       controlPlane.close();
@@ -598,6 +606,15 @@ describe("remote control plane and outbound agent flow", () => {
         expectedStatus: 200,
       });
       const agentId = String(enrollResponse.agent_id);
+      // New OAuth connections have no device visibility until explicitly shared.
+      const connection = controlPlane.store.listUserOAuthConnections("github:169144131")[0];
+      expect(connection).toBeDefined();
+      controlPlane.store.setOAuthConnectionDevices(
+        "github:169144131",
+        connection!.id,
+        [agentId],
+        nowIso(),
+      );
       const policy = enrollResponse.policy as AgentPolicy;
       const websocketUrl = String(enrollResponse.websocket_url);
       const first = await connectAgent(websocketUrl, agentId, agentKeys.privateKeyPem, policy);

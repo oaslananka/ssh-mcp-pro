@@ -12,7 +12,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
-import { randomToken } from "../../src/remote/crypto.js";
+import { loadJwtKeyPair, randomToken, verifyRemoteAccessToken } from "../../src/remote/crypto.js";
+import { createAgentPolicy } from "../../src/remote/policy.js";
 import type { RemoteConfig } from "../../src/remote/types.js";
 import { writeTestHttpError } from "../helpers/http-error.js";
 
@@ -325,6 +326,126 @@ describe("OAuth PKCE HTTP flow", () => {
           result: expect.objectContaining({ tools: expect.any(Array) }),
         }),
       );
+    } finally {
+      await closeHarness(harness);
+    }
+  });
+
+  test("binds OAuth tokens to a connection and filters actual MCP inventory after device selection", async () => {
+    const harness = await startHarness();
+    try {
+      const redirectUri = harness.baseUrl + "/cb-" + randomToken(6);
+      const clientId = await registerClient(harness.baseUrl, redirectUri);
+      const verifier = "verifier-" + randomToken(48);
+      const code = await authorize(harness.baseUrl, clientId, redirectUri, verifier);
+      const response = await exchangeCode(harness.baseUrl, clientId, code, redirectUri, verifier);
+      expect(response.status).toBe(200);
+      const first = await readJson(response);
+      const keyPair = await loadJwtKeyPair(harness.controlPlane.config.jwtSigningKeyPath);
+      const principal = await verifyRemoteAccessToken(
+        "Bearer " + first.access_token,
+        harness.controlPlane.config,
+        keyPair,
+      );
+      const connections = harness.controlPlane.store.listUserOAuthConnections(principal.userId);
+      expect(connections).toHaveLength(1);
+      expect(principal.connectionId).toBe(connections[0]?.id);
+      expect(principal.clientId).toBe(clientId);
+      const policy = createAgentPolicy("read-only");
+      const now = new Date().toISOString();
+      harness.controlPlane.store.insertAgent({
+        id: "agt_test_device",
+        userId: principal.userId,
+        alias: "test-device",
+        status: "offline",
+        profile: policy.profile,
+        policy,
+        policyVersion: policy.version,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const callListHosts = async (token: string) => {
+        // Do not forward dynamically constructed URLs to an HTTP client:
+        // this fixture only talks to its own validated loopback listener.
+        const port = loopbackTestPort(harness.baseUrl);
+        const payload = JSON.stringify({
+          jsonrpc: "2.0",
+          id: 71,
+          method: "tools/call",
+          params: { name: "list_hosts", arguments: {} },
+        });
+        return new Promise<{ response: { status: number }; body: Record<string, unknown> }>(
+          (resolve, reject) => {
+            const req = httpRequest(
+              {
+                hostname: "127.0.0.1",
+                port,
+                method: "POST",
+                path: "/mcp",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Content-Length": Buffer.byteLength(payload),
+                  Authorization: "Bearer " + token,
+                },
+              },
+              (res) => {
+                void (async () => {
+                  const chunks: Buffer[] = [];
+                  for await (const chunk of res) {
+                    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+                  }
+                  resolve({
+                    response: { status: res.statusCode ?? 0 },
+                    body: JSON.parse(Buffer.concat(chunks).toString("utf8")) as Record<
+                      string,
+                      unknown
+                    >,
+                  });
+                })().catch(reject);
+              },
+            );
+            req.on("error", reject);
+            req.end(payload);
+          },
+        );
+      };
+      const firstList = await callListHosts(String(first.access_token));
+      expect(firstList.response.status).toBe(200);
+      expect(
+        (firstList.body.result as { structuredContent: { hosts: unknown[] } }).structuredContent
+          .hosts,
+      ).toEqual([]);
+      harness.controlPlane.store.setOAuthConnectionDevices(
+        principal.userId,
+        principal.connectionId!,
+        ["agt_test_device"],
+        now,
+      );
+      const allowedList = await callListHosts(String(first.access_token));
+      expect(
+        (
+          allowedList.body.result as { structuredContent: { hosts: Array<{ alias: string }> } }
+        ).structuredContent.hosts.map((host) => host.alias),
+      ).toEqual(["test-device"]);
+      const refreshed = await refreshTokenRequest(
+        harness.baseUrl,
+        clientId,
+        String(first.refresh_token),
+      );
+      expect(refreshed.status).toBe(200);
+      const refreshedToken = await readJson(refreshed);
+      const refreshedPrincipal = await verifyRemoteAccessToken(
+        "Bearer " + refreshedToken.access_token,
+        harness.controlPlane.config,
+        keyPair,
+      );
+      expect(refreshedPrincipal.connectionId).toBe(principal.connectionId);
+      harness.controlPlane.store.revokeOAuthConnection(
+        principal.userId,
+        principal.connectionId!,
+        now,
+      );
+      expect((await callListHosts(String(refreshedToken.access_token))).response.status).toBe(401);
     } finally {
       await closeHarness(harness);
     }

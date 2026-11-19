@@ -137,6 +137,28 @@ export function migrateRemoteStoreSchema(db: DatabaseSync): void {
         error_code TEXT
       ) STRICT;
 
+      CREATE TABLE IF NOT EXISTS oauth_connections (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        client_id TEXT NOT NULL REFERENCES oauth_clients(client_id),
+        status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','revoked')),
+        created_at TEXT NOT NULL,
+        revoked_at TEXT
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS idx_oauth_connections_owner ON oauth_connections(user_id, client_id);
+
+      CREATE TABLE IF NOT EXISTS oauth_connection_devices (
+        connection_id TEXT NOT NULL REFERENCES oauth_connections(id) ON DELETE CASCADE,
+        agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+        PRIMARY KEY(connection_id, agent_id)
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS idx_oauth_connection_devices_agent ON oauth_connection_devices(agent_id);
+
+      CREATE TABLE IF NOT EXISTS oauth_visibility_users (
+        user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        enabled_at TEXT NOT NULL
+      ) STRICT;
+
       CREATE TABLE IF NOT EXISTS audit_events (
         id TEXT PRIMARY KEY,
         user_id TEXT,
@@ -148,4 +170,12 @@ export function migrateRemoteStoreSchema(db: DatabaseSync): void {
         created_at TEXT NOT NULL
       ) STRICT;
     `);
+  for (const table of ["oauth_authorization_codes", "oauth_refresh_tokens"]) {
+    const columns = (
+      db.prepare("PRAGMA table_info(" + table + ")").all() as Array<{ name: string }>
+    ).map((column) => column.name);
+    if (!columns.includes("connection_id")) {
+      db.exec("ALTER TABLE " + table + " ADD COLUMN connection_id TEXT");
+    }
+  }
 }

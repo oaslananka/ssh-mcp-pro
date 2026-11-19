@@ -127,6 +127,59 @@ describe("ssh-mcp-pro brand and first-use journey", () => {
     expect(page).toContain("Previously issued access tokens may remain valid until expiry");
   });
 
+  test("renders per-connection device choices and distinguishes scoped disconnect from device removal", async () => {
+    const elements = await runDashboardFixture(
+      async (...args: unknown[]) => ({
+        ok: true,
+        json: async () =>
+          String(args[0]).includes("/api/dashboard/devices")
+            ? {
+                devices: [
+                  {
+                    id: "agt_pc",
+                    alias: "<PC>",
+                    status: "online",
+                    isLiveConnected: true,
+                    profile: "read-only",
+                  },
+                  {
+                    id: "agt_server",
+                    alias: "Server",
+                    status: "offline",
+                    isLiveConnected: false,
+                    profile: "read-only",
+                  },
+                ],
+              }
+            : {
+                clients: [],
+                strictVisibility: true,
+                connections: [
+                  {
+                    id: "con_1234567890abcdef1234567890abcdef",
+                    clientId: "cli_test",
+                    clientName: "<AI client>",
+                    status: "active",
+                    deviceIds: ["agt_pc"],
+                    redirectHosts: ["example.test"],
+                  },
+                ],
+              },
+      }),
+      "ai-clients",
+    );
+    const page = elements.get("tabContent")?.innerHTML ?? "";
+    expect(page).toContain("Devices this AI can access");
+    expect(page).toContain("Save device access");
+    expect(page).toContain("Disconnect this AI");
+    expect(page).toContain("data-ai-index");
+    expect(page).toContain("&lt;AI client&gt;");
+    expect(page).toContain("&lt;PC&gt;");
+    expect(page).not.toContain("<AI client>");
+    expect(page).not.toContain("<PC>");
+    expect(page).toContain("checked");
+  });
+
   test("new icon contents automatically invalidate old browser caches", async () => {
     const original = readFileSync(new URL("../../assets/ssh-mcp-pro-icon.png", import.meta.url));
     const fingerprint = createHash("sha256").update(original).digest("hex").slice(0, 12);

@@ -231,7 +231,7 @@ export class WebDashboardHandler {
     pathname: string,
   ): Promise<boolean> {
     // Browser mutations require both exact Origin and a non-simple request header.
-    if (["POST", "PATCH", "DELETE"].includes(req.method ?? "")) {
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method ?? "")) {
       this.assertBrowserMutation(req);
     }
     // 3. Web Dashboard REST APIs
@@ -254,6 +254,16 @@ export class WebDashboardHandler {
     ) {
       this.handleApiRevokeAiClient(req, res, pathname);
       return true;
+    }
+    if (pathname.startsWith("/api/dashboard/ai-connections/")) {
+      if (req.method === "PUT" && pathname.endsWith("/devices")) {
+        await this.handleApiSaveAiConnectionDevices(req, res, pathname);
+        return true;
+      }
+      if (req.method === "POST" && pathname.endsWith("/disconnect")) {
+        this.handleApiDisconnectAiConnection(req, res, pathname);
+        return true;
+      }
     }
     if (await this.handleDashboardDeviceRoutes(req, res, pathname)) return true;
     if (pathname === "/api/dashboard/audit" && req.method === "GET") {
@@ -468,7 +478,11 @@ export class WebDashboardHandler {
     jsonResponse(
       res,
       200,
-      { clients: this.deps.store.listUserOAuthClients(principal.userId, new Date().toISOString()) },
+      {
+        clients: this.deps.store.listUserOAuthClients(principal.userId, new Date().toISOString()),
+        connections: this.deps.store.listUserOAuthConnections(principal.userId),
+        strictVisibility: this.deps.store.isStrictVisibilityEnabled(principal.userId),
+      },
       addNoStore(),
     );
   }
@@ -507,6 +521,99 @@ export class WebDashboardHandler {
       });
     }
     jsonResponse(res, 200, { revokedRefreshTokens: revoked }, addNoStore());
+  }
+
+  private async handleApiSaveAiConnectionDevices(
+    req: IncomingMessage,
+    res: ServerResponse,
+    pathname: string,
+  ): Promise<void> {
+    const principal = this.getPrincipalFromSession(req);
+    if (!principal) {
+      jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
+      return;
+    }
+    const connectionId = pathname.slice(
+      "/api/dashboard/ai-connections/".length,
+      -"/devices".length,
+    );
+    if (
+      !/^con_[a-f0-9]{32}$/.test(connectionId) ||
+      !this.deps.store.getOAuthConnection(principal.userId, connectionId)
+    ) {
+      jsonResponse(res, 404, { error: "AI connection not found" }, addNoStore());
+      return;
+    }
+    const body = await readJson(req);
+    if (
+      !Array.isArray(body.deviceIds) ||
+      body.deviceIds.length > 100 ||
+      !body.deviceIds.every((id) => typeof id === "string")
+    ) {
+      throw safeError("FORBIDDEN", "Select at most 100 devices", 400);
+    }
+    try {
+      this.deps.store.setOAuthConnectionDevices(
+        principal.userId,
+        connectionId,
+        body.deviceIds,
+        new Date().toISOString(),
+      );
+    } catch {
+      throw safeError("FORBIDDEN", "Device selection is invalid or no longer available", 400);
+    }
+    this.deps.audit({
+      userId: principal.userId,
+      eventType: "ai_connection_devices_updated",
+      severity: "warn",
+      metadata: { connection_id: connectionId, device_count: body.deviceIds.length },
+    });
+    jsonResponse(
+      res,
+      200,
+      {
+        connectionId,
+        deviceIds: this.deps.store.listGrantedDevices(principal.userId, connectionId),
+      },
+      addNoStore(),
+    );
+  }
+
+  private handleApiDisconnectAiConnection(
+    req: IncomingMessage,
+    res: ServerResponse,
+    pathname: string,
+  ): void {
+    const principal = this.getPrincipalFromSession(req);
+    if (!principal) {
+      jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
+      return;
+    }
+    const connectionId = pathname.slice(
+      "/api/dashboard/ai-connections/".length,
+      -"/disconnect".length,
+    );
+    if (
+      !/^con_[a-f0-9]{32}$/.test(connectionId) ||
+      !this.deps.store.getOAuthConnection(principal.userId, connectionId)
+    ) {
+      jsonResponse(res, 404, { error: "AI connection not found" }, addNoStore());
+      return;
+    }
+    const revoked = this.deps.store.revokeOAuthConnection(
+      principal.userId,
+      connectionId,
+      new Date().toISOString(),
+    );
+    if (revoked) {
+      this.deps.audit({
+        userId: principal.userId,
+        eventType: "ai_connection_disconnected",
+        severity: "warn",
+        metadata: { connection_id: connectionId },
+      });
+    }
+    jsonResponse(res, 200, { disconnected: true }, addNoStore());
   }
 
   private handleApiUsage(req: IncomingMessage, res: ServerResponse): void {
@@ -554,12 +661,19 @@ export class WebDashboardHandler {
       return;
     }
     const agents = this.deps.store.listAgents(principal.userId);
+    const connections = this.deps.store.listUserOAuthConnections(principal.userId);
     const enriched = agents.map((agent) => {
       const sanitized = sanitizeAgent(agent);
       const isOnline = this.deps.agentHandler.isAgentOnline(agent.id);
       return {
         ...sanitized,
         isLiveConnected: isOnline,
+        aiConnections: connections
+          .filter(
+            (connection) =>
+              connection.status === "active" && connection.deviceIds.includes(agent.id),
+          )
+          .map((connection) => ({ id: connection.id, name: connection.clientName })),
         status: isOnline ? "online" : sanitized.status,
       };
     });

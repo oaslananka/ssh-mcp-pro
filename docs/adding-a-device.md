@@ -286,6 +286,17 @@ The control plane masks managed command and stdin payloads in durable action
 metadata; the AI client may still receive and display command output. This
 tool does not elevate shell permissions or bypass the local device policy.
 
+## Sharing a device with an AI connection
+
+After authorizing an AI app, open **AI clients** in the browser workspace,
+select the devices for that individual OAuth connection, and select
+**Save device access**. Newly enrolled devices are not shared automatically.
+To stop a single AI's access, use **Disconnect this AI** instead of globally
+revoking the device.
+
+See [Manage AI connection device access](ai-device-access.md) for the legacy
+connection migration behavior and effective permission boundaries.
+
 ## Changing a policy later
 
 Capabilities are server-authoritative and pushed live to a connected agent —

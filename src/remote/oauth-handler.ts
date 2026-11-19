@@ -323,6 +323,7 @@ export class OAuthHandler {
     }
     if (readOnlyScope) {
       return [
+        '<p class="device-scope-note">After connecting, select the devices this AI can access under AI clients in your workspace. New connections start without shared devices.</p>',
         '<fieldset class="permission-options"><legend>Choose access level</legend>',
         '<label class="permission-option"><input type="radio" name="grant_mode" value="read_only" checked>',
         '<span class="permission-copy"><strong>Read-only inspection (recommended)</strong>',
@@ -339,6 +340,7 @@ export class OAuthHandler {
       ].join("");
     }
     return [
+      '<p class="device-scope-note">After connecting, choose which devices this AI may use in your workspace. New connections start without shared devices.</p>',
       '<p><span class="badge">',
       escapeHtml(scope),
       "</span></p>",
@@ -833,6 +835,7 @@ export class OAuthHandler {
       codeHash: hashSecret(code),
       clientId: pending.clientId,
       userId,
+      connectionId: this.store.createOAuthConnection(userId, pending.clientId, now),
       redirectUri: pending.redirectUri,
       codeChallenge: pending.codeChallenge,
       codeChallengeMethod: "S256",
@@ -896,13 +899,36 @@ export class OAuthHandler {
     } catch {
       throw safeError("INVALID_TOKEN", "Authorization code is expired or already used");
     }
-    const token = await issueAccessToken(this.config, jwtKeyPair, user, scopes);
+    const connection = codeRecord.connectionId
+      ? this.store.getOAuthConnection(codeRecord.userId, codeRecord.connectionId)
+      : undefined;
+    if (
+      codeRecord.connectionId &&
+      (connection?.clientId !== clientId || connection.status !== "active")
+    ) {
+      throw safeError("INVALID_TOKEN", "Authorization connection is no longer valid", 403);
+    }
+    if (
+      !codeRecord.connectionId &&
+      this.store.isStrictVisibilityEnabled(user.id) &&
+      user.provider !== "demo"
+    ) {
+      throw safeError("INVALID_TOKEN", "Reconnect to select authorized devices", 403);
+    }
+    const token = await issueAccessToken(
+      this.config,
+      jwtKeyPair,
+      user,
+      scopes,
+      connection ? { clientId, connectionId: connection.id } : undefined,
+    );
     const refreshToken = client.grantTypes.includes("refresh_token") ? randomToken(32) : undefined;
     if (refreshToken) {
       this.store.createRefreshToken({
         tokenHash: hashSecret(refreshToken),
         familyId: id("refreshfam"),
         clientId,
+        connectionId: codeRecord.connectionId,
         userId: codeRecord.userId,
         resource: codeRecord.resource,
         scope: scopes.join(" "),
@@ -974,12 +1000,31 @@ export class OAuthHandler {
       invalidGrant();
       return;
     }
-    const token = await issueAccessToken(this.config, this.getJwtKeyPair(), user, scopes);
+    const connection = old.connectionId
+      ? this.store.getOAuthConnection(old.userId, old.connectionId)
+      : undefined;
+    if (
+      (old.connectionId && (connection?.clientId !== clientId || connection.status !== "active")) ||
+      (!old.connectionId &&
+        this.store.isStrictVisibilityEnabled(old.userId) &&
+        user.provider !== "demo")
+    ) {
+      invalidGrant();
+      return;
+    }
+    const token = await issueAccessToken(
+      this.config,
+      this.getJwtKeyPair(),
+      user,
+      scopes,
+      connection ? { clientId, connectionId: connection.id } : undefined,
+    );
     const newRaw = randomToken(32);
     const successor: OAuthRefreshTokenRecord = {
       tokenHash: hashSecret(newRaw),
       familyId: old.familyId,
       clientId: old.clientId,
+      connectionId: old.connectionId,
       userId: old.userId,
       resource: old.resource,
       scope: old.scope,
