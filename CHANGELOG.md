@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.13.1...ssh-mcp-pro-v1.14.0) (2026-11-19)
+
+
+### Features
+
+* **agent:** make local activity logs actionable and privacy-safe ([#310](https://github.com/oaslananka/ssh-mcp-pro/issues/310)) ([d616203](https://github.com/oaslananka/ssh-mcp-pro/commit/d6162031aa32578819f0a9380aa6b5af468528bc))
+
 ## [1.13.1](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.13.0...ssh-mcp-pro-v1.13.1) (2026-11-18)
 
 
