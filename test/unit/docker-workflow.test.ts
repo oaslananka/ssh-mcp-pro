@@ -51,6 +51,16 @@ describe("Docker release workflow", () => {
     expect(workflow).toContain("scripts/install-agent.sh scripts/install-agent.ps1");
   });
 
+  test("installs patched Alpine OpenSSL libraries in both build and runtime image stages", () => {
+    for (const dockerfile of ["Dockerfile", "Dockerfile.coolify"]) {
+      const source = readText(dockerfile);
+      expect(source, dockerfile).toContain("'libssl3>=3.5.9-r1'");
+      expect(source, dockerfile).toContain("'libcrypto3>=3.5.9-r1'");
+      expect(source, dockerfile).toContain("FROM alpine-patched AS build");
+      expect(source, dockerfile).toContain("FROM alpine-patched AS runtime");
+    }
+  });
+
   test("blocks fixable high and critical image vulnerabilities while retaining SARIF evidence", () => {
     const workflow = readText(dockerWorkflowPath);
 
