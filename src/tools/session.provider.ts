@@ -229,12 +229,14 @@ export class SessionToolProvider implements ToolProvider {
 
   private async closeSession(args: unknown): Promise<unknown> {
     const { sessionId } = SessionIdSchema.parse(args);
+    const wasManaged = this.deps.sessionManager.hasManagedSession?.(sessionId);
     const result = await this.deps.sessionManager.closeSession(sessionId);
-    if (result) {
+    const removed = wasManaged === true && !this.deps.sessionManager.hasManagedSession(sessionId);
+    if (removed || (wasManaged === undefined && result)) {
       this.deps.metrics.recordSessionClosed();
     }
-    logger.info("SSH session closed", { sessionId });
-    return { closed: result };
+    logger.info("SSH session closed", { sessionId, cleanupSucceeded: result, removed });
+    return !result && removed ? { closed: false, removed: true } : { closed: result };
   }
 
   private async listSessions(): Promise<unknown> {

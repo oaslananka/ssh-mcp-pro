@@ -105,6 +105,8 @@ export class SessionManager {
    * Used to exclude them from active-session reporting.
    */
   private readonly closingSessions = new Set<string>();
+  /** Disposal ownership after a session has been removed from the usable registry. */
+  private readonly pendingDisposals = new Map<string, NodeSSH>();
 
   /**
    * Tracks in-flight operations per session.
@@ -348,27 +350,65 @@ export class SessionManager {
 
     const session = this.sessions.get(sessionId);
     if (!session) {
-      logger.warn("Session not found for closing", { sessionId });
-      return false;
+      const pending = this.pendingDisposals.get(sessionId);
+      if (!pending) {
+        logger.warn("Session not found for closing", { sessionId });
+        return false;
+      }
+      this.closingSessions.add(sessionId);
+      try {
+        pending.dispose();
+        this.pendingDisposals.delete(sessionId);
+        return true;
+      } catch (error) {
+        logger.warn("Pending SSH disposal still failed", { sessionId, error });
+        return false;
+      } finally {
+        this.closingSessions.delete(sessionId);
+      }
     }
 
     this.closingSessions.add(sessionId);
 
+    let cleanedUp = true;
     try {
-      await this.notifySessionClose(sessionId);
-      if (session.sftp) {
-        session.sftp.end();
+      if (!(await this.notifySessionClose(sessionId))) {
+        cleanedUp = false;
       }
+    } catch (error) {
+      cleanedUp = false;
+      logger.warn("Session close listeners failed", { sessionId, error });
+    }
+    try {
+      session.sftp?.end();
+    } catch (error) {
+      cleanedUp = false;
+      logger.warn("SFTP cleanup failed", { sessionId, error });
+    }
+    try {
       session.ssh.dispose();
     } catch (error) {
-      logger.warn("Error closing session", { sessionId, error });
+      cleanedUp = false;
+      // Never make a failed session usable just to keep the disposal handle.
+      this.pendingDisposals.set(sessionId, session.ssh);
+      logger.warn("SSH disposal failed; retaining cleanup ownership", { sessionId, error });
     }
 
     this.sessions.delete(sessionId);
     this.closingSessions.delete(sessionId);
     this.activeOperations.delete(sessionId);
-    logger.info("SSH session closed", { sessionId });
-    return true;
+    logger.info("SSH session removed", { sessionId, cleanupSucceeded: cleanedUp });
+    return cleanedUp;
+  }
+
+  /** The session still occupies an active slot, even if close cleanup is incomplete. */
+  hasManagedSession(sessionId: string): boolean {
+    return this.sessions.has(sessionId);
+  }
+
+  /** Reports whether teardown has started without hiding the session from cleanup listeners. */
+  isSessionClosing(sessionId: string): boolean {
+    return this.closingSessions.has(sessionId);
   }
 
   /**
@@ -392,7 +432,7 @@ export class SessionManager {
     return session;
   }
 
-  private async notifySessionClose(sessionId: string): Promise<void> {
+  private async notifySessionClose(sessionId: string): Promise<boolean> {
     const listenerTimeoutMs = 5_000;
     const runListener = async (listener: SessionCloseListener): Promise<void> => {
       let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -422,6 +462,7 @@ export class SessionManager {
         logger.warn("Session close listener failed", { sessionId, error: result.reason });
       }
     }
+    return results.every((result) => result.status === "fulfilled");
   }
 
   private resolveHostKeyPolicy(params: ConnectionParams): HostKeyPolicy {
@@ -617,8 +658,8 @@ export class SessionManager {
    * Closes all active sessions
    */
   async closeAllSessions(): Promise<void> {
-    const sessionIds = Array.from(this.sessions.keys());
-    await Promise.all(sessionIds.map((id) => this.closeSession(id)));
+    const sessionIds = new Set([...this.sessions.keys(), ...this.pendingDisposals.keys()]);
+    await Promise.all([...sessionIds].map((id) => this.closeSession(id)));
   }
 
   /**

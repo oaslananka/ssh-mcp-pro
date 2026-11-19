@@ -144,7 +144,11 @@ export const SESSION_OPEN_OUTPUT_SCHEMA = zodOutputSchema(
 );
 
 export const SESSION_CLOSE_OUTPUT_SCHEMA = zodOutputSchema(
-  z.strictObject({ closed: z.boolean() }),
+  z.strictObject({
+    closed: z.boolean(),
+    /** Set on partial cleanup failures when the session is no longer usable. */
+    removed: z.boolean().optional(),
+  }),
   "Session close result",
 );
 

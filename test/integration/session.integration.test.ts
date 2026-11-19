@@ -1,7 +1,8 @@
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { createContainer, type AppContainer } from "../../src/container.js";
 import { createProcessService, type ProcessService } from "../../src/process.js";
 import { withRetry } from "../../src/retry.js";
@@ -128,6 +129,111 @@ integrationDescribe("SSH integration tests", () => {
     expect(result.attempts).toBe(2);
     expect(result.result?.stdout).toContain("retry-success");
   });
+
+  // The default SSH fixture disables TCP forwarding. Enable this test only with an isolated, forwarding-enabled fixture.
+  test.skipIf(process.env.RUN_SSH_TUNNEL_INTEGRATION !== "1")(
+    "opens real SSH local forwarding and releases the port with a connected TCP client",
+    async () => {
+      const candidate = net.createServer();
+      await new Promise<void>((resolve) => candidate.listen(0, "127.0.0.1", resolve));
+      const address = candidate.address();
+      if (!address || typeof address === "string") throw new Error("No available loopback port");
+      await new Promise<void>((resolve) => candidate.close(() => resolve()));
+
+      const forward = await container.tunnelService.createLocalForward(
+        sessionId,
+        address.port,
+        "127.0.0.1",
+        TEST_SSH_PORT,
+      );
+      const client = net.connect(address.port, "127.0.0.1");
+      try {
+        await new Promise<void>((resolve, reject) => {
+          client.once("connect", resolve);
+          client.once("error", reject);
+        });
+        const received = await Promise.race([
+          new Promise<string>((resolve, reject) => {
+            client.once("data", (data: Buffer) => resolve(data.toString("utf8")));
+            client.once("error", reject);
+          }),
+          new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error("SSH banner not received")), 3_000).unref();
+          }),
+        ]);
+        expect(received).toContain("SSH-2.0");
+        await expect(container.tunnelService.closeTunnel(forward.id)).resolves.toBe(true);
+        await vi.waitFor(() => expect(client.destroyed).toBe(true));
+        const reuse = net.createServer();
+        try {
+          await new Promise<void>((resolve) => reuse.listen(address.port, "127.0.0.1", resolve));
+          expect(reuse.listening).toBe(true);
+        } finally {
+          await new Promise<void>((resolve) => reuse.close(() => resolve()));
+        }
+      } finally {
+        client.destroy();
+        await container.tunnelService.closeTunnel(forward.id);
+      }
+    },
+  );
+
+  // Opt-in only: the standard fixture deliberately disables SSH remote forwarding.
+  test.skipIf(process.env.RUN_SSH_REMOTE_TUNNEL_INTEGRATION !== "1")(
+    "closes actual remote SSH forwarding and releases the remote listener",
+    async () => {
+      const target = net.createServer();
+      const connection = new Promise<net.Socket>((resolve) => target.once("connection", resolve));
+      await new Promise<void>((resolve) => target.listen(0, "127.0.0.1", resolve));
+      const address = target.address();
+      if (!address || typeof address === "string") throw new Error("No local port");
+      const remotePort = 39489;
+      const session = container.sessionManager.getSession(sessionId);
+      if (!session) throw new Error("Missing SSH session");
+      let accepted: net.Socket | undefined;
+      let tunnelId: string | undefined;
+      let remoteProbe: Promise<unknown> | undefined;
+      try {
+        const tunnel = await container.tunnelService.createRemoteForward(
+          sessionId,
+          remotePort,
+          "127.0.0.1",
+          address.port,
+        );
+        tunnelId = tunnel.id;
+        remoteProbe = session.ssh.execCommand(
+          "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/" + remotePort + "; printf probe >&3; sleep 3'",
+        );
+        accepted = await Promise.race([
+          connection,
+          remoteProbe.then((result) => {
+            throw new Error(
+              "Remote SSH probe returned before forwarding: " + JSON.stringify(result),
+            );
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("Remote forward never reached local listener")),
+              5_000,
+            ).unref(),
+          ),
+        ]);
+        expect(accepted.destroyed).toBe(false);
+        await expect(container.tunnelService.closeTunnel(tunnel.id)).resolves.toBe(true);
+        await vi.waitFor(() => expect(accepted?.destroyed).toBe(true));
+        const secondAttempt = await session.ssh.execCommand(
+          "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/" + remotePort + "'",
+        );
+        expect(secondAttempt.code).not.toBe(0);
+      } finally {
+        accepted?.destroy();
+        if (tunnelId) await container.tunnelService.closeTunnel(tunnelId);
+        await new Promise<void>((resolve) => target.close(() => resolve()));
+        await remoteProbe?.catch(() => undefined);
+      }
+    },
+    20_000,
+  );
 
   test("fails host key verification when strict checking uses an empty known_hosts file", async () => {
     const isolated = createContainer();

@@ -48,6 +48,7 @@ export interface TunnelService {
 
 export interface TunnelServiceDeps {
   sessionManager: Pick<SessionManager, "getSession"> & {
+    isSessionClosing?: (sessionId: string) => boolean;
     onSessionClose?: (callback: (sessionId: string) => Promise<void> | void) => void;
   };
   metrics: Pick<
@@ -59,15 +60,70 @@ export interface TunnelServiceDeps {
 
 interface TunnelHandle {
   close(): Promise<void>;
+  /** Recheck synchronous cleanup obligations at the registry-retirement boundary. */
+  assertCleanupComplete?(): void;
+}
+
+/** A failed destroy is not cleared until the channel actually emits close. */
+function trackedChannelCleanup<
+  T extends { destroy(): unknown; once(event: "close", callback: () => void): unknown },
+>(onFailure: (error: unknown) => void) {
+  const failures = new Map<T, unknown>();
+  const observed = new WeakSet<T>();
+  const closed = new WeakSet<T>();
+  return {
+    destroy(channel: T): void {
+      if (closed.has(channel)) return;
+      if (!observed.has(channel)) {
+        observed.add(channel);
+        channel.once("close", () => {
+          closed.add(channel);
+          failures.delete(channel);
+        });
+      }
+      try {
+        channel.destroy();
+      } catch (error) {
+        // A synchronous close event is stronger evidence than a subsequent
+        // exception from destroy(): do not resurrect an already-cleared error.
+        if (!closed.has(channel)) {
+          failures.set(channel, error);
+          onFailure(error);
+        }
+      }
+    },
+    assertComplete(): void {
+      const errors = [...failures.values()];
+      if (errors.length === 1) throw errors[0];
+      if (errors.length > 1) {
+        throw new AggregateError(errors, "SSH channel destruction remains incomplete");
+      }
+    },
+  };
 }
 
 class TunnelManager {
   private readonly tunnels = new Map<string, TunnelInfo>();
   private readonly handles = new Map<string, TunnelHandle>();
+  private readonly closing = new Map<string, Promise<boolean>>();
+  private readonly pendingCreations = new Map<string, Set<() => void>>();
   private tunnelCounter = 0;
 
+  private trackPendingCreation(sessionId: string, cancel: () => void): () => void {
+    let pending = this.pendingCreations.get(sessionId);
+    if (!pending) {
+      pending = new Set();
+      this.pendingCreations.set(sessionId, pending);
+    }
+    pending.add(cancel);
+    return () => {
+      pending.delete(cancel);
+      if (pending.size === 0) this.pendingCreations.delete(sessionId);
+    };
+  }
+
   constructor(
-    private readonly sessionManager: Pick<SessionManager, "getSession">,
+    private readonly sessionManager: TunnelServiceDeps["sessionManager"],
     private readonly metrics: Pick<
       MetricsCollector,
       "recordTunnelOpened" | "recordTunnelClosed" | "recordTunnelError"
@@ -87,7 +143,7 @@ class TunnelManager {
     });
 
     const session = this.sessionManager.getSession(sessionId);
-    if (!session) {
+    if (!session || this.sessionManager.isSessionClosing?.(sessionId)) {
       throw createConnectionError("Session not found or expired");
     }
     const decision = this.policy.assertAllowed({
@@ -115,7 +171,36 @@ class TunnelManager {
 
     const tunnelId = `tunnel-${Date.now()}-${++this.tunnelCounter}`;
     const targetPort = remotePort ?? localPort;
+    const sockets = new Set<net.Socket>();
+    type ForwardChannel = Awaited<ReturnType<typeof session.ssh.forwardOut>>;
+    const channels = new Set<ForwardChannel>();
+    let closing = false;
+    let registered = false;
+    const channelCleanup = trackedChannelCleanup<ForwardChannel>((error) => {
+      this.metrics.recordTunnelError();
+      logger.warn("Local tunnel channel cleanup failed", { tunnelId, error });
+      if (closing && registered && !this.tunnels.has(tunnelId)) {
+        // The listener was already closed while forwardOut was unresolved.
+        // Restore a cleanup-only handle without reopening the TCP listener or
+        // counting another tunnel as opened. A caller can retry by tunnel ID.
+        this.tunnels.set(tunnelId, { ...tunnelInfo, active: false });
+        this.handles.set(tunnelId, {
+          close: stopLocalForward,
+          assertCleanupComplete: channelCleanup.assertComplete,
+        });
+        logger.warn("Late local forwarding requires deferred channel cleanup", { tunnelId });
+      }
+    });
+    const destroyChannel = channelCleanup.destroy;
     const server = net.createServer((socket) => {
+      if (closing) {
+        socket.destroy();
+        return;
+      }
+      sockets.add(socket);
+      socket.once("close", () => {
+        sockets.delete(socket);
+      });
       socket.on("error", (error) => {
         this.metrics.recordTunnelError();
         logger.error("Local tunnel socket error", { tunnelId, error });
@@ -129,12 +214,14 @@ class TunnelManager {
           targetPort,
         )
         .then((channel) => {
+          if (closing || socket.destroyed) {
+            destroyChannel(channel);
+            return;
+          }
+          channels.add(channel);
           socket.on("close", () => {
-            try {
-              channel.destroy();
-            } catch {
-              // ignore close errors on already-destroyed channel
-            }
+            channels.delete(channel);
+            destroyChannel(channel);
           });
           channel.on("error", (error: Error) => {
             this.metrics.recordTunnelError();
@@ -142,6 +229,7 @@ class TunnelManager {
             socket.destroy();
           });
           channel.on("close", () => {
+            channels.delete(channel);
             socket.destroy();
           });
           socket.pipe(channel).pipe(socket);
@@ -153,13 +241,43 @@ class TunnelManager {
         });
     });
 
-    await new Promise<void>((resolve, reject) => {
-      server.once("error", reject);
-      server.listen(localPort, localHost, () => {
-        server.off("error", reject);
-        resolve();
+    const stopLocalForward = async () => {
+      closing = true;
+      const listenerClosed = new Promise<void>((resolve, reject) => {
+        if (!server.listening) {
+          resolve();
+          return;
+        }
+        server.close((error) => (error ? reject(error) : resolve()));
       });
+      for (const socket of sockets) socket.destroy();
+      for (const channel of channels) destroyChannel(channel);
+      await listenerClosed;
+      channelCleanup.assertComplete();
+    };
+
+    const finishPending = this.trackPendingCreation(sessionId, () => {
+      closing = true;
     });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(localPort, localHost, () => {
+          server.off("error", reject);
+          resolve();
+        });
+      });
+      if (
+        closing ||
+        this.sessionManager.isSessionClosing?.(sessionId) ||
+        !this.sessionManager.getSession(sessionId)
+      ) {
+        await stopLocalForward();
+        throw createConnectionError("Session closed during local tunnel creation");
+      }
+    } finally {
+      finishPending();
+    }
 
     const tunnelInfo: TunnelInfo = {
       id: tunnelId,
@@ -175,12 +293,10 @@ class TunnelManager {
 
     this.tunnels.set(tunnelId, tunnelInfo);
     this.handles.set(tunnelId, {
-      close: () =>
-        new Promise<void>((resolve, reject) => {
-          (server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.();
-          server.close((error) => (error ? reject(error) : resolve()));
-        }),
+      close: stopLocalForward,
+      assertCleanupComplete: channelCleanup.assertComplete,
     });
+    registered = true;
     this.metrics.recordTunnelOpened();
 
     logger.info("Local tunnel created", {
@@ -205,7 +321,7 @@ class TunnelManager {
     });
 
     const session = this.sessionManager.getSession(sessionId);
-    if (!session) {
+    if (!session || this.sessionManager.isSessionClosing?.(sessionId)) {
       throw createConnectionError("Session not found or expired");
     }
     const decision = this.policy.assertAllowed({
@@ -234,6 +350,25 @@ class TunnelManager {
     const tunnelId = `tunnel-${Date.now()}-${++this.tunnelCounter}`;
     const targetPort = remotePort ?? localPort;
 
+    const connections = new Set<{ channel: import("ssh2").ClientChannel; socket: net.Socket }>();
+    let closing = false;
+    const channelCleanup = trackedChannelCleanup<import("ssh2").ClientChannel>((error) => {
+      this.metrics.recordTunnelError();
+      logger.warn("Remote tunnel channel cleanup failed", { tunnelId, error });
+    });
+    const destroyChannel = channelCleanup.destroy;
+    const closeConnections = () => {
+      for (const { socket, channel } of connections) {
+        socket.destroy();
+        destroyChannel(channel);
+      }
+    };
+
+    const finishPending = this.trackPendingCreation(sessionId, () => {
+      closing = true;
+      closeConnections();
+    });
+
     let forward: { port: number; dispose: () => Promise<void> };
     try {
       forward = await session.ssh.forwardIn(
@@ -249,7 +384,14 @@ class TunnelManager {
             return;
           }
 
+          if (closing) {
+            destroyChannel(channel);
+            return;
+          }
           const localSocket = net.connect(localPort, localHost);
+          const connection = { channel, socket: localSocket };
+          connections.add(connection);
+          const releaseConnection = () => connections.delete(connection);
           localSocket.on("error", (error) => {
             this.metrics.recordTunnelError();
             logger.error("Remote tunnel local socket failed", { tunnelId, error });
@@ -260,11 +402,8 @@ class TunnelManager {
             }
           });
           localSocket.on("close", () => {
-            try {
-              channel.destroy();
-            } catch {
-              // ignore close errors on already-destroyed channel
-            }
+            releaseConnection();
+            destroyChannel(channel);
           });
           channel.on("error", (error: Error) => {
             this.metrics.recordTunnelError();
@@ -272,19 +411,33 @@ class TunnelManager {
             localSocket.destroy();
           });
           channel.on("close", () => {
+            releaseConnection();
             localSocket.destroy();
           });
           channel.pipe(localSocket).pipe(channel);
         },
       );
     } catch (error) {
+      closing = true;
+      closeConnections();
       this.metrics.recordTunnelError();
       const message = error instanceof Error ? error.message : String(error);
+      finishPending();
       throw createConnectionError(
         `Remote tunnel forward failed on ${remoteHost}:${targetPort}: ${message}`,
       );
     }
 
+    let disposed = false;
+    const closeForward = async () => {
+      closing = true;
+      closeConnections();
+      if (!disposed) {
+        await forward.dispose();
+        disposed = true;
+      }
+      channelCleanup.assertComplete();
+    };
     const tunnelInfo: TunnelInfo = {
       id: tunnelId,
       sessionId,
@@ -296,11 +449,35 @@ class TunnelManager {
       createdAt: Date.now(),
       active: true,
     };
+    const handle: TunnelHandle = { close: closeForward };
+    try {
+      if (
+        closing ||
+        this.sessionManager.isSessionClosing?.(sessionId) ||
+        !this.sessionManager.getSession(sessionId)
+      ) {
+        try {
+          await closeForward();
+        } catch (error) {
+          // The creation failed, but its SSH listener can still exist.
+          // Keep it discoverable by listTunnels and retryable via closeTunnel.
+          this.tunnels.set(tunnelId, tunnelInfo);
+          this.handles.set(tunnelId, handle);
+          this.metrics.recordTunnelOpened();
+          this.metrics.recordTunnelError();
+          logger.warn("Cancelled remote forwarding still needs cleanup", { tunnelId, error });
+          throw createConnectionError(
+            "Session closed during remote tunnel creation; pending cleanup for " + tunnelId,
+          );
+        }
+        throw createConnectionError("Session closed during remote tunnel creation");
+      }
+    } finally {
+      finishPending();
+    }
 
     this.tunnels.set(tunnelId, tunnelInfo);
-    this.handles.set(tunnelId, {
-      close: () => forward.dispose(),
-    });
+    this.handles.set(tunnelId, handle);
     this.metrics.recordTunnelOpened();
 
     logger.info("Remote tunnel created", {
@@ -314,22 +491,45 @@ class TunnelManager {
   }
 
   async closeTunnel(tunnelId: string): Promise<boolean> {
+    const inProgress = this.closing.get(tunnelId);
+    if (inProgress) {
+      return inProgress;
+    }
     const tunnel = this.tunnels.get(tunnelId);
     if (!tunnel) {
       logger.warn("Tunnel not found", { tunnelId });
       return false;
     }
 
-    tunnel.active = false;
-    const handle = this.handles.get(tunnelId);
-    if (handle) {
-      await handle.close();
+    const close = (async () => {
+      const handle = this.handles.get(tunnelId);
+      try {
+        await handle?.close();
+        // A late forwardOut may fail after close()'s last assertion but before
+        // this await resumes. Keep that failure owned until retirement is safe.
+        // No await is permitted between this check and registry deletion.
+        handle?.assertCleanupComplete?.();
+      } catch (error) {
+        this.metrics.recordTunnelError();
+        logger.warn("Tunnel close failed, retaining for retry", { tunnelId, error });
+        throw error;
+      }
+      const wasActive = tunnel.active;
+      tunnel.active = false;
       this.handles.delete(tunnelId);
+      this.tunnels.delete(tunnelId);
+      // An inactive cleanup-only record was already counted closed when its
+      // listener was released; do not decrement active-tunnel metrics twice.
+      if (wasActive) this.metrics.recordTunnelClosed();
+      logger.info("Tunnel closed", { tunnelId });
+      return true;
+    })();
+    this.closing.set(tunnelId, close);
+    try {
+      return await close;
+    } finally {
+      this.closing.delete(tunnelId);
     }
-    this.tunnels.delete(tunnelId);
-    this.metrics.recordTunnelClosed();
-    logger.info("Tunnel closed", { tunnelId });
-    return true;
   }
 
   listTunnels(sessionId?: string): TunnelInfo[] {
@@ -338,15 +538,26 @@ class TunnelManager {
   }
 
   async closeSessionTunnels(sessionId: string): Promise<number> {
+    for (const cancel of this.pendingCreations.get(sessionId) ?? []) cancel();
     const sessionTunnels = this.listTunnels(sessionId);
     let closed = 0;
 
+    const failures: unknown[] = [];
     for (const tunnel of sessionTunnels) {
-      if (await this.closeTunnel(tunnel.id)) {
-        closed++;
+      try {
+        if (await this.closeTunnel(tunnel.id)) {
+          closed++;
+        }
+      } catch (error) {
+        failures.push(error);
       }
     }
-
+    if (failures.length === 1) {
+      throw failures[0];
+    }
+    if (failures.length > 1) {
+      throw new AggregateError(failures, "Multiple tunnels failed to close");
+    }
     return closed;
   }
 }

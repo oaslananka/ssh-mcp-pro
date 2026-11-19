@@ -1004,6 +1004,42 @@ describe("SessionManager", () => {
     );
   });
 
+  test("disposes SSH even when ending SFTP fails, and reports incomplete cleanup", async () => {
+    const result = await manager.openSession({
+      host: "sftp-cleanup.example",
+      username: "demo",
+      password: "secret",
+      auth: "password",
+    });
+    const session = manager.getSession(result.sessionId);
+    if (!session?.sftp) throw new Error("SFTP fixture unavailable");
+    session.sftp.end = vi.fn(() => {
+      throw new Error("SFTP teardown failed");
+    });
+    const dispose = vi.spyOn(session.ssh, "dispose");
+    await expect(manager.closeSession(result.sessionId)).resolves.toBe(false);
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(manager.getSession(result.sessionId)).toBeUndefined();
+  });
+
+  test("reports an unsuccessful close listener while still disposing the SSH client", async () => {
+    const result = await manager.openSession({
+      host: "listener-cleanup.example",
+      username: "demo",
+      password: "secret",
+      auth: "password",
+    });
+    const session = manager.getSession(result.sessionId);
+    if (!session) throw new Error("Missing session");
+    manager.onSessionClose(async () => {
+      throw new Error("tunnel teardown failed");
+    });
+    const dispose = vi.spyOn(session.ssh, "dispose");
+    await expect(manager.closeSession(result.sessionId)).resolves.toBe(false);
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(manager.getSession(result.sessionId)).toBeUndefined();
+  });
+
   test("swallows dispose errors while closing sessions", async () => {
     const session = await manager.openSession({
       host: "dispose.example",
@@ -1020,7 +1056,31 @@ describe("SessionManager", () => {
       throw new Error("dispose failed");
     }) as any;
 
-    await expect(manager.closeSession(session.sessionId)).resolves.toBe(true);
+    await expect(manager.closeSession(session.sessionId)).resolves.toBe(false);
+  });
+
+  test("keeps failed SSH disposal retryable without exposing a usable session", async () => {
+    const opened = await manager.openSession({
+      host: "retry-dispose.example",
+      username: "demo",
+      password: "secret",
+      auth: "password",
+    });
+    const current = manager.getSession(opened.sessionId);
+    if (!current) throw new Error("Missing SSH session");
+    const dispose = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new Error("dispose failed");
+      })
+      .mockImplementation(() => undefined);
+    current.ssh.dispose = dispose as any;
+    await expect(manager.closeSession(opened.sessionId)).resolves.toBe(false);
+    expect(manager.getSession(opened.sessionId)).toBeUndefined();
+    expect(manager.getActiveSessions()).toHaveLength(0);
+    await expect(manager.closeSession(opened.sessionId)).resolves.toBe(true);
+    expect(dispose).toHaveBeenCalledTimes(2);
+    await expect(manager.closeSession(opened.sessionId)).resolves.toBe(false);
   });
 
   test("getActiveSessions excludes closing sessions", async () => {
@@ -1034,6 +1094,7 @@ describe("SessionManager", () => {
     expect(manager.getActiveSessions()).toHaveLength(1);
 
     const closePromise = manager.closeSession(result.sessionId);
+    expect(manager.isSessionClosing(result.sessionId)).toBe(true);
 
     const activeDuringClose = manager.getActiveSessions();
     expect(activeDuringClose.find((s) => s.sessionId === result.sessionId)).toBeUndefined();
@@ -1041,6 +1102,7 @@ describe("SessionManager", () => {
     await expect(manager.closeSession(result.sessionId)).resolves.toBe(false);
 
     await closePromise;
+    expect(manager.isSessionClosing(result.sessionId)).toBe(false);
     expect(manager.getActiveSessions()).toHaveLength(0);
   });
 

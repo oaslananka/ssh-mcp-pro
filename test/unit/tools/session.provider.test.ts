@@ -77,6 +77,26 @@ describe("SessionToolProvider", () => {
     );
   });
 
+  test("records removal when SFTP cleanup fails after SSH was disposed", async () => {
+    const { SessionToolProvider } = await loadProvider();
+    let exists = true;
+    const recordSessionClosed = vi.fn();
+    const provider = new SessionToolProvider({
+      sessionManager: {
+        hasManagedSession: () => exists,
+        closeSession: vi.fn(async () => {
+          exists = false;
+          return false;
+        }),
+      } as any,
+      metrics: { recordSessionClosed } as any,
+    });
+    await expect(
+      provider.handleTool("ssh_close_session", { sessionId: "partial-cleanup" }),
+    ).resolves.toEqual({ closed: false, removed: true });
+    expect(recordSessionClosed).toHaveBeenCalledOnce();
+  });
+
   test("handles ssh-config backed tools", async () => {
     const { SessionToolProvider } = await loadProvider();
     getConfiguredHosts.mockResolvedValue(["web"]);
