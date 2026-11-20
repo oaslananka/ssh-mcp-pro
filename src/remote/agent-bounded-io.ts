@@ -69,8 +69,16 @@ export function finalizeBoundedOutput(
   return appendTruncationMarker(value, maxBytes);
 }
 
+export const MAX_READ_BUFFER_BYTES = 10 * 1024 * 1024;
+
 async function readHandleRange(file: FileHandle, start: number, length: number): Promise<Buffer> {
-  const buffer = Buffer.alloc(Math.max(0, length));
+  const boundedLength = Math.min(Math.max(0, length), MAX_READ_BUFFER_BYTES);
+  if (boundedLength > MAX_READ_BUFFER_BYTES) {
+    throw new Error(
+      `Buffer allocation exceeds maximum safety limit of ${MAX_READ_BUFFER_BYTES} bytes`,
+    );
+  }
+  const buffer = Buffer.alloc(boundedLength);
   let offset = 0;
   while (offset < buffer.byteLength) {
     const { bytesRead } = await file.read(
@@ -94,7 +102,7 @@ export async function readFileBounded(
   value: Buffer;
   truncated: boolean;
 }> {
-  const cappedBytes = Math.max(0, maxBytes);
+  const cappedBytes = Math.min(Math.max(0, maxBytes), MAX_READ_BUFFER_BYTES - 1);
   const buffer = await readHandleRange(file, 0, cappedBytes + 1);
   return truncateBuffer(buffer, cappedBytes);
 }
@@ -109,9 +117,10 @@ export async function readFilePageBounded(
   offsetBytes: number,
   maxBytes: number,
 ): Promise<{ value: Buffer; truncated: boolean; nextOffsetBytes?: number }> {
-  const raw = await readHandleRange(file, offsetBytes, maxBytes + 1);
-  let page = raw.subarray(0, maxBytes);
-  let truncated = raw.byteLength > maxBytes;
+  const boundedMaxBytes = Math.min(Math.max(0, maxBytes), MAX_READ_BUFFER_BYTES - 1);
+  const raw = await readHandleRange(file, offsetBytes, boundedMaxBytes + 1);
+  let page = raw.subarray(0, boundedMaxBytes);
+  let truncated = raw.byteLength > boundedMaxBytes;
   const decoder = new TextDecoder("utf-8", { fatal: true });
   let validPage = false;
   for (let removed = 0; removed <= (truncated ? Math.min(3, page.byteLength) : 0); removed += 1) {

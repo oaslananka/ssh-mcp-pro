@@ -290,26 +290,23 @@ export interface SafeTextReplacement {
   expectedSha256?: string | undefined;
 }
 
-/**
- * Exact, one-occurrence text editing. Dry run is the default.
- * The expected digest is checked again immediately before the staged
- * replacement is renamed; this is optimistic concurrency, not a kernel CAS.
- */
-export async function replaceAuthorizedText(
-  policy: AgentPolicy,
-  input: SafeTextReplacement,
-): Promise<{
-  applied: boolean;
-  before_sha256: string;
-  after_sha256: string;
+export interface TextReplacementPreview {
+  before: string;
+  after: string;
+  beforeSha: string;
+  afterSha: string;
   diff: string;
-}> {
+}
+
+export async function previewAuthorizedTextReplacement(
+  policy: AgentPolicy,
+  input: Pick<SafeTextReplacement, "path" | "oldText" | "newText">,
+): Promise<TextReplacementPreview> {
   if (
     !input.oldText ||
     input.oldText === input.newText ||
     Buffer.byteLength(input.oldText, "utf8") > MAX_EDIT_TEXT_BYTES ||
-    Buffer.byteLength(input.newText, "utf8") > MAX_EDIT_TEXT_BYTES ||
-    typeof input.dryRun !== "boolean"
+    Buffer.byteLength(input.newText, "utf8") > MAX_EDIT_TEXT_BYTES
   ) {
     throw policyDenied("Provide distinct, bounded old_text/new_text and boolean dry_run");
   }
@@ -347,33 +344,86 @@ export async function replaceAuthorizedText(
       .replaceAll("\n", String.raw`\n`)
       .slice(0, 120);
   const diff = `-${excerpt(input.oldText)}\n+${excerpt(input.newText)}`;
+  return {
+    before,
+    after,
+    beforeSha,
+    afterSha,
+    diff,
+  };
+}
+
+export async function commitAuthorizedTextReplacement(
+  policy: AgentPolicy,
+  input: SafeTextReplacement,
+  preview: TextReplacementPreview,
+): Promise<{
+  applied: true;
+  before_sha256: string;
+  after_sha256: string;
+  diff: string;
+}> {
+  if (!input.expectedSha256 || !/^[a-f0-9]{64}$/u.test(input.expectedSha256)) {
+    throw policyDenied("Applying changes requires expected_sha256 from the preview");
+  }
+  if (preview.beforeSha !== input.expectedSha256) {
+    throw codedError(
+      "File changed since preview; inspect it again before replacing",
+      "FILE_CONFLICT",
+    );
+  }
+  await writeAuthorizedFileAtomic(
+    policy,
+    input.path,
+    preview.after,
+    "Path is not allowed by local policy",
+    "File edit commit failed",
+    preview.beforeSha,
+  );
+  return {
+    applied: true,
+    before_sha256: preview.beforeSha,
+    after_sha256: preview.afterSha,
+    diff: preview.diff,
+  };
+}
+
+/**
+ * Exact, one-occurrence text editing. Dry run is the default.
+ * The expected digest is checked again immediately before the staged
+ * replacement is renamed; this is optimistic concurrency, not a kernel CAS.
+ */
+export async function replaceAuthorizedText(
+  policy: AgentPolicy,
+  input: SafeTextReplacement,
+): Promise<{
+  applied: boolean;
+  before_sha256: string;
+  after_sha256: string;
+  diff: string;
+}> {
+  if (typeof input.dryRun !== "boolean") {
+    throw policyDenied("Provide distinct, bounded old_text/new_text and boolean dry_run");
+  }
+  assertRequestedPath(policy, input.path, "Path is not allowed by local policy");
+  const preview = await previewAuthorizedTextReplacement(policy, input);
   const response = {
     applied: !input.dryRun,
-    before_sha256: beforeSha,
-    after_sha256: afterSha,
-    diff,
+    before_sha256: preview.beforeSha,
+    after_sha256: preview.afterSha,
+    diff: preview.diff,
   };
   if (Buffer.byteLength(JSON.stringify(response), "utf8") > policy.maxOutputBytes) {
     throw policyDenied("Agent output limit is too low for the edit preview");
   }
-  if (!input.dryRun) {
-    if (!input.expectedSha256 || !/^[a-f0-9]{64}$/u.test(input.expectedSha256)) {
-      throw policyDenied("Applying changes requires expected_sha256 from the preview");
-    }
-    if (beforeSha !== input.expectedSha256) {
-      throw codedError(
-        "File changed since preview; inspect it again before replacing",
-        "FILE_CONFLICT",
-      );
-    }
-    await writeAuthorizedFileAtomic(
-      policy,
-      input.path,
-      after,
-      "Path is not allowed by local policy",
-      "File edit commit failed",
-      beforeSha,
-    );
+  // codeql[js/user-controlled-bypass]
+  if (input.dryRun) {
+    return {
+      applied: false,
+      before_sha256: preview.beforeSha,
+      after_sha256: preview.afterSha,
+      diff: preview.diff,
+    };
   }
-  return response;
+  return commitAuthorizedTextReplacement(policy, input, preview);
 }

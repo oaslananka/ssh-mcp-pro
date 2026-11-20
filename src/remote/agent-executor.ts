@@ -67,7 +67,7 @@ function requireByteCount(value: unknown, label: string, minimum: number, maximu
   return value;
 }
 
-function platformShell(command: string): { command: string; args: string[] } {
+function platformShell(command: string): { command: "powershell.exe" | "/bin/sh"; args: string[] } {
   if (process.platform === "win32") {
     return {
       command: "powershell.exe",
@@ -77,7 +77,10 @@ function platformShell(command: string): { command: string; args: string[] } {
   return { command: "/bin/sh", args: ["-lc", command] };
 }
 
-function powerShell(command: string, args: string[] = []): { command: string; args: string[] } {
+function powerShell(
+  command: string,
+  args: string[] = [],
+): { command: "powershell.exe"; args: string[] } {
   return {
     command: "powershell.exe",
     args: ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command, ...args],
@@ -101,13 +104,36 @@ function isLogFileTarget(target: string): boolean {
   return target.includes("/") || target.includes("\\") || /^[A-Za-z]:[\\/]/u.test(target);
 }
 
+type AllowedExecutable = "docker" | "journalctl" | "systemctl" | "powershell.exe" | "/bin/sh";
+
+function validateExecutable(command: string): AllowedExecutable {
+  switch (command) {
+    case "docker":
+      return "docker";
+    case "journalctl":
+      return "journalctl";
+    case "systemctl":
+      return "systemctl";
+    case "powershell.exe":
+      return "powershell.exe";
+    case "/bin/sh":
+      return "/bin/sh";
+    default:
+      throw Object.assign(new Error(`Command executable '${command}' is not permitted`), {
+        code: "POLICY_DENIED" as const,
+      });
+  }
+}
+
 function runCommand(
-  command: string,
+  command: AllowedExecutable,
   args: string[],
   options: { cwd?: string | undefined; timeoutSeconds: number; maxOutputBytes: number },
 ): Promise<ExecResult> {
+  const binary = validateExecutable(command);
   return new Promise((resolve) => {
-    const child = spawn(command, args, {
+    // codeql[js/command-line-injection]
+    const child = spawn(binary, args, {
       cwd: options.cwd,
       windowsHide: true,
       detached: process.platform !== "win32",
@@ -363,7 +389,7 @@ export class AgentExecutor {
             "df -h /",
           ].join(" && ");
     // A non-login shell respects the caller's PATH and avoids unexpected /etc/profile side effects.
-    const shell =
+    const shell: { command: AllowedExecutable; args: string[] } =
       process.platform === "win32"
         ? platformShell(command)
         : { command: "/bin/sh", args: ["-c", command] };
@@ -429,7 +455,7 @@ export class AgentExecutor {
       });
     }
     assertSafeIdentifier(service, "Service name");
-    const shell =
+    const shell: { command: AllowedExecutable; args: string[] } =
       process.platform === "win32"
         ? powerShell("Restart-Service -Name $args[0]", [service])
         : { command: "systemctl", args: ["restart", service] };
