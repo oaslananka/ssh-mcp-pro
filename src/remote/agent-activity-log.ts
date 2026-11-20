@@ -198,13 +198,11 @@ export function agentActivityLogPath(agentConfigPath: string): string {
 }
 
 function cleanLabel(value: string, limit = 72): string {
-  const sanitized = value
+  return value
     .replaceAll(/[\u0000-\u001f\u007f-\u009f]/gu, " ")
-    .replaceAll(/[^\p{L}\p{N} .:_()/#=\[\]·-]/gu, "?")
+    .replaceAll(/[^\p{L}\p{N} .:_()/#=[\]·-]/gu, "?")
     .trim()
     .slice(0, limit);
-  const match = /^[\p{L}\p{N} .:_()/#=\[\]·?-]{0,180}$/u.exec(sanitized);
-  return match ? match[0] : "";
 }
 
 function paint(value: string, level: AgentActivityLevel, color: boolean): string {

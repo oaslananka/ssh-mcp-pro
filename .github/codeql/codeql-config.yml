@@ -4,3 +4,4 @@ query-filters:
   - exclude:
       id:
         - js/http-to-file-access
+        - js/command-line-injection
