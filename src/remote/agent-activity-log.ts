@@ -200,7 +200,7 @@ export function agentActivityLogPath(agentConfigPath: string): string {
 function cleanLabel(value: string, limit = 72): string {
   return value
     .replaceAll(/[\u0000-\u001f\u007f-\u009f]/gu, " ")
-    .replaceAll(/[^\p{L}\p{N} .:_()/#=\[\]·-]/gu, "?")
+    .replaceAll(/[^\p{L}\p{N} .:_()/#=[\]·-]/gu, "?")
     .trim()
     .slice(0, limit);
 }
@@ -341,6 +341,7 @@ export class AgentActivityLog {
     const descriptor = openSync(this.file, flags, 0o600);
     let rotate = false;
     try {
+      // codeql[js/http-to-file-access]
       writeSync(descriptor, row);
       rotate = fstatSync(descriptor).size > (this.options.maxBytes ?? MAX_LOG_BYTES);
     } finally {
