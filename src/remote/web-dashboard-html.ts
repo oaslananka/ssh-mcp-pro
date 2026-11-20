@@ -208,9 +208,9 @@ ${AI_CLIENT_STYLES}</style>
         <div class="landing-shell">
           <section class="landing-hero">
             <div class="landing-copy">
-              <div class="eyebrow"><span class="mini-spark" aria-hidden="true"></span> YOUR OWN MACHINES · ANY AI ASSISTANT</div>
+              <div class="eyebrow"><span class="mini-spark" aria-hidden="true"></span> ZERO-TRUST SSH CONTROL PLANE · MCP SERVER</div>
               <h1>Your machines. <em>Inside your AI chat.</em></h1>
-              <p>Connect your own computers and servers to ChatGPT, Claude or Gemini. Choose which devices — and which actions — your assistant can use.</p>
+              <p>Connect your workstations and servers to ChatGPT, Claude or Gemini with strict SSH Model Context Protocol access. Strict host-key checking, non-root enforcement, and tamper-evident audit logs.</p>
               <div class="auth-buttons">
                 <a href="/auth/login/google" class="auth-btn auth-btn-google">
                   <span class="google-icon" aria-hidden="true">G</span> Continue with Google
@@ -219,15 +219,21 @@ ${AI_CLIENT_STYLES}</style>
                   <span class="github-icon" aria-hidden="true">⌘</span> Continue with GitHub
                 </a>
               </div>
+              <div class="landing-specs" aria-label="Security specifications">
+                <span class="spec-pill"><span class="spec-dot" aria-hidden="true"></span>Strict host-key check</span>
+                <span class="spec-pill"><span class="spec-dot" aria-hidden="true"></span>Non-root isolation</span>
+                <span class="spec-pill"><span class="spec-dot" aria-hidden="true"></span>Zero sudo default</span>
+                <span class="spec-pill"><span class="spec-dot" aria-hidden="true"></span>SHA-256 audit chaining</span>
+              </div>
               <p class="landing-small-note">Already connected a device? Sign in with the same account to find it.</p>
               <p id="providerSetup" class="device-scope-note" role="status" hidden>Local sign-in is not configured yet. Configure a supported OAuth provider or use the <a href="https://ssh-mcp-pro.oaslananka.dev/">hosted dashboard</a>.</p>
             </div>
             <div class="product-stage" aria-label="Illustration of ssh-mcp-pro connecting AI clients to your device. Not a live session.">
               <div class="stage-overline">WORK WITH YOUR FAVORITE ASSISTANT</div>
               <div class="stage-clients">
-                <div class="assistant-chip"><span class="assistant-mark gpt-mark" aria-hidden="true">✳</span> ChatGPT</div>
-                <div class="assistant-chip"><span class="assistant-mark claude-mark" aria-hidden="true">✺</span> Claude</div>
-                <div class="assistant-chip"><span class="assistant-mark gemini-mark" aria-hidden="true">✦</span> Gemini</div>
+                <div class="assistant-chip"><span class="assistant-mark gpt-mark" aria-hidden="true">✳</span> ChatGPT<span class="chip-status">OpenAI MCP</span></div>
+                <div class="assistant-chip"><span class="assistant-mark claude-mark" aria-hidden="true">✺</span> Claude<span class="chip-status">Desktop &amp; Web</span></div>
+                <div class="assistant-chip"><span class="assistant-mark gemini-mark" aria-hidden="true">✦</span> Gemini<span class="chip-status">CLI &amp; Custom Apps</span></div>
               </div>
               <div class="stage-connector" aria-hidden="true"><span></span><i></i><span></span></div>
               <div class="stage-gateway">
@@ -236,22 +242,23 @@ ${AI_CLIENT_STYLES}</style>
                 <span class="stage-shield" aria-label="Policy controlled">✓</span>
               </div>
               <div class="stage-connector short" aria-hidden="true"><span></span><i></i><span></span></div>
-              <div class="terminal-preview">
-                <div class="terminal-titlebar"><span><i></i> Your computer</span><span class="terminal-sample">Illustrative preview</span></div>
+              <div class="terminal-preview" role="region" aria-label="Interactive terminal preview">
+                <div class="terminal-titlebar"><span class="terminal-host-badge"><i aria-hidden="true"></i> srv-prod-01 (Ubuntu 24.04 LTS)</span><span class="terminal-policy-badge">STRICT ENFORCE</span><span class="terminal-sample">Illustrative preview</span></div>
                 <div class="terminal-content">
-                  <div class="terminal-line"><span class="terminal-dollar" aria-hidden="true">›</span> ssh_hosts_list</div>
-                  <div class="terminal-result"><span class="mini-spark" aria-hidden="true"></span> Connected devices and allowed actions</div>
-                  <div class="terminal-caption">Run only what your access policy allows.</div>
+                  <div class="terminal-line"><span class="terminal-caller">claude</span><span class="terminal-dollar" aria-hidden="true">›</span> <span class="term-fn">proc_exec</span>(<span class="term-arg">"systemctl is-active docker"</span>)</div>
+                  <div class="terminal-result"><span class="mini-spark" aria-hidden="true"></span> [policy-guard] rule: <span class="term-hl">allow-read-only</span> · exit 0</div>
+                  <div class="terminal-output">active (running) · 4 containers up</div>
+                  <div class="terminal-caption">Run only what your access policy allows. Chained in audit log.</div>
                 </div>
               </div>
             </div>
           </section>
           <section class="onboarding-section" aria-labelledby="start-heading">
-            <div class="onboarding-section-head"><p class="eyebrow">GET STARTED</p><h2 id="start-heading">Quick start: three steps to connected.</h2><p>Go from your first sign-in to a working AI connection.</p></div>
+            <div class="onboarding-section-head"><p class="eyebrow">INTEGRATION FLOW</p><h2 id="start-heading">Quick start: three steps to connected.</h2><p>Zero daemon compile required. Start from sign-in to verified AI execution in three minutes.</p></div>
             <div class="onboarding-steps">
-              <article><span class="step-number">01</span><h3>Sign in</h3><p>Use Google or GitHub to create your private workspace.</p></article>
-              <article><span class="step-number">02</span><h3>Connect a device</h3><p>Install the lightweight agent on your computer or server. You choose its permissions.</p></article>
-              <article><span class="step-number">03</span><h3>Connect an AI app</h3><p>Use the secure MCP endpoint from ChatGPT, Claude or Gemini and start working.</p></article>
+              <article><span class="step-number">01</span><h3>Authenticate workspace</h3><p>Sign in with Google or GitHub to create an isolated cryptographic workspace with automatic keypair generation.</p></article>
+              <article><span class="step-number">02</span><h3>Enroll host daemon</h3><p>Install the lightweight agent on your Windows, Linux, or macOS machine. Choose exact scope policies.</p></article>
+              <article><span class="step-number">03</span><h3>Connect AI assistant</h3><p>Use the secure MCP endpoint from ChatGPT, Claude or Gemini and start working.</p></article>
             </div>
           </section>
           <section class="landing-local"><div><span class="landing-local-symbol" aria-hidden="true">⌘</span><div><h2>Prefer to stay local?</h2><p>Start your own local dashboard. Sign-in requires a Google or GitHub OAuth provider.</p></div></div><code>npx -y ssh-mcp-pro web</code></section>
