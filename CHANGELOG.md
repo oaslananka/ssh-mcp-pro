@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.16.0...ssh-mcp-pro-v1.17.0) (2026-11-21)
+
+
+### Features
+
+* **web:** harmonize AI connections theme, audit tables and dark palette ([#329](https://github.com/oaslananka/ssh-mcp-pro/issues/329)) ([50412b7](https://github.com/oaslananka/ssh-mcp-pro/commit/50412b7b0bd6fd7dbda11add235133b65fbe6bf3))
+
+
+### Bug Fixes
+
+* **remote:** report agent versions and recommend safe updates ([#332](https://github.com/oaslananka/ssh-mcp-pro/issues/332)) ([dab85e7](https://github.com/oaslananka/ssh-mcp-pro/commit/dab85e71739e99c7adc34f810adcf628aa6ca9d7))
+* **security:** Sanitize system tool commands and prevent credential leaks ([#330](https://github.com/oaslananka/ssh-mcp-pro/issues/330)) ([ba9b01a](https://github.com/oaslananka/ssh-mcp-pro/commit/ba9b01a23da4b33d79d5b56289d9b6a5c3d4159c))
+* **web:** load per-user usage on dashboard and embed in initial user state ([#327](https://github.com/oaslananka/ssh-mcp-pro/issues/327)) ([40b77ee](https://github.com/oaslananka/ssh-mcp-pro/commit/40b77eef7df414527faf7d4e516097d756341ea1))
+
 ## [1.16.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.15.2...ssh-mcp-pro-v1.16.0) (2026-11-21)
 
 
