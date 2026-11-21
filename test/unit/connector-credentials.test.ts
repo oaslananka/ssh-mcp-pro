@@ -118,6 +118,26 @@ describe("connector credential resolver", () => {
     ).rejects.toThrow("Unrecognized key");
   });
 
+  test("filters sensitive ambient environment variables from helper child process", async () => {
+    process.env.SSH_MCP_HTTP_BEARER_TOKEN = "super-secret-token";
+    process.env.INTERNAL_API_KEY = "leaked-key";
+    try {
+      const script = writeResolverScript(`
+        const leaked = Boolean(process.env.SSH_MCP_HTTP_BEARER_TOKEN || process.env.INTERNAL_API_KEY);
+        if (leaked) {
+          process.exit(2);
+        }
+        console.log(JSON.stringify({ auth: "agent", username: "deploy" }));
+      `);
+      await expect(
+        resolveConnectorCredentials({ hostAlias: "prod", purpose: "inspect" }, configFor(script)),
+      ).resolves.toEqual(expect.objectContaining({ username: "deploy" }));
+    } finally {
+      delete process.env.SSH_MCP_HTTP_BEARER_TOKEN;
+      delete process.env.INTERNAL_API_KEY;
+    }
+  });
+
   test("enforces credential command timeout", async () => {
     const script = writeResolverScript("setTimeout(() => {}, 5000);");
 

@@ -35,7 +35,15 @@ export function redactSensitiveData(obj: unknown): unknown {
   }
 
   if (typeof obj === "string") {
-    return obj;
+    return redactErrorMessage(obj);
+  }
+
+  if (obj instanceof Error) {
+    return {
+      name: obj.name,
+      message: redactErrorMessage(obj.message),
+      ...(obj.stack ? { stack: redactErrorMessage(obj.stack) } : {}),
+    };
   }
 
   if (Array.isArray(obj)) {
@@ -133,19 +141,19 @@ export class Logger {
 
     const timestamp = new Date().toISOString();
     const levelName = LogLevel[level];
+    const redactedMessage = redactErrorMessage(message);
     const redactedData = data !== undefined ? redactSensitiveData(data) : undefined;
 
     if (this.format === "json") {
-      this.writeJson(timestamp, levelName, message, redactedData);
+      this.writeJson(timestamp, levelName, redactedMessage, redactedData);
       return;
     }
 
-    this.writePlain(timestamp, levelName, message, redactedData);
+    this.writePlain(timestamp, levelName, redactedMessage, redactedData);
   }
 
   error(message: string, data?: unknown): void {
-    const redactedMessage = redactErrorMessage(message);
-    this.log(LogLevel.ERROR, redactedMessage, data);
+    this.log(LogLevel.ERROR, message, data);
   }
 
   warn(message: string, data?: unknown): void {

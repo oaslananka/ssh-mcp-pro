@@ -1,6 +1,7 @@
 import type { Tool } from "@modelcontextprotocol/server";
 import { logger } from "../logging.js";
 import type { MetricsCollector } from "../metrics.js";
+import type { PolicyEngine } from "../policy.js";
 import type { ProcessService } from "../process.js";
 import type { SessionManager } from "../session.js";
 import {
@@ -21,10 +22,27 @@ import {
 import { toolResult } from "./results.js";
 import type { ToolProvider } from "./types.js";
 
+const SAFE_SERVICE_NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.@:-]*$/;
+
+function sanitizeServiceName(name: string): string {
+  if (!SAFE_SERVICE_NAME.test(name)) {
+    throw new Error(
+      `Invalid service name: ${name}. Service names must contain only letters, numbers, dots, dashes, underscores, colons, or @`,
+    );
+  }
+  return name;
+}
+
+function shellQuote(value: string): string {
+  const escaped = String(value).replaceAll("'", "'\"'\"'");
+  return `'${escaped}'`;
+}
+
 export interface SystemToolProviderDeps {
   sessionManager: SessionManager;
   metrics: MetricsCollector;
   processService: ProcessService;
+  policy?: PolicyEngine;
 }
 
 export class SystemToolProvider implements ToolProvider {
@@ -342,44 +360,59 @@ export class SystemToolProvider implements ToolProvider {
 
   private async serviceStatus(args: unknown): Promise<unknown> {
     const { sessionId, name } = ServiceNameSchema.parse(args);
+    const safeName = sanitizeServiceName(name);
     const result = await this.deps.processService.execCommand(
       sessionId,
-      `systemctl status ${name} --no-pager`,
+      `systemctl status ${shellQuote(safeName)} --no-pager`,
     );
-    logger.info("Service status retrieved", { sessionId, name });
+    logger.info("Service status retrieved", { sessionId, name: safeName });
     return result;
   }
 
   private async serviceLogs(args: unknown): Promise<unknown> {
     const { sessionId, name, lines } = ServiceLogsSchema.parse(args);
+    const safeName = sanitizeServiceName(name);
     const result = await this.deps.processService.execCommand(
       sessionId,
-      `journalctl -u ${name} -n ${lines} --no-pager`,
+      `journalctl -u ${shellQuote(safeName)} -n ${lines} --no-pager`,
     );
-    logger.info("Service logs retrieved", { sessionId, name, lines });
+    logger.info("Service logs retrieved", { sessionId, name: safeName, lines });
     return result;
   }
 
   private async serviceRestart(args: unknown): Promise<unknown> {
     const { sessionId, name } = ServiceNameSchema.parse(args);
+    const safeName = sanitizeServiceName(name);
     const result = await this.deps.processService.execCommand(
       sessionId,
-      `systemctl restart ${name}`,
+      `systemctl restart ${shellQuote(safeName)}`,
     );
-    logger.info("Service restarted", { sessionId, name });
+    logger.info("Service restarted", { sessionId, name: safeName });
     return result;
   }
 
   private async serviceStop(args: unknown): Promise<unknown> {
     const { sessionId, name } = ServiceNameSchema.parse(args);
-    const result = await this.deps.processService.execCommand(sessionId, `systemctl stop ${name}`);
-    logger.info("Service stopped", { sessionId, name });
+    const safeName = sanitizeServiceName(name);
+    const result = await this.deps.processService.execCommand(
+      sessionId,
+      `systemctl stop ${shellQuote(safeName)}`,
+    );
+    logger.info("Service stopped", { sessionId, name: safeName });
     return result;
   }
 
   private async diskUsage(args: unknown): Promise<unknown> {
     const { sessionId, path } = DiskUsageSchema.parse(args);
-    const command = path ? `df -h ${path}` : "df -h";
+    if (path) {
+      const session = this.deps.sessionManager.getSession(sessionId);
+      this.deps.policy?.assertAllowed({
+        action: "fs.read",
+        path,
+        ...(session?.info.policyMode ? { mode: session.info.policyMode } : {}),
+      });
+    }
+    const command = path ? `df -h ${shellQuote(path)}` : "df -h";
     const result = await this.deps.processService.execCommand(sessionId, command);
     logger.info("Disk usage retrieved", { sessionId });
     return result;
@@ -420,9 +453,16 @@ export class SystemToolProvider implements ToolProvider {
     const { sessionId, path, service, lines } = LogTailSchema.parse(args);
     let command: string;
     if (service) {
-      command = `journalctl -u ${service} -n ${lines} --no-pager`;
+      const safeService = sanitizeServiceName(service);
+      command = `journalctl -u ${shellQuote(safeService)} -n ${lines} --no-pager`;
     } else if (path) {
-      command = `tail -n ${lines} ${path}`;
+      const session = this.deps.sessionManager.getSession(sessionId);
+      this.deps.policy?.assertAllowed({
+        action: "fs.read",
+        path,
+        ...(session?.info.policyMode ? { mode: session.info.policyMode } : {}),
+      });
+      command = `tail -n ${lines} ${shellQuote(path)}`;
     } else {
       command = `journalctl -n ${lines} --no-pager`;
     }

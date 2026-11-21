@@ -13,7 +13,7 @@ import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
 } from "@opentelemetry/semantic-conventions";
-import { logger } from "./logging.js";
+import { logger, redactErrorMessage } from "./logging.js";
 
 const DEFAULT_SERVICE_NAME = "ssh-mcp-pro";
 
@@ -135,10 +135,20 @@ export async function withSpan<T>(
       span.setStatus({ code: SpanStatusCode.OK });
       return result;
     } catch (error) {
-      span.recordException(error instanceof Error ? error : new Error(String(error)));
+      const rawMessage = error instanceof Error ? error.message : String(error);
+      const safeMessage = redactErrorMessage(rawMessage);
+      const safeError =
+        error instanceof Error && rawMessage === safeMessage
+          ? error
+          : Object.assign(new Error(safeMessage), {
+              name: error instanceof Error ? error.name : "Error",
+              stack:
+                error instanceof Error && error.stack ? redactErrorMessage(error.stack) : undefined,
+            });
+      span.recordException(safeError);
       span.setStatus({
         code: SpanStatusCode.ERROR,
-        message: error instanceof Error ? error.message : String(error),
+        message: safeMessage,
       });
       throw error;
     } finally {

@@ -169,6 +169,27 @@ describe("telemetry helpers", () => {
     expect(span.end).toHaveBeenCalledTimes(1);
   });
 
+  test("withSpan redacts credentials from recorded exceptions and span status", async () => {
+    const span = createMockSpan();
+    mockTracerWithSpan(span);
+    const error = new Error("Connection failed: password=supersecret token=abc12345");
+
+    await expect(
+      withSpan("ssh.secret_error", () => {
+        throw error;
+      }),
+    ).rejects.toBe(error);
+
+    expect(span.setStatus).toHaveBeenCalledWith({
+      code: SpanStatusCode.ERROR,
+      message: "Connection failed: **** ****",
+    });
+    const recorded = vi.mocked(span.recordException).mock.calls[0][0] as Error;
+    expect(recorded.message).not.toContain("supersecret");
+    expect(recorded.message).not.toContain("abc12345");
+    expect(recorded.message).toBe("Connection failed: **** ****");
+  });
+
   test("withSpan records errors and rethrows them", async () => {
     await expect(
       withSpan("test.error", () => {

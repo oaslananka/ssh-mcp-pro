@@ -71,6 +71,7 @@ export function createToolRegistry(container: AppContainer): ToolRegistry {
         sessionManager: container.sessionManager,
         metrics: container.metrics,
         processService,
+        policy: container.policy,
       }),
     )
     .register(new TransferToolProvider({ transferService }))
