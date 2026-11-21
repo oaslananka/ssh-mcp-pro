@@ -50,6 +50,9 @@ export function parseArgs(argv: string[]): CliOptions {
       case "agent":
         opts.agentArgs = argv.slice(index + 1);
         return opts;
+      case "remote":
+        opts.agentArgs = ["remote", ...argv.slice(index + 1)];
+        return opts;
       case "web":
         opts.transport = "http";
         opts.webDashboard = true;

@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   AgentActivityLog,
   agentActivityLogPath,
@@ -9,7 +9,17 @@ import {
 } from "../../src/remote/agent-activity-log.js";
 
 const temporaryDirs: string[] = [];
+let savedEnv: NodeJS.ProcessEnv;
+
+beforeEach(() => {
+  savedEnv = { ...process.env };
+  delete process.env.SSHAUTOMATOR_AGENT_LOG_DETAIL;
+  delete process.env.SSHAUTOMATOR_AGENT_LOG_COMMANDS;
+  delete process.env.SSHAUTOMATOR_AGENT_LOG_OUTPUT;
+});
+
 afterEach(() => {
+  process.env = savedEnv;
   vi.restoreAllMocks();
   for (const folder of temporaryDirs.splice(0)) {
     rmSync(folder, { recursive: true, force: true });

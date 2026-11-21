@@ -559,6 +559,13 @@ export async function runAgentCli(argv: string[], state?: AgentRuntimeState): Pr
     case "enroll":
       await enroll(argv.slice(1));
       break;
+    case "remote":
+      if (!existsSync(configPath())) {
+        output("ssh-mcp-pro: device is not enrolled yet. Starting browser setup...");
+        await enroll(["--browser", ...argv.slice(1)]);
+      }
+      await runAgent(state, argv.slice(1));
+      break;
     case "run":
       await runAgent(state, argv.slice(1));
       break;

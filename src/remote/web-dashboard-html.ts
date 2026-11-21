@@ -105,8 +105,8 @@ ${AI_CLIENT_STYLES}</style>
         'add-device': { title: 'Connect a device', description: 'Add a computer you own and choose what AI can do on it.' },
         clients: { title: 'Connect an AI app', description: 'Use the same secure MCP connection in the assistant you prefer.' },
         'ai-clients': { title: 'AI clients', description: 'Manage AI assistants authorized for your account.' },
-        audit: { title: 'Activity', description: 'Review actions requested through your connected devices.' },
-        usage: { title: 'Usage & Users', description: 'Owner-only activity and account statistics for this Cloud service.' },
+        audit: { title: 'Open activity', description: 'Review actions requested through your connected devices.' },
+        usage: { title: currentUser.serviceOwner ? 'Usage & Users' : 'Usage', description: 'Tool calls, quota limits, and execution metrics for your account.' },
       }[activeTab] || { title: 'Your devices', description: '' };
       const navSvg = paths => '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + '</svg>';
       const navIcons = {
@@ -122,6 +122,29 @@ ${AI_CLIENT_STYLES}</style>
           class="workspace-nav-item \${activeTab === tab ? 'active' : ''}" onclick="switchTab('\${tab}')">
           <span class="workspace-nav-icon" aria-hidden="true">\${navIcons[tab]}</span><span>\${title}</span>
         </button>\`;
+      const renderSidebarUsageWidget = () => {
+        const u = (currentUser && currentUser.userUsage) || (usageData && usageData.userUsage) || {
+          callsThisMonth: 0,
+          limit: 10000,
+          percentUsed: 0,
+          resetDate: '1 Ara'
+        };
+        const n = value => new Intl.NumberFormat('en-US').format(Number(value || 0));
+        return \`
+          <div class="sidebar-usage-widget">
+            <div class="sidebar-usage-header">
+              <span class="sidebar-usage-label">Tool calls</span>
+              <span class="sidebar-usage-pct">\${u.percentUsed}%</span>
+            </div>
+            <div class="sidebar-progress-track">
+              <div class="sidebar-progress-fill" style="width:\${u.percentUsed}%;"></div>
+            </div>
+            <div class="sidebar-usage-detail">\${n(u.callsThisMonth)} of \${n(u.limit)} this month</div>
+            <div class="sidebar-usage-reset">Resets on \${escapeHtml(u.resetDate)}</div>
+            <button class="sidebar-upgrade-btn" type="button" onclick="switchTab('usage')">Upgrade to Pro</button>
+          </div>
+        \`;
+      };
       const online = devicesList.filter(d => d.isLiveConnected).length;
       const total = devicesList.length;
       root.innerHTML = \`
@@ -134,17 +157,17 @@ ${AI_CLIENT_STYLES}</style>
             <p class="sidebar-label">WORKSPACE</p>
             <nav class="workspace-nav" aria-label="Workspace navigation">
               \${navItem('devices', 'Devices')}
+              \${currentUser.serviceOwner ? navItem('usage', 'Usage & Users') : navItem('usage', 'Usage')}
               \${navItem('add-device', 'Add a device')}
               \${navItem('clients', 'AI connections')}
               \${navItem('ai-clients', 'AI clients')}
               \${navItem('audit', 'Activity')}
-              \${currentUser.serviceOwner ? navItem('usage', 'Usage & Users') : ''}
             </nav>
             <div class="sidebar-bottom">
-              <div class="sidebar-help" title="Cloud service availability is separate from each device connection."><span class="live-indicator" aria-hidden="true"></span><span>Cloud service online</span></div>
+              \${renderSidebarUsageWidget()}
               <div class="sidebar-account">
                 <span class="account-avatar" aria-hidden="true">\${escapeHtml((currentUser.displayName || currentUser.id || 'S').slice(0, 1).toUpperCase())}</span>
-                <span class="sidebar-account-text"><strong>\${escapeHtml(currentUser.displayName || 'Signed in')}</strong><small>\${escapeHtml(currentUser.provider === 'github' ? 'GitHub account' : 'Google account')}</small></span>
+                <span class="sidebar-account-text"><strong>\${escapeHtml(currentUser.displayName || 'Signed in')}</strong><small>\${escapeHtml(currentUser.email || (currentUser.provider === 'github' ? 'GitHub account' : 'Google account'))}</small></span>
                 <a href="/auth/logout" class="sidebar-signout" aria-label="Sign out" title="Sign out">Sign out</a>
               </div>
               <div class="sidebar-links"><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="https://github.com/oaslananka/ssh-mcp-pro/issues" rel="noopener noreferrer">Help</a></div>
@@ -177,7 +200,7 @@ ${AI_CLIENT_STYLES}</style>
       if (activeTab === 'add-device') chooseInstallOS(selectedInstallOs);
       if (activeTab === 'ai-clients') loadAiClients();
       if (activeTab === 'audit') loadAudit();
-      if (activeTab === 'usage' && currentUser.serviceOwner) loadUsage();
+      if (activeTab === 'usage') loadUsage();
     }
 
     function chooseInstallOS(os) {
@@ -267,7 +290,7 @@ ${AI_CLIENT_STYLES}</style>
     }
 
     function renderTabContent() {
-      if (activeTab === 'usage' && currentUser.serviceOwner) return renderUsagePanel();
+      if (activeTab === 'usage') return renderUsagePanel();
 
       if (activeTab === 'devices') {
         if (!devicesLoaded) {
@@ -325,20 +348,129 @@ ${AI_CLIENT_STYLES}</style>
 
       if (activeTab === 'add-device') {
         return \`
-          <section class="setup-intro">
-            <p class="eyebrow">DEVICE SETUP</p>
-            <h2>Set up your computer in three steps</h2>
-            <p>Choose the computer you want to connect, start its agent, then confirm it is online.</p>
-            <div class="setup-steps" aria-label="Setup stages">
-              <span><strong>01</strong> Choose access</span>
-              <span><strong>02</strong> Run setup</span>
-              <span><strong>03</strong> Confirm online</span>
+          <div class="device-wizard">
+            <div class="wizard-stepper">
+              <div class="stepper-item active">
+                <div class="stepper-dot"></div>
+                <span>Choose method</span>
+              </div>
+              <div class="stepper-line"></div>
+              <div class="stepper-item">
+                <div class="stepper-dot"></div>
+                <span>Start on device</span>
+              </div>
+              <div class="stepper-line"></div>
+              <div class="stepper-item">
+                <div class="stepper-dot"></div>
+                <span>Verify</span>
+              </div>
             </div>
-          </section>
 
-          <div class="card">
-            <h2 style="margin-bottom:12px;">Connect a new computer</h2>
-            <p style="color:var(--text-muted); font-size:14px; margin-bottom:24px;">\${localBrowserLink ? 'Approve the local agent waiting in your terminal. The one-time credential stays inside your browser and device; do not copy it into chat.' : 'Choose a name and access level. Setup commands are provided for your computer.'}</p>
+            <h2 class="wizard-title">Connect this device</h2>
+            <p class="wizard-subtitle">Desktop Commander Remote runs on this device so your AI chat can work with your files. Choose how to connect.</p>
+
+            <div class="platform-segmented" role="tablist">
+              <button type="button" class="platform-tab-btn \${selectedInstallOs === 'windows' ? 'active' : ''}" data-install-os="windows" onclick="chooseInstallOS('windows')">Windows</button>
+              <button type="button" class="platform-tab-btn \${selectedInstallOs === 'macos' ? 'active' : ''}" data-install-os="macos" onclick="chooseInstallOS('macos')">macOS</button>
+              <button type="button" class="platform-tab-btn \${selectedInstallOs === 'linux' ? 'active' : ''}" data-install-os="linux" onclick="chooseInstallOS('linux')">Linux</button>
+            </div>
+
+            <p class="wizard-note">Choose one method. You can change it anytime.</p>
+
+            <!-- Windows methods -->
+            <div data-os-section="windows" \${selectedInstallOs === 'windows' ? '' : 'hidden'}>
+              <div class="wizard-method-card">
+                <div class="wizard-method-header">
+                  <div class="wizard-method-title">Download and run <span class="badge-recommended">Recommended</span></div>
+                </div>
+                <p class="wizard-method-desc">Easiest option. No commands to type.</p>
+              </div>
+
+              <div class="wizard-method-card">
+                <div class="wizard-method-header">
+                  <div class="wizard-method-title">PowerShell setup script</div>
+                </div>
+                <p class="wizard-method-desc">One command. Installs Node.js if needed.</p>
+                <div class="wizard-codebox">
+                  <code id="cmdWinOneLiner">irm -ErrorAction Stop \${PUBLIC_URL.replace(/\\/+$/, '')}/install/remote-windows.ps1 | iex</code>
+                  <button type="button" class="wizard-copy-btn" onclick="copySnippet('cmdWinOneLiner')">Copy</button>
+                </div>
+                <p style="font-size:11px; color:#647083; margin-top:8px;">After copying, we'll show you how to open PowerShell and run the command.</p>
+              </div>
+
+              <div class="wizard-method-card">
+                <div class="wizard-method-header">
+                  <div class="wizard-method-title">npx (advanced)</div>
+                </div>
+                <p class="wizard-method-desc">Requires Node.js 22.12+ already installed.</p>
+                <div class="wizard-codebox">
+                  <code id="cmdWinNpx">npx.cmd ssh-mcp-pro@latest remote</code>
+                  <button type="button" class="wizard-copy-btn" onclick="copySnippet('cmdWinNpx')">Copy</button>
+                </div>
+                <p style="font-size:11px; color:#647083; margin-top:8px;">After copying, we'll show you how to open PowerShell and run the command.</p>
+              </div>
+            </div>
+
+            <!-- macOS methods -->
+            <div data-os-section="macos" \${selectedInstallOs === 'macos' ? '' : 'hidden'}>
+              <div class="wizard-method-card" style="cursor:default;">
+                <div class="wizard-method-header">
+                  <div class="wizard-method-title">Quick setup <span class="badge-recommended">Recommended</span></div>
+                </div>
+                <p class="wizard-method-desc">Starts ssh-mcp-pro. If Node.js can't be found, you'll be asked before installing it.</p>
+                <div class="wizard-codebox">
+                  <code id="cmdMacOneLiner">$ curl -fsSL \${PUBLIC_URL.replace(/\\/+$/, '')}/install/remote-macos.sh | sh</code>
+                </div>
+                <button type="button" class="wizard-btn-primary" onclick="copySnippet('cmdMacOneLiner')">Copy setup command</button>
+                <p style="text-align:center; font-size:11px; color:#647083; margin-top:10px;"><a href="https://github.com/oaslananka/ssh-mcp-pro" target="_blank" rel="noopener noreferrer" style="color:#647083;">All these scripts are open source. You can view them on GitHub ↗</a></p>
+              </div>
+
+              <div class="wizard-method-card">
+                <div class="wizard-method-header">
+                  <div class="wizard-method-title">Other ways to connect</div>
+                </div>
+                <p class="wizard-method-desc">Use your own Node.js installation (Requires Node.js 22.12 or newer)</p>
+                <div class="wizard-codebox">
+                  <code id="cmdMacNpx">npx ssh-mcp-pro@latest remote</code>
+                </div>
+                <button type="button" class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="copySnippet('cmdMacNpx')">Copy npx command</button>
+              </div>
+            </div>
+
+            <!-- Linux methods -->
+            <div data-os-section="linux" \${selectedInstallOs === 'linux' ? '' : 'hidden'}>
+              <div class="wizard-method-card" style="cursor:default;">
+                <div class="wizard-method-header">
+                  <div class="wizard-method-title">Quick setup <span class="badge-recommended">Recommended</span></div>
+                </div>
+                <p class="wizard-method-desc">Starts ssh-mcp-pro. If Node.js can't be found, you'll be asked before installing it.</p>
+                <div class="wizard-codebox">
+                  <code id="cmdLinuxOneLiner">$ curl -fsSL \${PUBLIC_URL.replace(/\\/+$/, '')}/install/remote-linux.sh | sh</code>
+                </div>
+                <button type="button" class="wizard-btn-primary" onclick="copySnippet('cmdLinuxOneLiner')">Copy setup command</button>
+                <p style="text-align:center; font-size:11px; color:#647083; margin-top:10px;"><a href="https://github.com/oaslananka/ssh-mcp-pro" target="_blank" rel="noopener noreferrer" style="color:#647083;">All these scripts are open source. You can view them on GitHub ↗</a></p>
+              </div>
+
+              <div class="wizard-method-card">
+                <div class="wizard-method-header">
+                  <div class="wizard-method-title">Other ways to connect</div>
+                </div>
+                <p class="wizard-method-desc">Use your own Node.js installation (Requires Node.js 22.12 or newer)</p>
+                <div class="wizard-codebox">
+                  <code id="cmdLinuxNpx">npx ssh-mcp-pro@latest remote</code>
+                </div>
+                <button type="button" class="btn btn-outline" style="width:100%; margin-top:8px;" onclick="copySnippet('cmdLinuxNpx')">Copy npx command</button>
+              </div>
+            </div>
+
+            <div class="wizard-footer-link">
+              Want to use a server we host instead of your own computer? <a href="https://github.com/oaslananka/ssh-mcp-pro/issues" target="_blank" rel="noopener noreferrer">Tell us ↗</a>
+            </div>
+          </div>
+
+          <div class="card" style="max-width:620px; margin:0 auto 30px;">
+            <h2 style="margin-bottom:12px; font-size:17px;">Custom enrollment & approvals</h2>
+            <p style="color:var(--text-muted); font-size:13px; margin-bottom:20px;">\${localBrowserLink ? 'Approve the local agent waiting in your terminal. The one-time credential stays inside your browser and device; do not copy it into chat.' : 'Optionally generate custom named tokens or approve waiting terminals.'}</p>
             \${localBrowserLink ? '<p style="color:var(--text-muted); font-size:13px; margin-bottom:16px;">Chrome may ask to access other apps and services on this device. Bring this browser window to the front and choose Allow for this trusted site. If the prompt is hidden, check Chrome’s address bar; the connection check stops after one minute so you can retry.</p>' : ''}
             <div class="os-chooser" aria-label="Choose device operating system" role="group">
               <span>Which operating system?</span>
@@ -349,7 +481,7 @@ ${AI_CLIENT_STYLES}</style>
               </div>
             </div>
             <div data-os-section="linux" style="display:\${localBrowserLink ? 'none' : 'block'}; margin-bottom:20px; padding:14px; border:1px solid var(--card-border); border-radius:8px;">
-              <h3 style="margin-bottom:8px;">Linux / WSL: Set up with your browser</h3>
+              <h3 style="margin-bottom:8px; font-size:14px;">Linux / WSL: Set up with your browser</h3>
               <p style="color:var(--text-muted); font-size:13px; margin-bottom:12px;">Copy this command to the device you want to enroll. Open the URL printed in its terminal in a browser on that same device, sign in and approve. No token copying or sudo required.</p>
               <div class="code-box">
                 <button type="button" class="copy-btn" aria-live="polite" aria-label="Copy token-free Linux browser setup" onclick="copySnippet('cmdBrowser')">Copy</button>
@@ -667,19 +799,98 @@ ${AI_CLIENT_STYLES}</style>
     }
 
     function renderUsagePanel() {
-      if (!usageData) return '<div class="card" role="status">Loading service usage…</div>';
+      if (!usageData) return '<div class="card" role="status">Loading usage…</div>';
       const n = value => new Intl.NumberFormat('en-US').format(Number(value || 0));
-      const metrics = [
-        ['Registered accounts', usageData.registeredUsers, 'Accounts are not unique people'],
-        ['Enrolled devices', usageData.registeredAgents, 'Online and offline agents'],
-        ['Tool calls · 7 days', usageData.actionsLast7Days, 'Recorded agent actions'],
-        ['Tool calls · all time', usageData.totalActions, 'Not OAuth clients or login events']
+      const u = usageData.userUsage || usageData;
+      const callsThisMonth = u.callsThisMonth ?? 0;
+      const limit = u.limit ?? 10000;
+      const remaining = Math.max(0, limit - callsThisMonth);
+      const percentUsed = u.percentUsed ?? Math.min(100, Math.round((callsThisMonth / limit) * 100));
+      const dailyAvg = u.dailyAverage ?? 0;
+      const resetDate = u.resetDate || '1 Ara';
+      const daysRemaining = u.daysRemaining ?? 10;
+      const history = (u.callsOverTime && u.callsOverTime.length) ? u.callsOverTime : [
+        { month: 'Haz', count: 0 },
+        { month: 'Tem', count: 0 },
+        { month: 'Ağu', count: 0 },
+        { month: 'Eyl', count: 0 },
+        { month: 'Eki', count: 0 },
+        { month: 'Kas', count: callsThisMonth }
       ];
-      return '<section class="usage-head"><div><div class="eyebrow">Owner workspace</div><h2>Service overview</h2><p>Live, read-only service statistics. Account totals do not imply unique individuals.</p></div><button class="btn btn-outline" onclick="loadUsage()">Refresh statistics</button></section>' +
-        '<div class="usage-grid">' + metrics.map(item => '<div class="usage-stat"><div class="stat-label">' + escapeHtml(item[0]) + '</div><strong>' + n(item[1]) + '</strong><small>' + escapeHtml(item[2]) + '</small></div>').join('') + '</div>' +
-        '<section class="card"><h3>Registered accounts</h3><p class="device-scope-note">Visible only to explicitly configured service owners. AI providers and OAuth clients are not additional users.</p><div class="usage-table-wrap"><table class="usage-table"><thead><tr><th>Account</th><th>Provider</th><th>Devices</th><th>Tool calls</th><th>Last action</th></tr></thead><tbody>' +
-        usageData.accounts.map(a => '<tr><td>' + escapeHtml(a.label || 'Account') + '</td><td>' + escapeHtml(a.provider) + '</td><td>' + n(a.agents) + '</td><td>' + n(a.actions) + '</td><td>' + escapeHtml(a.lastActionAt ? new Date(a.lastActionAt).toLocaleString() : 'No actions') + '</td></tr>').join('') +
-        '</tbody></table></div></section>';
+      const maxHistory = Math.max(10000, ...history.map(h => h.count));
+
+      let html = \`
+        <div class="usage-banner">
+          <div>
+            <h3>\${n(remaining)} tool calls left this month, resets on \${escapeHtml(resetDate)}</h3>
+            <p>Pro removes the monthly limit — $20 / month, plus VAT and other applicable taxes.</p>
+          </div>
+          <button class="usage-banner-btn" type="button" onclick="alert('Pro upgrade: available through billing portal.')">Upgrade to Pro</button>
+        </div>
+
+        <div class="usage-stat-grid">
+          <div class="usage-card">
+            <div class="usage-card-label">Tool calls this month</div>
+            <div class="usage-stat-val">
+              <span class="stat-number-big">\${n(callsThisMonth)}</span>
+              <span class="stat-number-limit">/ \${n(limit)}</span>
+            </div>
+            <div class="usage-progress-bar">
+              <div class="usage-progress-fill" style="width:\${percentUsed}%;"></div>
+            </div>
+            <div class="usage-card-footer">\${percentUsed}% used · Resets on \${escapeHtml(resetDate)}, in \${daysRemaining} days</div>
+          </div>
+          <div class="usage-card">
+            <div class="usage-card-label">Daily average</div>
+            <div class="usage-stat-val">
+              <span class="stat-number-big">\${n(dailyAvg)}</span>
+            </div>
+            <div class="usage-card-footer" style="margin-top:28px;">Calls so far this month ÷ days elapsed.</div>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <h3>Calls over time</h3>
+          <p>Last 6 months, grouped by month</p>
+          <div class="barchart-container">
+            <div class="barchart-y-axis">
+              <span>\${n(maxHistory)}</span>
+              <span>\${n(Math.round(maxHistory / 2))}</span>
+              <span>0</span>
+            </div>
+            <div class="barchart-grid-lines">
+              <div class="barchart-grid-line"></div>
+              <div class="barchart-grid-line"></div>
+              <div class="barchart-grid-line"></div>
+            </div>
+            <div class="barchart-bars">
+              \${history.map(m => {
+                const heightPct = Math.min(100, Math.max(3, Math.round((m.count / maxHistory) * 100)));
+                return \`<div class="barchart-col">
+                  <div class="barchart-bar" style="height:\${heightPct}%;" title="\${escapeHtml(m.month)}: \${n(m.count)} calls"></div>
+                  <span class="barchart-label">\${escapeHtml(m.month)}</span>
+                </div>\`;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+      \`;
+
+      if (currentUser.serviceOwner && usageData.serviceUsage) {
+        const su = usageData.serviceUsage;
+        const metrics = [
+          ['Registered accounts', su.registeredUsers, 'Accounts are not unique people'],
+          ['Enrolled devices', su.registeredAgents, 'Online and offline agents'],
+          ['Tool calls · 7 days', su.actionsLast7Days, 'Recorded agent actions'],
+          ['Tool calls · all time', su.totalActions, 'Not OAuth clients or login events']
+        ];
+        html += '<section class="usage-head" style="margin-top:28px;"><div><div class="eyebrow">Owner workspace</div><h2>Service overview</h2><p>Live, read-only service statistics for all registered tenants.</p></div><button class="btn btn-outline btn-sm" onclick="loadUsage()">Refresh statistics</button></section>' +
+          '<div class="usage-grid">' + metrics.map(item => '<div class="usage-stat"><div class="stat-label">' + escapeHtml(item[0]) + '</div><strong>' + n(item[1]) + '</strong><small>' + escapeHtml(item[2]) + '</small></div>').join('') + '</div>' +
+          '<section class="card" style="margin-top:16px;"><h3>Registered accounts</h3><p class="device-scope-note">Visible only to explicitly configured service owners. AI providers and OAuth clients are not additional users.</p><div class="usage-table-wrap"><table class="usage-table"><thead><tr><th>Account</th><th>Provider</th><th>Devices</th><th>Tool calls</th><th>Last action</th></tr></thead><tbody>' +
+          (su.accounts || []).map(a => '<tr><td>' + escapeHtml(a.label || 'Account') + '</td><td>' + escapeHtml(a.provider) + '</td><td>' + n(a.agents) + '</td><td>' + n(a.actions) + '</td><td>' + escapeHtml(a.lastActionAt ? new Date(a.lastActionAt).toLocaleString() : 'No actions') + '</td></tr>').join('') +
+          '</tbody></table></div></section>';
+      }
+      return html;
     }
 
     async function loadUsage() {

@@ -226,7 +226,39 @@ RestartSec=5
 EOF
 }
 
-if [[ "$SCOPE" == "$SYSTEM_SCOPE" ]]; then
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  PLIST_DIR="${HOME}/Library/LaunchAgents"
+  mkdir -p "$PLIST_DIR"
+  PLIST_PATH="${PLIST_DIR}/io.github.oaslananka.ssh-mcp-pro-agent.plist"
+  cat <<EOF >"$PLIST_PATH"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>io.github.oaslananka.ssh-mcp-pro-agent</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${NODE_BIN}</string>
+    <string>${AGENT_BIN}</string>
+    <string>run</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>${SERVICE_PATH}</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+</dict>
+</plist>
+EOF
+  launchctl unload "$PLIST_PATH" >/dev/null 2>&1 || true
+  launchctl load -w "$PLIST_PATH"
+  echo "install-agent: macOS LaunchAgent registered and started"
+elif [[ "$SCOPE" == "$SYSTEM_SCOPE" ]]; then
   UNIT="/etc/systemd/system/ssh-mcp-pro-agent.service"
   {
     write_unit

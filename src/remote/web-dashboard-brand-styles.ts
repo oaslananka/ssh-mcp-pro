@@ -1,31 +1,31 @@
 export const BRAND_STYLES = `
-:root{--bg:#101719;--card-bg:#1c2529;--card-border:#35494d;--text-main:#f5faf8;--text-muted:#b4c9cb;--primary:#73d9d5;--primary-hover:#98e9e6;--blue:#a3dff8;--blue-bg:#274b59;--red:#f4aaaa}
+:root{--bg:#090a0d;--card-bg:#12151b;--card-border:#1f2532;--text-main:#ffffff;--text-muted:#8e9bb0;--primary:#0084ff;--primary-hover:#0070d9;--blue:#0084ff;--blue-bg:#132035;--red:#f43f5e}
 html{scroll-behavior:smooth}
-body{background:#101719;color:var(--text-main);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.6;padding-bottom:0;-webkit-font-smoothing:antialiased}
-.public-header{position:relative;top:auto;padding:17px clamp(20px,5vw,72px);background:#141e21;border-bottom:1px solid #314448}
+body{background:#090a0d;color:var(--text-main);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.6;padding-bottom:0;-webkit-font-smoothing:antialiased}
+.public-header{position:relative;top:auto;padding:17px clamp(20px,5vw,72px);background:#0d0f14;border-bottom:1px solid #1a202c}
 .logo-area{display:flex;align-items:center;gap:13px;text-decoration:none;color:inherit}
-.brand-mark{width:46px;height:46px;object-fit:contain;flex-shrink:0;border-radius:9px;box-shadow:0 4px 15px #0003}
-.brand-title{display:block;color:#f5fafa;font-weight:790;letter-spacing:-.035em;font-size:17px;line-height:1.2}
-.brand-sub{display:block;margin-top:4px;color:#9db8ba;font-size:11px}
+.brand-mark{width:46px;height:46px;object-fit:contain;flex-shrink:0;border-radius:9px;box-shadow:0 4px 15px #0006}
+.brand-title{display:block;color:#ffffff;font-weight:790;letter-spacing:-.035em;font-size:17px;line-height:1.2}
+.brand-sub{display:block;margin-top:4px;color:#8e9bb0;font-size:11px}
 .container{max-width:1280px;margin:0 auto;padding:0 clamp(18px,3vw,36px)}
-.btn{border-radius:10px;font-size:13px;min-height:42px;padding:10px 16px;justify-content:center;transition:background .16s ease,border-color .16s ease,transform .16s ease}
+.btn{border-radius:8px;font-size:13px;min-height:40px;padding:9px 16px;justify-content:center;transition:background .16s ease,border-color .16s ease,transform .16s ease}
 .btn:hover{transform:translateY(-1px)}
-.btn-primary{background:#74dad6;color:#113239;border:1px solid #99e6df;font-weight:780}
-.btn-primary:hover{background:#a1efea;color:#0e2d34}
-.btn-outline{background:#26363a;border:1px solid #567278;color:#eaf9f7}
-.btn-outline:hover{background:#34494d;border-color:#89c7ca}
-.btn-danger{background:#473035;color:#ffc0c0;border:1px solid #865459}
-.btn-danger:hover{background:#623a40;color:#fff}
-.btn-soft{background:#315054;border-color:#587d7f;color:#c8f9f2}
-.btn-soft:hover{background:#41636a}
-.btn-sm{min-height:37px;padding:7px 12px}
-.card{background:#1c272a;border:1px solid #365056;border-radius:16px;box-shadow:0 12px 28px #0002;padding:clamp(20px,2.6vw,30px)}
-.card:hover{border-color:#507078}
-.card a{color:#aae8ea}
-.code-box{border:1px solid #446269;border-radius:10px;background:#142326;color:#b8f5ee}
-.copy-btn{border-radius:7px;background:#31474d;border-color:#587e86;color:#ecfaf9}
-.eyebrow{display:block;font-size:10px;letter-spacing:.14em;font-weight:800;color:#8de4dc;text-transform:uppercase;margin-bottom:12px}
-.mini-spark,.live-indicator{display:inline-block;height:8px;width:8px;border-radius:50%;background:#69e0b1;box-shadow:0 0 0 4px #64dcb21c;flex-shrink:0}
+.btn-primary{background:#0084ff;color:#ffffff;border:1px solid #2694ff;font-weight:680}
+.btn-primary:hover{background:#0070d9;color:#ffffff}
+.btn-outline{background:#161a22;border:1px solid #283244;color:#e2e8f0}
+.btn-outline:hover{background:#202634;border-color:#3f4f6b}
+.btn-danger{background:#38161f;color:#ff859b;border:1px solid #6b2636}
+.btn-danger:hover{background:#541e2c;color:#fff}
+.btn-soft{background:#172235;border-color:#2a3d5e;color:#8ac0ff}
+.btn-soft:hover{background:#20314d}
+.btn-sm{min-height:34px;padding:6px 12px;border-radius:6px}
+.card{background:#12151b;border:1px solid #1f2532;border-radius:14px;box-shadow:0 10px 30px #0004;padding:clamp(20px,2.6vw,30px)}
+.card:hover{border-color:#2f3a4e}
+.card a{color:#389bff}
+.code-box{border:1px solid #232b3b;border-radius:8px;background:#090b10;color:#cbd5e1}
+.copy-btn{border-radius:6px;background:#1e2636;border-color:#313f57;color:#f1f5f9}
+.eyebrow{display:block;font-size:10px;letter-spacing:.14em;font-weight:800;color:#389bff;text-transform:uppercase;margin-bottom:12px}
+.mini-spark,.live-indicator{display:inline-block;height:8px;width:8px;border-radius:50%;background:#10b981;box-shadow:0 0 0 4px #10b98126;flex-shrink:0}
 .mini-spark{margin-right:8px}
 /* Landing: explain actual user tasks; the diagram is illustrative, not fake live data. */
 .landing-shell{padding:0 0 76px}
