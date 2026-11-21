@@ -37,6 +37,15 @@ describe("managed process action record sanitization", () => {
     expect(args.query).toBe("secret-token-fragment");
   });
 
+  test("redacts file_write content from persisted action records", () => {
+    const args = { agent_id_or_alias: "device", path: "/tmp/secret.env", content: "SECRET=12345" };
+    expect(safeStoredActionArgs("file_write", args)).toEqual({
+      ...args,
+      content: "[redacted]",
+    });
+    expect(args.content).toBe("SECRET=12345");
+  });
+
   test("preserves non-managed action arguments", () => {
     const args = { path: "/tmp/config", old_text: "from", new_text: "to" };
     expect(safeStoredActionArgs("file_replace", args)).toEqual(args);

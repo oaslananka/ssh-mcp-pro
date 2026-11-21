@@ -380,14 +380,28 @@ export const ProcKillSchema = z.object({
     .default("SIGTERM"),
 });
 
+const SAFE_SERVICE_NAME = /^[a-zA-Z0-9][a-zA-Z0-9_.@:-]*$/;
+
 export const ServiceNameSchema = z.object({
   sessionId: z.string().min(1),
-  name: z.string().min(1),
+  name: z
+    .string()
+    .min(1)
+    .regex(
+      SAFE_SERVICE_NAME,
+      "Service names must start with alphanumeric and contain only letters, numbers, dots, dashes, underscores, colons, or @",
+    ),
 });
 
 export const ServiceLogsSchema = z.object({
   sessionId: z.string().min(1),
-  name: z.string().min(1),
+  name: z
+    .string()
+    .min(1)
+    .regex(
+      SAFE_SERVICE_NAME,
+      "Service names must start with alphanumeric and contain only letters, numbers, dots, dashes, underscores, colons, or @",
+    ),
   lines: z.number().int().positive().max(1000).default(50),
 });
 
@@ -405,6 +419,12 @@ export const PortCheckSchema = z.object({
 export const LogTailSchema = z.object({
   sessionId: z.string().min(1),
   path: z.string().optional(),
-  service: z.string().optional(),
+  service: z
+    .string()
+    .regex(
+      SAFE_SERVICE_NAME,
+      "Service names must start with alphanumeric and contain only letters, numbers, dots, dashes, underscores, colons, or @",
+    )
+    .optional(),
   lines: z.number().int().positive().max(1000).default(50),
 });

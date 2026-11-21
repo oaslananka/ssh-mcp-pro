@@ -140,6 +140,49 @@ function terminateCredentialHelper(
   return escalation;
 }
 
+function buildSafeCredentialEnv(
+  request: ConnectorCredentialRequest,
+  baseEnv: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const safeEnv: NodeJS.ProcessEnv = {
+    SSH_MCP_CONNECTOR_HOST_ALIAS: request.hostAlias,
+    SSH_MCP_CONNECTOR_PURPOSE: request.purpose,
+  };
+
+  const allowedPrefixes = ["LC_", "LANG"];
+  const allowedKeys = new Set([
+    "PATH",
+    "Path",
+    "PATHEXT",
+    "SYSTEMROOT",
+    "SystemRoot",
+    "WINDIR",
+    "windir",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "HOME",
+    "USERPROFILE",
+    "HOMEDRIVE",
+    "HOMEPATH",
+    "SSH_AUTH_SOCK",
+    "TERM",
+    "NODE_PATH",
+    "NODE_OPTIONS",
+  ]);
+
+  for (const [key, value] of Object.entries(baseEnv)) {
+    if (
+      value !== undefined &&
+      (allowedKeys.has(key) || allowedPrefixes.some((p) => key.startsWith(p)))
+    ) {
+      safeEnv[key] = value;
+    }
+  }
+
+  return safeEnv;
+}
+
 async function runCredentialCommand(
   request: ConnectorCredentialRequest,
   config: ServerConfig["connector"],
@@ -159,11 +202,7 @@ async function runCredentialCommand(
     const child = spawn(command, config.credentialCommandArgs, {
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
-      env: {
-        ...process.env,
-        SSH_MCP_CONNECTOR_HOST_ALIAS: request.hostAlias,
-        SSH_MCP_CONNECTOR_PURPOSE: request.purpose,
-      },
+      env: buildSafeCredentialEnv(request),
     });
 
     let finished = false;
