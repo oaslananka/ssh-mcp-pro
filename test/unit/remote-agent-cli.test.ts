@@ -241,7 +241,11 @@ describe("remote agent CLI", () => {
     expect(requestBody).toMatchObject({
       token: oneTimeToken,
       alias: "my server",
-      agent_version: expect.any(String),
+      agent_version: (
+        JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as {
+          version: string;
+        }
+      ).version,
     });
     expect(requestBody.public_key).toEqual(expect.stringContaining("BEGIN PUBLIC KEY"));
     expect(requestBody.host).toEqual(
@@ -598,6 +602,11 @@ describe("remote agent CLI", () => {
       expect(hello).toMatchObject({
         type: "agent.hello",
         agent_id: "agt_online",
+        agent_version: (
+          JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as {
+            version: string;
+          }
+        ).version,
         capabilities: expect.arrayContaining(["shell.exec", "system.read"]),
       });
       expect(verifyEnvelope(hello, agentKeys.publicKeyPem)).toBe(true);

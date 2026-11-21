@@ -138,7 +138,7 @@ export interface RemoteAgentRecord {
   profile: AgentProfileName;
   policy: AgentPolicy;
   policyVersion: number;
-  hostMetadata?: AgentHostMetadata | undefined;
+  hostMetadata?: (AgentHostMetadata & { agentVersion?: string | undefined }) | undefined;
   lastSeenAt?: string | undefined;
   createdAt: string;
   updatedAt: string;

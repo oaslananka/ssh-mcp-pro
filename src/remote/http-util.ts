@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { URL } from "node:url";
 import { LATEST_PROTOCOL_VERSION, SUPPORTED_PROTOCOL_VERSIONS } from "@modelcontextprotocol/server";
 import { sha256Base64Url } from "./crypto.js";
+import { compareAgentVersion, installedPackageVersion } from "./package-version.js";
 import { parseScopes } from "./scopes.js";
 import type { RemoteAgentRecord, RemoteErrorCode, RemoteScope } from "./types.js";
 import { REMOTE_SCOPES } from "./types.js";
@@ -184,13 +185,21 @@ export function scopeList(scope: string): RemoteScope[] {
 }
 
 export function sanitizeAgent(agent: RemoteAgentRecord): Record<string, unknown> {
+  const serverVersion = installedPackageVersion();
+  const host = agent.hostMetadata;
+  const agentVersion = host?.agentVersion;
   return {
     id: agent.id,
     alias: agent.alias,
     status: agent.status,
     profile: agent.profile,
     policy_version: agent.policyVersion,
-    host_metadata: agent.hostMetadata,
+    agent_version: agentVersion,
+    server_version: serverVersion,
+    agent_update_status: compareAgentVersion(agentVersion, serverVersion),
+    host_metadata: host
+      ? { hostname: host.hostname, os: host.os, arch: host.arch, platform: host.platform }
+      : undefined,
     last_seen_at: agent.lastSeenAt,
     created_at: agent.createdAt,
     updated_at: agent.updatedAt,

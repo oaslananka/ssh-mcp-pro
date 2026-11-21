@@ -7,11 +7,12 @@ import type { AgentHostMetadata, RemoteAgentRecord } from "../../src/remote/type
 describe("dashboard device metadata contract", () => {
   test("matches the snake_case API response for host, OS, arch and policy", () => {
     const policy = createAgentPolicy("full-admin");
-    const hostMetadata: AgentHostMetadata = {
+    const hostMetadata: AgentHostMetadata & { agentVersion: string } = {
       hostname: "msi",
       os: "Linux",
       arch: "x64",
       platform: "linux",
+      agentVersion: "0.1.0",
     };
     const agent: RemoteAgentRecord = {
       id: "agt_fixture",
@@ -29,8 +30,11 @@ describe("dashboard device metadata contract", () => {
     expect(apiDevice).toMatchObject({
       alias: "msi",
       policy_version: 1,
-      host_metadata: hostMetadata,
+      agent_version: "0.1.0",
+      agent_update_status: "older_than_server",
+      host_metadata: { hostname: "msi", os: "Linux", arch: "x64", platform: "linux" },
     });
+    expect(apiDevice.host_metadata).not.toHaveProperty("agentVersion");
     expect(apiDevice).not.toHaveProperty("hostMetadata");
     expect(apiDevice).not.toHaveProperty("policyVersion");
 
@@ -45,10 +49,16 @@ describe("dashboard device metadata contract", () => {
       "dev.host_metadata?.arch",
       "dev.host_metadata?.platform",
       "dev.policy_version",
+      "dev.agent_version",
+      "dev.agent_update_status",
     ]) {
       expect(markup).toContain(field);
     }
     expect(markup).toContain("Not reported");
+    expect(markup).toContain("https://github.com/oaslananka/ssh-mcp-pro/releases/latest");
+    expect(sanitizeAgent({ ...agent, hostMetadata: undefined })).toMatchObject({
+      agent_update_status: "unknown",
+    });
     expect(markup).not.toContain("dev.hostMetadata");
     expect(markup).not.toContain("dev.policyVersion");
   });

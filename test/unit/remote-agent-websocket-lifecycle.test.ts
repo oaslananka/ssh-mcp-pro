@@ -344,6 +344,9 @@ describe("agent WebSocket lifecycle limits", () => {
 
       expect(harness.agentConnections.has(agent.id)).toBe(false);
       expect(harness.store.getAgent(agent.id)?.status).toBe("offline");
+      expect(harness.store.getAgent(agent.id)?.hostMetadata).toMatchObject({
+        agentVersion: "1.2.0",
+      });
       expect(harness.audits).toContainEqual(
         expect.objectContaining({
           eventType: "agent_disconnected",
