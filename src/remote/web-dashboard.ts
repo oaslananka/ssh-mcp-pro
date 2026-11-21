@@ -839,6 +839,7 @@ export class WebDashboardHandler {
             email: user?.email ?? principal.email,
             provider: user?.provider ?? principal.provider ?? "github",
             serviceOwner: this.isUsageOwner(principal),
+            userUsage: this.deps.store.getUserUsage(principal.userId),
           }
         : null,
     );

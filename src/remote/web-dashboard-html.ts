@@ -59,7 +59,7 @@ ${AI_CLIENT_STYLES}</style>
     let auditList = [];
     let auditLoaded = false;
     let auditError = '';
-    let usageData = null;
+    let usageData = currentUser && currentUser.userUsage ? { userUsage: currentUser.userUsage } : null;
     let aiClientsList = [];
     let aiConnectionsList = [];
     let strictVisibilityEnabled = false;
@@ -896,12 +896,25 @@ ${AI_CLIENT_STYLES}</style>
     async function loadUsage() {
       const target = document.getElementById('tabContent');
       try {
-        const response = await fetch('/api/dashboard/usage', { cache: 'no-store' });
-        if (!response.ok) throw new Error('Usage data unavailable or access denied');
-        usageData = await response.json();
+        const userRes = await fetch('/api/dashboard/user-usage', { cache: 'no-store' });
+        if (!userRes.ok) throw new Error('User usage data unavailable');
+        const userUsage = await userRes.json();
+        usageData = { ...(usageData || {}), userUsage };
+        if (currentUser && currentUser.serviceOwner) {
+          try {
+            const ownerRes = await fetch('/api/dashboard/usage', { cache: 'no-store' });
+            if (ownerRes.ok) {
+              usageData.serviceUsage = await ownerRes.json();
+            }
+          } catch (e) {
+            console.error('Service usage unavailable', e);
+          }
+        }
         if (activeTab === 'usage' && target) target.innerHTML = renderUsagePanel();
       } catch (error) {
-        if (activeTab === 'usage' && target) target.innerHTML = '<div class="card" role="alert">Could not load usage. Check owner authorization and retry.</div>';
+        if (activeTab === 'usage' && target) {
+          target.innerHTML = usageData ? renderUsagePanel() : '<div class="card feedback-error" role="alert"><h2>Could not load usage</h2><p>Please check your connection and try again.</p><button type="button" class="btn btn-primary" onclick="loadUsage()">Retry</button></div>';
+        }
       }
     }
 

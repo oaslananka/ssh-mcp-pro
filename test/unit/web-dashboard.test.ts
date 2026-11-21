@@ -221,6 +221,17 @@ describe("Web Dashboard and Multi-provider OAuth", () => {
         "/api/dashboard/usage",
       );
       expect(unauthorized.statusCode).toBe(403);
+      const userUsageRes = captureResponse();
+      await cp.handleHttp(
+        request("GET", "/api/dashboard/user-usage", { cookie }),
+        userUsageRes as unknown as ServerResponse,
+        "/api/dashboard/user-usage",
+      );
+      expect(userUsageRes.statusCode).toBe(200);
+      expect(JSON.parse(userUsageRes.body)).toMatchObject({
+        callsThisMonth: 0,
+        limit: 10000,
+      });
       process.env.SSH_MCP_DASHBOARD_OWNER_GOOGLE_EMAILS = "operator@example.test";
       const authorized = captureResponse();
       await cp.handleHttp(
