@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.1](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.17.0...ssh-mcp-pro-v1.17.1) (2026-11-21)
+
+
+### Bug Fixes
+
+* **remote:** report interrupted actions as unknown outcomes ([#334](https://github.com/oaslananka/ssh-mcp-pro/issues/334)) ([363146b](https://github.com/oaslananka/ssh-mcp-pro/commit/363146bb4a78e8a50645084c79469cb052100d13))
+
 ## [1.17.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.16.0...ssh-mcp-pro-v1.17.0) (2026-11-21)
 
 
