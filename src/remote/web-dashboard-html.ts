@@ -619,23 +619,23 @@ ${AI_CLIENT_STYLES}</style>
           return '<div class="card empty-box">No audit events recorded yet.</div>';
         }
         return \`
-          <div class="card" style="padding:0; overflow:hidden;">
+          <div class="card" style="padding:0; overflow:hidden; border:1px solid #1e2430; border-radius:14px;">
             <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
-              <thead style="background:#21262d; border-bottom:1px solid var(--card-border);">
+              <thead style="background:#151922; border-bottom:1px solid #1e2430;">
                 <tr>
-                  <th style="padding:12px 16px;">Timestamp</th>
-                  <th style="padding:12px 16px;">Event</th>
-                  <th style="padding:12px 16px;">Severity</th>
-                  <th style="padding:12px 16px;">Target</th>
+                  <th style="padding:14px 18px; color:#8e9bb0; font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:600;">Timestamp</th>
+                  <th style="padding:14px 18px; color:#8e9bb0; font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:600;">Event</th>
+                  <th style="padding:14px 18px; color:#8e9bb0; font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:600;">Severity</th>
+                  <th style="padding:14px 18px; color:#8e9bb0; font-size:11px; text-transform:uppercase; letter-spacing:.05em; font-weight:600;">Target</th>
                 </tr>
               </thead>
               <tbody>
                 \${auditList.map(e => \`
-                  <tr style="border-bottom:1px solid #21262d;">
-                    <td style="padding:12px 16px; font-family:var(--font-mono); color:var(--text-muted);">\${new Date(e.createdAt).toLocaleTimeString()}</td>
-                    <td style="padding:12px 16px; font-weight:600;">\${escapeHtml(e.eventType)}</td>
-                    <td style="padding:12px 16px;"><span class="badge \${e.severity === 'info' ? 'badge-blue' : (e.severity === 'warn' ? 'badge-green' : 'badge-gray')}">\${e.severity}</span></td>
-                    <td style="padding:12px 16px; font-family:var(--font-mono); color:var(--text-muted);">\${escapeHtml(e.agentAlias || e.agentId || e.actionId || '-')}</td>
+                  <tr style="border-bottom:1px solid #1a202c; transition:background .15s ease;">
+                    <td style="padding:14px 18px; font-family:var(--font-mono); color:var(--text-muted); font-size:12px;">\${new Date(e.createdAt).toLocaleTimeString()}</td>
+                    <td style="padding:14px 18px; font-weight:600; color:#ffffff;">\${escapeHtml(e.eventType)}</td>
+                    <td style="padding:14px 18px;"><span class="badge \${e.severity === 'info' ? 'badge-blue' : (e.severity === 'warn' ? 'badge-green' : 'badge-gray')}">\${e.severity}</span></td>
+                    <td style="padding:14px 18px; font-family:var(--font-mono); color:var(--text-muted); font-size:12px;">\${escapeHtml(e.agentAlias || e.agentId || e.actionId || '-')}</td>
                   </tr>
                 \`).join('')}
               </tbody>
