@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.15.2...ssh-mcp-pro-v1.16.0) (2026-11-21)
+
+
+### Features
+
+* **dashboard:** modernize web landing page with tasteskill design ([#321](https://github.com/oaslananka/ssh-mcp-pro/issues/321)) ([eefba87](https://github.com/oaslananka/ssh-mcp-pro/commit/eefba8716d0b33016f29712522c563e4b95e6818))
+* **dashboard:** redesign theme, add usage tracking and smart one-command installer ([#325](https://github.com/oaslananka/ssh-mcp-pro/issues/325)) ([9ef92cf](https://github.com/oaslananka/ssh-mcp-pro/commit/9ef92cfbf8fab1b070e019739a99325831d7074f))
+
+
+### Bug Fixes
+
+* resolve codeql command-line, resource and file alerts ([#324](https://github.com/oaslananka/ssh-mcp-pro/issues/324)) ([29b86b7](https://github.com/oaslananka/ssh-mcp-pro/commit/29b86b775f67bc2eeb2d9d5839b5c0c8ed9431a2))
+
 ## [1.15.2](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.15.1...ssh-mcp-pro-v1.15.2) (2026-11-19)
 
 
