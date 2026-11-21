@@ -171,44 +171,47 @@ input,select{color-scheme:dark}
 /* Device setup: steps stay in view while details remain progressive. */
 
 .os-chooser{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:13px;margin-bottom:23px}
-.os-chooser>span{font-size:13px;color:#d9eaea;font-weight:730}
+.os-chooser>span{font-size:13px;color:#e2e8f0;font-weight:650}
 .os-chooser-options{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-.os-choice{min-height:42px;padding:9px 14px;border-radius:10px;border:1px solid #4b696d;background:#263a3d;color:#c6d8d7;font-size:12px;font-weight:730;cursor:pointer}
-.os-choice.active,.os-choice[aria-pressed="true"]{border-color:#81d9d5;background:#345d60;color:#d9fffa}
-.os-choice:hover{border-color:#89bbb8}
-.setup-intro{padding:26px 28px;margin-bottom:20px;background:linear-gradient(115deg,#254549,#1b2b30);border-radius:17px;border:1px solid #4c777c}
-.setup-intro h2{font-size:22px;letter-spacing:-.038em;line-height:1.25}
-.setup-intro>p:not(.eyebrow){color:#bbd3d1;font-size:13px;margin-top:8px;max-width:640px}
+.os-choice{min-height:38px;padding:8px 14px;border-radius:8px;border:1px solid #1e2430;background:#12151c;color:#8e9bb0;font-size:12px;font-weight:650;cursor:pointer}
+.os-choice.active,.os-choice[aria-pressed="true"]{border-color:#0084ff;background:rgba(0,132,255,0.12);color:#ffffff}
+.os-choice:hover{border-color:#2b3548;color:#ffffff}
+.setup-intro{padding:24px 26px;margin-bottom:20px;background:#12151c;border-radius:14px;border:1px solid #1e2430}
+.setup-intro h2{font-size:20px;letter-spacing:-.03em;color:#ffffff}
+.setup-intro>p:not(.eyebrow){color:#8e9bb0;font-size:13px;margin-top:6px;max-width:640px}
 .setup-steps{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
-.setup-steps span{display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border-radius:10px;border:1px solid #52797a;background:#254247;color:#d6eeec;font-size:12px}
-.setup-steps strong{display:grid;place-items:center;background:#3a6f70;border-radius:7px;width:27px;height:27px;color:#d3faf6;font-size:11px}
-.setup-main-card{background:#1e2b2e}
-.setup-main-card h2{letter-spacing:-.025em}
-.setup-main-card input,.setup-main-card select{min-height:45px;border-radius:10px!important;border:1px solid #56777b!important;background:#142326!important;color:#eafaf8!important;padding:12px!important}
-.setup-main-card .code-box{border-color:#49676b}
-.setup-main-card #enrollOutput{padding-top:25px;border-top:1px solid #3a5558}
+.setup-steps span{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;border:1px solid #1e2430;background:#090a0d;color:#cbd5e1;font-size:12px}
+.setup-steps strong{display:grid;place-items:center;background:#0084ff;border-radius:6px;width:26px;height:26px;color:#ffffff;font-size:11px}
+.setup-main-card{background:#12151c;border:1px solid #1e2430}
+.setup-main-card h2{letter-spacing:-.025em;color:#ffffff}
+.setup-main-card input,.setup-main-card select{min-height:42px;border-radius:8px!important;border:1px solid #1e2430!important;background:#090a0d!important;color:#ffffff!important;padding:10px 14px!important}
+.setup-main-card .code-box{border-color:#1e2430;background:#090a0d}
+.setup-main-card #enrollOutput{padding-top:20px;border-top:1px solid #1e2430}
 /* AI connections: one shared endpoint first, platform-specific examples second. */
-.integration-feature{padding:28px 30px;background:linear-gradient(110deg,#285255,#22373d);border:1px solid #568487;border-radius:17px;margin-bottom:18px}
-.integration-feature h2{font-size:23px;letter-spacing:-.038em;line-height:1.25}
-.integration-feature>p:not(.eyebrow){font-size:13px;color:#c0d8d7;max-width:650px;margin:10px 0 20px}
-.connection-url{max-width:900px;font-size:14px;overflow-wrap:anywhere;padding:18px 108px 18px 18px}
-.platform-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin:0 0 18px}
-.platform-card{padding:25px 23px;border:1px solid #3f575b;border-radius:16px;background:#1d2a2e;min-height:230px}
-.platform-card h3{font-size:18px;margin:14px 0 9px;letter-spacing:-.02em}
-.platform-card p{font-size:13px;color:#bdcdcf;line-height:1.72}
-.platform-card small{display:block;margin-top:17px;color:#93b4b5;font-size:11px}
-.platform-symbol{display:grid;place-items:center;width:42px;height:42px;border-radius:11px;font-size:23px;background:#345451;color:#aaf7df}
-.platform-symbol.claude{background:#6b4b42;color:#ffe1c4}
-.platform-symbol.gemini{background:#3c4e70;color:#d6daff}
-.integration-next{display:flex;align-items:flex-start;gap:13px;background:#20383a;border:1px solid #3f5d60;border-radius:12px;padding:15px 18px;margin:0 0 21px}
-.integration-next .live-indicator{margin-top:6px}
-.integration-next p{font-size:12px;color:#c4d7d6}
-.advanced-integrations{background:#1c282b;border:1px solid #385255;border-radius:15px;overflow:hidden}
-.advanced-integrations>summary{list-style:none;cursor:pointer;font-weight:720;font-size:13px;padding:19px 23px;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.integration-feature{padding:28px 32px;background:linear-gradient(135deg,#12151c 0%,#161a24 100%);border:1px solid #1e2430;border-radius:16px;margin-bottom:20px;box-shadow:0 8px 30px #0004}
+.integration-feature h2{font-size:22px;letter-spacing:-.03em;line-height:1.25;color:#ffffff}
+.integration-feature>p:not(.eyebrow){font-size:13px;color:#8e9bb0;max-width:650px;margin:8px 0 20px;line-height:1.6}
+.connection-url{max-width:900px;font-size:14px;overflow-wrap:anywhere;padding:16px 108px 16px 16px;background:#090a0d!important;border:1px solid #1e2430!important;border-radius:8px}
+.platform-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:0 0 20px}
+.platform-card{padding:24px;border:1px solid #1e2430;border-radius:14px;background:#12151c;min-height:220px;display:flex;flex-direction:column;transition:border-color .18s ease,transform .18s ease,box-shadow .18s ease}
+.platform-card:hover{border-color:#2e384b;transform:translateY(-2px);box-shadow:0 8px 24px #0005}
+.platform-card h3{font-size:17px;font-weight:700;color:#ffffff;margin:14px 0 8px;letter-spacing:-.02em}
+.platform-card p{font-size:13px;color:#8e9bb0;line-height:1.6;flex:1}
+.platform-card small{display:block;margin-top:16px;color:#647083;font-size:11px;font-weight:500}
+.platform-symbol{display:grid;place-items:center;width:42px;height:42px;border-radius:10px;font-size:20px;background:rgba(16,185,129,0.12);color:#10b981;border:1px solid rgba(16,185,129,0.25)}
+.platform-symbol.claude{background:rgba(217,119,87,0.12);color:#d97757;border-color:rgba(217,119,87,0.25)}
+.platform-symbol.gemini{background:rgba(56,189,248,0.12);color:#38bdf8;border-color:rgba(56,189,248,0.25)}
+.integration-next{display:flex;align-items:center;gap:12px;background:rgba(0,132,255,0.06);border:1px solid rgba(0,132,255,0.18);border-radius:12px;padding:14px 18px;margin:0 0 22px}
+.integration-next .live-indicator{margin-top:0}
+.integration-next p{font-size:13px;color:#cbd5e1;margin:0}
+.advanced-integrations{background:#12151c;border:1px solid #1e2430;border-radius:14px;overflow:hidden;margin-bottom:24px}
+.advanced-integrations>summary{list-style:none;cursor:pointer;font-weight:650;font-size:13px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:14px;color:#ffffff}
 .advanced-integrations>summary::-webkit-details-marker{display:none}
-.advanced-integrations[open]>summary{border-bottom:1px solid #3e5b5d}
-.advanced-integrations>.grid-2{padding:19px;gap:15px}
+.advanced-integrations>summary:hover{background:#161a23}
+.advanced-integrations[open]>summary{border-bottom:1px solid #1e2430}
+.advanced-integrations>.grid-2{padding:18px;gap:16px}
+.advanced-integrations .card{background:#090a0d;border:1px solid #1e2430;border-radius:10px}
 .device-list-tools{display:flex;gap:9px;flex-wrap:wrap}
 @media(max-width:930px){.platform-grid{grid-template-columns:1fr}.platform-card{min-height:0}}
-@media(max-width:640px){.setup-intro,.integration-feature{padding:21px 17px}.connection-url{font-size:12px;padding-right:98px}.advanced-integrations>.grid-2{padding:12px}}
+@media(max-width:640px){.setup-intro,.integration-feature{padding:20px 16px}.connection-url{font-size:12px;padding-right:98px}.advanced-integrations>.grid-2{padding:12px}}
 `;
