@@ -34,14 +34,19 @@
 #>
 
 param(
-  [Parameter(Mandatory = $true)][string]$Server,
-  [Parameter(Mandatory = $true)][string]$Token,
+  [string]$Server = "http://127.0.0.1:3000",
+  [string]$Token = "",
+  [switch]$Browser,
   [string]$Alias = $env:COMPUTERNAME,
   [string]$Version = "latest",
   [string]$TaskName = "ssh-mcp-pro-agent"
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $Server) {
+  $Server = "http://127.0.0.1:3000"
+}
 
 function Die($message) {
   Write-Error "install-agent: $message"
@@ -90,8 +95,15 @@ if ($LASTEXITCODE -ne 0) { Die "npm install failed" }
 $agentCmd = (Get-Command ssh-mcp-pro-agent.cmd -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1).Source
 if (-not $agentCmd) { Die "ssh-mcp-pro-agent.cmd not found on PATH after install" }
 
-Write-Host "install-agent: enrolling as alias '$Alias'"
-& $agentCmd enroll --server $Server --token $Token --alias $Alias
+Write-Host "install-agent: checking enrollment as alias '$Alias'"
+if ($Token) {
+  & $agentCmd enroll --server $Server --token $Token --alias $Alias
+} elseif ($Browser -or -not (Test-Path -Path "$HOME\.config\ssh-mcp-pro\agent.json")) {
+  Write-Host "install-agent: starting browser enrollment approval"
+  & $agentCmd enroll --server $Server --browser --alias $Alias
+} else {
+  Write-Host "install-agent: device already enrolled, keeping verified configuration"
+}
 if ($LASTEXITCODE -ne 0) { Die "enrollment failed" }
 
 # /d skips user AutoRun commands; /s ensures a quoted path survives /c.

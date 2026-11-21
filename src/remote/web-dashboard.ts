@@ -176,12 +176,24 @@ export class WebDashboardHandler {
       }
     }
     // 1. Static installation scripts
-    if (pathname === "/install-agent.sh" && req.method === "GET") {
-      serveAgentScript(res, "scripts/install-agent.sh", "text/x-shellscript; charset=utf-8");
+    if (
+      (pathname === "/install-agent.sh" ||
+        pathname === "/install/remote-linux.sh" ||
+        pathname === "/install/remote-macos.sh") &&
+      req.method === "GET"
+    ) {
+      serveAgentScript(res, "scripts/install-agent.sh", "text/x-shellscript; charset=utf-8", {
+        publicBaseUrl: this.deps.config.publicBaseUrl,
+      });
       return true;
     }
-    if (pathname === "/install-agent.ps1" && req.method === "GET") {
-      serveAgentScript(res, "scripts/install-agent.ps1", "text/plain; charset=utf-8");
+    if (
+      (pathname === "/install-agent.ps1" || pathname === "/install/remote-windows.ps1") &&
+      req.method === "GET"
+    ) {
+      serveAgentScript(res, "scripts/install-agent.ps1", "text/plain; charset=utf-8", {
+        publicBaseUrl: this.deps.config.publicBaseUrl,
+      });
       return true;
     }
 
@@ -241,6 +253,10 @@ export class WebDashboardHandler {
     }
     if (pathname === "/api/dashboard/usage" && req.method === "GET") {
       this.handleApiUsage(req, res);
+      return true;
+    }
+    if (pathname === "/api/dashboard/user-usage" && req.method === "GET") {
+      this.handleApiUserUsage(req, res);
       return true;
     }
     if (pathname === "/api/dashboard/ai-clients" && req.method === "GET") {
@@ -629,6 +645,15 @@ export class WebDashboardHandler {
     jsonResponse(res, 200, this.deps.store.getServiceUsage(), addNoStore());
   }
 
+  private handleApiUserUsage(req: IncomingMessage, res: ServerResponse): void {
+    const principal = this.getPrincipalFromSession(req);
+    if (!principal) {
+      jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
+      return;
+    }
+    jsonResponse(res, 200, this.deps.store.getUserUsage(principal.userId), addNoStore());
+  }
+
   private handleApiMe(req: IncomingMessage, res: ServerResponse): void {
     const principal = this.getPrincipalFromSession(req);
     if (!principal) {
@@ -636,6 +661,7 @@ export class WebDashboardHandler {
       return;
     }
     const user = this.deps.store.getUserById(principal.userId);
+    const userUsage = this.deps.store.getUserUsage(principal.userId);
     jsonResponse(
       res,
       200,
@@ -648,6 +674,7 @@ export class WebDashboardHandler {
           provider: user?.provider ?? principal.provider ?? "github",
           scopes: principal.scopes,
           serviceOwner: this.isUsageOwner(principal),
+          userUsage,
         },
       },
       addNoStore(),

@@ -156,6 +156,82 @@ export class RemoteStore {
     };
   }
 
+  /** Bounded, per-user usage summary for dashboard usage reporting. */
+  getUserUsage(userId: string): {
+    callsThisMonth: number;
+    limit: number;
+    dailyAverage: number;
+    daysElapsed: number;
+    daysRemaining: number;
+    percentUsed: number;
+    resetDate: string;
+    callsOverTime: Array<{ month: string; count: number }>;
+  } {
+    const now = new Date();
+    const monthNames = [
+      "Oca",
+      "Şub",
+      "Mar",
+      "Nis",
+      "May",
+      "Haz",
+      "Tem",
+      "Ağu",
+      "Eyl",
+      "Eki",
+      "Kas",
+      "Ara",
+    ];
+    const startOfMonth = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+    ).toISOString();
+    const nextMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+    const daysRemaining = Math.max(
+      0,
+      Math.ceil((nextMonth.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+    );
+    const daysElapsed = Math.max(1, now.getUTCDate());
+
+    const monthRow = this.db
+      .prepare("SELECT COUNT(*) AS n FROM actions WHERE user_id = ? AND issued_at >= ?")
+      .get(userId, startOfMonth) as { n: number } | undefined;
+    const callsThisMonth = Number(monthRow?.n ?? 0);
+    const limit = 10_000;
+    const dailyAverage = Math.round(callsThisMonth / daysElapsed);
+    const percentUsed = Math.min(100, Math.round((callsThisMonth / limit) * 100));
+    const resetDate = `1 ${monthNames[nextMonth.getUTCMonth()] ?? "Gelecek Ay"}`;
+
+    const callsOverTime: Array<{ month: string; count: number }> = [];
+    for (let i = 5; i >= 0; i--) {
+      const mDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+      const mStart = mDate.toISOString();
+      const mEnd = new Date(
+        Date.UTC(mDate.getUTCFullYear(), mDate.getUTCMonth() + 1, 1),
+      ).toISOString();
+      const countRow = this.db
+        .prepare(
+          "SELECT COUNT(*) AS n FROM actions WHERE user_id = ? AND issued_at >= ? AND issued_at < ?",
+        )
+        .get(userId, mStart, mEnd) as { n: number } | undefined;
+      const count = Number(countRow?.n ?? 0);
+      callsOverTime.push({
+        month: monthNames[mDate.getUTCMonth()] ?? "",
+        count,
+      });
+    }
+
+    return {
+      callsThisMonth,
+      limit,
+      dailyAverage,
+      daysElapsed,
+      daysRemaining,
+      percentUsed,
+      resetDate,
+      callsOverTime,
+    };
+  }
+
   /**
    * Reclaim expired credentials and unclaimed device placeholders. Real
    * devices, accounts, actions and security audit history are preserved.
