@@ -1572,6 +1572,7 @@ describe("remote control plane remote-agent contracts", () => {
           string,
           {
             action: ActionRecord;
+            connection: unknown;
             resolve(value: ActionResultEnvelope): void;
             reject(error: Error): void;
             timeout: NodeJS.Timeout;
@@ -1680,6 +1681,7 @@ describe("remote control plane remote-agent contracts", () => {
       const timeout = setTimeout(() => undefined, 30_000);
       harness.pendingActions.set(action.id, {
         action,
+        connection: liveConnection,
         resolve: vi.fn(),
         reject: pendingReject,
         timeout,
@@ -1707,6 +1709,7 @@ describe("remote control plane remote-agent contracts", () => {
       const wrongConnectionTimeout = setTimeout(() => undefined, 30_000);
       harness.pendingActions.set(wrongConnectionAction.id, {
         action: wrongConnectionAction,
+        connection: liveConnection,
         resolve: vi.fn(),
         reject: wrongConnectionReject,
         timeout: wrongConnectionTimeout,
@@ -1967,6 +1970,7 @@ describe("remote control plane remote-agent contracts", () => {
           string,
           {
             action: ActionRecord;
+            connection: unknown;
             resolve(value: ActionResultEnvelope): void;
             reject(error: Error): void;
             timeout: NodeJS.Timeout;
@@ -1982,7 +1986,7 @@ describe("remote control plane remote-agent contracts", () => {
         connection,
         seenNonces: new Map([[replayNonce, Date.now() + 30_000]]),
       });
-      harness.pendingActions.set(action.id, { action, resolve, reject, timeout });
+      harness.pendingActions.set(action.id, { action, connection, resolve, reject, timeout });
       const result: ActionResultEnvelope = {
         type: "action.result",
         action_id: action.id,
@@ -2066,4 +2070,146 @@ describe("remote control plane remote-agent contracts", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+  test.each(["disconnect", "replace"] as const)(
+    "reports an unknown action outcome on %s without replay or affecting another connection",
+    async (mode) => {
+      const dir = mkdtempSync(path.join(os.tmpdir(), "remote-interrupted-action-"));
+      const controlPlane = new RemoteControlPlane(testConfig(dir));
+      await controlPlane.initialize();
+      try {
+        const keys = generateEd25519PemKeyPair();
+        const agent = agentRecord({
+          id: "agt_interrupted",
+          alias: "interrupted",
+          publicKey: keys.publicKeyPem,
+        });
+        const other = agentRecord({
+          id: "agt_other",
+          alias: "other",
+          publicKey: keys.publicKeyPem,
+        });
+        const harness = controlPlane as unknown as {
+          pendingActions: Map<string, unknown>;
+          agentHandler: {
+            handleAgentHello(connection: unknown, hello: unknown): Promise<void>;
+            handleActionResult(connection: unknown, result: ActionResultEnvelope): Promise<void>;
+          };
+          callRemoteTool(
+            principal: RemotePrincipal,
+            tool: string,
+            args: Record<string, unknown>,
+          ): Promise<Record<string, unknown>>;
+        };
+        controlPlane.store.insertAgent(agent);
+        controlPlane.store.insertAgent(other);
+        const connect = async (record: RemoteAgentRecord) => {
+          const handlers: Array<(code: number) => void> = [];
+          const connection = {
+            sendJson: vi.fn(),
+            close: vi.fn(),
+            onClose: vi.fn((handler: (code: number) => void) => handlers.push(handler)),
+          };
+          const hello = {
+            type: "agent.hello",
+            agent_id: record.id,
+            timestamp: nowIso(),
+            nonce: randomToken(16),
+            capabilities: ["system.read"],
+            agent_version: "1.0.0",
+            host: { hostname: "fixture", os: "Linux", arch: "x64", platform: "linux" },
+            signature: "",
+          };
+          hello.signature = signEnvelope(hello, keys.privateKeyPem);
+          await harness.agentHandler.handleAgentHello(connection, hello);
+          return { connection, disconnect: () => handlers.forEach((handler) => handler(1006)) };
+        };
+        const old = await connect(agent);
+        const second = await connect(other);
+        const caller = principal(["system.read"]);
+        const call = (alias: string) =>
+          harness.callRemoteTool(caller, "get_system_status", {
+            agent_id_or_alias: alias,
+            timeout_seconds: 30,
+          });
+        const updateAction = vi.spyOn(controlPlane.store, "updateAction");
+        const interrupted = call(agent.alias).catch((error: unknown) => error);
+        const unaffected = call(other.alias);
+        // Observe rejection immediately to avoid an unhandled rejection if a regression occurs.
+        void unaffected.catch(() => undefined);
+        const requests = (c: typeof old.connection) =>
+          c.sendJson.mock.calls
+            .map(([message]) => message as ActionRequestEnvelope)
+            .filter((message) => message.type === "action.request");
+        const original = requests(old.connection)[0]!;
+        const otherRequest = requests(second.connection)[0]!;
+        expect(harness.pendingActions.size).toBe(2);
+        if (mode === "disconnect") old.disconnect();
+        const replacement = mode === "replace" ? await connect(agent) : undefined;
+        expect(harness.pendingActions.has(original.action_id)).toBe(false);
+        expect(await interrupted).toEqual(
+          expect.objectContaining({
+            code: "ACTION_OUTCOME_UNKNOWN",
+            message: expect.stringContaining("outcome is unknown"),
+          }),
+        );
+        expect(updateAction).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: original.action_id,
+            status: "error",
+            errorCode: "ACTION_OUTCOME_UNKNOWN",
+          }),
+        );
+        expect(controlPlane.store.listAudit(agent.userId, agent.id, 20)).toContainEqual(
+          expect.objectContaining({
+            actionId: original.action_id,
+            eventType: "action_denied_or_failed",
+            metadata: expect.objectContaining({ error_code: "ACTION_OUTCOME_UNKNOWN" }),
+          }),
+        );
+        expect(harness.pendingActions.has(otherRequest.action_id)).toBe(true);
+        if (!replacement) {
+          await expect(call(agent.alias)).rejects.toMatchObject({ code: "AGENT_OFFLINE" });
+        }
+        const current = replacement ?? (await connect(agent));
+        expect(requests(current.connection)).toHaveLength(0);
+        const fresh = call(agent.alias);
+        void fresh.catch(() => undefined);
+        const freshRequest = requests(current.connection)[0]!;
+        old.disconnect();
+        expect(harness.pendingActions.has(freshRequest.action_id)).toBe(true);
+        expect(controlPlane.store.getAgent(agent.id)?.status).toBe("online");
+        const finish = async (c: typeof old.connection, req: ActionRequestEnvelope) => {
+          const result: ActionResultEnvelope = {
+            type: "action.result",
+            action_id: req.action_id,
+            agent_id: req.agent_id,
+            nonce: randomToken(16),
+            status: "ok",
+            exit_code: 0,
+            stdout: "fixture",
+            stderr: "",
+            started_at: nowIso(),
+            finished_at: nowIso(),
+            truncated: false,
+            signature: "",
+          };
+          result.signature = signEnvelope(
+            result as unknown as Record<string, unknown>,
+            keys.privateKeyPem,
+          );
+          await harness.agentHandler.handleActionResult(c, result);
+        };
+        await finish(old.connection, original);
+        expect(harness.pendingActions.has(freshRequest.action_id)).toBe(true);
+        await finish(current.connection, freshRequest);
+        await finish(second.connection, otherRequest);
+        await expect(fresh).resolves.toMatchObject({ action: { status: "ok" } });
+        await expect(unaffected).resolves.toMatchObject({ action: { status: "ok" } });
+        expect(harness.pendingActions.size).toBe(0);
+      } finally {
+        controlPlane.close();
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+  );
 });

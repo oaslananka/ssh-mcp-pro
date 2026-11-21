@@ -5,6 +5,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { AgentExecutor, defaultHostMetadata } from "../../src/remote/agent-executor.js";
 import {
   generateEd25519PemKeyPair,
@@ -656,6 +657,100 @@ describe("remote control plane and outbound agent flow", () => {
       controlPlane.close();
     }
   }, 30_000);
+  test.each(["legacy", "modern"] as const)(
+    "reports an interrupted action to a %s MCP client",
+    async (transportKind) => {
+      const { baseUrl, controlPlane, server } = await startHarness();
+      let ws: RuntimeWebSocket | undefined;
+      let client: Client | undefined;
+      try {
+        const token = await issueTestAccessToken(baseUrl, "agents:read agents:admin status:read");
+        const headers = { Authorization: `Bearer ${token}` };
+        const enrollment = await jsonFetch(`${baseUrl}/api/agents/enrollment-tokens`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ alias: "interrupted-fixture", requested_profile: "read-only" }),
+          expectedStatus: 201,
+        });
+        const keys = generateEd25519PemKeyPair();
+        const enrolled = await jsonFetch(`${baseUrl}/api/agents/enroll`, {
+          method: "POST",
+          body: JSON.stringify({
+            token: String(enrollment.enrollment_token),
+            public_key: keys.publicKeyPem,
+            host: defaultHostMetadata(),
+          }),
+          expectedStatus: 200,
+        });
+        const agentId = String(enrolled.agent_id);
+        const connection = controlPlane.store.listUserOAuthConnections("github:169144131")[0]!;
+        controlPlane.store.setOAuthConnectionDevices(
+          "github:169144131",
+          connection.id,
+          [agentId],
+          nowIso(),
+        );
+        const policy = enrolled.policy as AgentPolicy;
+        ws = await connectAgent(
+          String(enrolled.websocket_url),
+          agentId,
+          keys.privateKeyPem,
+          policy,
+        );
+        let dispatched = 0;
+        const socket = ws;
+        socket.onmessage = (event) => {
+          const message = JSON.parse(String(event.data)) as Record<string, unknown>;
+          if (message.type === "action.request") {
+            dispatched += 1;
+            socket.close();
+          }
+        };
+        const args = { agent_id_or_alias: agentId, timeout_seconds: 30 };
+        let result: unknown;
+        if (transportKind === "modern") {
+          client = new Client(
+            { name: "interruption-test", version: "1.0.0" },
+            { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+          );
+          await client.connect(
+            new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`), {
+              requestInit: { headers },
+            }),
+          );
+          expect(client.getProtocolEra()).toBe("modern");
+          result = await client.callTool({ name: "get_system_status", arguments: args });
+          expect(result).toMatchObject({
+            isError: true,
+            structuredContent: { code: "ACTION_OUTCOME_UNKNOWN" },
+          });
+        } else {
+          result = await jsonFetch(`${baseUrl}/mcp`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              id: 1,
+              method: "tools/call",
+              params: { name: "get_system_status", arguments: args },
+            }),
+            expectedStatus: 200,
+          });
+          expect(result).toMatchObject({ error: { data: { code: "ACTION_OUTCOME_UNKNOWN" } } });
+        }
+        expect(JSON.stringify(result)).toContain("outcome is unknown");
+        expect(JSON.stringify(result)).toContain("do not automatically replay");
+        expect(dispatched).toBe(1);
+      } finally {
+        await client?.close();
+        ws?.close();
+        controlPlane.close();
+        await new Promise<void>((resolve) => server.close(() => resolve()));
+      }
+    },
+    10_000,
+  );
+
   test("closes unauthenticated agent sockets at the configured hello deadline", async () => {
     const { baseUrl, controlPlane, server } = await startHarness({
       agentHelloTimeoutMs: 1_000,

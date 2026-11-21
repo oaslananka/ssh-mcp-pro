@@ -30,6 +30,7 @@ export interface AgentConnection {
 
 export interface PendingAction {
   action: ActionRecord;
+  connection: WebSocketConnection;
   resolve: (value: ActionResultEnvelope) => void;
   reject: (error: Error) => void;
   timeout: NodeJS.Timeout;
@@ -288,6 +289,7 @@ export class AgentWebSocketHandler {
       severity: "info",
       metadata: {},
     });
+    this.interruptConnectionActions(existingConnection.connection);
     this.lifecycle.closeConnection(existingConnection.connection, 1000, "connection replaced");
   }
 
@@ -309,7 +311,11 @@ export class AgentWebSocketHandler {
       return;
     }
     const live = this.agentConnections.get(result.agent_id);
-    if (pending.action.agentId !== result.agent_id || live?.connection !== connection) {
+    if (
+      pending.action.agentId !== result.agent_id ||
+      pending.connection !== connection ||
+      live?.connection !== connection
+    ) {
       this.rejectPendingAction(pending, result.action_id, "agent_result_connection_invalid");
       pending.reject(
         Object.assign(new Error("Agent result came from an unexpected connection"), {
@@ -347,6 +353,19 @@ export class AgentWebSocketHandler {
     });
   }
 
+  private interruptConnectionActions(connection: WebSocketConnection): void {
+    for (const [actionId, pending] of this.pendingActions) {
+      if (pending.connection !== connection) continue;
+      clearTimeout(pending.timeout);
+      this.pendingActions.delete(actionId);
+      pending.reject(
+        Object.assign(new Error("Agent connection lost after dispatch"), {
+          code: "ACTION_OUTCOME_UNKNOWN" satisfies RemoteErrorCode,
+        }),
+      );
+    }
+  }
+
   private handleLiveConnectionClosedById(
     agentId: string,
     connection: WebSocketConnection,
@@ -361,6 +380,7 @@ export class AgentWebSocketHandler {
     connection: WebSocketConnection,
     closeCode: number,
   ): boolean {
+    this.interruptConnectionActions(connection);
     const live = this.agentConnections.get(agent.id);
     if (live?.connection !== connection) {
       return false;
