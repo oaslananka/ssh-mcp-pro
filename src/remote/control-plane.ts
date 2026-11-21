@@ -349,15 +349,28 @@ export class RemoteControlPlane {
           if (!Object.hasOwn(TOOL_CAPABILITY_MAP, name)) {
             throw safeError("INVALID_SCOPE", "Unknown tool", 400);
           }
-          const result = await this.callRemoteTool(
-            principal,
-            name as RemoteToolName,
-            rpc.params.arguments ?? {},
-          );
-          return {
-            content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
-            structuredContent: result,
-          };
+          try {
+            const result = await this.callRemoteTool(
+              principal,
+              name as RemoteToolName,
+              rpc.params.arguments ?? {},
+            );
+            return {
+              content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+              structuredContent: result,
+            };
+          } catch (error) {
+            // An interrupted execution is a tool outcome, not a transport failure.
+            if (isRecord(error) && error.code === "ACTION_OUTCOME_UNKNOWN") {
+              const result = { code: error.code, message: String(error.message) };
+              return {
+                isError: true,
+                content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+                structuredContent: result,
+              };
+            }
+            throw error;
+          }
         });
         return server;
       },
@@ -882,7 +895,13 @@ export class RemoteControlPlane {
           },
           timeoutSeconds * 1000 + 2000,
         );
-        this.pendingActions.set(actionId, { action, resolve, reject, timeout });
+        this.pendingActions.set(actionId, {
+          action,
+          connection: live.connection,
+          resolve,
+          reject,
+          timeout,
+        });
         live.connection.sendJson(envelope);
       });
     } catch (error) {
@@ -904,6 +923,13 @@ export class RemoteControlPlane {
         severity: "warn",
         metadata: { status: "error", error_code: code },
       });
+      if (code === "ACTION_OUTCOME_UNKNOWN") {
+        throw safeError(
+          code,
+          "Agent connection lost after dispatch; action outcome is unknown. Inspect current state before retrying; do not automatically replay the action.",
+          409,
+        );
+      }
       throw safeError(
         code,
         code === "AGENT_TIMEOUT" ? "Agent timed out" : "Agent action failed",

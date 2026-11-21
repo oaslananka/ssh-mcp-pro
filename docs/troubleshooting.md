@@ -41,6 +41,20 @@ request/response-level detail, check whether OpenTelemetry export is configured 
 `@opentelemetry/*` dependencies and the telemetry-related environment variables) — this
 project ships OTLP trace export support, not just console logging.
 
+## An outbound agent disconnects during an action
+
+`ACTION_OUTCOME_UNKNOWN` means the control plane lost or replaced the authenticated
+agent connection after dispatching the action but before receiving a verified result.
+The action may have completed, partially executed, or not started. Reconnection does
+not replay the action. Inspect the current state before deciding whether any further
+mutation is needed; do not automatically retry. A device offline before dispatch is
+reported separately as `AGENT_OFFLINE`. A normal action deadline still produces
+`AGENT_TIMEOUT` and also does not establish that a mutation had no effect.
+
+If an endpoint security product reports a threat, keep protection enabled and review
+its detection details. Do not repeat a blocked command or allowlist the agent to
+circumvent a detection. This error does not identify the cause of the disconnection.
+
 ## Windows-specific SSH integration issues
 
 There's a dedicated Windows SSH integration test project
