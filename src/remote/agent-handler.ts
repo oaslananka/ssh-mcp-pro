@@ -215,7 +215,7 @@ export class AgentWebSocketHandler {
       ...agent,
       status: "online",
       lastSeenAt: nowIso(),
-      hostMetadata: hello.host,
+      hostMetadata: { ...hello.host, agentVersion: hello.agent_version },
       updatedAt: nowIso(),
     };
     this.store.updateAgent(online);

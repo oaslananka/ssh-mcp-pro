@@ -170,6 +170,34 @@ ssh-mcp-pro-agent install-service
 ssh-mcp-pro-agent uninstall-service
 ```
 
+### Maintain an enrolled agent
+
+The device dashboard shows the last version reported by the authenticated agent,
+compared with the deployed server version. This is not a live registry lookup.
+Older agents may report no version; check locally rather than assuming they are
+current. A newer server version is an update recommendation, not a request to
+execute a remote install.
+
+Before updating, finish active work on the device. Review the
+[latest public release](https://github.com/oaslananka/ssh-mcp-pro/releases/latest)
+and verify the intended npm package and provenance. For a global npm installation,
+use the same local account and package manager that installed the agent.
+
+```bash
+ssh-mcp-pro-agent --version
+npm view ssh-mcp-pro version --registry=https://registry.npmjs.org
+```
+
+Install the reviewed version with the normal package manager, then restart the
+existing agent through its normal service manager or foreground terminal. Verify
+the version locally and confirm that the same enrolled device reconnects in the
+dashboard. Do not re-enroll just to update.
+
+If endpoint protection blocks a command or package, stop and investigate the
+detection. Do not disable endpoint protection, add broad exclusions, re-run
+blocked commands, or automatically retry a blocked installation.
+
+
 ## VS Code Setup
 
 ### 1. Install GitHub Copilot Extension

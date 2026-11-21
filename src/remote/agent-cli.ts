@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { AgentExecutor, defaultHostMetadata } from "./agent-executor.js";
 import { startLocalBrowserEnrollment } from "./agent-browser-enrollment.js";
 import {
@@ -17,6 +16,7 @@ import {
   verifyEnvelope,
   type PemKeyPair,
 } from "./crypto.js";
+import { installedPackageVersion } from "./package-version.js";
 import {
   rememberAcceptedPolicyUpdate,
   validatePolicyUpdate,
@@ -201,7 +201,7 @@ async function enrollWithToken(server: string, token: string, alias: string): Pr
     token,
     public_key: keyPair.publicKeyPem,
     alias,
-    agent_version: process.env.npm_package_version ?? "unknown",
+    agent_version: installedPackageVersion(),
     host: defaultHostMetadata() satisfies AgentHostMetadata,
   });
   const config: AgentConfigFile = {
@@ -378,7 +378,7 @@ async function runAgent(state?: AgentRuntimeState, flags: string[] = []): Promis
         capabilities: Object.entries(config.policy.capabilities)
           .filter(([, enabled]) => enabled)
           .map(([capability]) => capability as AgentHelloEnvelope["capabilities"][number]),
-        agent_version: process.env.npm_package_version ?? "unknown",
+        agent_version: installedPackageVersion(),
         host: defaultHostMetadata(),
         signature: "",
       };
@@ -540,17 +540,11 @@ function printAgentUsage(): void {
 }
 
 function printAgentVersion(): void {
-  const packagePath = path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    "..",
-    "..",
-    "package.json",
-  );
-  const pkg = JSON.parse(readFileSync(packagePath, "utf8")) as { version?: string };
-  if (!pkg.version) {
+  const version = installedPackageVersion();
+  if (version === "unknown") {
     throw new Error("Agent package version is unavailable");
   }
-  output(pkg.version);
+  output(version);
 }
 
 export async function runAgentCli(argv: string[], state?: AgentRuntimeState): Promise<void> {
