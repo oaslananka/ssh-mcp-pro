@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -14,7 +15,7 @@ const params: ConnectionParams = {
   host: "fixture.example.test",
   username: "fixture",
   auth: "password",
-  password: "fixture-only",
+  password: randomUUID(),
 };
 const security = {
   allowRootLogin: false,
