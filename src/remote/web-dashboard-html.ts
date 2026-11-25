@@ -1,3 +1,4 @@
+import { DASHBOARD_DEVICE_MANAGEMENT_SCRIPT } from "./web-dashboard-device-management-script.js";
 import { DASHBOARD_PAGE_RENDER_SCRIPT } from "./web-dashboard-page-render-script.js";
 import { DASHBOARD_AI_CLIENT_SCRIPT } from "./web-dashboard-ai-client-script.js";
 import { buildDashboardBrowserEnrollmentCommand } from "./dashboard-enrollment-commands.js";
@@ -45,6 +46,15 @@ ${AI_CLIENT_STYLES}</style>
     <!-- Rendered by client script based on currentUser -->
   </div>
 
+  <dialog id="deviceActionDialog" class="device-action-dialog" aria-labelledby="deviceActionTitle" aria-describedby="deviceActionDescription">
+    <h2 id="deviceActionTitle"></h2>
+    <p id="deviceActionDescription"></p>
+    <p id="deviceActionFeedback" role="alert" hidden></p>
+    <div class="device-dialog-actions">
+      <button id="deviceActionCancel" type="button" class="btn btn-outline" onclick="cancelDeviceAction()" autofocus>Cancel</button>
+      <button id="deviceActionConfirm" type="button" class="btn btn-danger" onclick="confirmDeviceAction()">Remove device</button>
+    </div>
+  </dialog>
   <script>
     const INITIAL_USER = JSON.parse(atob("${initialUserBase64}"));
     const MCP_URL = ${mcpUrlJson};
@@ -57,6 +67,8 @@ ${AI_CLIENT_STYLES}</style>
     let devicesList = [];
     let devicesLoaded = false;
     let devicesError = '';
+    let deviceNotice = '';
+    let deviceLoadGeneration = 0;
     let selectedInstallOs = 'windows';
     let auditList = [];
     let auditLoaded = false;
@@ -149,6 +161,8 @@ ${AI_CLIENT_STYLES}</style>
       };
       const online = devicesList.filter(d => d.isLiveConnected).length;
       const total = devicesList.length;
+      const revoked = devicesList.filter(d => d.status === 'revoked').length;
+      const pending = devicesList.filter(d => d.status === 'pending').length;
       root.innerHTML = \`
         <div class="workspace-shell">
           <aside class="workspace-sidebar">
@@ -187,13 +201,14 @@ ${AI_CLIENT_STYLES}</style>
             \${activeTab === 'devices' ? \`
               <section class="connection-summary" aria-label="Connection overview">
                 <div class="connection-summary-primary"><span class="summary-pulse" aria-hidden="true"></span><div>
-                  <strong>\${devicesError ? 'Device status unavailable' : !devicesLoaded ? 'Checking your devices…' : online > 0 ? "You're ready to work" : total > 0 ? 'Your devices are offline' : 'Connect your first device'}</strong>
-                  <span>\${devicesError ? 'Please retry to check the current device status' : !devicesLoaded ? 'Loading live connection status' : online > 0 ? online + ' connected device' + (online === 1 ? '' : 's') + ' · Connect an AI app to start' : total > 0 ? 'Check the agent on your computer to reconnect' : 'Your AI assistant needs a connected computer to get started'}</span>
+                  <strong>\${devicesError ? 'Device status unavailable' : !devicesLoaded ? 'Checking your devices…' : online > 0 ? "You're ready to work" : total > 0 && revoked === total ? 'Access is revoked for all devices' : pending > 0 ? 'Device setup is incomplete' : total > 0 ? 'Your devices are offline' : 'Connect your first device'}</strong>
+                  <span>\${devicesError ? 'Please retry to check the current device status' : !devicesLoaded ? 'Loading live connection status' : online > 0 ? online + ' connected device' + (online === 1 ? '' : 's') + ' · Connect an AI app to start' : total > 0 && revoked === total ? 'Remove devices you no longer need or enroll again' : pending > 0 ? 'Finish enrolling your devices to connect' : total > 0 ? 'Check the agent on your computer to reconnect' : 'Your AI assistant needs a connected computer to get started'}</span>
                 </div></div>
-                \${devicesLoaded && !devicesError && total > 0 ? \`<button class="btn btn-soft" type="button" onclick="\${online > 0 ? "switchTab('clients')" : 'retryDevices()'}">\${online > 0 ? 'Connect an AI app' : 'Check connection'} <span aria-hidden="true">→</span></button>\` : ''}
+                \${devicesLoaded && !devicesError && total > revoked ? \`<button class="btn btn-soft" type="button" onclick="\${online > 0 ? "switchTab('clients')" : 'retryDevices()'}">\${online > 0 ? 'Connect an AI app' : 'Check connection'} <span aria-hidden="true">→</span></button>\` : ''}
               </section>
               \${!devicesLoaded ? '' : total > 0 ? '<p class="device-scope-note" role="note">Showing devices for your ' + escapeHtml(currentUser.provider === 'github' ? 'GitHub' : 'Google') + ' account. Other sign-in providers have separate device lists.</p>' : ''}
             \` : ''}
+            <div id="deviceNotice" tabindex="-1" role="status" aria-live="polite" class="device-notice" \${activeTab === 'devices' && deviceNotice ? '' : 'hidden'}>\${escapeHtml(deviceNotice)}</div>
             <div id="tabContent">\${renderTabContent()}</div>
           </main>
         </div>
@@ -354,21 +369,7 @@ ${DASHBOARD_PAGE_RENDER_SCRIPT}${DASHBOARD_AI_CLIENT_SCRIPT}    function renderU
       if (activeTab === 'devices') renderApp();
     }
 
-    async function loadDevices() {
-      try {
-        const res = await fetch('/api/dashboard/devices', { cache: 'no-store' });
-        if (!res.ok) throw new Error('Device API unavailable');
-        const data = await res.json();
-        devicesList = Array.isArray(data.devices) ? data.devices : [];
-        devicesError = '';
-      } catch (e) {
-        devicesError = 'unavailable';
-        console.error('Failed to load devices', e);
-      } finally {
-        devicesLoaded = true;
-        if (activeTab === 'devices') renderApp();
-      }
-    }
+    ${DASHBOARD_DEVICE_MANAGEMENT_SCRIPT}
 
     async function loadAudit() {
       auditLoaded = false;
@@ -386,59 +387,6 @@ ${DASHBOARD_PAGE_RENDER_SCRIPT}${DASHBOARD_AI_CLIENT_SCRIPT}    function renderU
       } finally {
         auditLoaded = true;
         if (activeTab === 'audit' && target) target.innerHTML = renderTabContent();
-      }
-    }
-
-    async function changePolicy(id, profile) {
-      try {
-        const res = await fetch('/api/dashboard/devices/' + encodeURIComponent(id), {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'X-SSH-MCP-Dashboard': '1' },
-          body: JSON.stringify({ policy: { profile } })
-        });
-        if (res.ok) {
-          loadDevices();
-        } else {
-          alert('Failed to update policy');
-        }
-      } catch (e) {
-        alert('Error: ' + e.message);
-      }
-    }
-
-    async function revokeDevice(id) {
-      if (!confirm('Revoke access for this device? The agent will disconnect, but its record will remain until removed.')) return;
-      try {
-        const res = await fetch('/api/dashboard/devices/' + encodeURIComponent(id) + '/revoke', {
-          method: 'POST',
-          headers: { 'X-SSH-MCP-Dashboard': '1' }
-        });
-        if (res.ok) {
-          await loadDevices();
-        } else {
-          const detail = await res.json().catch(() => ({}));
-          alert(detail.error || 'Failed to revoke device');
-        }
-      } catch (e) {
-        alert('Error: ' + e.message);
-      }
-    }
-
-    async function removeDevice(id) {
-      if (!confirm('Remove this device? Access will be revoked and its device record permanently deleted. Audit history is retained.')) return;
-      try {
-        const res = await fetch('/api/dashboard/devices/' + encodeURIComponent(id), {
-          method: 'DELETE',
-          headers: { 'X-SSH-MCP-Dashboard': '1' }
-        });
-        if (res.ok) {
-          loadDevices();
-        } else {
-          const detail = await res.json().catch(() => ({}));
-          alert(detail.error || 'Failed to remove device');
-        }
-      } catch (e) {
-        alert('Error: ' + e.message);
       }
     }
 

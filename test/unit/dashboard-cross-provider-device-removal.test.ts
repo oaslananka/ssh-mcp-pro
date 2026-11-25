@@ -21,14 +21,14 @@ describe("GitHub and Google dashboard device ownership", () => {
       JSON.stringify("https://mcp.example.invalid"),
     );
     expect(html).toContain("async function changePolicy(id, profile)");
-    expect(html).toContain("async function revokeDevice(id)");
-    expect(html).toContain("async function removeDevice(id)");
+    expect(html).toContain("function revokeDevice(id)");
+    expect(html).toContain("function removeDevice(id)");
     expect(html).toContain('onclick="revokeDevice(');
     expect(html).toContain("Revoke access");
     expect(html).toContain("fetch('/api/dashboard/devices/' + encodeURIComponent(id), {");
-    expect(html).toContain(
-      "fetch('/api/dashboard/devices/' + encodeURIComponent(id) + '/revoke', {",
-    );
+    expect(html).toContain("const endpoint = '/api/dashboard/devices/' + encodeURIComponent(id)");
+    expect(html).toContain("fetch(endpoint + (kind === 'revoke' ? '/revoke' : ''), {");
+    expect(html).toContain("method: kind === 'remove' ? 'DELETE' : 'POST'");
     expect(html).not.toContain(" + id + '/policy'");
   });
 

@@ -226,8 +226,31 @@ body {
 .device-icon{background:#141a26;border-color:#202a3d;color:#7ebbff}
 .status-pill.online{background:rgba(16,185,129,0.15);color:#10b981}
 .status-pill.offline{background:rgba(244,63,94,0.12);color:#fb7185}
+.status-pill.revoked{background:#34232d;color:#ffb5c1}
+.status-pill.pending{background:#343123;color:#f7d78b}
+.status-pill.revoked>span{background:#ffb5c1}
+.status-pill.pending>span{background:#f7d78b}
 .device-controls summary{background:#141720;border-color:#202738;color:#cbd5e1}
 .device-control-panel{background:#0e1117;border-color:#1f2636}
+.device-controls > summary.device-row{display:flex;position:static;min-height:64px;padding:18px 24px;border:0;border-radius:0;background:transparent;gap:14px;text-align:left;cursor:pointer}
+.device-controls > summary.device-row:hover{background:#181d28}
+.device-controls > summary.device-row:focus-visible{outline-offset:-3px}
+.device-controls[open] > summary.device-row{background:#181d28}
+.device-manage-label{display:inline-flex;gap:8px;align-items:center;color:#b7d4ff;font-size:13px;min-height:44px}
+.device-controls[open] .device-manage-label > span{transform:rotate(180deg)}
+.device-control-panel{position:static;width:auto;margin:0 24px 18px;padding:18px;border-radius:10px;box-shadow:none}
+.device-control-panel select,.device-control-actions .btn{min-height:44px}
+.device-control-actions{border-top:1px solid #293343;padding-top:14px}
+.device-meta{display:block;font-family:inherit;font-size:13px;color:#b1bfd2}
+.device-notice{padding:12px 16px;border:1px solid #39536c;background:#142235;color:#dcecff;border-radius:9px;margin-bottom:16px;overflow-wrap:anywhere}
+.device-action-dialog{position:fixed;inset:0;margin:auto;max-width:min(440px,calc(100% - 32px));max-height:calc(100% - 32px);overflow:auto;padding:24px;border:1px solid #3a455c;border-radius:14px;background:#171b24;color:#f1f5f9;box-shadow:0 24px 70px #0009}
+.device-action-dialog::backdrop{background:#000a}
+.device-action-dialog h2{font-size:21px;margin-bottom:12px;overflow-wrap:anywhere}
+.device-action-dialog p{font-size:14px;line-height:1.6;color:#c3cedf;overflow-wrap:anywhere}
+#deviceActionFeedback{color:#ffb5c1;margin-top:12px}
+.device-dialog-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-top:20px}
+.device-dialog-actions .btn{min-height:44px}
+
 
 /* Usage Page (matching Desktop Commander Screenshot 1) */
 .usage-banner {
@@ -475,6 +498,11 @@ ${DEVICE_WIZARD_STYLES}/* Product stage & terminal preview */
   .usage-stat-grid{grid-template-columns:1fr}
 }
 @media(max-width:640px) {
+  .device-controls > summary.device-row{padding:16px}
+  .device-control-panel{margin:0 16px 16px}
+  .device-list-heading{flex-wrap:wrap}
+  .device-row-status{gap:12px}
+  .device-dialog-actions .btn{flex:1}
   .workspace-page-heading h1{font-size:24px}
   .wizard-stepper{gap:6px}
   .stepper-line{width:35px}

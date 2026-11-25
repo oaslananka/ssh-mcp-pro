@@ -33,8 +33,12 @@ beforeEach(() => {
     GIT_CONFIG_GLOBAL: globalConfig,
     GIT_CONFIG_NOSYSTEM: "1",
   };
-  delete env.GIT_CONFIG_COUNT;
-  delete env.GIT_CONFIG_PARAMETERS;
+  // Git hooks export repository-local variables; nested fixtures must not inherit them.
+  const localVariables = spawnSync("git", ["rev-parse", "--local-env-vars"], { encoding: "utf8" });
+  expect(localVariables.status, localVariables.stderr).toBe(0);
+  for (const name of localVariables.stdout.trim().split(/\s+/)) delete env[name];
+  env.GIT_CONFIG_GLOBAL = globalConfig;
+  env.GIT_CONFIG_NOSYSTEM = "1";
   git("init", "--quiet");
   mkdirSync(join(root, ".githooks"));
   writeFileSync(join(root, ".githooks", "pre-commit"), "#!/bin/sh\nexit 0\n");
