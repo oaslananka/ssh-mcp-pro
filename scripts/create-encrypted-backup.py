@@ -6,7 +6,6 @@ import json
 import os
 import pathlib
 import re
-import shutil
 import sqlite3
 import subprocess  # nosec B404 - fixed age invocation, no shell
 import sys
@@ -20,7 +19,7 @@ from backup_validation import (
 )
 
 
-def copy_snapshot(source, staging, max_bytes):
+def validate_source(source, max_bytes):
     for name in REQUIRED:
         item = source / name
         if item.is_symlink() or not item.is_file():
@@ -28,6 +27,9 @@ def copy_snapshot(source, staging, max_bytes):
         if item.stat().st_size > (65536 if name in KEYS else max_bytes):
             reject("ARCHIVE_TOO_LARGE")
 
+
+
+def stage_keys(source, staging):
     # A source directory is operator-controlled; do not rotate signing keys
     # during capture. Compare the staged keys again after the database backup.
     for name in KEYS:
@@ -38,6 +40,9 @@ def copy_snapshot(source, staging, max_bytes):
             (staging / name).chmod(0o600)
             target.write(data)
 
+
+
+def backup_database(source, staging, max_bytes):
     deadline = time.monotonic() + 120
     db = staging / "sshautomator.db"
     try:
@@ -60,6 +65,12 @@ def copy_snapshot(source, staging, max_bytes):
 
     if db.stat().st_size > max_bytes:
         reject("ARCHIVE_TOO_LARGE")
+
+
+def copy_snapshot(source, staging, max_bytes):
+    validate_source(source, max_bytes)
+    stage_keys(source, staging)
+    backup_database(source, staging, max_bytes)
     for name in KEYS:
         if (source / name).read_bytes() != (staging / name).read_bytes():
             reject("SIGNING_KEYS_CHANGED")
@@ -68,17 +79,20 @@ def copy_snapshot(source, staging, max_bytes):
 
 
 def encrypt_archive(archive, output, recipient, max_bytes):
-    if not shutil.which("age"):
+    if not os.access("/usr/bin/age", os.X_OK):
         reject("AGE_NOT_INSTALLED")
     if os.path.lexists(output):
         reject("OUTPUT_EXISTS")
     # Publish only complete ciphertext; link is atomic and refuses overwrite.
     with tempfile.TemporaryDirectory(prefix=".ssh-backup-", dir=output.parent) as tmp:
         ciphertext = pathlib.Path(tmp) / "snapshot.age"
+        # The validated public recipient is data, not a process argument.
+        (pathlib.Path(tmp) / "recipient.txt").write_text(recipient + "\n", encoding="ascii")
         with archive.open("rb") as source, ciphertext.open("xb") as target:
             ciphertext.chmod(0o600)
             result = subprocess.run(
-                ["age", "--encrypt", "--recipient", recipient],
+                ["/usr/bin/age", "--encrypt", "--recipients-file", "recipient.txt"],
+                cwd=tmp,
                 stdin=source, stdout=target, stderr=subprocess.DEVNULL,
                 timeout=120, check=False,
             )
@@ -88,16 +102,34 @@ def encrypt_archive(archive, output, recipient, max_bytes):
             os.fsync(target.fileno())
         if ciphertext.stat().st_size > max_bytes:
             reject("ARCHIVE_TOO_LARGE")
+        publish_ciphertext(pathlib.Path(tmp), output.parent, output.name)
+
+
+def publish_ciphertext(staging, destination, filename):
+    # The directory descriptors confine publication to the selected directory;
+    # a validated single filename cannot traverse out of it.
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*[.]age", filename):
+        reject("INVALID_OUTPUT_PATH")
+    src_fd = os.open(staging, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        dst_fd = os.open(destination, os.O_RDONLY | os.O_DIRECTORY)
         try:
-            os.link(ciphertext, output)
+            os.link("snapshot.age", filename, src_dir_fd=src_fd,
+                    dst_dir_fd=dst_fd, follow_symlinks=False)
         except FileExistsError:
             reject("OUTPUT_EXISTS")
+        finally:
+            os.close(dst_fd)
+    finally:
+        os.close(src_fd)
 
 
 def create(source, recipient, output, capacity):
     # Only native X25519 age recipients; no external recipient plugins.
     if not re.fullmatch(r"age1[023456789acdefghjklmnpqrstuvwxyz]{58}", recipient):
         reject("INVALID_RECIPIENT")
+    if ".." in output.parts or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*[.]age", output.name):
+        reject("INVALID_OUTPUT_PATH")
     if os.path.lexists(output):
         reject("OUTPUT_EXISTS")
     if not source.is_dir() or not output.parent.is_dir():

@@ -2,7 +2,7 @@
 import argparse
 import json
 from contextlib import closing
-import shutil
+import os
 import sqlite3
 import subprocess  # nosec B404
 from urllib.parse import quote
@@ -50,19 +50,20 @@ def validate_sqlite(restore):
 
 
 def openssl_public_der(pem, private):
-    args = ["openssl", "pkey", "-outform", "DER"]
-    args.append("-pubout" if private else "-pubin")
     try:
-        # Fixed OpenSSL pkey flags; untrusted PEM is passed on stdin, never as
-        # executable arguments or a shell command.
-        result = subprocess.run(  # nosec B603
-            args,
-            input=pem.encode("utf-8"),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            timeout=10,
-            check=False,
-        )
+        # Only fixed executable/flags; PEM enters via stdin.
+        if private:
+            result = subprocess.run(
+                ["/usr/bin/openssl", "pkey", "-outform", "DER", "-pubout"],
+                input=pem.encode("utf-8"), stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL, timeout=10, check=False,
+            )
+        else:
+            result = subprocess.run(
+                ["/usr/bin/openssl", "pkey", "-outform", "DER", "-pubin"],
+                input=pem.encode("utf-8"), stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL, timeout=10, check=False,
+            )
     except (OSError, subprocess.SubprocessError):
         reject("KEY_PAIR_MISMATCH")
     if result.returncode != 0:
@@ -71,7 +72,7 @@ def openssl_public_der(pem, private):
 
 
 def validate_signing_keys(restore):
-    if not shutil.which("openssl"):
+    if not os.access("/usr/bin/openssl", os.X_OK):
         reject("OPENSSL_NOT_INSTALLED")
     for filename in KEYS:
         try:

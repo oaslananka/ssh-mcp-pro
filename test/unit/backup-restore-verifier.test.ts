@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
@@ -6,6 +7,8 @@ import { describe, expect, test } from "vitest";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const hasTools =
   process.platform !== "win32" &&
+  existsSync("/usr/bin/age") &&
+  existsSync("/usr/bin/openssl") &&
   ["python3", "openssl", "age", "age-keygen"].every(
     (tool) => spawnSync("sh", ["-c", "command -v " + tool], { timeout: 2_000 }).status === 0,
   );

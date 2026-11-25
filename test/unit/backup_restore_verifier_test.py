@@ -200,6 +200,17 @@ class OfflineRestoreVerifierTests(unittest.TestCase):
             self.assertEqual(stderr, b"")
             self.assertEqual(verify(output, identity, "--max-backup-mib", "512")[0], 0)
 
+    def test_creation_rejects_parent_traversal_in_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            _, identity = fixture(root)
+            output = root / "data" / ".." / "escaped.age"
+            code, data, stderr = self.create_snapshot(root, identity, output)
+            self.assertEqual(code, 2)
+            self.assertEqual(data, {"status": "fail", "code": "INVALID_OUTPUT_PATH"})
+            self.assertFalse((root / "escaped.age").exists())
+            self.assertEqual(stderr, b"")
+
     def test_creation_never_overwrites_existing_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)

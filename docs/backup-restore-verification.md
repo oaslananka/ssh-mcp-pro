@@ -7,7 +7,9 @@ size or encryption header alone does not prove recoverability.
 ## Create an encrypted snapshot
 
 Use the checked-out script on a trusted Linux source host with Python 3, age
-and OpenSSL, as the service owner or an authorized backup operator. The source
+and OpenSSL, as the service owner or an authorized backup operator. Use
+the Linux distribution packages providing executable `/usr/bin/age` and
+`/usr/bin/openssl`; the creator invokes these fixed system executables. The source
 directory must contain the actual database and both signing-key files under
 their standard names. Keep the signing keys stable during the snapshot; do not
 rotate or replace them concurrently. The SQLite online backup API captures
@@ -28,7 +30,9 @@ python3 scripts/create-encrypted-backup.py \
 
 The source and output directories must be trusted, service-owned or restricted
 to the authorized operator. Use a local filesystem that supports hard links
-for the output directory. Use a private temporary filesystem with sufficient
+for the output directory. Use a single output filename ending in `.age` with
+ASCII letters, digits, dots, underscores or hyphens, starting with a letter or
+digit. Parent traversal components (`..`) are rejected. Use a private temporary filesystem with sufficient
 free space (at least three times the selected capacity, plus overhead). The
 command checks the snapshot database and signing-key pairs, encrypts with the
 public recipient, and publishes only complete ciphertext without overwriting
@@ -41,7 +45,7 @@ a backup stored only on the production volume as an offsite recovery copy.
 
 ## Independent recovery host
 
-On an authorized isolated Linux host with Python 3, age and OpenSSL, obtain a
+On an authorized isolated Linux host with Python 3, age and OpenSSL (distribution package at `/usr/bin/openssl`), obtain a
 **separately stored encrypted backup** and its matching age identity using
 your approved secure recovery process. Never paste the identity/private key
 into chat, support requests, CI logs or a Git repository. Store the identity

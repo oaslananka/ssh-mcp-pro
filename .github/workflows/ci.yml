@@ -153,10 +153,12 @@ jobs:
         if: ${{ matrix.node_major == 24 }}
         run: |
           set -euo pipefail
-          if ! command -v age >/dev/null || ! command -v age-keygen >/dev/null; then
+          if ! test -x /usr/bin/age || ! command -v age-keygen >/dev/null; then
             sudo apt-get update
             sudo apt-get install --no-install-recommends -y age
           fi
+          test -x /usr/bin/age
+          test -x /usr/bin/openssl
           for tool in python3 openssl age age-keygen; do
             command -v "$tool"
           done
