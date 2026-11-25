@@ -315,10 +315,7 @@ function acceptAgentAction(
     activity.event("warn", "action_expired", "Expired action ignored.");
     return false;
   }
-  if (
-    action.policy_version !== config.policy.version &&
-    action.policy_version !== config.policy.version + 1
-  ) {
+  if (action.policy_version !== config.policy.version) {
     activity.event("warn", "policy_mismatch", "Action policy version mismatch.");
     return false;
   }

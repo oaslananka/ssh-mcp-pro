@@ -311,8 +311,20 @@ curl -sS -X PATCH "https://your-control-plane.example.com/api/agents/<agent-id>/
 ```
 
 or call the `update_agent_policy` tool from an admin-scoped connector. The
-control plane pushes a `policy.update` to the running agent within seconds; no
-restart is required.
+control plane sends a signed `policy.update` to the running agent; no restart
+is required when that update is accepted. For an updated policy, the control
+plane also resends a fresh signed snapshot when the agent reconnects, before
+its ready acknowledgement. An agent running the strict policy-version check
+rejects requests for any version it has not applied. The unsigned ready
+message itself never authorizes a policy change.
+
+Upgrade the control plane first, then the agents, before relying on this
+reconnect protection across a mixed-version fleet. The dashboard version is
+the server's configured version, not an acknowledgement that a particular
+agent saved it. Confirm the agent's local policy and activity log; an
+already-current agent can reject a resent snapshot as not newer without
+changing its policy. If the versions differ, investigate and reconnect the
+agent rather than increasing permissions to make an action work.
 
 > Do not edit `data/sshautomator.db` directly to change capabilities. The
 > database is an implementation detail; the API and tools are the supported
@@ -320,9 +332,11 @@ restart is required.
 
 ## Troubleshooting
 
-- **`shell.exec` denied / tool call fails**: the agent profile is too low.
-  Raise it with the policy API above. Read-only agents intentionally cannot
-  run shell commands, and a connection cannot grant itself more access.
+- **`shell.exec` denied / tool call fails**: verify the AI connection's scope,
+  device selection and the device's applied policy. Read-only agents
+  intentionally cannot run shell commands. Prefer the narrowest policy and
+  connection grant that supports the intended task; do not switch to Full
+  Admin just to resolve a denied request.
 - **Agent shows offline**: check the service
   (`systemctl --user status ssh-mcp-pro-agent` on Linux, the Scheduled Task on
   Windows) and that the device can reach the control plane URL over HTTPS.
