@@ -134,7 +134,7 @@ importers:
         specifier: ^4.10.3
         version: 4.11.0
       knip:
-        specifier: ^6.46.0
+        specifier: ^6.46.1
         version: 6.48.0
       parse5:
         specifier: 8.1.1
