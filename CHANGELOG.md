@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.1](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.19.0...ssh-mcp-pro-v1.19.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* **dashboard:** make device removal reliable and recoverable ([#395](https://github.com/oaslananka/ssh-mcp-pro/issues/395)) ([55d48cd](https://github.com/oaslananka/ssh-mcp-pro/commit/55d48cda9439136bdf6025d129766da91f6d7e7b))
+
 ## [1.19.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.18.0...ssh-mcp-pro-v1.19.0) (2026-11-25)
 
 
