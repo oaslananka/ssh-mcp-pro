@@ -164,7 +164,10 @@ async function requestLocalHttp(
   harness: Harness,
   headers: Record<string, string>,
   body: string,
-  options: { method?: "GET" | "POST" | "OPTIONS"; path?: "/mcp" | "/healthz" } = {},
+  options: {
+    method?: "GET" | "POST" | "OPTIONS";
+    path?: "/mcp" | "/healthz" | "/sse" | "/messages";
+  } = {},
 ): Promise<Response> {
   const address = harness.runtime.server.address();
   if (!address || typeof address === "string") {
@@ -689,11 +692,16 @@ describe("real HTTP server boundary", () => {
       expect(
         warning.mock.calls.filter(([message]) => message.includes("Legacy HTTP/SSE is deprecated")),
       ).toHaveLength(0);
-      for (const route of ["/sse", "/messages"]) {
-        const response = await fetch(standard.baseUrl + route, { headers: authorizedHeaders() });
-        expect(response.status).toBe(404);
-        await response.text();
-      }
+      const sse = await requestLocalHttp(standard, authorizedHeaders(), "", {
+        method: "GET",
+        path: "/sse",
+      });
+      expect(sse.status).toBe(404);
+      const messages = await requestLocalHttp(standard, authorizedHeaders(), "{}", {
+        method: "POST",
+        path: "/messages",
+      });
+      expect(messages.status).toBe(404);
       await closeHarness(standard);
       warning.mockClear();
       const compatible = await startHarness({ http: { enableLegacySse: true } });
