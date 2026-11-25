@@ -1,5 +1,6 @@
 import { Script, createContext } from "node:vm";
 import { describe, expect, test, vi } from "vitest";
+import { escape as escapeHtml } from "html-escaper";
 import { DASHBOARD_AI_CLIENT_SCRIPT } from "../../src/remote/web-dashboard-ai-client-script.js";
 import { DASHBOARD_AI_REMOVAL_SCRIPT } from "../../src/remote/web-dashboard-ai-removal-script.js";
 const active = {
@@ -48,12 +49,7 @@ function fixture() {
       { id: "agt_fixture", alias: "Fixture PC", isLiveConnected: true, profile: "read-only" },
     ],
     loadDevices: vi.fn().mockResolvedValue(true),
-    escapeHtml: (text: string) =>
-      String(text)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;"),
+    escapeHtml,
     fetch,
   });
   new Script(DASHBOARD_AI_CLIENT_SCRIPT + DASHBOARD_AI_REMOVAL_SCRIPT).runInContext(context);
