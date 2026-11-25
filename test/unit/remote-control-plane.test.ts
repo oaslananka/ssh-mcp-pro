@@ -6,6 +6,8 @@ import { Readable } from "node:stream";
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/server";
 import { describe, expect, vi, test } from "vitest";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
+import { OAuthClientValidator } from "../../src/remote/oauth-client-validator.js";
+import { readOnlyConsentScope } from "../../src/remote/oauth-consent-scopes.js";
 import {
   ensurePemKeyPair,
   generateEd25519PemKeyPair,
@@ -387,14 +389,9 @@ describe("remote control plane remote-agent contracts", () => {
       );
       const clientId = String(responseBody(registered).client_id);
       const requested = "hosts:read agents:read status:read files:write shell:exec";
-      const limitedScopes = plane.oauth as unknown as {
-        readOnlyConsentScope(requested: string): string | undefined;
-      };
-      expect(limitedScopes.readOnlyConsentScope("hosts:read")).toBeUndefined();
-      expect(limitedScopes.readOnlyConsentScope("files:write")).toBeUndefined();
-      expect(limitedScopes.readOnlyConsentScope(requested)).toBe(
-        "hosts:read agents:read status:read",
-      );
+      expect(readOnlyConsentScope("hosts:read")).toBeUndefined();
+      expect(readOnlyConsentScope("files:write")).toBeUndefined();
+      expect(readOnlyConsentScope(requested)).toBe("hosts:read agents:read status:read");
       for (const [mode, expected] of [
         ["read_only", "hosts:read agents:read status:read"],
         ["omitted", "hosts:read agents:read status:read"],
@@ -592,17 +589,9 @@ describe("remote control plane remote-agent contracts", () => {
               expiresAt: number;
             }
           >;
-          validateAuthorizeParams(
-            clientId: string,
-            redirectUri: string,
-            responseType: string,
-            codeChallenge: string,
-            codeChallengeMethod: string,
-            resource: string,
-            scope: string,
-          ): void;
         };
       };
+      const validator = new OAuthClientValidator(config, harness.store, () => {});
       harness.store.insertClient({
         id: "row_oauth",
         clientId: "cli_oauth",
@@ -615,7 +604,7 @@ describe("remote control plane remote-agent contracts", () => {
       });
 
       expect(() =>
-        harness.oauth.validateAuthorizeParams(
+        validator.validateAuthorizeParams(
           "missing",
           "http://localhost/callback",
           "code",
@@ -626,7 +615,7 @@ describe("remote control plane remote-agent contracts", () => {
         ),
       ).toThrow(expect.objectContaining({ code: "INVALID_CLIENT" }));
       expect(() =>
-        harness.oauth.validateAuthorizeParams(
+        validator.validateAuthorizeParams(
           "cli_cached_chatgpt",
           "https://chatgpt.com/connector/oauth/callback",
           "code",
@@ -640,9 +629,23 @@ describe("remote control plane remote-agent contracts", () => {
         clientId: "cli_cached_chatgpt",
         redirectUris: ["https://chatgpt.com/connector/oauth/callback"],
       });
+      for (const clientId of ["cli_", "cli_x!", "cli_\u00e9", "cli_x\n", "cli_x y"]) {
+        expect(() =>
+          validator.validateAuthorizeParams(
+            clientId,
+            "https://chatgpt.com/connector/oauth/callback",
+            "code",
+            "challenge",
+            "S256",
+            config.mcpResourceUrl,
+            "hosts:read",
+          ),
+        ).toThrow(expect.objectContaining({ code: "INVALID_CLIENT" }));
+        expect(harness.store.getClient(clientId)).toBeUndefined();
+      }
       // existing ChatGPT client presenting a new redirect_uri should be accepted and stored
       expect(() =>
-        harness.oauth.validateAuthorizeParams(
+        validator.validateAuthorizeParams(
           "cli_cached_chatgpt",
           "https://chatgpt.com/connectors/oauth/callback",
           "code",
@@ -661,7 +664,7 @@ describe("remote control plane remote-agent contracts", () => {
       });
       // existing ChatGPT client with a non-chatgpt redirect_uri must not be accepted
       expect(() =>
-        harness.oauth.validateAuthorizeParams(
+        validator.validateAuthorizeParams(
           "cli_cached_chatgpt",
           "https://evil.example/callback",
           "code",
@@ -672,7 +675,7 @@ describe("remote control plane remote-agent contracts", () => {
         ),
       ).toThrow(expect.objectContaining({ code: "INVALID_REDIRECT_URI" }));
       expect(() =>
-        harness.oauth.validateAuthorizeParams(
+        validator.validateAuthorizeParams(
           "cli_cached_evil",
           "https://evil.example/callback",
           "code",
@@ -683,7 +686,7 @@ describe("remote control plane remote-agent contracts", () => {
         ),
       ).toThrow(expect.objectContaining({ code: "INVALID_CLIENT" }));
       expect(() =>
-        harness.oauth.validateAuthorizeParams(
+        validator.validateAuthorizeParams(
           "cli_oauth",
           "https://evil.example/callback",
           "code",
@@ -694,7 +697,7 @@ describe("remote control plane remote-agent contracts", () => {
         ),
       ).toThrow(expect.objectContaining({ code: "INVALID_REDIRECT_URI" }));
       expect(() =>
-        harness.oauth.validateAuthorizeParams(
+        validator.validateAuthorizeParams(
           "cli_oauth",
           "http://localhost/callback",
           "token",
@@ -705,7 +708,7 @@ describe("remote control plane remote-agent contracts", () => {
         ),
       ).toThrow(expect.objectContaining({ code: "INVALID_CLIENT" }));
       expect(() =>
-        harness.oauth.validateAuthorizeParams(
+        validator.validateAuthorizeParams(
           "cli_oauth",
           "http://localhost/callback",
           "code",
@@ -716,7 +719,7 @@ describe("remote control plane remote-agent contracts", () => {
         ),
       ).toThrow(expect.objectContaining({ code: "PKCE_VALIDATION_FAILED" }));
       expect(() =>
-        harness.oauth.validateAuthorizeParams(
+        validator.validateAuthorizeParams(
           "cli_oauth",
           "http://localhost/callback",
           "code",
@@ -727,7 +730,7 @@ describe("remote control plane remote-agent contracts", () => {
         ),
       ).toThrow(expect.objectContaining({ code: "INVALID_TOKEN" }));
       expect(() =>
-        harness.oauth.validateAuthorizeParams(
+        validator.validateAuthorizeParams(
           "cli_oauth",
           "http://localhost/callback",
           "code",
