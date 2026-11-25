@@ -289,8 +289,11 @@ export class DashboardAuthHandler {
     res: ServerResponse,
   ): Promise<void> {
     const { code, nonce } = this.consumeWebAuthTransaction(req, "google");
-    // Nonce is guaranteed by consumeWebAuthTransaction for Google.
-    const googleUser = await fetchGoogleUserDirect(this.deps.config, code, nonce!);
+    // Keep the provider-specific nonce requirement explicit at the exchange boundary.
+    if (!nonce) {
+      throw safeError("INVALID_TOKEN", "Web login transaction missing or expired", 403);
+    }
+    const googleUser = await fetchGoogleUserDirect(this.deps.config, code, nonce);
     const user = this.deps.oauth.upsertGoogleUser(googleUser);
     this.completeWebAuth(res, user.id, "/oauth");
   }
