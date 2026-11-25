@@ -2,14 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { escape as escapeHtml } from "html-escaper";
 import { URL } from "node:url";
 import { hashSecret, id, nowIso, randomToken } from "./crypto.js";
-import {
-  asString,
-  isSafeRedirectUri,
-  readJsonOrForm,
-  redirect,
-  safeError,
-  scopeList,
-} from "./http-util.js";
+import { asString, readJsonOrForm, redirect, safeError } from "./http-util.js";
 import type { RemoteStore } from "./store.js";
 import type { ReviewerSessionHandler } from "./reviewer-session.js";
 import type {
@@ -17,14 +10,16 @@ import type {
   GitHubUser,
   GoogleUser,
   OAuthAuthorizationCode,
-  OAuthClient,
   RemoteConfig,
 } from "./types.js";
-import { REVIEWER_DEMO_SCOPES, REVIEWER_DEMO_USER_ID } from "./types.js";
+import { REVIEWER_DEMO_USER_ID } from "./types.js";
 import { continueBrowserNavigation } from "./oauth-browser-navigation.js";
-
-/** Minimal inspection grant available even when an AI client requests elevated scopes. */
-const READ_ONLY_CONSENT_SCOPES = REVIEWER_DEMO_SCOPES;
+import { OAuthClientValidator } from "./oauth-client-validator.js";
+import {
+  readOnlyConsentScope,
+  reviewerConsentScope,
+  resolveConsentScope,
+} from "./oauth-consent-scopes.js";
 
 /** Pending OAuth authorization transaction. */
 export interface PendingAuthorize {
@@ -48,14 +43,18 @@ type AuthorizationIdentity = {
 };
 
 export class OAuthAuthorizationFlow {
+  private readonly clientValidator: OAuthClientValidator;
+
   constructor(
     private readonly config: RemoteConfig,
     private readonly store: RemoteStore,
     private readonly authorizeTransactions: Map<string, PendingAuthorize>,
     private readonly reviewerSessions: ReviewerSessionHandler,
     private readonly identity: AuthorizationIdentity,
-    private readonly audit: (event: Omit<AuditEvent, "id" | "createdAt">) => void,
-  ) {}
+    audit: (event: Omit<AuditEvent, "id" | "createdAt">) => void,
+  ) {
+    this.clientValidator = new OAuthClientValidator(config, store, audit);
+  }
 
   private isReviewerEnabled(): boolean {
     return this.reviewerSessions.isEnabled();
@@ -72,21 +71,6 @@ export class OAuthAuthorizationFlow {
       .some((part) => part.trim() === `ssh_mcp_oauth_tx=${transactionId}`);
   }
 
-  /** A consent choice must never add scopes not requested by the client. */
-  private readOnlyConsentScope(requested: string): string | undefined {
-    const requestedScopes = scopeList(requested);
-    const readScopes = READ_ONLY_CONSENT_SCOPES.filter((entry) => requestedScopes.includes(entry));
-    return readScopes.length > 0 && readScopes.length < requestedScopes.length
-      ? readScopes.join(" ")
-      : undefined;
-  }
-
-  private reviewerConsentScope(requested: string): string | undefined {
-    const requestedScopes = scopeList(requested);
-    const reviewerScopes = REVIEWER_DEMO_SCOPES.filter((entry) => requestedScopes.includes(entry));
-    return reviewerScopes.length > 0 ? reviewerScopes.join(" ") : undefined;
-  }
-
   /** GET /oauth/authorize */
   async handleAuthorize(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const url = new URL(req.url ?? "/oauth/authorize", this.config.publicBaseUrl);
@@ -99,7 +83,7 @@ export class OAuthAuthorizationFlow {
     const resource = url.searchParams.get("resource") ?? this.config.mcpResourceUrl;
     const scope = url.searchParams.get("scope") ?? "hosts:read agents:read status:read logs:read";
 
-    this.validateAuthorizeParams(
+    this.clientValidator.validateAuthorizeParams(
       clientId,
       redirectUri,
       responseType,
@@ -121,7 +105,7 @@ export class OAuthAuthorizationFlow {
       expiresAt: Date.now() + this.config.authCodeTtlSeconds * 1000,
     };
     if (reviewerSession) {
-      const reviewerScope = this.reviewerConsentScope(scope);
+      const reviewerScope = reviewerConsentScope(scope);
       if (!reviewerScope) {
         throw safeError(
           "INVALID_SCOPE",
@@ -276,7 +260,7 @@ export class OAuthAuthorizationFlow {
     const transactionId = id("code");
     this.authorizeTransactions.set(transactionId, pending);
     const hostname = escapeHtml(new URL(redirectUri).hostname);
-    const readOnlyScope = reviewerSession ? pending.scope : this.readOnlyConsentScope(scope);
+    const readOnlyScope = reviewerSession ? pending.scope : readOnlyConsentScope(scope);
     const permissions = this.consentPermissions(
       reviewerSession,
       pending.scope,
@@ -344,17 +328,7 @@ export class OAuthAuthorizationFlow {
       this.approveReviewerConsent(req, res, pending, transactionId);
       return;
     }
-    const grantMode =
-      form.grant_mode ?? (this.readOnlyConsentScope(pending.scope) ? "read_only" : "requested");
-    if (grantMode === "read_only") {
-      const narrowed = this.readOnlyConsentScope(pending.scope);
-      if (!narrowed) {
-        throw safeError("INVALID_SCOPE", "Read-only consent is not available", 400);
-      }
-      pending.scope = narrowed;
-    } else if (grantMode !== "requested") {
-      throw safeError("INVALID_SCOPE", "Invalid access level", 400);
-    }
+    pending.scope = resolveConsentScope(pending.scope, form.grant_mode);
 
     if (provider === "google") {
       if (!this.config.googleClientId || !this.config.googleClientSecret) {
@@ -396,7 +370,7 @@ export class OAuthAuthorizationFlow {
     ) {
       throw safeError("FORBIDDEN", "Reviewer session is missing or expired", 403);
     }
-    const reviewerScope = this.reviewerConsentScope(pending.scope);
+    const reviewerScope = reviewerConsentScope(pending.scope);
     if (!reviewerScope) {
       throw safeError(
         "INVALID_SCOPE",
@@ -408,96 +382,6 @@ export class OAuthAuthorizationFlow {
     pending.approved = true;
     this.completeOAuthCallback(res, pending, userId);
     this.authorizeTransactions.delete(transactionId);
-  }
-
-  private validateAuthorizeParams(
-    clientId: string,
-    redirectUri: string,
-    responseType: string,
-    codeChallenge: string,
-    codeChallengeMethod: string,
-    resource: string,
-    scope: string,
-  ): void {
-    let client = this.store.getClient(clientId);
-    if (!client) {
-      client = this.restoreChatGptClient(clientId, redirectUri);
-    } else if (!client.redirectUris.includes(redirectUri)) {
-      client = this.addChatGptRedirectUri(client, redirectUri) ?? client;
-    }
-    if (!client) {
-      throw safeError("INVALID_CLIENT", "Unknown client_id");
-    }
-    if (!client.redirectUris.includes(redirectUri) || !isSafeRedirectUri(redirectUri)) {
-      throw safeError("INVALID_REDIRECT_URI", "redirect_uri is not registered");
-    }
-    if (responseType !== "code") {
-      throw safeError("INVALID_CLIENT", "response_type must be code");
-    }
-    if (!codeChallenge || codeChallengeMethod !== "S256") {
-      throw safeError("PKCE_VALIDATION_FAILED", "PKCE S256 is required");
-    }
-    if (resource !== this.config.mcpResourceUrl) {
-      throw safeError("INVALID_TOKEN", "resource must match MCP resource URL");
-    }
-    scopeList(scope);
-  }
-
-  private restoreChatGptClient(clientId: string, redirectUri: string): OAuthClient | undefined {
-    if (!/^cli_[A-Za-z0-9_-]+$/u.test(clientId) || !isSafeRedirectUri(redirectUri)) {
-      return undefined;
-    }
-
-    let url: URL;
-    try {
-      url = new URL(redirectUri);
-    } catch {
-      return undefined;
-    }
-    if (url.hostname !== "chatgpt.com" && url.hostname !== "chat.openai.com") {
-      return undefined;
-    }
-
-    const client: OAuthClient = {
-      id: id("clirow"),
-      clientId,
-      clientName: "Restored ChatGPT Connector",
-      redirectUris: [redirectUri],
-      grantTypes: ["authorization_code", "refresh_token"],
-      responseTypes: ["code"],
-      tokenEndpointAuthMethod: "none",
-      createdAt: nowIso(),
-    };
-    this.store.insertClient(client);
-    this.audit({
-      eventType: "oauth_client_restored",
-      severity: "info",
-      metadata: { client_id: client.clientId, redirect_uri_host: url.hostname },
-    });
-    return client;
-  }
-
-  private addChatGptRedirectUri(client: OAuthClient, redirectUri: string): OAuthClient | undefined {
-    if (!isSafeRedirectUri(redirectUri)) {
-      return undefined;
-    }
-    let url: URL;
-    try {
-      url = new URL(redirectUri);
-    } catch {
-      return undefined;
-    }
-    if (url.hostname !== "chatgpt.com" && url.hostname !== "chat.openai.com") {
-      return undefined;
-    }
-    const updatedUris = [...client.redirectUris, redirectUri];
-    this.store.updateClientRedirectUris(client.clientId, updatedUris);
-    this.audit({
-      eventType: "oauth_client_restored",
-      severity: "info",
-      metadata: { client_id: client.clientId, redirect_uri_host: url.hostname },
-    });
-    return { ...client, redirectUris: updatedUris };
   }
 
   /** Consume one-use OAuth transaction and preserve the associated PKCE request. */
