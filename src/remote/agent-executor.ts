@@ -1,16 +1,9 @@
-import { spawn } from "node:child_process";
 import { ManagedProcessRegistry } from "./agent-managed-process.js";
+import { runCommand, type AllowedExecutable, type ExecResult } from "./agent-command-runner.js";
 import { inspectComputerFile, manageComputerFile } from "./agent-file-operations.js";
 import { access } from "node:fs/promises";
 import os from "node:os";
-import {
-  appendBoundedOutput,
-  finalizeBoundedOutput,
-  readFileBounded,
-  readFilePageBounded,
-  readFileTailBounded,
-  type OutputAccumulator,
-} from "./agent-bounded-io.js";
+import { readFileBounded, readFilePageBounded, readFileTailBounded } from "./agent-bounded-io.js";
 import { isContainerAllowed, isServiceAllowed } from "./policy.js";
 import { searchAuthorizedFileNames, type FileSearchInput } from "./agent-file-search.js";
 import { searchAuthorizedFileContents, type ContentSearchInput } from "./agent-content-search.js";
@@ -27,14 +20,6 @@ import type {
   RemoteErrorCode,
 } from "./types.js";
 import { nowIso, randomToken, signEnvelope } from "./crypto.js";
-
-interface ExecResult {
-  exitCode: number;
-  stdout: string;
-  stderr: string;
-  truncated: boolean;
-  nextOffsetBytes?: number;
-}
 
 const SAFE_IDENTIFIER_PATTERN = /^[A-Za-z0-9_.@:-]{1,128}$/u;
 
@@ -102,94 +87,6 @@ function assertSafeIdentifier(value: string, label: string): void {
 
 function isLogFileTarget(target: string): boolean {
   return target.includes("/") || target.includes("\\") || /^[A-Za-z]:[\\/]/u.test(target);
-}
-
-type AllowedExecutable = "docker" | "journalctl" | "systemctl" | "powershell.exe" | "/bin/sh";
-
-function validateExecutable(command: string): AllowedExecutable {
-  switch (command) {
-    case "docker":
-      return "docker";
-    case "journalctl":
-      return "journalctl";
-    case "systemctl":
-      return "systemctl";
-    case "powershell.exe":
-      return "powershell.exe";
-    case "/bin/sh":
-      return "/bin/sh";
-    default:
-      throw Object.assign(new Error(`Command executable '${command}' is not permitted`), {
-        code: "POLICY_DENIED" as const,
-      });
-  }
-}
-
-function runCommand(
-  command: AllowedExecutable,
-  args: string[],
-  options: { cwd?: string | undefined; timeoutSeconds: number; maxOutputBytes: number },
-): Promise<ExecResult> {
-  const binary = validateExecutable(command);
-  return new Promise((resolve) => {
-    // codeql[js/command-line-injection]
-    const child = spawn(binary, args, {
-      cwd: options.cwd,
-      windowsHide: true,
-      detached: process.platform !== "win32",
-    });
-    const stdout: OutputAccumulator = { bytes: 0, chunks: [], truncated: false };
-    const stderr: OutputAccumulator = { bytes: 0, chunks: [], truncated: false };
-    let timedOut = false;
-    const timeout = setTimeout(() => {
-      timedOut = true;
-      if (process.platform !== "win32" && child.pid) {
-        try {
-          process.kill(-child.pid, "SIGTERM");
-        } catch {
-          child.kill("SIGTERM");
-        }
-        setTimeout(() => {
-          try {
-            if (child.pid) {
-              process.kill(-child.pid, "SIGKILL");
-            }
-          } catch {
-            child.kill("SIGKILL");
-          }
-        }, 1500).unref();
-      } else {
-        child.kill("SIGTERM");
-      }
-    }, options.timeoutSeconds * 1000);
-
-    child.stdout.on("data", (chunk: Buffer) =>
-      appendBoundedOutput(stdout, chunk, options.maxOutputBytes),
-    );
-    child.stderr.on("data", (chunk: Buffer) =>
-      appendBoundedOutput(stderr, chunk, options.maxOutputBytes),
-    );
-    child.on("close", (code) => {
-      clearTimeout(timeout);
-      const out = finalizeBoundedOutput(stdout, options.maxOutputBytes);
-      const err = finalizeBoundedOutput(stderr, options.maxOutputBytes);
-      resolve({
-        exitCode: timedOut ? 124 : (code ?? 0),
-        stdout: out.value.toString("utf8"),
-        stderr: err.value.toString("utf8"),
-        truncated: out.truncated || err.truncated,
-      });
-    });
-    child.on("error", (error) => {
-      clearTimeout(timeout);
-      resolve({
-        exitCode: 127,
-        stdout: "",
-        stderr: error.message,
-        truncated: false,
-      });
-    });
-  });
 }
 
 function managedResult(value: unknown): ExecResult {
