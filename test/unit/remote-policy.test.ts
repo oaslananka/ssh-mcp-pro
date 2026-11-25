@@ -61,6 +61,29 @@ describe("remote agent policy", () => {
     expect(isPathAllowed(policy, "/home/user/.ssh/id_ed25519")).toBe(false);
   });
 
+  test("root-only allow and deny rules distinguish the root from its descendants", () => {
+    const rootOnly = mergeCustomPolicy({ allowPaths: ["/"], denyPaths: [] });
+    expect(isPathAllowed(rootOnly, "/")).toBe(true);
+    expect(isPathAllowed(rootOnly, "/tmp")).toBe(false);
+    expect(isPathAllowed(rootOnly, "/tmp/..")).toBe(true);
+
+    const denyRoot = mergeCustomPolicy({ allowPaths: ["*"], denyPaths: ["/"] });
+    expect(isPathAllowed(denyRoot, "/")).toBe(false);
+    expect(isPathAllowed(denyRoot, "/tmp")).toBe(true);
+    expect(isPathAllowed(denyRoot, "relative.txt")).toBe(false);
+  });
+
+  test("explicit path prefixes match the directory itself without matching adjacent names", () => {
+    const policy = mergeCustomPolicy({
+      allowPaths: ["/srv/app"],
+      denyPaths: ["/srv/app/private"],
+    });
+    expect(isPathAllowed(policy, "/srv/app")).toBe(true);
+    expect(isPathAllowed(policy, "/srv/app/private")).toBe(false);
+    expect(isPathAllowed(policy, "/srv/app/private-backup")).toBe(true);
+    expect(isPathAllowed(policy, "/srv/application")).toBe(false);
+  });
+
   test("normalizes Windows drive paths case-insensitively while preserving deny prefixes", () => {
     const policy = mergeCustomPolicy({
       allowPaths: ["C:\\Agent\\Data"],

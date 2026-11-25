@@ -42,7 +42,11 @@ predictable while the mutation score is advisory.
 
 The CI mutation job is advisory while the score is calibrated. It runs on
 `schedule` and `workflow_dispatch`, uses `continue-on-error: true`, and uploads
-`reports/mutation` for review.
+`reports/mutation` for review. The summary counts actual per-file mutants, reports compile
+errors separately from the score, and rejects missing reports or zero-test
+killed/survived results as invalid evidence. A low score is still advisory.
+Stryker's core, Vitest runner and TypeScript checker are pinned together at a
+version supporting Vitest 5.
 
 Promotion criteria:
 

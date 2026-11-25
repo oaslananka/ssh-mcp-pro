@@ -43,9 +43,9 @@ describe("mutation testing gate", () => {
 
     expect(pkg.scripts["test:mutation"]).toBe("stryker run");
     expect(pkg.scripts["test:mutation:ci"]).toBe("stryker run");
-    expect(pkg.devDependencies["@stryker-mutator/core"]).toBe("9.6.1");
-    expect(pkg.devDependencies["@stryker-mutator/vitest-runner"]).toBe("9.6.1");
-    expect(pkg.devDependencies["@stryker-mutator/typescript-checker"]).toBe("9.6.1");
+    expect(pkg.devDependencies["@stryker-mutator/core"]).toBe("10.1.1");
+    expect(pkg.devDependencies["@stryker-mutator/vitest-runner"]).toBe("10.1.1");
+    expect(pkg.devDependencies["@stryker-mutator/typescript-checker"]).toBe("10.1.1");
   });
 
   test("keeps mutation scope focused on policy-critical modules", async () => {

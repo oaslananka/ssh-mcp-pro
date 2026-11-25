@@ -4,78 +4,80 @@ import { readFileSync, existsSync, appendFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { mutationScoreSymbol } from "./lib/maintenance-cli-input.mjs";
+import { summarizeMutationReport } from "./lib/mutation-report.mjs";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const reportPath = join(__dirname, "..", "reports", "mutation", "mutation.json");
-
-if (!existsSync(reportPath)) {
-  console.log(
-    "## Mutation Test Report\n\nNo mutation report found at `reports/mutation/mutation.json`.",
-  );
-  process.exit(0);
+const reportPath = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "reports",
+  "mutation",
+  "mutation.json",
+);
+function emit(output) {
+  if (process.env.GITHUB_STEP_SUMMARY)
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, output + "\n");
+  console.log(output);
 }
 
-const report = JSON.parse(readFileSync(reportPath, "utf-8"));
-
-const score = report.mutationScore ?? report.framework?.mutationScore ?? 0;
-const totalDetected = (report.killed ?? 0) + (report.timedOut ?? 0);
-const totalUndetected = (report.survived ?? 0) + (report.noCoverage ?? 0);
-const total = totalDetected + totalUndetected;
-const scoreFormatted = score.toFixed(1);
-
-const status = mutationScoreSymbol(score);
-
-const lines = [
-  "## Mutation Test Report",
-  "",
-  `**${status} Mutation Score: ${scoreFormatted}%**`,
-  "",
-  "| Metric | Count |",
-  "|---|---:|",
-  `| **Killed** | ${report.killed ?? 0} |`,
-  `| **Survived** | ${report.survived ?? 0} |`,
-  `| **Timed out** | ${report.timedOut ?? 0} |`,
-  `| **No coverage** | ${report.noCoverage ?? 0} |`,
-  `| **Total mutants** | ${total} |`,
-  "",
-];
-
-if (report.files && Object.keys(report.files).length > 0) {
-  lines.push(
+try {
+  if (!existsSync(reportPath)) throw new Error("No mutation report found");
+  const report = JSON.parse(readFileSync(reportPath, "utf8"));
+  const result = summarizeMutationReport(report);
+  const score = result.score === null ? "N/A" : result.score.toFixed(1) + "%";
+  const lines = [
+    "## Mutation Test Report",
+    "",
+    result.valid
+      ? "**" + mutationScoreSymbol(result.score) + " Mutation Score: " + score + "**"
+      : "**Invalid mutation evidence. Reported score: " + score + " (not a validated result).**",
+    "",
+    "| Metric | Count |",
+    "|---|---:|",
+    ...[
+      ["Killed", result.killed],
+      ["Survived", result.survived],
+      ["Timed out", result.timedOut],
+      ["No coverage", result.noCoverage],
+      ["Compile errors", result.compileErrors],
+      ["Runtime errors", result.runtimeErrors],
+      ["Ignored", result.ignored],
+      ["Pending", result.pending],
+      ["Zero-test killed/survived mutants", result.zeroTestMutants],
+      ["Completed tests", result.testsCompleted],
+      ["Total mutants", result.total],
+    ].map(([name, count]) => "| " + name + " | " + count + " |"),
+    "",
     "### Per-File Results",
     "",
-    "| File | Score | Killed | Survived |",
-    "|---|---:|---:|---:|",
-  );
-
-  for (const [filePath, fileResult] of Object.entries(report.files)) {
-    if (!fileResult) continue;
-    const fileScore = fileResult.mutationScore ?? 0;
-    const fileKilled = fileResult.killed ?? 0;
-    const fileSurvived = fileResult.survived ?? 0;
-    lines.push(`| \`${filePath}\` | ${fileScore.toFixed(1)}% | ${fileKilled} | ${fileSurvived} |`);
-  }
-  lines.push("");
-}
-
-if (report.thresholds) {
-  const thresholds = report.thresholds;
-  if (thresholds.high != null || thresholds.low != null || thresholds.break != null) {
+    "| File | Score | Killed | Survived | Total |",
+    "|---|---:|---:|---:|---:|",
+    ...result.files.map(
+      (f) =>
+        "| `" +
+        f.path +
+        "` | " +
+        (f.score === null ? "N/A" : f.score.toFixed(1) + "%") +
+        " | " +
+        f.killed +
+        " | " +
+        f.survived +
+        " | " +
+        f.total +
+        " |",
+    ),
+    "",
+  ];
+  if (report.thresholds) {
     lines.push("### Thresholds", "", "| Threshold | Value |", "|---|---:|");
-    if (thresholds.high != null) lines.push(`| High | ${thresholds.high} |`);
-    if (thresholds.low != null) lines.push(`| Low | ${thresholds.low} |`);
-    if (thresholds.break != null) lines.push(`| Break | ${thresholds.break} |`);
-    lines.push("");
+    for (const name of ["high", "low", "break"]) {
+      if (report.thresholds[name] != null)
+        lines.push("| " + name + " | " + report.thresholds[name] + " |");
+    }
   }
-}
-
-lines.push("---", "", "_Report generated from `reports/mutation/mutation.json`_", "");
-
-const output = lines.join("\n");
-
-if (process.env.GITHUB_STEP_SUMMARY) {
-  appendFileSync(process.env.GITHUB_STEP_SUMMARY, output + "\n");
-  console.log("Mutation summary appended to $GITHUB_STEP_SUMMARY");
-} else {
-  console.log(output);
+  lines.push("", "---", "", "_Report generated from `reports/mutation/mutation.json`_", "");
+  emit(lines.join("\n"));
+  if (!result.valid) process.exitCode = 1;
+} catch (error) {
+  emit("## Mutation Test Report\n\n**Invalid mutation evidence:** " + error.message);
+  process.exitCode = 1;
 }

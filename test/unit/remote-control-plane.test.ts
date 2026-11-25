@@ -1891,6 +1891,27 @@ describe("remote control plane remote-agent contracts", () => {
         status: 403,
       });
 
+      // The extra read permission applies to copies, not all write operations.
+      const writable = agentRecord({ id: "agt_writable_fixture", alias: "writable-fixture" });
+      writable.policy.capabilities["files.write"] = true;
+      harness.store.insertAgent(writable);
+      await expect(
+        harness.callRemoteTool(principal(["files.write"]), "file_manage", {
+          agent_id_or_alias: writable.alias,
+          operation: "mkdir",
+          path: "/tmp/fixture-directory",
+        }),
+      ).rejects.toMatchObject({ code: "AGENT_OFFLINE", status: 503 });
+
+      await expect(
+        harness.callRemoteTool(principal(["files.read", "files.write"]), "file_manage", {
+          agent_id_or_alias: writable.alias,
+          operation: "copy",
+          path: "/tmp/source.txt",
+          destination_path: "/tmp/copy.txt",
+        }),
+      ).rejects.toMatchObject({ code: "AGENT_OFFLINE", status: 503 });
+
       await expect(
         harness.callRemoteTool(principal(["system.read"]), "get_system_status", {
           agent_id_or_alias: agent.alias,
