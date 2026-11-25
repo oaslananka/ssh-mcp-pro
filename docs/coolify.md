@@ -28,6 +28,18 @@ Dashboard login callback URLs additionally use `/auth/callback/google` and `/aut
 
 Before deployment verify local OAuth login, dashboard and MCP flow. After deployment check health, login callbacks, device connectivity, and persistent state across a controlled restart. Do not run the SSH test fixture service in production.
 
+## Local data permissions
+
+On POSIX hosts the remote store creates new database files with owner-only
+permissions (`0600`) before SQLite initializes, and restricts existing database
+and SQLite sidecar files (`-wal`, `-shm`, `-journal`) when opening the store.
+New directories are created with `0700`; existing directories are not modified.
+Use a dedicated service-owned data directory that other users cannot modify or
+traverse. On a deployment using an existing volume, verify its ownership and
+access policy separately. A final-component symbolic link for the database or
+its sidecars is rejected: configure the actual file path instead. Windows
+operators must enforce the equivalent access policy using filesystem ACLs.
+
 ## Encrypted backup recovery gate
 
 Before changing the hosted image, validate a fresh offsite encrypted SQLite

@@ -1,8 +1,7 @@
-import { mkdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
-import path from "node:path";
 import { migrateRemoteStoreSchema } from "./store-schema.js";
+import { prepareRemoteStoreFile } from "./store-file-permissions.js";
 import {
   REVIEWER_DEMO_USER_ID,
   type ActionRecord,
@@ -88,10 +87,8 @@ export class RemoteStore {
 
   constructor(databaseUrl: string, options: RemoteStoreOptions = {}) {
     const filePath = dbPathFromUrl(databaseUrl);
-    if (filePath !== ":memory:") {
-      mkdirSync(path.dirname(path.resolve(filePath)), { recursive: true });
-    }
     const DatabaseSync = resolveDatabaseSync(options.loadSqlite);
+    if (filePath !== ":memory:") prepareRemoteStoreFile(filePath);
     this.db = new DatabaseSync(filePath);
     this.db.exec("PRAGMA foreign_keys = ON");
     migrateRemoteStoreSchema(this.db);
