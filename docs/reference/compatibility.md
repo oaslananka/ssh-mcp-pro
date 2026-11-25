@@ -36,7 +36,7 @@ installing the published package via npm/npx are unaffected — see
 | --- | --- |
 | stdio | Passed — default, used by all documented client configs |
 | Streamable HTTP | Passed — `http`/`--transport=http`, with the non-loopback safety gate described in [SECURITY_DECISIONS.md](../../SECURITY_DECISIONS.md) |
-| Legacy SSE | Partial — available behind `SSH_MCP_ENABLE_LEGACY_SSE` for compatibility, not the recommended path |
+| Legacy SSE | Deprecated - opt-in via `SSH_MCP_ENABLE_LEGACY_SSE`; see [migration guide](../../MIGRATION.md#migrate-legacy-httpsse-clients-to-streamable-http). Legacy Streamable HTTP remains supported |
 
 ## MCP client compatibility
 

@@ -15,6 +15,7 @@ import {
   type HttpServerRuntimeOptions,
 } from "../../src/server-http.js";
 import { loadRemoteConfig } from "../../src/remote/config.js";
+import { logger } from "../../src/logging.js";
 import type { RemoteConfig } from "../../src/remote/types.js";
 
 const allowedOrigin = "https://client.example";
@@ -679,6 +680,34 @@ describe("real HTTP server boundary", () => {
     expect(deleted.status).toBeLessThan(300);
     await deleted.text();
     expect(harness.runtime.sessionCount).toBe(0);
+  });
+
+  test("announces the legacy SSE migration only when the bridge is enabled", async () => {
+    const warning = vi.spyOn(logger, "warn");
+    try {
+      const standard = await startHarness();
+      expect(
+        warning.mock.calls.filter(([message]) => message.includes("Legacy HTTP/SSE is deprecated")),
+      ).toHaveLength(0);
+      for (const route of ["/sse", "/messages"]) {
+        const response = await fetch(standard.baseUrl + route, { headers: authorizedHeaders() });
+        expect(response.status).toBe(404);
+        await response.text();
+      }
+      await closeHarness(standard);
+      warning.mockClear();
+      const compatible = await startHarness({ http: { enableLegacySse: true } });
+      expect(
+        warning.mock.calls.filter(([message]) => message.includes("Legacy HTTP/SSE is deprecated")),
+      ).toEqual([[expect.stringContaining("/mcp")]]);
+      const legacy = await openLegacySse(compatible);
+      legacy.response.destroy();
+      expect(
+        warning.mock.calls.filter(([message]) => message.includes("Legacy HTTP/SSE is deprecated")),
+      ).toHaveLength(1);
+    } finally {
+      warning.mockRestore();
+    }
   });
 
   test("covers legacy SSE route boundaries and transport mismatch handling", async () => {

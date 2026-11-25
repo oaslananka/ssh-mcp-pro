@@ -231,7 +231,7 @@ All `SSH_MCP_*` environment variables parsed by `src/config.ts` are listed below
 | `SSH_MCP_HTTP_PORT` | `3000` | Streamable HTTP bind port. |
 | `SSH_MCP_HTTP_ALLOWED_ORIGINS` | `http://127.0.0.1,http://localhost` | Browser origins allowed for HTTP clients. |
 | `SSH_MCP_HTTP_BEARER_TOKEN_FILE` | unset | Bearer token file for HTTP transport. Required for non-loopback bearer deployments. |
-| `SSH_MCP_ENABLE_LEGACY_SSE` | `false` | Enables legacy SSE compatibility. |
+| `SSH_MCP_ENABLE_LEGACY_SSE` | `false` | Deprecated HTTP+SSE compatibility bridge; prefer Streamable HTTP at `/mcp`. See [migration guide](MIGRATION.md#migrate-legacy-httpsse-clients-to-streamable-http). |
 | `SSH_MCP_HTTP_MAX_REQUEST_BODY_BYTES` | `1048576` | Maximum HTTP request body size. |
 | `SSH_MCP_HTTP_MAX_SESSIONS` | `20` | Maximum active Streamable HTTP MCP sessions. Expired sessions are cleaned first; if capacity is still full, the oldest idle session is evicted so abandoned clients do not cause persistent 502s. Use `100` for ChatGPT/Cloudflare production deployments. |
 | `SSH_MCP_HTTP_SESSION_IDLE_TTL_MS` | `900000` | HTTP MCP session idle timeout in milliseconds. Use `300000` for ChatGPT/Cloudflare production deployments where clients may abandon sessions without DELETE. |
