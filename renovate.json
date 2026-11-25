@@ -188,9 +188,47 @@
         "runtime-risk",
         "requires-review"
       ]
+    },
+    {
+      "description": "Update all active pnpm toolchain pins together.",
+      "matchDatasources": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "pnpm"
+      ],
+      "groupName": "pnpm toolchain",
+      "groupSlug": "pnpm-toolchain"
     }
   ],
   "automerge": false,
   "automergeType": "pr",
-  "platformAutomerge": false
+  "platformAutomerge": false,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track active pnpm pins outside package.json.",
+      "managerFilePatterns": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/docs.yml",
+        ".github/workflows/mcp-registry.yml",
+        ".github/workflows/release.yml",
+        "CONTRIBUTING.md",
+        "Dockerfile",
+        "Dockerfile.coolify",
+        "Dockerfile.test",
+        "MIGRATION.md",
+        "README.md",
+        "docs/development/local-setup.md",
+        "docs/reference/compatibility.md",
+        "docs/tutorials/getting-started.md"
+      ],
+      "matchStrings": [
+        "(?:pnpm@|PNPM_VERSION:[ \\t]+|pnpm(?: must satisfy)?[ \\t]+`?\\^?)(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "pnpm",
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "npm"
+    }
+  ]
 }
