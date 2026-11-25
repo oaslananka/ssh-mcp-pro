@@ -179,6 +179,34 @@ export class RemoteOAuthStore {
     return Number(updated.changes) === 1;
   }
 
+  /** Remove a disconnected connection without touching shared client registrations or audit events. */
+  removeRevokedOAuthConnection(userId: string, connectionId: string): boolean {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const result = this.db
+        .prepare(
+          "DELETE FROM oauth_connections WHERE user_id = ? AND id = ? AND status = 'revoked'",
+        )
+        .run(userId, connectionId);
+      if (Number(result.changes) !== 1) {
+        this.db.exec("COMMIT");
+        return false;
+      }
+      // Device grants cascade; bound credentials must not remain in the client inventory.
+      this.db
+        .prepare("DELETE FROM oauth_refresh_tokens WHERE user_id = ? AND connection_id = ?")
+        .run(userId, connectionId);
+      this.db
+        .prepare("DELETE FROM oauth_authorization_codes WHERE user_id = ? AND connection_id = ?")
+        .run(userId, connectionId);
+      this.db.exec("COMMIT");
+      return true;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   listUserOAuthConnections(userId: string): Array<{
     id: string;
     clientId: string;

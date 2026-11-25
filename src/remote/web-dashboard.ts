@@ -13,6 +13,7 @@ import { serveAgentScript } from "./web-dashboard-static.js";
 import { createDashboardClientConfigs } from "./web-dashboard-client-config.js";
 import { buildDashboardEnrollmentCommands } from "./dashboard-enrollment-commands.js";
 import { DashboardAuthHandler } from "./web-dashboard-auth.js";
+import { handleAiConnectionMutation } from "./web-dashboard-ai-connection-routes.js";
 
 export interface WebDashboardDependencies {
   config: RemoteConfig;
@@ -145,12 +146,28 @@ export class WebDashboardHandler {
       return true;
     }
     if (pathname.startsWith("/api/dashboard/ai-connections/")) {
+      if (req.method === "DELETE") {
+        handleAiConnectionMutation(
+          this.deps,
+          this.getPrincipalFromSession(req),
+          res,
+          pathname,
+          "remove",
+        );
+        return true;
+      }
       if (req.method === "PUT" && pathname.endsWith("/devices")) {
         await this.handleApiSaveAiConnectionDevices(req, res, pathname);
         return true;
       }
       if (req.method === "POST" && pathname.endsWith("/disconnect")) {
-        this.handleApiDisconnectAiConnection(req, res, pathname);
+        handleAiConnectionMutation(
+          this.deps,
+          this.getPrincipalFromSession(req),
+          res,
+          pathname,
+          "disconnect",
+        );
         return true;
       }
     }
@@ -321,43 +338,6 @@ export class WebDashboardHandler {
       },
       addNoStore(),
     );
-  }
-
-  private handleApiDisconnectAiConnection(
-    req: IncomingMessage,
-    res: ServerResponse,
-    pathname: string,
-  ): void {
-    const principal = this.getPrincipalFromSession(req);
-    if (!principal) {
-      jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
-      return;
-    }
-    const connectionId = pathname.slice(
-      "/api/dashboard/ai-connections/".length,
-      -"/disconnect".length,
-    );
-    if (
-      !/^con_[a-f0-9]{32}$/.test(connectionId) ||
-      !this.deps.store.getOAuthConnection(principal.userId, connectionId)
-    ) {
-      jsonResponse(res, 404, { error: "AI connection not found" }, addNoStore());
-      return;
-    }
-    const revoked = this.deps.store.revokeOAuthConnection(
-      principal.userId,
-      connectionId,
-      new Date().toISOString(),
-    );
-    if (revoked) {
-      this.deps.audit({
-        userId: principal.userId,
-        eventType: "ai_connection_disconnected",
-        severity: "warn",
-        metadata: { connection_id: connectionId },
-      });
-    }
-    jsonResponse(res, 200, { disconnected: true }, addNoStore());
   }
 
   private handleApiUsage(req: IncomingMessage, res: ServerResponse): void {

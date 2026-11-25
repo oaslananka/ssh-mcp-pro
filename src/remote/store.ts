@@ -250,6 +250,10 @@ export class RemoteStore {
     return this.oauth.revokeOAuthConnection(userId, connectionId, now);
   }
 
+  removeRevokedOAuthConnection(userId: string, connectionId: string): boolean {
+    return this.oauth.removeRevokedOAuthConnection(userId, connectionId);
+  }
+
   listUserOAuthConnections(userId: string): Array<{
     id: string;
     clientId: string;

@@ -1,5 +1,6 @@
 import { DASHBOARD_DEVICE_MANAGEMENT_SCRIPT } from "./web-dashboard-device-management-script.js";
 import { DASHBOARD_PAGE_RENDER_SCRIPT } from "./web-dashboard-page-render-script.js";
+import { DASHBOARD_AI_REMOVAL_SCRIPT } from "./web-dashboard-ai-removal-script.js";
 import { DASHBOARD_AI_CLIENT_SCRIPT } from "./web-dashboard-ai-client-script.js";
 import { buildDashboardBrowserEnrollmentCommand } from "./dashboard-enrollment-commands.js";
 import { DASHBOARD_STYLES } from "./web-dashboard-styles.js";
@@ -55,6 +56,15 @@ ${AI_CLIENT_STYLES}</style>
       <button id="deviceActionConfirm" type="button" class="btn btn-danger" onclick="confirmDeviceAction()">Remove device</button>
     </div>
   </dialog>
+  <dialog id="aiRemoveDialog" class="device-action-dialog" aria-labelledby="aiRemoveTitle" aria-describedby="aiRemoveDescription">
+    <h2 id="aiRemoveTitle"></h2>
+    <p id="aiRemoveDescription">This permanently removes the disconnected connection record and its credentials. Your devices, other AI connections and audit history are unchanged.</p>
+    <p id="aiRemoveFeedback" role="alert" hidden></p>
+    <div class="device-dialog-actions">
+      <button id="aiRemoveCancel" type="button" class="btn btn-outline" onclick="cancelAiRemove()" autofocus>Cancel</button>
+      <button id="aiRemoveConfirm" type="button" class="btn btn-danger" onclick="confirmAiRemove()">Remove connection</button>
+    </div>
+  </dialog>
   <script>
     const INITIAL_USER = JSON.parse(atob("${initialUserBase64}"));
     const MCP_URL = ${mcpUrlJson};
@@ -80,6 +90,8 @@ ${AI_CLIENT_STYLES}</style>
     let aiClientsLoaded = false;
     let aiClientsError = '';
     let aiClientNotice = '';
+    let aiHistoryOpen = false;
+    let aiLoadGeneration = 0;
 
     ${DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT}
 
@@ -243,7 +255,7 @@ ${AI_CLIENT_STYLES}</style>
       document.querySelector('[data-dashboard-tab="' + tab + '"]')?.focus({ preventScroll: true });
     }
 
-${DASHBOARD_PAGE_RENDER_SCRIPT}${DASHBOARD_AI_CLIENT_SCRIPT}    function renderUsagePanel() {
+${DASHBOARD_PAGE_RENDER_SCRIPT}${DASHBOARD_AI_CLIENT_SCRIPT}${DASHBOARD_AI_REMOVAL_SCRIPT}    function renderUsagePanel() {
       if (!usageData) return '<div class="card" role="status">Loading usage…</div>';
       const n = value => new Intl.NumberFormat('en-US').format(Number(value || 0));
       const u = usageData.userUsage || usageData;
