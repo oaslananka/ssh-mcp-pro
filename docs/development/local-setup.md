@@ -19,10 +19,16 @@ task verify    # lint + format:check + typecheck + test + build
 
 ## What `pnpm run prepare` does
 
-Configures `core.hooksPath=.githooks` so pre-commit/pre-push hooks
-(`pnpm run hook:pre-commit`, `pnpm run hook:pre-push`) run automatically. This runs
-automatically after `pnpm install` via the `prepare` script — you don't need to invoke
-it manually unless hooks stop working.
+On a clone without a configured hook path, `prepare` sets the local
+`core.hooksPath=.githooks` so pre-commit/pre-push hooks run automatically.
+If Git already has an external hook provider configured (including inherited
+settings), `prepare` preserves it and prints instructions instead of silently
+overriding it. This runs automatically after `pnpm install`.
+
+With an external provider, configure it to call the repository's `.githooks`
+entrypoints where supported. Until both checks are chained, run `pnpm run check`
+and the pre-commit commands in CONTRIBUTING.md before submitting changes.
+CI requirements are unchanged.
 
 ## Docker-based integration tests
 

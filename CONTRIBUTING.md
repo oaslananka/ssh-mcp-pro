@@ -21,7 +21,7 @@ pnpm run build
 pnpm run prepare
 ```
 
-`pnpm run prepare` configures `core.hooksPath=.githooks` and makes the local Git hooks executable.
+`pnpm run prepare` installs local `.githooks` when Git has no configured hook path and makes the repository hooks executable. Existing external hook providers (including global settings) are preserved. In that case, configure the provider to invoke the repository hooks where supported, or run the repository checks manually as described below.
 
 ## Running Tests
 
