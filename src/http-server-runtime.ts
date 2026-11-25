@@ -37,6 +37,7 @@ import { createHttpServerLifecycle } from "./http-server-lifecycle.js";
 import { createHttpRequestHandler } from "./http-server-router.js";
 import { HttpSessionRegistry } from "./http-session-registry.js";
 import { toMcpWebRequest, sendMcpWebResponse } from "./mcp-http-web.js";
+import { readHttpJsonBody, httpErrorResponse } from "./http-json-body.js";
 
 type HttpTransport = NodeStreamableHTTPServerTransport | SSEServerTransport;
 
@@ -97,17 +98,6 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     },
   });
   let bearerToken: string | undefined;
-
-  class RequestBodyTooLargeError extends Error {
-    constructor() {
-      super("Request body is too large");
-    }
-  }
-  class InvalidJsonBodyError extends Error {
-    constructor() {
-      super("Invalid JSON body");
-    }
-  }
 
   function sendJson(
     req: IncomingMessage,
@@ -272,33 +262,6 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     return false;
   }
 
-  async function readJsonBody(req: IncomingMessage): Promise<unknown> {
-    const chunks: Buffer[] = [];
-    let size = 0;
-    for await (const chunk of req) {
-      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      size += buffer.byteLength;
-      if (size > httpConfig.maxRequestBodyBytes) {
-        throw new RequestBodyTooLargeError();
-      }
-      chunks.push(buffer);
-    }
-
-    if (chunks.length === 0) {
-      return undefined;
-    }
-
-    const raw = Buffer.concat(chunks).toString("utf8");
-    if (!raw) {
-      return undefined;
-    }
-    try {
-      return JSON.parse(raw) as unknown;
-    } catch {
-      throw new InvalidJsonBodyError();
-    }
-  }
-
   async function handleStreamableRequest(
     req: IncomingMessage,
     res: ServerResponse,
@@ -454,28 +417,6 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     return remoteControlPlane.handleHttp(req, res, pathname);
   }
 
-  function errorResponse(error: unknown): {
-    statusCode: number;
-    payload: Record<string, unknown>;
-  } {
-    if (error && typeof error === "object" && "status" in error && "message" in error) {
-      const status = Number((error as { status: number }).status);
-      const message = String((error as { message: string }).message);
-      const code = "code" in error ? String((error as { code: string }).code) : undefined;
-      return {
-        statusCode: Number.isFinite(status) ? status : 500,
-        payload: { error: message, code },
-      };
-    }
-    if (error instanceof RequestBodyTooLargeError) {
-      return { statusCode: 413, payload: { error: "Request body is too large" } };
-    }
-    if (error instanceof InvalidJsonBodyError) {
-      return { statusCode: 400, payload: { error: "Invalid JSON body" } };
-    }
-    return { statusCode: 500, payload: { error: "Internal server error" } };
-  }
-
   const handleHttpRequest = createHttpRequestHandler({
     endpoint,
     legacySseEndpoint,
@@ -488,11 +429,11 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     handleRemoteHttpRequest,
     protectedResourceMetadata,
     rejectIfUnauthorized,
-    readJsonBody,
+    readJsonBody: (req) => readHttpJsonBody(req, httpConfig.maxRequestBodyBytes),
     handleStreamableRequest,
     handleLegacySseConnection,
     handleLegacyMessage,
-    errorResponse,
+    errorResponse: httpErrorResponse,
     onError: (error) => {
       logger.error("HTTP MCP request failed", { error: userSafeError(error) });
     },
