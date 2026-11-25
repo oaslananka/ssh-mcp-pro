@@ -1,7 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { AgentConnectionLifecycle } from "./agent-connection-lifecycle.js";
-import { nowIso, verifyEnvelope } from "./crypto.js";
+import { nowIso, randomToken, signEnvelope, verifyEnvelope } from "./crypto.js";
 import {
   AGENT_NONCE_TTL_MS,
   isRecord,
@@ -15,6 +15,7 @@ import type {
   ActionRecord,
   ActionResultEnvelope,
   AgentHelloEnvelope,
+  PolicyUpdateEnvelope,
   AuditEvent,
   RemoteAgentRecord,
   RemoteConfig,
@@ -55,6 +56,7 @@ export class AgentWebSocketHandler {
     private readonly agentHelloNonces: Map<string, Map<string, number>>,
     private readonly pendingActions: Map<string, PendingAction>,
     private readonly audit: (event: Omit<AuditEvent, "id" | "createdAt">) => void,
+    private readonly controlPlaneSigningKey: string,
   ) {
     this.lifecycle = new AgentConnectionLifecycle(
       config,
@@ -230,7 +232,30 @@ export class AgentWebSocketHandler {
       severity: "info",
       metadata: {},
     });
+    // A disconnected agent may have missed one or more updates. The ready
+    // acknowledgement is not an authorization to apply a policy.
+    if (agent.policyVersion > 1) {
+      this.sendPolicyUpdate(agent, connection);
+    }
     connection.sendJson({ type: "agent.ready", agent_id: agent.id, policy: agent.policy });
+  }
+
+  /** Deliver an authoritative signed policy, using the existing wire format. */
+  sendPolicyUpdate(agent: RemoteAgentRecord, connection: WebSocketConnection): void {
+    const envelope: PolicyUpdateEnvelope = {
+      type: "policy.update",
+      agent_id: agent.id,
+      policy: agent.policy,
+      policy_version: agent.policyVersion,
+      issued_at: nowIso(),
+      nonce: randomToken(16),
+      signature: "",
+    };
+    envelope.signature = signEnvelope(
+      envelope as unknown as Record<string, unknown>,
+      this.controlPlaneSigningKey,
+    );
+    connection.sendJson(envelope);
   }
 
   private isStaleHello(hello: AgentHelloEnvelope): boolean {

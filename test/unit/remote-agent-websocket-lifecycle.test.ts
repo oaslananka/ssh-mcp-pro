@@ -139,6 +139,7 @@ function createHarness(overrides: Partial<RemoteConfig> = {}): TestHarness {
     new Map(),
     new Map(),
     (event) => audits.push(event),
+    generateEd25519PemKeyPair().privateKeyPem,
   );
   return {
     handler,

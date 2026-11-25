@@ -7,6 +7,7 @@ import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/server";
 import { describe, expect, vi, test } from "vitest";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
 import {
+  ensurePemKeyPair,
   generateEd25519PemKeyPair,
   issueAccessToken,
   loadJwtKeyPair,
@@ -14,6 +15,7 @@ import {
   randomToken,
   sha256Base64Url,
   signEnvelope,
+  verifyEnvelope,
 } from "../../src/remote/crypto.js";
 import { createAgentPolicy } from "../../src/remote/policy.js";
 import { capabilitiesFromScopes, parseScopes } from "../../src/remote/scopes.js";
@@ -1327,6 +1329,65 @@ describe("remote control plane remote-agent contracts", () => {
       } finally {
         uninitialized.close();
       }
+    } finally {
+      controlPlane.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("resends the current signed policy before ready on an authenticated reconnect", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "sshautomator-policy-reconnect-"));
+    const config = { ...testConfig(dir), databaseUrl: ":memory:" };
+    const controlPlane = new RemoteControlPlane(config);
+    try {
+      const keys = generateEd25519PemKeyPair();
+      const policy = { ...createAgentPolicy("read-only"), version: 3 };
+      const agent = {
+        ...agentRecord({
+          id: "agt_policy_reconnect",
+          alias: "policy-reconnect",
+          publicKey: keys.publicKeyPem,
+          status: "offline",
+        }),
+        profile: policy.profile,
+        policy,
+        policyVersion: policy.version,
+      };
+      controlPlane.store.insertAgent(agent);
+      const handler = controlPlane.agentHandler as unknown as {
+        handleAgentHello(connection: unknown, hello: unknown): Promise<void>;
+      };
+      const connection = { sendJson: vi.fn(), close: vi.fn(), onClose: vi.fn() };
+      const hello = {
+        type: "agent.hello",
+        agent_id: agent.id,
+        timestamp: nowIso(),
+        nonce: "nonce-policy-reconnect-000",
+        capabilities: ["system.read", "files.write"],
+        agent_version: "1.17.1",
+        host: { hostname: "fixture", os: "Linux", arch: "x64", platform: "linux" },
+        signature: "",
+      };
+      hello.signature = signEnvelope(hello, keys.privateKeyPem);
+      await handler.handleAgentHello(connection, hello);
+      const messages = connection.sendJson.mock.calls.map(
+        ([message]) => message as Record<string, unknown>,
+      );
+      expect(messages).toEqual([
+        expect.objectContaining({
+          type: "policy.update",
+          agent_id: agent.id,
+          policy_version: 3,
+          policy,
+        }),
+        expect.objectContaining({ type: "agent.ready", agent_id: agent.id }),
+      ]);
+      expect(
+        verifyEnvelope(
+          messages[0]!,
+          ensurePemKeyPair(config.controlPlaneSigningKeyPath).publicKeyPem,
+        ),
+      ).toBe(true);
     } finally {
       controlPlane.close();
       rmSync(dir, { recursive: true, force: true });

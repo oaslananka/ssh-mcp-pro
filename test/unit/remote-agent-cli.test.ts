@@ -859,6 +859,25 @@ describe("remote agent CLI", () => {
         action as unknown as Record<string, unknown>,
         controlPlaneKeys.privateKeyPem,
       );
+      const nextVersionAction: ActionRequestEnvelope = {
+        ...action,
+        action_id: "act_unapplied_policy",
+        policy_version: updatedPolicy.version + 1,
+        nonce: "nonce-action-unapplied-policy",
+        signature: "",
+      };
+      nextVersionAction.signature = signEnvelope(
+        nextVersionAction as unknown as Record<string, unknown>,
+        controlPlaneKeys.privateKeyPem,
+      );
+      socket?.onmessage?.({ data: JSON.stringify(nextVersionAction) });
+      await waitFor(
+        () =>
+          stdout.read().includes("Action policy version mismatch.") ||
+          (socket?.sent.length ?? 0) >= 2,
+      );
+      expect(socket?.sent).toHaveLength(1);
+
       const expiredAction: ActionRequestEnvelope = {
         ...action,
         action_id: "act_expired",

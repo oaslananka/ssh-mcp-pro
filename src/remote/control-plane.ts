@@ -52,7 +52,6 @@ import type {
   RemoteErrorCode,
   RemotePrincipal,
   RemoteToolName,
-  PolicyUpdateEnvelope,
 } from "./types.js";
 import { REVIEWER_DEMO_USER_ID, TOOL_CAPABILITY_MAP } from "./types.js";
 import { jsonResponse } from "./util.js";
@@ -94,6 +93,7 @@ export class RemoteControlPlane {
       this.agentHelloNonces,
       this.pendingActions,
       (event) => this.audit(event),
+      this.controlPlaneKeyPair.privateKeyPem,
     );
     this.enrollment = new AgentEnrollmentService(this.config, this.store, (event) =>
       this.audit(event),
@@ -774,20 +774,7 @@ export class RemoteControlPlane {
     this.store.updateAgent(updated);
     const live = this.agentConnections.get(agent.id);
     if (live) {
-      const envelope: PolicyUpdateEnvelope = {
-        type: "policy.update",
-        agent_id: agent.id,
-        policy,
-        policy_version: nextVersion,
-        issued_at: nowIso(),
-        nonce: randomToken(16),
-        signature: "",
-      };
-      envelope.signature = signEnvelope(
-        envelope as unknown as Record<string, unknown>,
-        this.controlPlaneKeyPair.privateKeyPem,
-      );
-      live.connection.sendJson(envelope);
+      this.agentHandler.sendPolicyUpdate(updated, live.connection);
     }
     this.audit({
       userId: principal.userId,
