@@ -145,7 +145,9 @@ async function waitUntil(predicate: () => boolean): Promise<void> {
 describe("remote control plane remote-agent contracts", () => {
   test("limits repeated public OAuth client registrations", async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "oauth-registration-"));
-    const cp = new RemoteControlPlane(testConfig(dir));
+    // This test exercises rate limiting, not disk persistence. Avoid contending for
+    // filesystem flushes when the Windows test suite runs in parallel.
+    const cp = new RemoteControlPlane({ ...testConfig(dir), databaseUrl: ":memory:" });
     await cp.initialize();
     try {
       for (let index = 0; index < 20; index++) {
