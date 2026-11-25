@@ -69,9 +69,13 @@ try {
   ];
   if (report.thresholds) {
     lines.push("### Thresholds", "", "| Threshold | Value |", "|---|---:|");
-    for (const name of ["high", "low", "break"]) {
-      if (report.thresholds[name] != null)
-        lines.push("| " + name + " | " + report.thresholds[name] + " |");
+    const { high, low, break: breakThreshold } = report.thresholds;
+    for (const [name, value] of [
+      ["high", high],
+      ["low", low],
+      ["break", breakThreshold],
+    ]) {
+      if (value != null) lines.push("| " + name + " | " + value + " |");
     }
   }
   lines.push("", "---", "", "_Report generated from `reports/mutation/mutation.json`_", "");

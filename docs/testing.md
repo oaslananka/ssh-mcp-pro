@@ -27,7 +27,8 @@ these tests with a coverage exclusion when adding routes or lifecycle branches.
 ## Mutation testing
 
 Mutation testing is configured for policy-critical security surfaces only. The
-line-range allowlist lives in `stryker.conf.mjs`. Exact source anchors resolve
+line-range allowlist lives in `scripts/mutation-targets.json`, resolved by
+`stryker.conf.mjs` against its fixed source-file allowlist. Exact source anchors resolve
 the ranges when configuration loads, and missing or duplicate anchors fail
 clearly instead of silently mutating the wrong lines. It covers the allow/deny
 branches in `src/policy.ts`, `src/safety.ts`, `src/config.ts`,

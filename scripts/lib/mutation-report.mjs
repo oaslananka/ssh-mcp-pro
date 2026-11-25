@@ -40,7 +40,22 @@ function scored(counts) {
   };
 }
 
-export function summarizeMutationReport(report) {
+function countMutants(mutants, path) {
+  const counts = emptyCounts();
+  for (const mutant of mutants) {
+    const key = statusKeys.get(mutant?.status);
+    if (!key) throw new Error("Unsupported mutant status in " + path);
+    counts[key]++;
+    counts.total++;
+    const completed = mutant.testsCompleted;
+    const ranTests = Number.isSafeInteger(completed) && completed > 0;
+    if (ranTests) counts.testsCompleted += completed;
+    else if (key === "killed" || key === "survived") counts.zeroTestMutants++;
+  }
+  return counts;
+}
+
+function reportFiles(report) {
   if (
     report?.schemaVersion !== "1.0" ||
     !report.files ||
@@ -49,25 +64,15 @@ export function summarizeMutationReport(report) {
   ) {
     throw new Error("Missing or unsupported mutation report schema");
   }
+  return Object.entries(report.files);
+}
+
+export function summarizeMutationReport(report) {
   const totals = emptyCounts();
   const files = [];
-  for (const [path, file] of Object.entries(report.files)) {
+  for (const [path, file] of reportFiles(report)) {
     if (!Array.isArray(file?.mutants)) throw new Error("Missing mutant list: " + path);
-    const counts = emptyCounts();
-    for (const mutant of file.mutants) {
-      const key = statusKeys.get(mutant?.status);
-      if (!key) throw new Error("Unsupported mutant status in " + path);
-      counts[key]++;
-      counts.total++;
-      const completed = mutant.testsCompleted;
-      if (Number.isSafeInteger(completed) && completed > 0) counts.testsCompleted += completed;
-      if (
-        (key === "killed" || key === "survived") &&
-        !(Number.isSafeInteger(completed) && completed > 0)
-      ) {
-        counts.zeroTestMutants++;
-      }
-    }
+    const counts = countMutants(file.mutants, path);
     for (const key of Object.keys(totals)) totals[key] += counts[key];
     files.push({ path, ...scored(counts) });
   }
