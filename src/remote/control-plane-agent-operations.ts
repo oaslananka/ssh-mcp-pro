@@ -15,12 +15,23 @@ import type {
   ActionResultEnvelope,
   AuditEvent,
   RemoteAgentRecord,
+  RemoteCapability,
   RemoteConfig,
   RemoteErrorCode,
   RemotePrincipal,
   RemoteToolName,
 } from "./types.js";
 import { REVIEWER_DEMO_USER_ID, TOOL_CAPABILITY_MAP } from "./types.js";
+
+const TOOL_CAPABILITIES = new Map<string, RemoteCapability>(Object.entries(TOOL_CAPABILITY_MAP));
+
+function requireKnownToolCapability(tool: RemoteToolName): RemoteCapability {
+  const capability = TOOL_CAPABILITIES.get(tool);
+  if (!capability) {
+    throw safeError("INVALID_SCOPE", "Unknown tool", 403);
+  }
+  return capability;
+}
 
 export class RemoteAgentOperations {
   constructor(
@@ -52,7 +63,7 @@ export class RemoteAgentOperations {
         403,
       );
     }
-    const capability = TOOL_CAPABILITY_MAP[tool];
+    const capability = requireKnownToolCapability(tool);
     if (!hasCapability(principal.capabilities, capability)) {
       throw safeError("INVALID_SCOPE", `Scope does not grant ${capability}`, 403);
     }
@@ -143,7 +154,7 @@ export class RemoteAgentOperations {
     }
 
     const agent = this.requireAgent(principal, args);
-    if (!agent.policy.capabilities[capability]) {
+    if (Object.getOwnPropertyDescriptor(agent.policy.capabilities, capability)?.value !== true) {
       this.audit({
         userId: principal.userId,
         agentId: agent.id,
@@ -162,7 +173,7 @@ export class RemoteAgentOperations {
     tool: RemoteToolName,
     args: Record<string, unknown>,
   ): ActionRecord["capability"] {
-    const capability = TOOL_CAPABILITY_MAP[tool];
+    const capability = requireKnownToolCapability(tool);
     if (!hasCapability(principal.capabilities, capability)) {
       throw safeError("INVALID_SCOPE", `Scope does not grant ${capability}`, 403);
     }
