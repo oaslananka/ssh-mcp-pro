@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, type Mock, vi, test } from "vitest";
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import fs from "fs";
 import { NodeSSH } from "node-ssh";
 import os from "os";
@@ -761,26 +761,68 @@ describe("SessionManager", () => {
     expect(manager.getActiveSessions()).toHaveLength(1);
   });
 
-  test("evicts oldest sessions and expires stale ones", async () => {
-    await manager.openSession({
-      host: "one",
-      username: "demo",
-      password: "secret",
-      auth: "password",
-      ttlMs: 5,
-    });
-    const second = await manager.openSession({
-      host: "two",
-      username: "demo",
-      password: "secret",
-      auth: "password",
-      ttlMs: 5,
-    });
-    const active = manager.getActiveSessions();
+  test("evicts the least recently used idle session when capacity is reached", async () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(100_000);
+    const open = (host: string) =>
+      manager.openSession({
+        host,
+        username: "demo",
+        auth: "password",
+        password: randomUUID(),
+      });
 
-    expect(active).toHaveLength(2);
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    const first = await open("first.example.test");
+    clock.mockReturnValue(100_001);
+    const second = await open("second.example.test");
+    clock.mockReturnValue(100_002);
+    expect(manager.getSession(first.sessionId)).toBeDefined();
+    clock.mockReturnValue(100_003);
+    const third = await open("third.example.test");
+
+    expect(manager.getActiveSessions().map((session) => session.sessionId)).toEqual([
+      first.sessionId,
+      third.sessionId,
+    ]);
+    expect(manager.hasManagedSession(second.sessionId)).toBe(false);
+    expect(NodeSSH.prototype.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  test("expires sessions at their exact TTL boundaries without wall-clock delays", async () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(100_000);
+    const open = (host: string) =>
+      manager.openSession({
+        host,
+        username: "demo",
+        auth: "password",
+        password: randomUUID(),
+        ttlMs: 5,
+      });
+
+    const first = await open("first.example.test");
+    clock.mockReturnValue(100_001);
+    const second = await open("second.example.test");
+    clock.mockReturnValue(100_004);
+    expect(manager.getActiveSessions().map((session) => session.sessionId)).toEqual([
+      first.sessionId,
+      second.sessionId,
+    ]);
+    expect(manager.getSession(first.sessionId)).toBeDefined();
+
+    clock.mockReturnValue(100_005);
+    expect(manager.getSession(first.sessionId)).toBeUndefined();
+    expect(manager.getActiveSessions().map((session) => session.sessionId)).toEqual([
+      second.sessionId,
+    ]);
+    expect(manager.getSession(second.sessionId)).toBeDefined();
+
+    clock.mockReturnValue(100_006);
     expect(manager.getSession(second.sessionId)).toBeUndefined();
+    expect(manager.getActiveSessions()).toHaveLength(0);
+    // Drain the asynchronous close operations without a timing-sensitive sleep.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(manager.hasManagedSession(first.sessionId)).toBe(false);
+    expect(manager.hasManagedSession(second.sessionId)).toBe(false);
+    expect(NodeSSH.prototype.dispose).toHaveBeenCalledTimes(2);
   });
 
   test("reconnects and checks session health", async () => {
@@ -1120,6 +1162,7 @@ describe("SessionManager", () => {
   });
 
   test("cleanup does not evict session with active operation", async () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(100_000);
     const result = await manager.openSession({
       host: "example.com",
       username: "demo",
@@ -1144,12 +1187,14 @@ describe("SessionManager", () => {
       auth: "password",
     });
 
+    clock.mockReturnValue(100_100);
     expect(manager.getSession(result.sessionId)).toBeDefined();
 
     manager.endOperation(result.sessionId);
   });
 
   test("cleanup evicts session after operation finishes and session expires", async () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(100_000);
     const result = await manager.openSession({
       host: "expire-after-op.example",
       username: "demo",
@@ -1160,7 +1205,7 @@ describe("SessionManager", () => {
 
     manager.beginOperation(result.sessionId);
 
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    clock.mockReturnValue(100_050);
 
     expect(manager.getSession(result.sessionId)).toBeDefined();
 
