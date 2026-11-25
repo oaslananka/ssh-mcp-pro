@@ -28,7 +28,7 @@ describe("supply-chain policy", () => {
     // All active build/user-entrypoint pins must match the package manifest.
     // The immutable v1.3.0 release-recovery workflow intentionally retains
     // its historical toolchain and is not part of the current-build list.
-    for (const file of [
+    const activeFiles = [
       "Dockerfile",
       "Dockerfile.coolify",
       "Dockerfile.test",
@@ -42,9 +42,47 @@ describe("supply-chain policy", () => {
       ".github/workflows/docs.yml",
       ".github/workflows/mcp-registry.yml",
       ".github/workflows/release.yml",
-    ]) {
-      expect(readText(file), `Current pnpm pin in ${file}`).toContain(pinnedVersion);
+    ];
+    const config = JSON.parse(readText("renovate.json")) as {
+      customManagers: Array<{
+        customType: string;
+        depNameTemplate: string;
+        datasourceTemplate: string;
+        managerFilePatterns: string[];
+        matchStrings: string[];
+      }>;
+      packageRules: Array<{
+        matchPackageNames?: string[];
+        matchDatasources?: string[];
+        groupSlug?: string;
+      }>;
+    };
+    const manager = config.customManagers.find((entry) => entry.depNameTemplate === "pnpm");
+    expect(manager).toBeDefined();
+    if (!manager || !pinnedVersion) throw new Error("Missing pnpm manager or pin");
+    expect(manager.customType).toBe("regex");
+    expect(manager.datasourceTemplate).toBe("npm");
+    expect([...manager.managerFilePatterns].sort()).toEqual([...activeFiles].sort());
+    for (const file of activeFiles) {
+      const source = readText(file);
+      expect(source, `Current pnpm pin in ${file}`).toContain(pinnedVersion);
+      const versions = manager.matchStrings.flatMap((pattern) =>
+        [...source.matchAll(new RegExp(pattern, "gu"))].map((match) => match.groups?.currentValue),
+      );
+      expect(versions.length, file).toBeGreaterThan(0);
+      expect(
+        versions.every((pin) => pin === pinnedVersion),
+        file,
+      ).toBe(true);
+      expect(versions.length, file).toBe(source.split(pinnedVersion).length - 1);
     }
+    expect(config.packageRules).toContainEqual(
+      expect.objectContaining({
+        matchPackageNames: ["pnpm"],
+        matchDatasources: ["npm"],
+        groupSlug: "pnpm-toolchain",
+      }),
+    );
 
     const dockerfile = readText("Dockerfile");
     const supportedVersionDocs = [
