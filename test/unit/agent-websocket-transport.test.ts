@@ -22,7 +22,7 @@ describe("agent WebSocket transport boundary", () => {
   });
 
   test.each([
-    ["https://agent.example.test", "ws://agent.example.test/socket"],
+    ["https://127.0.0.1", "ws://127.0.0.1/socket"],
     ["http://agent.example.test", "wss://agent.example.test/socket"],
     ["https://agent.example.test", "wss://other.example.test/socket"],
     ["https://agent.example.test:8443", "wss://agent.example.test/socket"],
@@ -32,7 +32,7 @@ describe("agent WebSocket transport boundary", () => {
     ["https://agent.example.test", "wss://user:password@agent.example.test/socket"],
     ["https://agent.example.test", "wss://agent.example.test/socket?query=1"],
     ["https://agent.example.test", "wss://agent.example.test/socket#fragment"],
-    ["ftp://agent.example.test", "ws://agent.example.test/socket"],
+    ["ftp://127.0.0.1", "ws://127.0.0.1/socket"],
     ["invalid", "wss://agent.example.test/socket"],
     ["https://agent.example.test", "/socket"],
   ])("rejects mismatched or invalid destination %s -> %s", (server, destination) => {
