@@ -121,10 +121,10 @@ describe("account-scoped AI OAuth clients dashboard", () => {
         ),
       ).rejects.toMatchObject({ status: 403 });
 
-      const post = async (url: string, session: string) => {
+      const post = async (url: string, session: string, method = "POST") => {
         const res = captureResponse();
         await cp.handleHttp(
-          request("POST", url, {
+          request(method, url, {
             cookie: "ssh_mcp_web_session=" + session,
             origin: "http://127.0.0.1:3000",
             "x-ssh-mcp-dashboard": "1",
@@ -138,6 +138,12 @@ describe("account-scoped AI OAuth clients dashboard", () => {
       expect(
         (await post("/api/dashboard/ai-clients/client_bobonly/revoke", dashboardA)).statusCode,
       ).toBe(404);
+      const removeEndpoint = "/api/dashboard/ai-clients/client_shared";
+      expect(alice[0].canRemove).toBe(false);
+      expect((await post(removeEndpoint, dashboardA, "DELETE")).statusCode).toBe(409);
+      expect(
+        (await post("/api/dashboard/ai-clients/client_bobonly", dashboardA, "DELETE")).statusCode,
+      ).toBe(404);
       const revoked = await post(endpoint, dashboardA);
       expect(revoked.statusCode).toBe(200);
       expect(JSON.parse(revoked.body)).toEqual({ revokedRefreshTokens: 1 });
@@ -150,6 +156,51 @@ describe("account-scoped AI OAuth clients dashboard", () => {
       expect(JSON.parse((await post(endpoint, dashboardA)).body)).toEqual({
         revokedRefreshTokens: 0,
       });
+      expect(JSON.parse((await getClients(dashboardA)).body).clients[0].canRemove).toBe(true);
+      const connection = cp.store.createOAuthConnection("github:101", "client_shared", now);
+      expect(JSON.parse((await getClients(dashboardA)).body).clients[0].canRemove).toBe(false);
+      expect((await post(removeEndpoint, dashboardA, "DELETE")).statusCode).toBe(409);
+      cp.store.revokeOAuthConnection("github:101", connection, now);
+      const pendingCode = hashSecret(randomToken(32));
+      cp.store.insertAuthorizationCode({
+        id: "pending",
+        codeHash: pendingCode,
+        clientId: "client_shared",
+        userId: "github:101",
+        redirectUri: "https://chatgpt.com/oauth/callback",
+        codeChallenge: "synthetic-challenge",
+        codeChallengeMethod: "S256",
+        resource: "http://127.0.0.1:3000/mcp",
+        scope: "hosts:read",
+        expiresAt: future,
+        createdAt: now,
+      });
+      expect(JSON.parse((await getClients(dashboardA)).body).clients[0].canRemove).toBe(false);
+      expect((await post(removeEndpoint, dashboardA, "DELETE")).statusCode).toBe(409);
+      await post(endpoint, dashboardA);
+      await expect(
+        cp.handleHttp(
+          request("DELETE", removeEndpoint, { cookie: "ssh_mcp_web_session=" + dashboardA }),
+          captureResponse() as unknown as ServerResponse,
+          removeEndpoint,
+        ),
+      ).rejects.toMatchObject({ status: 403 });
+      const removed = await post(removeEndpoint, dashboardA, "DELETE");
+      expect(removed.statusCode).toBe(200);
+      expect(JSON.parse(removed.body)).toEqual({ removed: true, clientId: "client_shared" });
+      expect(JSON.parse((await getClients(dashboardA)).body).clients).toEqual([]);
+      expect(cp.store.getClient("client_shared")).toBeDefined();
+      expect(cp.store.getOAuthConnection("github:101", connection)?.status).toBe("revoked");
+      expect(cp.store.getRefreshTokenByHash(hashSecret(tokenA))).toBeUndefined();
+      expect(cp.store.getAuthorizationCodeByHash(codeA)).toBeUndefined();
+      expect(cp.store.getAuthorizationCodeByHash(pendingCode)).toBeUndefined();
+      expect(cp.store.getRefreshTokenByHash(hashSecret(tokenB))?.revokedAt).toBeUndefined();
+      expect(cp.store.getAuthorizationCodeByHash(codeB)).toBeDefined();
+      expect(JSON.parse((await getClients(dashboardB)).body).clients).toHaveLength(2);
+      expect((await post(removeEndpoint, dashboardA, "DELETE")).statusCode).toBe(404);
+      expect(
+        cp.store.listAudit("github:101", undefined, 20).map((event) => event.eventType),
+      ).toContain("oauth_client_history_removed");
       expect(
         cp.store
           .listAudit("github:101", undefined, 20)

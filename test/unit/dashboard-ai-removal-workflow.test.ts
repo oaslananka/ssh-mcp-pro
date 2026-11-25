@@ -24,6 +24,7 @@ function fixture() {
   const elements = {
     aiRemoveDialog: { showModal: vi.fn(), close: vi.fn() },
     aiRemoveTitle: button(),
+    aiRemoveDescription: button(),
     aiRemoveFeedback: button(),
     aiRemoveConfirm: button(),
     aiRemoveCancel: button(),
@@ -40,6 +41,8 @@ function fixture() {
     aiClientsLoaded: true,
     aiClientsError: "",
     aiHistoryOpen: false,
+    aiOAuthOpen: false,
+    aiOAuthHistoryOpen: false,
     aiLoadGeneration: 0,
     aiClientNotice: "",
     strictVisibilityEnabled: true,
@@ -122,6 +125,47 @@ describe("AI connection removal in the dashboard", () => {
     expect(f.fetch).toHaveBeenCalledTimes(2);
     expect(f.context.aiClientNotice).toContain("no longer in your connection list");
     expect(f.elements.aiRemoveDialog.close).toHaveBeenCalledOnce();
+  });
+
+  test("removes inactive OAuth history only, while retaining active client and connection", async () => {
+    const f = fixture();
+    const oldClient = {
+      clientId: "cli_old",
+      clientName: "Google",
+      activeGrants: 0,
+      canRemove: true,
+    };
+    const liveClient = {
+      clientId: "cli_active",
+      clientName: "ChatGPT",
+      activeGrants: 1,
+      canRemove: false,
+    };
+    f.context.aiClientsList = [oldClient, liveClient];
+    const page = f.run<string>("renderAiClientsPanel()");
+    expect(page).toContain("Inactive OAuth history (1)");
+    expect(page).toContain('data-client-id="cli_old"');
+    expect(page).not.toContain('data-client-id="cli_active"');
+    f.run("openOAuthRemoveDialog('cli_active')");
+    expect(f.elements.aiRemoveDialog.showModal).not.toHaveBeenCalled();
+    f.run("openOAuthRemoveDialog('cli_old')");
+    expect(f.elements.aiRemoveTitle.textContent).toBe("Remove Google OAuth history?");
+    f.fetch.mockResolvedValueOnce(Response.json({ removed: true, clientId: oldClient.clientId }));
+    f.fetch.mockResolvedValueOnce(
+      Response.json({
+        clients: [liveClient],
+        connections: [active, revoked],
+        strictVisibility: true,
+      }),
+    );
+    await f.run<Promise<void>>("confirmAiRemove()");
+    expect(f.fetch).toHaveBeenNthCalledWith(1, "/api/dashboard/ai-clients/cli_old", {
+      method: "DELETE",
+      headers: { "X-SSH-MCP-Dashboard": "1" },
+    });
+    expect(f.context.aiClientsList).toEqual([liveClient]);
+    expect(f.context.aiConnectionsList).toEqual([active, revoked]);
+    expect(f.elements.tabContent.innerHTML).not.toContain("Inactive OAuth history");
   });
 
   test("rejects stale inventory and locks duplicate confirmations", async () => {

@@ -13,7 +13,10 @@ import { serveAgentScript } from "./web-dashboard-static.js";
 import { createDashboardClientConfigs } from "./web-dashboard-client-config.js";
 import { buildDashboardEnrollmentCommands } from "./dashboard-enrollment-commands.js";
 import { DashboardAuthHandler } from "./web-dashboard-auth.js";
-import { handleAiConnectionMutation } from "./web-dashboard-ai-connection-routes.js";
+import {
+  handleAiClientMutation,
+  handleAiConnectionMutation,
+} from "./web-dashboard-ai-connection-routes.js";
 
 export interface WebDashboardDependencies {
   config: RemoteConfig;
@@ -137,13 +140,17 @@ export class WebDashboardHandler {
       this.handleApiAiClients(req, res);
       return true;
     }
-    if (
-      pathname.startsWith("/api/dashboard/ai-clients/") &&
-      pathname.endsWith("/revoke") &&
-      req.method === "POST"
-    ) {
-      this.handleApiRevokeAiClient(req, res, pathname);
-      return true;
+    if (pathname.startsWith("/api/dashboard/ai-clients/")) {
+      if (req.method === "DELETE" || (req.method === "POST" && pathname.endsWith("/revoke"))) {
+        handleAiClientMutation(
+          this.deps,
+          this.getPrincipalFromSession(req),
+          res,
+          pathname,
+          req.method === "DELETE" ? "remove" : "revoke",
+        );
+        return true;
+      }
     }
     if (pathname.startsWith("/api/dashboard/ai-connections/")) {
       if (req.method === "DELETE") {
@@ -246,42 +253,6 @@ export class WebDashboardHandler {
       },
       addNoStore(),
     );
-  }
-
-  private handleApiRevokeAiClient(
-    req: IncomingMessage,
-    res: ServerResponse,
-    pathname: string,
-  ): void {
-    const principal = this.getPrincipalFromSession(req);
-    if (!principal) {
-      jsonResponse(res, 401, { error: "Authentication required" }, addNoStore());
-      return;
-    }
-    const clientId = pathname.slice("/api/dashboard/ai-clients/".length, -"/revoke".length);
-    // Registered IDs are server-generated and never contain a slash.
-    if (!/^[a-zA-Z0-9_-]{1,160}$/u.test(clientId)) {
-      jsonResponse(res, 404, { error: "AI client not found" }, addNoStore());
-      return;
-    }
-    const revoked = this.deps.store.revokeUserOAuthClientGrants(
-      principal.userId,
-      clientId,
-      new Date().toISOString(),
-    );
-    if (revoked === undefined) {
-      jsonResponse(res, 404, { error: "AI client not found" }, addNoStore());
-      return;
-    }
-    if (revoked > 0) {
-      this.deps.audit({
-        userId: principal.userId,
-        eventType: "oauth_client_grants_revoked",
-        severity: "warn",
-        metadata: { client_id: clientId, revoked_refresh_tokens: revoked },
-      });
-    }
-    jsonResponse(res, 200, { revokedRefreshTokens: revoked }, addNoStore());
   }
 
   private async handleApiSaveAiConnectionDevices(
