@@ -15,9 +15,13 @@ instead of requiring a tour of five config files.
 | Commit messages | [.commitlintrc.json](../../.commitlintrc.json) | see [commit-conventions.md](commit-conventions.md) |
 | Documentation prose | [scripts/check-doc-language.mjs](../../scripts/check-doc-language.mjs) | `pnpm run check:doc-language` |
 
-Run everything at once with `pnpm run check:maintainability` (module size + circular
-deps + actionable unused-file/dependency checks) or `pnpm run check:quality` (formatting, lint, typecheck, audit,
-licenses, and more — see [CONTRIBUTING.md](../../CONTRIBUTING.md) for the full gate).
+Run the complete non-packaging gate with `pnpm run check:quality`, including
+formatting, lint, typecheck, audit, licenses and maintainability. The required CI
+Quality Gates job runs this same command. For focused checks, use
+`pnpm run check:maintainability` (module size, circular dependencies and actionable
+unused files/dependencies). Module size warns above 400 lines and fails above 600
+lines for source TypeScript files (excluding tests and declarations).
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for the full gate.
 
 ## Security-sensitive code
 

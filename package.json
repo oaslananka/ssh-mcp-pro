@@ -96,7 +96,7 @@
     "check:circular": "depcruise src --config .dependency-cruiser.mjs",
     "check:module-size": "node scripts/check-module-size.mjs",
     "check:maintainability": "pnpm run check:module-size && pnpm run check:circular && pnpm run check:knip",
-    "check:quality": "pnpm run format:check && pnpm run check:doc-language && pnpm run check:package-scripts && pnpm run check:rulesets && pnpm run verify:actions-runtime && pnpm run lint && pnpm run typecheck && pnpm run audit && pnpm run licenses:check",
+    "check:quality": "pnpm run format:check && pnpm run check:doc-language && pnpm run check:package-scripts && pnpm run check:rulesets && pnpm run verify:actions-runtime && pnpm run lint && pnpm run typecheck && pnpm run audit && pnpm run licenses:check && pnpm run check:maintainability",
     "check:package": "pnpm run build && pnpm run sync-version -- --check && pnpm run validate:mcp-metadata && pnpm run validate:chatgpt-app && pnpm run validate:claude-connector && pnpm run validate:google-app && pnpm run docs:check && pnpm run pack:check && pnpm run pack:install-smoke && pnpm run audit:packed",
     "check:push": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm test",
     "check": "pnpm run check:quality && pnpm run test:coverage && pnpm run check:package",
