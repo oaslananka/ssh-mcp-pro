@@ -82,7 +82,8 @@ def verify(encrypted, identity, *options):
         [sys.executable, str(VERIFIER), "--archive", str(encrypted), "--identity", str(identity), *options],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20,
     )
-    return outcome.returncode, json.loads(outcome.stdout.decode()), outcome.stderr
+    data = json.loads(outcome.stdout.decode()) if outcome.stdout else None
+    return outcome.returncode, data, outcome.stderr
 
 
 class OfflineRestoreVerifierTests(unittest.TestCase):
@@ -139,14 +140,11 @@ class OfflineRestoreVerifierTests(unittest.TestCase):
             archive, identity = fixture(pathlib.Path(tmp))
             for capacity in ("0", "1025"):
                 with self.subTest(capacity=capacity):
-                    outcome = subprocess.run(  # nosec B603 - fixed verifier and synthetic input
-                        [sys.executable, str(VERIFIER), "--archive", str(archive),
-                         "--identity", str(identity), "--max-backup-mib", capacity],
-                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20,
-                    )
-                    self.assertNotEqual(outcome.returncode, 0)
-                    self.assertIn(b"128", outcome.stderr)
-                    self.assertIn(b"1024", outcome.stderr)
+                    code, data, stderr = verify(archive, identity, "--max-backup-mib", capacity)
+                    self.assertEqual(code, 2)
+                    self.assertIsNone(data)
+                    self.assertIn(b"128", stderr)
+                    self.assertIn(b"1024", stderr)
 
     def test_wrong_identity(self):
         with tempfile.TemporaryDirectory() as tmp:
