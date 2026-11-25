@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.2](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.19.1...ssh-mcp-pro-v1.19.2) (2026-11-25)
+
+
+### Bug Fixes
+
+* **dashboard:** allow removal of disconnected AI connections ([#398](https://github.com/oaslananka/ssh-mcp-pro/issues/398)) ([0420b1e](https://github.com/oaslananka/ssh-mcp-pro/commit/0420b1e072484151643d67f7be74a9e3e1935578))
+
 ## [1.19.1](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.19.0...ssh-mcp-pro-v1.19.1) (2026-11-25)
 
 
