@@ -149,7 +149,23 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile --ignore-scripts
 
+      - name: Ensure encrypted backup test tools
+        if: ${{ matrix.node_major == 24 }}
+        run: |
+          set -euo pipefail
+          if ! test -x /usr/bin/age || ! command -v age-keygen >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install --no-install-recommends -y age
+          fi
+          test -x /usr/bin/age
+          test -x /usr/bin/openssl
+          for tool in python3 openssl age age-keygen; do
+            command -v "$tool"
+          done
+
       - name: Unit coverage
+        env:
+          SSH_MCP_REQUIRE_BACKUP_TESTS: ${{ matrix.node_major == 24 }}
         run: pnpm run test:coverage
 
       - name: Upload JUnit results
