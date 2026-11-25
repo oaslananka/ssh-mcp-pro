@@ -1830,6 +1830,20 @@ describe("remote control plane remote-agent contracts", () => {
       };
       harness.store.insertAgent(agent);
 
+      for (const tool of ["constructor", "__proto__", "toString", "unknown_fixture_tool"]) {
+        await expect(
+          harness.callRemoteTool(principal(["system.read"]), tool, {}),
+        ).rejects.toMatchObject({ code: "INVALID_SCOPE", message: "Unknown tool" });
+      }
+      const malformed = agentRecord({ id: "agt_malformed", alias: "malformed" });
+      malformed.policy.capabilities["system.read"] = "false" as unknown as boolean;
+      harness.store.insertAgent(malformed);
+      await expect(
+        harness.callRemoteTool(principal(["system.read"]), "get_system_status", {
+          agent_id_or_alias: malformed.alias,
+        }),
+      ).rejects.toMatchObject({ code: "CAPABILITY_DENIED", status: 403 });
+
       await expect(
         harness.callRemoteTool(principal(["agents.admin"]), "create_enrollment_token", {}),
       ).rejects.toMatchObject({
