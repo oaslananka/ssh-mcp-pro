@@ -38,6 +38,17 @@ describe("package script entrypoints", () => {
     expect(missing).toEqual([]);
   });
 
+  test("enforces maintainability in the required quality script chain", () => {
+    const { scripts } = readPackageJson();
+    expect(scripts["check:quality"].split(" && ")).toContain("pnpm run check:maintainability");
+    expect(scripts["check:maintainability"].split(" && ")).toEqual([
+      "pnpm run check:module-size",
+      "pnpm run check:circular",
+      "pnpm run check:knip",
+    ]);
+    expect(scripts.check.split(" && ")).toContain("pnpm run check:quality");
+  });
+
   test("remove obsolete undocumented helper commands", () => {
     const packageJson = readPackageJson();
     const contributing = readText("CONTRIBUTING.md");

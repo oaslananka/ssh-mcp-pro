@@ -67,7 +67,8 @@ For faster local iteration, these commands are also available:
 | `pnpm run check:rulesets` | Validate local GitHub ruleset files when present. |
 | `pnpm run verify:actions-runtime` | Verify GitHub Actions metadata does not use deprecated runtimes. |
 | `pnpm run check:governance` | Validate canonical issue labels, open issue taxonomy, and Governance project coverage. |
-| `pnpm run check:quality` | Run the non-packaging quality checks. |
+| `pnpm run check:maintainability` | Check module size, circular dependencies, and actionable unused files/dependencies. |
+| `pnpm run check:quality` | Run the non-packaging quality checks, including maintainability; required in CI. |
 | `pnpm run check:package` | Build and validate package metadata, docs, package contents, and install smoke. |
 | `pnpm run check:push` | Run the pre-push subset: format, lint, typecheck, and unit tests. |
 
