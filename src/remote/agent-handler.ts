@@ -445,6 +445,15 @@ export class AgentWebSocketHandler {
     this.lifecycle.close();
   }
 
+  /** Interrupt work before removing the agent record; close callbacks can arrive later. */
+  disconnectRevokedAgent(agentId: string): void {
+    const live = this.agentConnections.get(agentId);
+    if (!live) return;
+    this.interruptConnectionActions(live.connection);
+    this.agentConnections.delete(agentId);
+    this.lifecycle.closeConnection(live.connection, 1008, "agent revoked");
+  }
+
   /** Check if a specific agent has an active authenticated connection. */
   isAgentOnline(agentId: string): boolean {
     return this.agentConnections.has(agentId);

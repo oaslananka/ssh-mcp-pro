@@ -31,7 +31,6 @@ export interface WebDashboardDependencies {
     policyInput: unknown,
   ) => RemoteAgentRecord;
   revokeAgent: (principal: RemotePrincipal, agent: RemoteAgentRecord) => RemoteAgentRecord;
-  resolveAgent: (userId: string, value: string) => RemoteAgentRecord | undefined;
 }
 
 export class WebDashboardHandler {
@@ -406,7 +405,15 @@ export class WebDashboardHandler {
         status: isOnline ? "online" : sanitized.status,
       };
     });
-    jsonResponse(res, 200, { devices: enriched }, addNoStore());
+    jsonResponse(
+      res,
+      200,
+      {
+        devices: enriched,
+        strictVisibility: this.deps.store.isStrictVisibilityEnabled(principal.userId),
+      },
+      addNoStore(),
+    );
   }
 
   private async handleApiEnrollDevice(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -449,8 +456,8 @@ export class WebDashboardHandler {
       return undefined;
     }
     const agentId = pathname.slice("/api/dashboard/devices/".length);
-    const agent = this.deps.resolveAgent(principal.userId, agentId);
-    if (!agent) {
+    const agent = this.deps.store.getAgent(agentId);
+    if (agent?.userId !== principal.userId) {
       jsonResponse(res, 404, { error: "Device not found" }, addNoStore());
       return undefined;
     }

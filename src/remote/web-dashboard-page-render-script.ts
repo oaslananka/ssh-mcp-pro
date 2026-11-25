@@ -87,32 +87,32 @@ export const DASHBOARD_PAGE_RENDER_SCRIPT = `    function renderLanding() {
           <div class="device-list-body">
           \${devicesList.map(dev => \`
             <article class="device-entry">
-              <div class="device-row">
-                <div class="device-info">
-                  <div class="device-icon" aria-hidden="true">\${dev.host_metadata?.platform === 'win32' ? '▣' : dev.host_metadata?.platform === 'darwin' ? '⌘' : '⌁'}</div>
-                  <div class="device-ident"><div class="device-name">\${escapeHtml(dev.alias)}</div>
-                  <div class="device-meta">\${escapeHtml(dev.host_metadata?.os || dev.host_metadata?.platform || 'Computer')} · \${escapeHtml(dev.host_metadata?.hostname || 'Device')} · \${escapeHtml(dev.profile)}</div><div class="device-meta">Agent: \${escapeHtml(dev.agent_version && dev.agent_version !== 'unknown' ? dev.agent_version : 'Not reported')} · Server: \${escapeHtml(dev.server_version || 'Not reported')} \${dev.agent_update_status === 'older_than_server' ? '· Older than server — update recommended' : dev.agent_update_status === 'unknown' ? '· Confirm local version' : ''} <a href="https://github.com/oaslananka/ssh-mcp-pro/releases/latest" target="_blank" rel="noopener noreferrer">Check releases</a></div><div class="device-meta">AI access: \${Array.isArray(dev.aiConnections) && dev.aiConnections.length ? escapeHtml(dev.aiConnections.map(c => c.name).join(', ')) : 'No explicitly shared AI connections'}\${strictVisibilityEnabled ? '' : ' · Legacy connections may still have access'}</div></div>
-                </div>
-                <div class="device-row-status"><span class="status-pill \${dev.isLiveConnected ? 'online' : 'offline'}"><span aria-hidden="true"></span>\${dev.isLiveConnected ? 'Online' : dev.status === 'revoked' ? 'Access revoked' : 'Offline'}</span>
-                  <details class="device-controls">
-                    <summary>Manage <span aria-hidden="true">⌄</span></summary>
+              <details class="device-controls"><summary class="device-row">
+                <span class="device-info">
+                  <span class="device-icon" aria-hidden="true">\${dev.host_metadata?.platform === 'win32' ? '▣' : dev.host_metadata?.platform === 'darwin' ? '⌘' : '⌁'}</span>
+                  <span class="device-ident"><span class="device-name">\${escapeHtml(dev.alias)}</span>
+                  <span class="device-meta">\${escapeHtml(dev.host_metadata?.os || dev.host_metadata?.platform || 'Computer')} · \${escapeHtml(dev.host_metadata?.hostname || 'Device')} · \${escapeHtml(dev.profile)}</span><span class="device-meta">Agent: \${escapeHtml(dev.agent_version && dev.agent_version !== 'unknown' ? dev.agent_version : 'Not reported')} · Server: \${escapeHtml(dev.server_version || 'Not reported')} \${dev.agent_update_status === 'older_than_server' ? '· Older than server — update recommended' : dev.agent_update_status === 'unknown' ? '· Confirm local version' : ''}</span><span class="device-meta">AI access: \${Array.isArray(dev.aiConnections) && dev.aiConnections.length ? escapeHtml(dev.aiConnections.map(c => c.name).join(', ')) : 'No explicitly shared AI connections'}\${strictVisibilityEnabled ? '' : ' · Legacy connections may still have access'}</span></span>
+                </span>
+                <span class="device-row-status"><span class="status-pill \${dev.isLiveConnected ? 'online' : dev.status === 'revoked' ? 'revoked' : dev.status === 'pending' ? 'pending' : 'offline'}"><span aria-hidden="true"></span>\${dev.isLiveConnected ? 'Online' : dev.status === 'revoked' ? 'Access revoked' : dev.status === 'pending' ? 'Awaiting setup' : 'Offline'}</span>
+                  <span class="device-manage-label">Manage device <span aria-hidden="true">⌄</span></span>
+                </span>
+              </summary>
                     <div class="device-control-panel">
                       <h3>Advanced device controls</h3>
+                      <p><a href="https://github.com/oaslananka/ssh-mcp-pro/releases/latest" target="_blank" rel="noopener noreferrer">Check agent releases</a></p>
                       <p>Permission changes affect what this device can do. You can revoke or remove it at any time.</p>
                       <p class="device-technical-meta">Host: \${escapeHtml(dev.host_metadata?.hostname || 'Not reported')} · OS: \${escapeHtml(dev.host_metadata?.os || 'Not reported')} · Architecture: \${escapeHtml(dev.host_metadata?.arch || 'Not reported')} · Platform: \${escapeHtml(dev.host_metadata?.platform || 'Not reported')} · Policy v\${escapeHtml(dev.policy_version ?? '—')}</p>
                       <label for="profile-\${escapeHtml(dev.id)}">Permission profile</label>
-                      <select id="profile-\${escapeHtml(dev.id)}" aria-label="Policy for \${escapeHtml(dev.alias)}" class="btn btn-outline btn-sm" onchange="changePolicy('\${dev.id}', this.value)" \${dev.status === 'revoked' ? 'disabled' : ''}>
+                      <select id="profile-\${escapeHtml(dev.id)}" aria-label="Policy for \${escapeHtml(dev.alias)}" class="btn btn-outline btn-sm" onchange="changePolicy(this.dataset.deviceId, this.value)" data-device-id="\${escapeHtml(dev.id)}" \${dev.status === 'revoked' ? 'disabled' : ''}>
                         <option value="read-only" \${dev.profile === 'read-only' ? 'selected' : ''}>Read only</option>
                         <option value="operations" \${dev.profile === 'operations' ? 'selected' : ''}>Operations</option>
                         <option value="full-admin" \${dev.profile === 'full-admin' ? 'selected' : ''}>Full admin</option>
                       </select>
-                      <div class="device-control-actions"><button class="btn btn-outline btn-sm" type="button" onclick="revokeDevice('\${dev.id}')" \${dev.status === 'revoked' ? 'disabled' : ''}>\${dev.status === 'revoked' ? 'Revoked' : 'Revoke access'}</button>
-                      <button class="btn btn-danger btn-sm" type="button" onclick="removeDevice('\${dev.id}')">Remove device</button></div>
+                      <div class="device-control-actions"><button class="btn btn-outline btn-sm" type="button" onclick="revokeDevice(this.dataset.deviceId)" data-device-id="\${escapeHtml(dev.id)}" \${dev.status === 'revoked' ? 'disabled' : ''}>\${dev.status === 'revoked' ? 'Revoked' : 'Revoke access'}</button>
+                      <button class="btn btn-danger btn-sm" type="button" onclick="removeDevice(this.dataset.deviceId)" data-device-id="\${escapeHtml(dev.id)}">Remove device</button></div>
                     </div>
-                  </details>
-                </div>
-              </div>
-              \${!dev.isLiveConnected && dev.status !== 'revoked' ? '<div class="device-offline-tip">Agent offline — start ssh-mcp-pro Agent on this computer to reconnect. <a href="https://github.com/oaslananka/ssh-mcp-pro/blob/main/docs/adding-a-device.md" target="_blank" rel="noopener noreferrer">Connection help</a></div>' : ''}
+              </details>
+              \${!dev.isLiveConnected && dev.status === 'offline' ? '<div class="device-offline-tip">Agent offline — start ssh-mcp-pro Agent on this computer to reconnect. <a href="https://github.com/oaslananka/ssh-mcp-pro/blob/main/docs/adding-a-device.md" target="_blank" rel="noopener noreferrer">Connection help</a></div>' : ''}
             </article>
           \`).join('')}
           </div>
@@ -141,7 +141,7 @@ export const DASHBOARD_PAGE_RENDER_SCRIPT = `    function renderLanding() {
             </div>
 
             <h2 class="wizard-title">Connect this device</h2>
-            <p class="wizard-subtitle">Desktop Commander Remote runs on this device so your AI chat can work with your files. Choose how to connect.</p>
+            <p class="wizard-subtitle">ssh-mcp-pro Agent runs on this device so your AI chat can work with your files. Choose how to connect.</p>
 
             <div class="platform-segmented" role="tablist">
               <button type="button" class="platform-tab-btn \${selectedInstallOs === 'windows' ? 'active' : ''}" data-install-os="windows" onclick="chooseInstallOS('windows')">Windows</button>

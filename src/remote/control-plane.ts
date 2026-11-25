@@ -114,7 +114,6 @@ export class RemoteControlPlane {
       updateAgentPolicy: (principal, agent, policy) =>
         this.updateAgentPolicy(principal, agent, policy),
       revokeAgent: (principal, agent) => this.revokeAgent(principal, agent),
-      resolveAgent: (userId, value) => this.resolveAgent(userId, value),
     });
     this.cleanupInterval = setInterval(() => this.cleanupEphemeralState(), 60_000);
     this.cleanupInterval.unref?.();

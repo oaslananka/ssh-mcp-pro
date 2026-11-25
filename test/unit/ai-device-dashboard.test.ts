@@ -2,7 +2,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import type { ServerResponse } from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+import type { AgentConnection, PendingAction } from "../../src/remote/agent-handler.js";
+import type { WebSocketConnection } from "../../src/remote/websocket.js";
 import { RemoteControlPlane } from "../../src/remote/control-plane.js";
 import { hashSecret, randomToken } from "../../src/remote/crypto.js";
 import { createAgentPolicy } from "../../src/remote/policy.js";
@@ -107,6 +109,76 @@ describe("dashboard account-owned AI connection controls", () => {
         api,
       );
       expect(JSON.parse(other.body).connections).toEqual([]);
+
+      // The browser must only remove the exact immutable ID, never a matching alias.
+      const aliasPath = "/api/dashboard/devices/PC";
+      const aliasRemoval = captureResponse();
+      await cp.handleHttp(
+        request("DELETE", aliasPath, headers("github:1")),
+        aliasRemoval as unknown as ServerResponse,
+        aliasPath,
+      );
+      expect(aliasRemoval.statusCode).toBe(404);
+      expect(cp.store.getAgent("agt_own")).toBeDefined();
+
+      // Model an authenticated socket whose close event arrives after the database row is gone.
+      const liveAgent = { ...cp.store.getAgent("agt_own")!, status: "online" as const };
+      cp.store.updateAgent(liveAgent);
+      const close = vi.fn();
+      const connection = { close } as unknown as WebSocketConnection;
+      const reject = vi.fn();
+      const timeout = setTimeout(() => undefined, 30_000);
+      timeout.unref();
+      const live = cp as unknown as {
+        agentConnections: Map<string, AgentConnection>;
+        pendingActions: Map<string, PendingAction>;
+      };
+      live.agentConnections.set(liveAgent.id, {
+        agent: liveAgent,
+        connection,
+        seenNonces: new Map(),
+      });
+      live.pendingActions.set("act_pending", {
+        action: {
+          id: "act_pending",
+          userId: liveAgent.userId,
+          agentId: liveAgent.id,
+          tool: "get_system_status",
+          capability: "system.read",
+          args: {},
+          status: "sent",
+          issuedAt: now,
+          deadline: future,
+        },
+        connection,
+        resolve: vi.fn(),
+        reject,
+        timeout,
+      });
+
+      // Direct removal (without an earlier revoke click) also drops scoped AI grants.
+      const removePath = "/api/dashboard/devices/agt_own";
+      const removed = captureResponse();
+      await cp.handleHttp(
+        request("DELETE", removePath, headers("github:1")),
+        removed as unknown as ServerResponse,
+        removePath,
+      );
+      expect(removed.statusCode).toBe(200);
+      expect(JSON.parse(removed.body)).toEqual({ removed: true, agent_id: "agt_own" });
+      expect(cp.store.getAgent("agt_own")).toBeUndefined();
+      clearTimeout(timeout);
+      expect(close).toHaveBeenCalledOnce();
+      expect(live.agentConnections.has(liveAgent.id)).toBe(false);
+      expect(live.pendingActions.has("act_pending")).toBe(false);
+      expect(reject).toHaveBeenCalledWith(
+        expect.objectContaining({ code: "ACTION_OUTCOME_UNKNOWN" }),
+      );
+      expect(cp.store.listGrantedDevices("github:1", connectionId)).toEqual([]);
+      expect(cp.store.getOAuthConnection("github:1", connectionId)?.status).toBe("active");
+      expect(cp.store.listAudit("github:1", undefined, 20).map((event) => event.eventType)).toEqual(
+        expect.arrayContaining(["agent_revoked", "agent_removed"]),
+      );
 
       const disconnectPath = "/api/dashboard/ai-connections/" + connectionId + "/disconnect";
       const disconnected = captureResponse();

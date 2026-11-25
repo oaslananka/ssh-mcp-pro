@@ -236,8 +236,7 @@ export class RemoteAgentOperations {
     }
     const updated = { ...agent, status: "revoked" as const, updatedAt: nowIso() };
     this.store.updateAgent(updated);
-    this.agentConnections.get(agent.id)?.connection.close();
-    this.agentConnections.delete(agent.id);
+    this.agentHandler.disconnectRevokedAgent(agent.id);
     this.audit({
       userId: principal.userId,
       agentId: agent.id,
