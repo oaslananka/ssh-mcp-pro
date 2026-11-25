@@ -23,7 +23,7 @@ Source of truth: [src/cli.ts](../../src/cli.ts).
 | `--host <value>` | HTTP bind host (overrides `SSH_MCP_HTTP_HOST`) |
 | `--port <value>` | HTTP bind port (overrides `SSH_MCP_HTTP_PORT`) |
 | `--bearer-token-file <path>` | Bearer token file for HTTP auth (overrides `SSH_MCP_HTTP_BEARER_TOKEN_FILE`) |
-| `--enable-legacy-sse` | Enables legacy SSE compatibility (overrides `SSH_MCP_ENABLE_LEGACY_SSE`) |
+| `--enable-legacy-sse` | Enables the deprecated HTTP+SSE bridge (overrides `SSH_MCP_ENABLE_LEGACY_SSE`); see [migration guide](../../MIGRATION.md#migrate-legacy-httpsse-clients-to-streamable-http) |
 | `--tool-profile <name>` | Selects a tool exposure profile (overrides `SSH_MCP_TOOL_PROFILE`) — see [Tool Profiles](../../README.md#tool-profiles) |
 | `--connector-credential-provider <name>` | Selects a connector credential provider (overrides `SSH_MCP_CONNECTOR_CREDENTIAL_PROVIDER`) |
 | `--no-stdio` | Unsupported/internal flag; do not rely on it |

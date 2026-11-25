@@ -1,8 +1,8 @@
 # Deprecation Policy
 
-No formal deprecation has ever happened in this project's history (it's 5 days old at
-time of writing), so this document states intent, not a track record — consistent with
-[docs/development/api-stability.md](api-stability.md).
+This policy defines how compatibility changes are announced and delivered, consistent with
+[API stability](api-stability.md). The [migration guide](../../MIGRATION.md) records
+current deprecation notices, including the opt-in legacy HTTP+SSE bridge.
 
 ## Policy going forward
 
@@ -22,8 +22,8 @@ time of writing), so this document states intent, not a track record — consist
 
 ## What this policy does not yet cover
 
-- A specific minimum notice period (e.g. "one minor version" vs. "90 days") — left
-  unspecified until there's a real deprecation to calibrate against.
+- A fixed calendar-day minimum notice period. The usual release-based notice in
+  item 1 applies; document exceptions and the evidence supporting removal.
 - Deprecation of MCP tool schema fields specifically (as opposed to whole tools) — see
   the open question in [docs/development/api-stability.md](api-stability.md) about
   whether profile/schema changes are SemVer-significant.

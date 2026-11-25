@@ -560,6 +560,11 @@ export function createHttpServerRuntime(options: HttpServerRuntimeOptions = {}):
     },
     afterListen: (listeningPort) => {
       activeListeningPort = listeningPort;
+      if (httpConfig.enableLegacySse) {
+        logger.warn(
+          "Legacy HTTP/SSE is deprecated. Migrate clients to Streamable HTTP at /mcp before disabling the compatibility bridge.",
+        );
+      }
       logger.info("Streamable HTTP MCP server listening", {
         host: httpConfig.host,
         port: listeningPort,
