@@ -12,17 +12,13 @@
   ],
   "timezone": "Europe/Istanbul",
   "minimumReleaseAge": "7 days",
-  "labels": [
-    "dependencies"
-  ],
-  "dependencyDashboardLabels": [
-    "dependencies"
-  ],
-  "dependencyDashboardTitle": "Dependency Dashboard",
-  "dependencyDashboardOSVVulnerabilitySummary": "unresolved",
-  "assignees": [
-    "oaslananka"
-  ],
+  "labels": ["dependencies"],
+  "dependencyDashboard": {
+    "labels": ["dependencies"],
+    "title": "Dependency Dashboard",
+    "osvVulnerabilitySummary": "unresolved"
+  },
+  "assignees": ["oaslananka"],
   "prHourlyLimit": 2,
   "prConcurrentLimit": 3,
   "branchConcurrentLimit": 3,
@@ -37,23 +33,13 @@
   ],
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": [
-      "before 6am on monday"
-    ],
+    "schedule": ["before 6am on monday"],
     "automerge": false,
-    "addLabels": [
-      "lockfile",
-      "requires-review"
-    ]
+    "addLabels": ["lockfile", "requires-review"]
   },
   "vulnerabilityAlerts": {
     "enabled": true,
-    "labels": [
-      "dependencies",
-      "security",
-      "risk:high",
-      "requires-review"
-    ],
+    "labels": ["dependencies", "security", "risk:high", "requires-review"],
     "prCreation": "immediate",
     "vulnerabilityFixStrategy": "highest"
   },
@@ -61,75 +47,45 @@
   "packageRules": [
     {
       "description": "Delegate low-risk dependency merging to Mergify.",
-      "matchUpdateTypes": [
-        "patch",
-        "digest",
-        "pin"
-      ],
+      "matchUpdateTypes": ["patch", "digest", "pin"],
       "automerge": false,
-      "addLabels": [
-        "automerge:enabled",
-        "risk:low"
-      ]
+      "addLabels": ["automerge:enabled", "risk:low"]
     },
     {
       "description": "Delegate stable minor development dependency updates to Mergify after CI.",
-      "matchManagers": [
-        "npm"
-      ],
-      "matchDepTypes": [
-        "devDependencies"
-      ],
-      "matchUpdateTypes": [
-        "minor"
-      ],
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor"],
       "matchCurrentVersion": "!/^0/",
       "automerge": false,
-      "addLabels": [
-        "automerge:enabled",
-        "risk:low"
-      ]
+      "addLabels": ["automerge:enabled", "risk:low"]
     },
     {
       "description": "Require explicit approval for major version changes.",
-      "matchUpdateTypes": [
-        "major"
-      ],
+      "matchUpdateTypes": ["major"],
       "dependencyDashboardApproval": true,
-      "addLabels": [
-        "major",
-        "requires-review"
-      ],
+      "addLabels": ["major", "requires-review"],
       "prPriority": -5,
       "automerge": false
     },
     {
       "description": "Apply npm release-age guard to reduce supply-chain churn.",
-      "matchDatasources": [
-        "npm"
-      ],
+      "matchDatasources": ["npm"],
       "minimumReleaseAge": "7 days",
       "prCreation": "immediate",
       "internalChecksFilter": "strict",
-      "addLabels": [
-        "javascript"
-      ]
+      "addLabels": ["javascript"]
     },
     {
       "description": "Pin and group non-major GitHub Actions updates.",
-      "matchManagers": [
-        "github-actions"
-      ],
+      "matchManagers": ["github-actions"],
       "minimumReleaseAge": "7 days",
       "prCreation": "immediate",
       "internalChecksFilter": "strict",
       "pinDigests": true,
       "groupName": "GitHub Actions",
       "groupSlug": "github-actions",
-      "addLabels": [
-        "ci",
-        "github-actions"
-      ]
+      "addLabels": ["ci", "github-actions"]
     },
     {
       "description": "Group TypeScript quality toolchain updates.",
@@ -147,9 +103,7 @@
       ],
       "groupName": "TypeScript quality toolchain",
       "groupSlug": "typescript-quality-toolchain",
-      "addLabels": [
-        "javascript"
-      ]
+      "addLabels": ["javascript"]
     },
     {
       "description": "MCP SDK and SSH/runtime-affecting dependencies require manual review.",
@@ -172,31 +126,18 @@
       ],
       "dependencyDashboardApproval": true,
       "automerge": false,
-      "addLabels": [
-        "requires-review",
-        "runtime-risk"
-      ]
+      "addLabels": ["requires-review", "runtime-risk"]
     },
     {
       "description": "Keep Node runtime jumps explicit.",
-      "matchPackageNames": [
-        "node",
-        "@types/node"
-      ],
+      "matchPackageNames": ["node", "@types/node"],
       "dependencyDashboardApproval": true,
-      "addLabels": [
-        "runtime-risk",
-        "requires-review"
-      ]
+      "addLabels": ["runtime-risk", "requires-review"]
     },
     {
       "description": "Update all active pnpm toolchain pins together.",
-      "matchDatasources": [
-        "npm"
-      ],
-      "matchPackageNames": [
-        "pnpm"
-      ],
+      "matchDatasources": ["npm"],
+      "matchPackageNames": ["pnpm"],
       "groupName": "pnpm toolchain",
       "groupSlug": "pnpm-toolchain"
     }
