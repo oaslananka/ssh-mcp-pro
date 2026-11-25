@@ -30,6 +30,10 @@ def fixture(root, mode="valid", gz=False):
             "CREATE TABLE agents(id TEXT PRIMARY KEY);"
             "CREATE TABLE audit_events(id TEXT PRIMARY KEY);"
         )
+    if mode == "large-db":
+        with sqlite3.connect(db) as connection:
+            connection.execute("CREATE TABLE padding(data BLOB)")
+            connection.execute("INSERT INTO padding VALUES (zeroblob(?))", (130 * 1024 * 1024,))
     if mode == "bad-db":
         db.write_bytes(b"invalid SQLite")
 
@@ -73,12 +77,13 @@ def fixture(root, mode="valid", gz=False):
     return encrypted, identity
 
 
-def verify(encrypted, identity):
+def verify(encrypted, identity, *options):
     outcome = subprocess.run(  # nosec B603 - fixed local verifier path, shell=False
-        [sys.executable, str(VERIFIER), "--archive", str(encrypted), "--identity", str(identity)],
+        [sys.executable, str(VERIFIER), "--archive", str(encrypted), "--identity", str(identity), *options],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20,
     )
-    return outcome.returncode, json.loads(outcome.stdout.decode()), outcome.stderr
+    data = json.loads(outcome.stdout.decode()) if outcome.stdout else None
+    return outcome.returncode, data, outcome.stderr
 
 
 class OfflineRestoreVerifierTests(unittest.TestCase):
@@ -116,6 +121,30 @@ class OfflineRestoreVerifierTests(unittest.TestCase):
             self.assertEqual(outcome.returncode, 0)
             self.assertEqual(json.loads(outcome.stdout)["status"], "pass")
             self.assertEqual(outcome.stderr, b"")
+
+    def test_large_backup_requires_explicit_capacity(self):
+        with tempfile.TemporaryDirectory(prefix="ssh-restore-large-") as tmp:
+            archive, identity = fixture(pathlib.Path(tmp), "large-db", gz=True)
+            code, data, stderr = verify(archive, identity)
+            self.assertNotEqual(code, 0)
+            self.assertEqual(data, {"status": "fail", "code": "UNSAFE_ARCHIVE"})
+            self.assertEqual(stderr, b"")
+            code, data, stderr = verify(archive, identity, "--max-backup-mib", "512")
+            self.assertEqual(code, 0)
+            self.assertEqual(data["status"], "pass")
+            self.assertEqual(data["validatedKeyPairs"], 2)
+            self.assertEqual(stderr, b"")
+
+    def test_invalid_capacity_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive, identity = fixture(pathlib.Path(tmp))
+            for capacity in ("0", "1025"):
+                with self.subTest(capacity=capacity):
+                    code, data, stderr = verify(archive, identity, "--max-backup-mib", capacity)
+                    self.assertEqual(code, 2)
+                    self.assertIsNone(data)
+                    self.assertIn(b"128", stderr)
+                    self.assertIn(b"1024", stderr)
 
     def test_wrong_identity(self):
         with tempfile.TemporaryDirectory() as tmp:
