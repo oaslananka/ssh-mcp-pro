@@ -114,7 +114,11 @@ describe("OpenAI reviewer sandbox browser authentication", () => {
       const insertActionSpy = vi.spyOn(controlPlane.store, "insertAction");
       const insertAuditSpy = vi.spyOn(controlPlane.store, "insertAudit");
       const dispatchActionSpy = vi.spyOn(
-        controlPlane as unknown as { dispatchAction: (...args: unknown[]) => Promise<unknown> },
+        (
+          controlPlane as unknown as {
+            agentOperations: { dispatchAction: (...args: unknown[]) => Promise<unknown> };
+          }
+        ).agentOperations,
         "dispatchAction",
       );
 
