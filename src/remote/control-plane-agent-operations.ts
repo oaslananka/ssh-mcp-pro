@@ -100,19 +100,7 @@ export class RemoteAgentOperations {
       return this.callReviewerTool(principal, tool, args);
     }
 
-    const capability = TOOL_CAPABILITY_MAP[tool];
-    if (!hasCapability(principal.capabilities, capability)) {
-      throw safeError("INVALID_SCOPE", `Scope does not grant ${capability}`, 403);
-    }
-    // Copying reads an existing file before writing the destination. Both permissions
-    // must belong to the OAuth client; agent-side policy checks alone are insufficient.
-    if (
-      tool === "file_manage" &&
-      args.operation === "copy" &&
-      !hasCapability(principal.capabilities, "files.read")
-    ) {
-      throw safeError("INVALID_SCOPE", "Copy requires files.read and files.write", 403);
-    }
+    const capability = this.requireToolCapability(principal, tool, args);
 
     if (tool === "list_hosts") {
       return {
@@ -167,6 +155,27 @@ export class RemoteAgentOperations {
     }
     const actionResult = await this.dispatchAction(principal, agent, tool, capability, args);
     return { action: actionResult };
+  }
+
+  private requireToolCapability(
+    principal: RemotePrincipal,
+    tool: RemoteToolName,
+    args: Record<string, unknown>,
+  ): ActionRecord["capability"] {
+    const capability = TOOL_CAPABILITY_MAP[tool];
+    if (!hasCapability(principal.capabilities, capability)) {
+      throw safeError("INVALID_SCOPE", `Scope does not grant ${capability}`, 403);
+    }
+    // Copying reads an existing file before writing the destination. Both permissions
+    // must belong to the OAuth client; agent-side policy checks alone are insufficient.
+    if (
+      tool === "file_manage" &&
+      args.operation === "copy" &&
+      !hasCapability(principal.capabilities, "files.read")
+    ) {
+      throw safeError("INVALID_SCOPE", "Copy requires files.read and files.write", 403);
+    }
+    return capability;
   }
 
   updateAgentPolicy(
