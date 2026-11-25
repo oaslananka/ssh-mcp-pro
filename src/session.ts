@@ -1,32 +1,14 @@
 import { NodeSSH } from "node-ssh";
-import { buildSessionAuthConfig } from "./session-auth-config.js";
+import {
+  SessionConnectionConfig,
+  translateSshConnectionError,
+} from "./session-connection-config.js";
 import type { SFTPWrapper } from "ssh2";
-import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import {
-  normalizeSha256Fingerprint,
-  knownHostKeyFingerprints,
-  generateSessionId,
-  parseKnownHostLine,
-  knownHostPatternMatches,
-  type SSHConnectConfig,
-} from "./session-auth.js";
-import {
-  ConnectionParams,
-  SessionInfo,
-  SessionResult,
-  OSInfo,
-  SSHMCPError,
-  type HostKeyPolicy,
-} from "./types.js";
-import {
-  createAuthError,
-  createConnectionError,
-  createHostKeyError,
-  createPolicyError,
-  createTimeoutError,
-} from "./errors.js";
+import { generateSessionId } from "./session-auth.js";
+import { ConnectionParams, SessionInfo, SessionResult, OSInfo } from "./types.js";
+import { createConnectionError, createPolicyError } from "./errors.js";
 import { logger } from "./logging.js";
 import { detectOS } from "./detect.js";
 import type { ServerConfig } from "./config.js";
@@ -44,47 +26,6 @@ export interface SSHSession {
   osInfo?: OSInfo;
 }
 
-function translateSshConnectionError(error: unknown): SSHMCPError {
-  if (error instanceof SSHMCPError) {
-    return error;
-  }
-
-  if (error instanceof Error) {
-    if (error.message.includes("authentication")) {
-      return createAuthError(
-        "SSH authentication failed",
-        "Check your username, password, or SSH key configuration",
-      );
-    }
-    if (error.message.includes("timeout") || error.message.includes("ETIMEDOUT")) {
-      return createTimeoutError(
-        "SSH connection timeout",
-        "Check if the host is reachable and the SSH service is running",
-      );
-    }
-    if (error.message.includes("ECONNREFUSED")) {
-      return createConnectionError(
-        "SSH connection refused",
-        "Check if the SSH service is running on the target port",
-      );
-    }
-    if (
-      error.message.toLowerCase().includes("host key") ||
-      error.message.toLowerCase().includes("host denied")
-    ) {
-      return createHostKeyError(
-        "SSH host key verification failed",
-        "Check known_hosts, hostKeyPolicy, or expectedHostKeySha256",
-      );
-    }
-  }
-
-  return createConnectionError(
-    `Failed to establish SSH connection: ${error instanceof Error ? error.message : String(error)}`,
-    "Verify the host, port, and network connectivity",
-  );
-}
-
 export type SessionCloseListener = (sessionId: string) => void | Promise<void>;
 
 /**
@@ -97,7 +38,7 @@ export class SessionManager {
   private readonly maxSessions: number;
   private readonly defaultTtlMs: number;
   private cleanupInterval: NodeJS.Timeout | undefined;
-  private readonly acceptedHostKeys = new Map<string, string>();
+  private readonly connectionConfig = new SessionConnectionConfig();
   private readonly closeListeners = new Set<SessionCloseListener>();
 
   /**
@@ -184,7 +125,10 @@ export class SessionManager {
     const now = Date.now();
     const ttl = params.ttlMs ?? this.defaultTtlMs;
     const policyMode = params.policyMode ?? "enforce";
-    const hostKeyPolicy = this.resolveHostKeyPolicy(params);
+    const hostKeyPolicy = this.connectionConfig.resolveHostKeyPolicy(
+      params,
+      this.security.hostKeyPolicy,
+    );
     const policyHost = params.policyHost ?? params.host;
 
     const policyDecision = this.policy?.assertAllowed({
@@ -221,25 +165,7 @@ export class SessionManager {
       reserved = true;
 
       const ssh = new NodeSSH();
-      const authConfig = await buildSessionAuthConfig(params);
-
-      const knownHostsPath = params.knownHostsPath ?? this.security.knownHostsPath;
-
-      const connectConfig: SSHConnectConfig = {
-        host: params.host,
-        username: params.username,
-        port: params.port ?? 22,
-        readyTimeout: params.readyTimeoutMs ?? 20000,
-        ...authConfig,
-      };
-      if (this.security.allowedCiphers.length > 0) {
-        connectConfig.algorithms = {
-          ...connectConfig.algorithms,
-          cipher: this.security.allowedCiphers as never,
-        };
-      }
-
-      this.configureHostKeyVerification(connectConfig, params, hostKeyPolicy, knownHostsPath);
+      const connectConfig = await this.connectionConfig.build(params, this.security, hostKeyPolicy);
 
       logger.debug("Connecting to SSH server");
       await ssh.connect(connectConfig);
@@ -310,30 +236,6 @@ export class SessionManager {
       if (reserved) {
         this.pendingConnections--;
       }
-    }
-  }
-
-  private configureHostKeyVerification(
-    connectConfig: SSHConnectConfig,
-    params: ConnectionParams,
-    hostKeyPolicy: HostKeyPolicy,
-    knownHostsPath: string,
-  ): void {
-    if (params.expectedHostKeySha256) {
-      connectConfig.hostHash = "sha256";
-      connectConfig.hostVerifier = (hashedKey: string) =>
-        normalizeSha256Fingerprint(hashedKey) ===
-        normalizeSha256Fingerprint(params.expectedHostKeySha256 ?? "");
-    } else if (hostKeyPolicy === "insecure") {
-      connectConfig.hostVerifier = () => true;
-    } else if (hostKeyPolicy === "accept-new") {
-      connectConfig.hostHash = "sha256";
-      connectConfig.hostVerifier = (hashedKey: string) =>
-        this.verifyAcceptNewHostKey(params.host, params.port ?? 22, hashedKey);
-    } else {
-      connectConfig.hostHash = "sha256";
-      connectConfig.hostVerifier = (hashedKey: string) =>
-        this.verifyKnownHostKey(params.host, params.port ?? 22, knownHostsPath, hashedKey);
     }
   }
 
@@ -463,73 +365,6 @@ export class SessionManager {
       }
     }
     return results.every((result) => result.status === "fulfilled");
-  }
-
-  private resolveHostKeyPolicy(params: ConnectionParams): HostKeyPolicy {
-    if (params.hostKeyPolicy) {
-      return params.hostKeyPolicy;
-    }
-    if (params.strictHostKeyChecking !== undefined) {
-      return params.strictHostKeyChecking ? "strict" : "insecure";
-    }
-    return this.security.hostKeyPolicy;
-  }
-
-  private verifyAcceptNewHostKey(host: string, port: number, hashedKey: string): boolean {
-    const key = `${host}:${port}`;
-    const normalized = normalizeSha256Fingerprint(hashedKey);
-    const accepted = this.acceptedHostKeys.get(key);
-
-    if (!accepted) {
-      this.acceptedHostKeys.set(key, normalized);
-      logger.warn("Accepted first-seen SSH host key for this process only", { host, port });
-      return true;
-    }
-
-    return accepted === normalized;
-  }
-
-  private verifyKnownHostKey(
-    host: string,
-    port: number,
-    knownHostsPath: string,
-    hashedKey: string,
-  ): boolean {
-    if (!knownHostsPath) {
-      return false;
-    }
-
-    let contents: string;
-    try {
-      contents = fs.readFileSync(knownHostsPath, "utf8");
-    } catch {
-      return false;
-    }
-
-    const expected = normalizeSha256Fingerprint(hashedKey);
-    for (const line of contents.split(/\r?\n/)) {
-      const parsed = parseKnownHostLine(line);
-      if (!parsed || !knownHostPatternMatches(parsed.hosts, host, port)) {
-        continue;
-      }
-
-      if (parsed.marker === "@revoked") {
-        return false;
-      }
-
-      try {
-        const fingerprints = knownHostKeyFingerprints(parsed.keyBlob);
-        if (
-          fingerprints.some((fingerprint) => normalizeSha256Fingerprint(fingerprint) === expected)
-        ) {
-          return true;
-        }
-      } catch {
-        continue;
-      }
-    }
-
-    return false;
   }
 
   /**
