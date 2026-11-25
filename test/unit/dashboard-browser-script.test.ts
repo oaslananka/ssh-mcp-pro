@@ -4,6 +4,7 @@ import type { DefaultTreeAdapterMap } from "parse5";
 import { Script } from "node:vm";
 import { renderDashboardHtml } from "../../src/remote/web-dashboard-html.js";
 import { DASHBOARD_PAGE_RENDER_SCRIPT } from "../../src/remote/web-dashboard-page-render-script.js";
+import { DASHBOARD_AI_REMOVAL_SCRIPT } from "../../src/remote/web-dashboard-ai-removal-script.js";
 import { DASHBOARD_AI_CLIENT_SCRIPT } from "../../src/remote/web-dashboard-ai-client-script.js";
 import { DASHBOARD_BRAND_FINGERPRINT } from "../../src/remote/web-dashboard-brand.js";
 
@@ -44,7 +45,7 @@ describe("dashboard browser script composition", () => {
     const aiStart = text.indexOf(DASHBOARD_AI_CLIENT_SCRIPT);
     expect(pageStart).toBeGreaterThan(text.indexOf("function switchTab("));
     expect(pageStart + DASHBOARD_PAGE_RENDER_SCRIPT.length).toBe(aiStart);
-    expect(aiStart + DASHBOARD_AI_CLIENT_SCRIPT.length).toBe(
+    expect(aiStart + DASHBOARD_AI_CLIENT_SCRIPT.length + DASHBOARD_AI_REMOVAL_SCRIPT.length).toBe(
       text.indexOf("    function renderUsagePanel()"),
     );
     expect(() => new Script(text)).not.toThrow();

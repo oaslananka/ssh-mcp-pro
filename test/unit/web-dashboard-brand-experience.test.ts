@@ -101,6 +101,7 @@ describe("ssh-mcp-pro brand and first-use journey", () => {
       async () => ({
         ok: true,
         json: async () => ({
+          connections: [],
           clients: [
             {
               clientId: "client_test",
