@@ -105,26 +105,38 @@ export const DASHBOARD_AI_CLIENT_SCRIPT = `    function renderAiConnectionCards(
       const notice = aiClientNotice ? '<p id="aiClientNotice" tabindex="-1" class="ai-client-notice" role="status">' + escapeHtml(aiClientNotice) + '</p>' : '';
       const deviceControls = renderAiConnectionCards();
       if (!aiClientsList.length) return heading + notice + deviceControls;
-      const rows = aiClientsList.map((c, i) => {
+      const retained = aiClientsList.filter(c => c.canRemove !== true);
+      const inactive = aiClientsList.filter(c => c.canRemove === true);
+      const rows = retained.map(c => {
+        const i = aiClientsList.indexOf(c);
         const active = Number(c.activeGrants) > 0;
         const scopes = Array.isArray(c.scopes) ? c.scopes : [];
-        const permissions = !active ? 'Disconnected' : scopes.some(s => /:write|:manage|:exec|admin/.test(s)) ? 'Elevated scopes' : 'Read scopes';
+        const permissions = !active ? 'Authorization retained' : scopes.some(s => /:write|:manage|:exec|admin/.test(s)) ? 'Elevated scopes' : 'Read scopes';
         const when = c.lastTokenAt ? new Date(c.lastTokenAt).toLocaleString() : 'Not recorded';
         const created = c.registeredAt ? new Date(c.registeredAt).toLocaleString() : 'Not recorded';
-        const hosts = Array.isArray(c.redirectHosts) ? c.redirectHosts.join(', ') : '';
+        const hosts = renderAiHosts(c);
         const detail = 'ai-client-detail-' + i;
         return '<tr><td data-label="Client"><strong>' + escapeHtml(c.clientName) + '</strong><small class="ai-client-id">' + escapeHtml(c.clientId) + '</small></td>' +
-          '<td data-label="Redirect host">' + escapeHtml(hosts || 'Unknown') + '</td><td data-label="Created">' + escapeHtml(created) + '</td><td data-label="Last renewal">' + escapeHtml(when) + '</td>' +
+          '<td data-label="Redirect host">' + hosts + '</td><td data-label="Created">' + escapeHtml(created) + '</td><td data-label="Last renewal">' + escapeHtml(when) + '</td>' +
           '<td data-label="Active grants"><span class="ai-client-grant ' + (active ? 'is-active' : '') + '">' + Number(c.activeGrants || 0) + '</span></td>' +
           '<td data-label="Permissions">' + escapeHtml(permissions) + '</td><td data-label="Actions"><div class="ai-client-actions">' +
           '<button type="button" class="btn btn-outline btn-sm" aria-controls="' + detail + '" aria-expanded="false" onclick="toggleAiClientDetails(' + i + ', this)">Manage access</button>' +
-          '<button type="button" class="btn btn-danger btn-sm" ' + (active ? '' : 'disabled ') + 'onclick="revokeAiClient(' + i + ')">Revoke</button></div></td></tr>' +
+          '<button type="button" class="btn btn-danger btn-sm" onclick="revokeAiClient(' + i + ')">Revoke</button></div></td></tr>' +
           '<tr class="ai-client-details-row" id="' + detail + '" hidden><td colspan="7"><div class="ai-client-details"><strong>Granted OAuth scopes</strong><p>' +
           escapeHtml(scopes.length ? scopes.join(' · ') : 'No active renewable scopes') + '</p><small>Registered ' + escapeHtml(created) + '. To change OAuth scopes, revoke the grant and reconnect. Device policy is enforced separately.</small></div></td></tr>';
       }).join('');
-      return heading + notice + deviceControls + '<details class="card ai-connection-history ai-oauth-details"><summary>Advanced · OAuth client grants (' + aiClientsList.length + ')</summary>' +
-        '<div class="ai-clients-table-wrap"><table class="ai-clients-table"><thead><tr><th>Client</th><th>Redirect host</th><th>Created</th><th>Last renewal</th><th>Active grants</th><th>Permissions</th><th>Actions</th></tr></thead><tbody>' +
-        rows + '</tbody></table></div><p class="ai-client-footnote">Shows renewable OAuth grants for this account, not all registered clients. Revocation disables future refreshes, without changing other users or shared registrations. Previously issued access tokens may remain valid until expiry before device restrictions are enabled. Device-scoped connections are checked on each request. Older unbound connections need to reconnect after device controls are enabled. Local stdio MCP has separate permissions.</p></details>';
+      const table = retained.length ? '<div class="ai-clients-table-wrap"><table class="ai-clients-table"><thead><tr><th>Client</th><th>Redirect host</th><th>Created</th><th>Last renewal</th><th>Active grants</th><th>Permissions</th><th>Actions</th></tr></thead><tbody>' +
+        rows + '</tbody></table></div>' : '<p>No active or pending OAuth grants.</p>';
+      const history = inactive.length ? '<details class="ai-connection-history" id="aiOAuthHistory"' +
+        (aiOAuthHistoryOpen ? ' open' : '') + ' ontoggle="aiOAuthHistoryOpen=this.open"><summary>Inactive OAuth history (' +
+        inactive.length + ')</summary><p>Remove unused authorization records without affecting devices or other accounts.</p>' +
+        inactive.map(c => '<article class="ai-disconnected-row"><div class="ai-disconnected-info"><h3>' + escapeHtml(c.clientName) +
+          '</h3>' + renderAiHosts(c) + '<small>Client ' + escapeHtml(c.clientId.slice(-8)) + ' · No renewable grants</small></div>' +
+          '<button type="button" class="btn btn-outline btn-sm ai-remove-btn" data-client-id="' + escapeHtml(c.clientId) +
+          '" onclick="openOAuthRemoveDialog(this.dataset.clientId)">Remove history</button></article>').join('') + '</details>' : '';
+      return heading + notice + deviceControls + '<details class="card ai-connection-history ai-oauth-details"' +
+        (aiOAuthOpen ? ' open' : '') + ' ontoggle="aiOAuthOpen=this.open"><summary>Advanced · OAuth client grants (' + aiClientsList.length + ')</summary>' +
+        table + history + '<p class="ai-client-footnote">Shows renewable OAuth grants for this account, not all registered clients. Revocation disables future refreshes, without changing other users or shared registrations. Previously issued access tokens may remain valid until expiry before device restrictions are enabled. Device-scoped connections are checked on each request. Older unbound connections need to reconnect after device controls are enabled. Local stdio MCP has separate permissions.</p></details>';
     }
 
     function toggleAiClientDetails(i, button) {
@@ -165,7 +177,7 @@ export const DASHBOARD_AI_CLIENT_SCRIPT = `    function renderAiConnectionCards(
 
     async function revokeAiClient(i) {
       const client = aiClientsList[i];
-      if (!client || Number(client.activeGrants) < 1) return;
+      if (!client || client.canRemove === true) return;
       if (!window.confirm('Revoke ' + client.clientName + ' refresh access for your account? Existing access tokens can remain valid until they expire.')) return;
       try {
         const response = await fetch('/api/dashboard/ai-clients/' + encodeURIComponent(client.clientId) + '/revoke', {

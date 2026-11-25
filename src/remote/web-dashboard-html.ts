@@ -91,6 +91,8 @@ ${AI_CLIENT_STYLES}</style>
     let aiClientsError = '';
     let aiClientNotice = '';
     let aiHistoryOpen = false;
+    let aiOAuthOpen = false;
+    let aiOAuthHistoryOpen = false;
     let aiLoadGeneration = 0;
 
     ${DASHBOARD_ENROLLMENT_FEEDBACK_SCRIPT}

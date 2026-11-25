@@ -252,6 +252,52 @@ export class RemoteOAuthStore {
     }));
   }
 
+  /** A zero refresh count alone does not prove a client is safe to remove. */
+  private hasLiveClientAccess(userId: string, clientId: string, now: string): boolean {
+    return !!this.db
+      .prepare(
+        "SELECT 1 FROM oauth_connections WHERE user_id = ? AND client_id = ? AND status = 'active' " +
+          "UNION ALL SELECT 1 FROM oauth_refresh_tokens WHERE user_id = ? AND client_id = ? " +
+          "AND revoked_at IS NULL AND used_at IS NULL AND expires_at > ? " +
+          "UNION ALL SELECT 1 FROM oauth_authorization_codes WHERE user_id = ? AND client_id = ? " +
+          "AND used_at IS NULL AND expires_at > ? LIMIT 1",
+      )
+      .get(userId, clientId, userId, clientId, now, userId, clientId, now);
+  }
+
+  /** Remove only inactive account credential history, not shared registrations or audit records. */
+  removeUserOAuthClientHistory(
+    userId: string,
+    clientId: string,
+    now: string,
+  ): "removed" | "active" | "missing" {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const known = this.db
+        .prepare("SELECT 1 FROM oauth_refresh_tokens WHERE user_id = ? AND client_id = ? LIMIT 1")
+        .get(userId, clientId);
+      let outcome: "removed" | "active" | "missing" = "missing";
+      if (known) {
+        if (this.hasLiveClientAccess(userId, clientId, now)) {
+          outcome = "active";
+        } else {
+          this.db
+            .prepare("DELETE FROM oauth_refresh_tokens WHERE user_id = ? AND client_id = ?")
+            .run(userId, clientId);
+          this.db
+            .prepare("DELETE FROM oauth_authorization_codes WHERE user_id = ? AND client_id = ?")
+            .run(userId, clientId);
+          outcome = "removed";
+        }
+      }
+      this.db.exec("COMMIT");
+      return outcome;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   /** List only OAuth clients granted by this specific dashboard account. */
   listUserOAuthClients(
     userId: string,
@@ -263,6 +309,7 @@ export class RemoteOAuthStore {
     registeredAt: string;
     lastTokenAt: string;
     activeGrants: number;
+    canRemove: boolean;
     scopes: string[];
   }> {
     const rows = this.db
@@ -304,6 +351,8 @@ export class RemoteOAuthStore {
       registeredAt: row.registeredAt,
       lastTokenAt: row.lastTokenAt,
       activeGrants: Number(row.activeGrants),
+      canRemove:
+        Number(row.activeGrants) === 0 && !this.hasLiveClientAccess(userId, row.clientId, now),
       scopes: [
         ...new Set(
           (row.activeScopes ?? "")

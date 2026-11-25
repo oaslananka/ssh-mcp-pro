@@ -277,6 +277,7 @@ export class RemoteStore {
     registeredAt: string;
     lastTokenAt: string;
     activeGrants: number;
+    canRemove: boolean;
     scopes: string[];
   }> {
     return this.oauth.listUserOAuthClients(userId, now);
@@ -285,6 +286,14 @@ export class RemoteStore {
   /** Account-scoped disconnection: retain global DCR records and other users' grants. */
   revokeUserOAuthClientGrants(userId: string, clientId: string, now: string): number | undefined {
     return this.oauth.revokeUserOAuthClientGrants(userId, clientId, now);
+  }
+
+  removeUserOAuthClientHistory(
+    userId: string,
+    clientId: string,
+    now: string,
+  ): "removed" | "active" | "missing" {
+    return this.oauth.removeUserOAuthClientHistory(userId, clientId, now);
   }
 
   countOAuthClients(): number {
