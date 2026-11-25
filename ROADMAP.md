@@ -1,31 +1,27 @@
 # Roadmap
 
-This roadmap tracks real, currently-open gaps identified in
-[docs/repo-maturity-report.md](docs/repo-maturity-report.md), not speculative
-feature ideas. It will be revised as items close.
+This roadmap tracks current repository and product assurance priorities. The
+[July 2026 repository maturity report](docs/repo-maturity-report.md) is a
+historical baseline, not a live status dashboard. See [open issues](https://github.com/oaslananka/ssh-mcp-pro/issues)
+for actionable work and [releases](https://github.com/oaslananka/ssh-mcp-pro/releases)
+for shipped versions.
 
 ## Near term
 
-- **Ship the first release.** Release-please PR #1 (`chore(main): release
-  ssh-mcp-pro 1.2.0`) has been open since repo creation; merging it exercises
-  the release pipeline (SBOM generation, checksums, build-provenance
-  attestation, optional npm publish) for the first time.
-- **Apply branch protection to `main`.** A ruleset already exists at
-  `.github/rulesets/main-protection.json` describing the intended checks; it
-  needs to actually be imported/applied via repository Settings.
-- **Triage the Trivy container-image findings.** Adding Trivy scanning to
-  `docker.yml` surfaced 50+ open alerts against the built image, mostly in
-  the Alpine base image's OpenSSL packages and npm/corepack's own bundled
-  dependencies rather than this project's code. Decide whether to rebuild on
-  a newer/slimmer base image, prune build tooling from the final layer, or
-  accept and document the current baseline.
-- ~~Resolve the 7 open CodeQL alerts~~ — **done 2026-07-03**: 1 fixed in
-  code, 7 dismissed with rationale re-verified against current code (see
-  `SECURITY_DECISIONS.md`).
-- ~~Confirm "Private vulnerability reporting" is enabled~~ — **done**:
-  confirmed already enabled via API.
-- ~~Decide on the Dependabot security-updates toggle~~ — **done**: enabled,
-  alongside Dependabot vulnerability alerts.
+- **Release and branch protection foundations established.** The project has
+  published v1.17.1 and enforces the active `main-standard` ruleset with 13
+  required checks. Keep the version-controlled snapshot and live ruleset aligned.
+- **Converge dependency and supply-chain updates.** Keep current security
+  patches, reviewed lockfile changes, and immutable build inputs consistent;
+  investigate actual advisories without weakening security gates.
+- **Validate connector isolation and recovery.** Verify public OAuth scopes,
+  independent client/device permissions, and documented backup restoration
+  with isolated test identities and environments.
+- **Maintain product reliability.** Prioritize behavior-preserving changes to
+  complex modules, cross-platform acceptance tests, and accessible onboarding.
+- **Continue security monitoring.** Review fresh CodeQL, Trivy, Dependabot,
+  SonarCloud and Codacy evidence rather than treating the July 2026 alert count
+  as current.
 
 ## Mid term
 

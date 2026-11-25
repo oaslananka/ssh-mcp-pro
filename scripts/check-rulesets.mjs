@@ -13,18 +13,20 @@ const requiredMainProtectionRules = [
 ];
 const requiredMainContexts = [
   "Quality Gates",
-  "Unit Tests (Node 22)",
+  "Unit Tests (Node 26)",
   "Unit Tests (Node 24)",
   "SSH Integration",
   "Windows Command-Path Integration",
   "SSH E2E",
   "Build, SBOM, and Pack",
   "Build and smoke image",
-  "Analyze TypeScript",
   "Validate MCP Registry metadata",
   "Secret scan (full history)",
   "Dependency Review",
+  "SonarCloud Code Analysis",
+  "Codacy Static Code Analysis",
 ];
+const externalStatusContexts = new Set(["SonarCloud Code Analysis", "Codacy Static Code Analysis"]);
 const protectedWorkflowFiles = [
   ".github/workflows/ci.yml",
   ".github/workflows/docker.yml",
@@ -56,10 +58,12 @@ for (const file of files) {
 console.log(`check-rulesets: validated ${files.length} ruleset file(s).`);
 
 function validateMainProtection(path, ruleset, workflowJobNames) {
-  assertEqual(path, "name", ruleset.name, "main branch protection");
+  assertEqual(path, "name", ruleset.name, "main-standard");
   assertEqual(path, "target", ruleset.target, "branch");
   assertEqual(path, "enforcement", ruleset.enforcement, "active");
-  assertArrayEqual(path, "bypass_actors", ruleset.bypass_actors, []);
+  assertArrayEqual(path, "bypass_actors", ruleset.bypass_actors, [
+    { actor_id: 285490571, actor_type: "User", bypass_mode: "pull_request" },
+  ]);
   assertArrayEqual(path, "conditions.ref_name.include", ruleset.conditions?.ref_name?.include, [
     "~DEFAULT_BRANCH",
   ]);
@@ -77,7 +81,7 @@ function validateMainProtection(path, ruleset, workflowJobNames) {
     path,
     "pull_request.parameters.allowed_merge_methods",
     pullRequestRule.parameters?.allowed_merge_methods,
-    ["squash", "rebase"],
+    ["squash"],
   );
   assertEqual(
     path,
@@ -89,9 +93,39 @@ function validateMainProtection(path, ruleset, workflowJobNames) {
     path,
     "pull_request.parameters.required_approving_review_count",
     pullRequestRule.parameters?.required_approving_review_count,
-    1,
+    0,
   );
 
+  assertEqual(
+    path,
+    "pull_request.parameters.dismiss_stale_reviews_on_push",
+    pullRequestRule.parameters?.dismiss_stale_reviews_on_push,
+    false,
+  );
+  assertEqual(
+    path,
+    "pull_request.parameters.require_code_owner_review",
+    pullRequestRule.parameters?.require_code_owner_review,
+    false,
+  );
+  assertEqual(
+    path,
+    "pull_request.parameters.require_last_push_approval",
+    pullRequestRule.parameters?.require_last_push_approval,
+    false,
+  );
+  assertEqual(
+    path,
+    "pull_request.parameters.require_extra_approval_for_unattributed_changes",
+    pullRequestRule.parameters?.require_extra_approval_for_unattributed_changes,
+    true,
+  );
+  assertArrayEqual(
+    path,
+    "pull_request.parameters.required_reviewers",
+    pullRequestRule.parameters?.required_reviewers,
+    [],
+  );
   const statusRule = findRule(path, ruleset, "required_status_checks");
   assertEqual(
     path,
@@ -113,12 +147,23 @@ function validateMainProtection(path, ruleset, workflowJobNames) {
     contexts,
     requiredMainContexts,
   );
+  const codacy = statusRule.parameters.required_status_checks.find(
+    (check) => check.context === "Codacy Static Code Analysis",
+  );
+  assertEqual(path, "Codacy integration_id", codacy?.integration_id, 56611);
   validateContextsMatchWorkflowJobs(path, contexts, workflowJobNames);
 }
 
 function validateContextsMatchWorkflowJobs(path, contexts, workflowJobNames) {
+  const ci = readFileSync(".github/workflows/ci.yml", "utf8");
+  const nodeMajors = [...ci.matchAll(/^\s+node_major: (\d+)$/gmu)].map((match) => match[1]);
   for (const context of contexts) {
-    if (!workflowJobNames.some((jobName) => workflowJobNameMatchesContext(jobName, context))) {
+    if (externalStatusContexts.has(context)) continue;
+    if (
+      !workflowJobNames.some((jobName) =>
+        workflowJobNameMatchesContext(jobName, context, nodeMajors),
+      )
+    ) {
       throw new Error(`${path} references ${context}, but no protected workflow job matches.`);
     }
   }
@@ -192,7 +237,7 @@ function unquoteYamlScalar(value) {
   return isQuoted ? trimmed.slice(1, -1) : trimmed;
 }
 
-function workflowJobNameMatchesContext(jobName, context) {
+function workflowJobNameMatchesContext(jobName, context, nodeMajors) {
   if (jobName === context) {
     return true;
   }
@@ -204,7 +249,7 @@ function workflowJobNameMatchesContext(jobName, context) {
 
   const [prefix, suffix] = jobName.split(token);
   const matrixValue = context.slice(prefix.length, context.length - suffix.length);
-  return context.startsWith(prefix) && context.endsWith(suffix) && matrixValue.length > 0;
+  return context.startsWith(prefix) && context.endsWith(suffix) && nodeMajors.includes(matrixValue);
 }
 
 function findRule(path, ruleset, type) {
