@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.17.1...ssh-mcp-pro-v1.18.0) (2026-11-25)
+
+
+### Features
+
+* **backup:** create recoverable encrypted SQLite snapshots ([#353](https://github.com/oaslananka/ssh-mcp-pro/issues/353)) ([a6cf6b5](https://github.com/oaslananka/ssh-mcp-pro/commit/a6cf6b547966d0dcdb37bb827d47e8c657af6afe))
+
+
+### Bug Fixes
+
+* **agent:** synchronize signed policy on reconnect ([#355](https://github.com/oaslananka/ssh-mcp-pro/issues/355)) ([fa5882f](https://github.com/oaslananka/ssh-mcp-pro/commit/fa5882f5525bd0c47d9a9f3c5c68ce69c288650c))
+* **backup:** support bounded large archive verification ([#349](https://github.com/oaslananka/ssh-mcp-pro/issues/349)) ([b42a831](https://github.com/oaslananka/ssh-mcp-pro/commit/b42a831bf46539175c6cd1452ad391605a77ec36))
+* **dx:** preserve existing Git hook providers during prepare ([#347](https://github.com/oaslananka/ssh-mcp-pro/issues/347)) ([ea9e10c](https://github.com/oaslananka/ssh-mcp-pro/commit/ea9e10cb1076499df5c8595a2d17300cf5661e75))
+* **governance:** align branch protection policy with enforced ruleset ([#343](https://github.com/oaslananka/ssh-mcp-pro/issues/343)) ([3cacca1](https://github.com/oaslananka/ssh-mcp-pro/commit/3cacca1581cd998a566b17b75276a7cdc05513bf))
+* **security:** protect local SQLite control-plane files ([#351](https://github.com/oaslananka/ssh-mcp-pro/issues/351)) ([fb9e8ad](https://github.com/oaslananka/ssh-mcp-pro/commit/fb9e8ad4cc5315875d562f8e27f1a9e03d6d8d92))
+
 ## [1.17.1](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.17.0...ssh-mcp-pro-v1.17.1) (2026-11-21)
 
 
