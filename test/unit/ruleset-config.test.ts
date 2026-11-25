@@ -6,17 +6,18 @@ const repoRoot = path.resolve(import.meta.dirname, "../..");
 const rulesetPath = ".github/rulesets/main-protection.json";
 const requiredProtectionContexts = [
   "Quality Gates",
-  "Unit Tests (Node 22)",
+  "Unit Tests (Node 26)",
   "Unit Tests (Node 24)",
   "SSH Integration",
   "Windows Command-Path Integration",
   "SSH E2E",
   "Build, SBOM, and Pack",
   "Build and smoke image",
-  "Analyze TypeScript",
   "Validate MCP Registry metadata",
   "Secret scan (full history)",
   "Dependency Review",
+  "SonarCloud Code Analysis",
+  "Codacy Static Code Analysis",
 ] as const;
 
 interface RequiredStatusCheck {
@@ -143,10 +144,10 @@ describe("GitHub branch protection ruleset configuration", () => {
 
     const ruleset = readRuleset();
     expect(ruleset).toMatchObject({
-      name: "main branch protection",
+      name: "main-standard",
       target: "branch",
       enforcement: "active",
-      bypass_actors: [],
+      bypass_actors: [{ actor_id: 285490571, actor_type: "User", bypass_mode: "pull_request" }],
       conditions: {
         ref_name: {
           include: ["~DEFAULT_BRANCH"],
@@ -171,16 +172,17 @@ describe("GitHub branch protection ruleset configuration", () => {
     );
 
     expect(ruleOfType(ruleset, "pull_request").parameters).toMatchObject({
-      allowed_merge_methods: ["squash", "rebase"],
-      dismiss_stale_reviews_on_push: true,
+      allowed_merge_methods: ["squash"],
+      dismiss_stale_reviews_on_push: false,
       require_code_owner_review: false,
       require_last_push_approval: false,
-      required_approving_review_count: 1,
+      required_approving_review_count: 0,
+      require_extra_approval_for_unattributed_changes: true,
       required_review_thread_resolution: true,
     });
   });
 
-  test("requires protected status contexts that map to workflow job names", () => {
+  test("requires the live workflow and external application status contexts", () => {
     const workflows = [
       readText(".github/workflows/ci.yml"),
       readText(".github/workflows/docker.yml"),
@@ -198,6 +200,13 @@ describe("GitHub branch protection ruleset configuration", () => {
       strict_required_status_checks_policy: true,
     });
     expect(contexts).toEqual([...requiredProtectionContexts]);
+    expect(statusRule.parameters?.required_status_checks).toContainEqual({
+      context: "Codacy Static Code Analysis",
+      integration_id: 56611,
+    });
+    const ci = readText(".github/workflows/ci.yml");
+    const unitMajors = [...ci.matchAll(/^\s+node_major: (\d+)$/gmu)].map((match) => match[1]);
+    expect(unitMajors).toEqual(["24", "26"]);
 
     expect(workflowJobNames).toEqual(
       expect.arrayContaining([
@@ -208,7 +217,6 @@ describe("GitHub branch protection ruleset configuration", () => {
         "SSH E2E",
         "Build, SBOM, and Pack",
         "Build and smoke image",
-        "Analyze TypeScript",
         "Validate MCP Registry metadata",
         "Secret scan (full history)",
         "Dependency Review",
@@ -222,6 +230,6 @@ describe("GitHub branch protection ruleset configuration", () => {
     expect(contributing).toContain(rulesetPath);
     expect(contributing).toContain("https://docs.github.com");
     expect(contributing).toContain("Rulesets");
-    expect(contributing).toContain("Administrators are enforced");
+    expect(contributing).toContain("PR-only bypass");
   });
 });

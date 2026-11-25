@@ -1,6 +1,9 @@
 # Repository Maturity Report — ssh-mcp-pro
 
 **Date:** 2026-07-03
+
+> Historical audit snapshot. For current priorities and shipped milestones, see
+> [ROADMAP.md](../ROADMAP.md). The findings below describe the recorded date.
 **Scope:** `oaslananka/ssh-mcp-pro` (GitHub + local checkout)
 **Method:** Static inspection of repo contents, GitHub API (branch protection, security
 alerts, collaborators, releases, open PRs, workflow runs), and workflow source review.

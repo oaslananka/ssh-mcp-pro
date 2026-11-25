@@ -126,14 +126,19 @@ uvx pre-commit run --all-files --hook-stage manual
 
 ## Branch Rulesets
 
-The main branch protection rules are version-controlled in
-`.github/rulesets/main-protection.json`. The file is a GitHub repository
-ruleset export that targets the default branch, requires pull requests, requires
-the protected status contexts listed across the GitHub workflow files, blocks
-force pushes and branch deletion, and permits only squash or rebase merge
-history. Administrators are enforced: no repository administrator bypass actors
-are configured for the version-controlled ruleset, and the live branch
-protection configuration must keep `enforce_admins` enabled.
+The active `main-standard` ruleset is recorded in
+`.github/rulesets/main-protection.json`. It targets the default branch, requires
+pull requests with squash-only merges and resolved review threads, blocks force
+pushes and branch deletion, and requires 13 status contexts with strict
+up-to-date checks. These include Node 24 and 26 unit tests and the independent
+SonarCloud and Codacy checks. Node 22 compatibility and CodeQL run separately;
+their results must not be confused with the required status list.
+
+The owner has a PR-only bypass in the live ruleset, not a direct-push bypass.
+Routine merges must use the protected queue after all applicable checks and
+review requirements pass; never exercise the bypass to merge. This JSON is a
+snapshot, not an automatic settings deployment. Compare it with the live
+ruleset before importing or changing any protection.
 
 Repository administrators can import or compare the file from GitHub repository
 settings under Rules, Rulesets, using GitHub's ruleset JSON import flow:
