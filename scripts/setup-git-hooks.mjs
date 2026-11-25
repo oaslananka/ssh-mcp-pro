@@ -20,10 +20,30 @@ if (!existsSync(hooksDir)) {
   process.exit(0);
 }
 
-const config = run("git", ["config", "core.hooksPath", hooksDir]);
-if (config.status !== 0) {
-  process.stderr.write(config.stderr || "setup-git-hooks: failed to configure hooks.\n");
-  process.exit(config.status ?? 1);
+const existing = run("git", ["config", "--get", "core.hooksPath"]);
+if (existing.status !== 0 && existing.status !== 1) {
+  process.stderr.write(
+    existing.stderr || "setup-git-hooks: failed to read Git hook configuration.\n",
+  );
+  process.exit(existing.status ?? 1);
+}
+
+if (existing.status === 0 && existing.stdout.trimEnd() !== hooksDir) {
+  console.log(
+    "setup-git-hooks: preserving existing core.hooksPath; repository hooks were not installed.",
+  );
+  console.log(
+    "Run pnpm run check before opening a PR, or configure your hook provider to invoke the repository hooks.",
+  );
+  process.exit(0);
+}
+
+if (existing.status === 1) {
+  const config = run("git", ["config", "--local", "core.hooksPath", hooksDir]);
+  if (config.status !== 0) {
+    process.stderr.write(config.stderr || "setup-git-hooks: failed to configure hooks.\n");
+    process.exit(config.status ?? 1);
+  }
 }
 
 for (const entry of readdirSync(hooksDir, { withFileTypes: true })) {
