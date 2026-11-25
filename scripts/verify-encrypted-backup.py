@@ -17,8 +17,9 @@ import tarfile
 import tempfile
 from urllib.parse import quote
 
-MAX_ENCRYPTED_BYTES = 128 * 1024 * 1024
-MAX_EXTRACTED_BYTES = 256 * 1024 * 1024
+MIB = 1024 * 1024
+DEFAULT_MAX_BACKUP_MIB = 128
+MAX_BACKUP_MIB = 1024
 MAX_MEMBERS = 4096
 KEYS = ("control-plane-ed25519.json", "jwt-ed25519.json")
 REQUIRED = ("sshautomator.db", *KEYS)
@@ -37,10 +38,10 @@ def reject(code):
     raise VerificationFailure(code)
 
 
-def decrypt_to_private_file(encrypted, identity, target):
+def decrypt_to_private_file(encrypted, identity, target, max_backup_bytes):
     if not encrypted.is_file() or not identity.is_file():
         reject("INPUT_NOT_FOUND")
-    if encrypted.stat().st_size > MAX_ENCRYPTED_BYTES:
+    if encrypted.stat().st_size > max_backup_bytes:
         reject("ARCHIVE_TOO_LARGE")
     if identity.stat().st_size > 65536:
         reject("AGE_DECRYPT_FAILED")
@@ -69,13 +70,13 @@ def decrypt_to_private_file(encrypted, identity, target):
             )
         if result.returncode != 0:
             reject("AGE_DECRYPT_FAILED")
-        if target.stat().st_size > MAX_ENCRYPTED_BYTES:
+        if target.stat().st_size > max_backup_bytes:
             reject("ARCHIVE_TOO_LARGE")
     except (OSError, subprocess.SubprocessError):
         reject("AGE_DECRYPT_FAILED")
 
 
-def validate_member(member):
+def validate_member(member, max_backup_bytes):
     name = member.name
     if (
         not name
@@ -85,21 +86,21 @@ def validate_member(member):
         or not (member.isfile() or member.isdir())
     ):
         reject("UNSAFE_ARCHIVE")
-    if member.isfile() and (member.size < 0 or member.size > MAX_ENCRYPTED_BYTES):
+    if member.isfile() and (member.size < 0 or member.size > max_backup_bytes):
         reject("UNSAFE_ARCHIVE")
 
 
-def selected_members(archive):
+def selected_members(archive, max_backup_bytes):
     selected = {}
     total_bytes = 0
     for index, member in enumerate(archive, 1):
         if index > MAX_MEMBERS:
             reject("UNSAFE_ARCHIVE")
-        validate_member(member)
+        validate_member(member, max_backup_bytes)
         if member.isdir():
             continue
         total_bytes += member.size
-        if total_bytes > MAX_EXTRACTED_BYTES:
+        if total_bytes > 2 * max_backup_bytes:
             reject("UNSAFE_ARCHIVE")
         basename = pathlib.PurePosixPath(member.name).name
         if basename not in NEEDED:
@@ -188,16 +189,19 @@ def validate_signing_keys(restore):
             reject("KEY_PAIR_MISMATCH")
 
 
-def verify(encrypted, identity):
+def verify(encrypted, identity, max_backup_mib=DEFAULT_MAX_BACKUP_MIB):
+    if not DEFAULT_MAX_BACKUP_MIB <= max_backup_mib <= MAX_BACKUP_MIB:
+        reject("INVALID_CAPACITY")
+    max_backup_bytes = max_backup_mib * MIB
     with tempfile.TemporaryDirectory(prefix="ssh-mcp-offline-restore-") as tmp:
         directory = pathlib.Path(tmp)
         plaintext = directory / "snapshot.tar"
         restore = directory / "restored"
         restore.mkdir(mode=0o700)
-        decrypt_to_private_file(encrypted, identity, plaintext)
+        decrypt_to_private_file(encrypted, identity, plaintext, max_backup_bytes)
         try:
             with tarfile.open(plaintext, mode="r:*") as archive:
-                selected = selected_members(archive)
+                selected = selected_members(archive, max_backup_bytes)
                 extract_selected(archive, selected, restore)
         except (tarfile.TarError, EOFError, OSError, ValueError):
             reject("UNSAFE_ARCHIVE")
@@ -211,15 +215,32 @@ def verify(encrypted, identity):
     }
 
 
+def capacity_mib(value):
+    try:
+        capacity = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError("capacity must be an integer in MiB") from None
+    if not DEFAULT_MAX_BACKUP_MIB <= capacity <= MAX_BACKUP_MIB:
+        raise argparse.ArgumentTypeError(
+            f"capacity must be between {DEFAULT_MAX_BACKUP_MIB} and {MAX_BACKUP_MIB} MiB"
+        )
+    return capacity
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Check an encrypted production snapshot using only local files."
     )
     parser.add_argument("--archive", type=pathlib.Path, required=True)
     parser.add_argument("--identity", type=pathlib.Path, required=True)
+    parser.add_argument(
+        "--max-backup-mib", type=capacity_mib, default=DEFAULT_MAX_BACKUP_MIB,
+        help="Maximum archive and individual member size in MiB (128-1024); "
+             "the total extracted-size limit is twice this value (default: 128).",
+    )
     args = parser.parse_args()
     try:
-        outcome = verify(args.archive, args.identity)
+        outcome = verify(args.archive, args.identity, args.max_backup_mib)
     except VerificationFailure as error:
         print(json.dumps({"status": "fail", "code": error.code}))
         return 2
