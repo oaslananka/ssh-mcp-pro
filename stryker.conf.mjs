@@ -1,3 +1,62 @@
+import { readFileSync } from "node:fs";
+
+// Resolve exact, contiguous source anchors rather than stale absolute line numbers.
+// Formatting indentation and CRLF differences do not affect the selected range.
+export function resolveMutationRange(file, source, anchor) {
+  const needle = anchor
+    .trim()
+    .split(/\r?\n/u)
+    .map((line) => line.trim());
+  if (needle.length > 20 || !needle.some(Boolean)) {
+    throw new Error("Mutation anchor must be nonempty and bounded: " + file);
+  }
+  const lines = source.split(/\r?\n/u).map((line) => line.trim());
+  const matches = [];
+  for (let index = 0; index <= lines.length - needle.length; index++) {
+    if (needle.every((line, offset) => lines[index + offset] === line)) {
+      matches.push(index + 1);
+    }
+  }
+  if (matches.length !== 1) {
+    throw new Error(
+      "Mutation anchor must match exactly one location: " +
+        file +
+        " (" +
+        needle[0] +
+        "), found " +
+        matches.length,
+    );
+  }
+  return file + ":" + matches[0] + "-" + (matches[0] + needle.length - 1);
+}
+
+// Mutation commands run from the repository root, just like tsconfigFile.
+// Only these explicitly approved source files may be read by the manifest.
+const sources = new Map([
+  ["src/auth.ts", readFileSync("src/auth.ts", "utf8")],
+  ["src/policy.ts", readFileSync("src/policy.ts", "utf8")],
+  ["src/safety.ts", readFileSync("src/safety.ts", "utf8")],
+  ["src/config.ts", readFileSync("src/config.ts", "utf8")],
+  ["src/session.ts", readFileSync("src/session.ts", "utf8")],
+  ["src/session-connection-config.ts", readFileSync("src/session-connection-config.ts", "utf8")],
+  ["src/http-security.ts", readFileSync("src/http-security.ts", "utf8")],
+  ["src/oauth.ts", readFileSync("src/oauth.ts", "utf8")],
+  [
+    "src/remote/control-plane-agent-operations.ts",
+    readFileSync("src/remote/control-plane-agent-operations.ts", "utf8"),
+  ],
+  ["src/remote/crypto.ts", readFileSync("src/remote/crypto.ts", "utf8")],
+  ["src/remote/policy.ts", readFileSync("src/remote/policy.ts", "utf8")],
+  ["src/remote/scopes.ts", readFileSync("src/remote/scopes.ts", "utf8")],
+]);
+const targets = JSON.parse(readFileSync("scripts/mutation-targets.json", "utf8"));
+
+function resolveTarget({ file, anchor }) {
+  const source = sources.get(file);
+  if (source === undefined) throw new Error("Unapproved mutation source: " + file);
+  return resolveMutationRange(file, source, anchor);
+}
+
 const config = {
   packageManager: "pnpm",
   testRunner: "vitest",
@@ -7,32 +66,7 @@ const config = {
   vitest: {
     configFile: "vitest.mutation.config.ts",
   },
-  mutate: [
-    "src/auth.ts:38-42",
-    "src/policy.ts:281-285",
-    "src/policy.ts:293-297",
-    "src/policy.ts:361-370",
-    "src/policy.ts:404-405",
-    "src/policy.ts:434-435",
-    "src/policy.ts:457-458",
-    "src/policy.ts:483-484",
-    "src/policy.ts:496-500",
-    "src/safety.ts:156-157",
-    "src/config.ts:468-469",
-    "src/session.ts:175-187",
-    "src/session.ts:222-236",
-    "src/http-security.ts:90-94",
-    "src/oauth.ts:48-49",
-    "src/oauth.ts:61-65",
-    "src/remote/control-plane.ts:599-605",
-    "src/remote/control-plane.ts:1163-1172",
-    "src/remote/control-plane.ts:1264-1276",
-    "src/remote/crypto.ts:176-184",
-    "src/remote/policy.ts:92-100",
-    "src/remote/policy.ts:102-107",
-    "src/remote/scopes.ts:8-16",
-    "src/remote/scopes.ts:28-32",
-  ],
+  mutate: targets.map(resolveTarget),
   reporters: ["clear-text", "html", "json"],
   thresholds: {
     high: 80,

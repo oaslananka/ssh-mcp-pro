@@ -1,0 +1,98 @@
+[
+  {
+    "file": "src/auth.ts",
+    "anchor": "if (providedToken === undefined) {\nreturn false;\n}\n\nreturn constantTimeTokenEquals(providedToken, expectedToken);"
+  },
+  {
+    "file": "src/policy.ts",
+    "anchor": "if (\nbindHost &&\n(this.config.tunnelDenyBindHosts ?? []).length > 0 &&\nmatchesPolicyValue(bindHost, this.config.tunnelDenyBindHosts)\n) {"
+  },
+  {
+    "file": "src/policy.ts",
+    "anchor": "if (\nbindHost &&\n(this.config.tunnelAllowBindHosts ?? []).length > 0 &&\n!matchesPolicyValue(bindHost, this.config.tunnelAllowBindHosts)\n) {"
+  },
+  {
+    "file": "src/policy.ts",
+    "anchor": "if (context.username === \"root\" && !this.config.allowRootLogin) {\nreturn denied({\nmode,\naction: context.action,\nreason: \"Root SSH login is disabled by policy\",\nhint: \"Connect as an unprivileged user and use approved ensure tools where possible.\",\n});\n}\n\nif (context.rawSudo && !this.config.allowRawSudo) {"
+  },
+  {
+    "file": "src/policy.ts",
+    "anchor": "const safety = checkCommandSafety(context.command);\nif (!safety.safe && !this.config.allowDestructiveCommands) {"
+  },
+  {
+    "file": "src/policy.ts",
+    "anchor": "if (\nthis.localPathDenyPrefixes.some((prefix) => isPathUnder(normalizedPath, prefix, path.sep))\n) {"
+  },
+  {
+    "file": "src/policy.ts",
+    "anchor": "const underAllowedPrefix = this.localPathAllowPrefixes.some((prefix) =>\nisPathUnder(normalizedPath, prefix, path.sep),\n);\nif (!underAllowedPrefix) {"
+  },
+  {
+    "file": "src/policy.ts",
+    "anchor": "if (this.pathDenyPrefixes.some((prefix) => isPathUnder(normalizedPath, prefix, \"/\"))) {\nreturn denied({"
+  },
+  {
+    "file": "src/policy.ts",
+    "anchor": "if (isDestructiveFs && !this.config.allowDestructiveFs) {\nconst underAllowedPrefix = allowPrefixes.some((prefix) =>\nisPathUnder(normalizedPath, prefix, \"/\"),\n);\nif (!underAllowedPrefix) {"
+  },
+  {
+    "file": "src/safety.ts",
+    "anchor": "for (const { pattern, riskLevel, warning, suggestion } of DANGEROUS_PATTERNS) {\nif (\ntypeof pattern === \"function\" ? pattern(normalizedCommand) : pattern.test(normalizedCommand)\n) {"
+  },
+  {
+    "file": "src/config.ts",
+    "anchor": "allowRootLogin: overrides.policy?.allowRootLogin ?? security.allowRootLogin,\nallowedHosts: overrides.policy?.allowedHosts ?? [...config.policy.allowedHosts],"
+  },
+  {
+    "file": "src/session.ts",
+    "anchor": "if (rootDenied) {\nthrow createPolicyError(\n\"Root SSH login is disabled by policy\",\n\"Connect as an unprivileged user and use approved privilege escalation workflows.\",\n);\n}"
+  },
+  {
+    "file": "src/session-connection-config.ts",
+    "anchor": "if (params.expectedHostKeySha256) {\nconnectConfig.hostHash = \"sha256\";\nconnectConfig.hostVerifier = (hashedKey: string) =>\nnormalizeSha256Fingerprint(hashedKey) ===\nnormalizeSha256Fingerprint(params.expectedHostKeySha256 ?? \"\");\n} else if (hostKeyPolicy === \"insecure\") {\nconnectConfig.hostVerifier = () => true;\n} else if (hostKeyPolicy === \"accept-new\") {\nconnectConfig.hostHash = \"sha256\";\nconnectConfig.hostVerifier = (hashedKey: string) =>\nthis.verifyAcceptNewHostKey(params.host, params.port ?? 22, hashedKey);\n} else {\nconnectConfig.hostHash = \"sha256\";\nconnectConfig.hostVerifier = (hashedKey: string) =>\nthis.verifyKnownHostKey(params.host, params.port ?? 22, knownHostsPath, hashedKey);\n}"
+  },
+  {
+    "file": "src/http-security.ts",
+    "anchor": "if ((context.hostKeyPolicy ?? \"strict\") !== \"strict\") {\nthrow new Error(\n\"Refusing non-loopback HTTP MCP binding without strict SSH host-key verification\",\n);\n}"
+  },
+  {
+    "file": "src/oauth.ts",
+    "anchor": "if (!token) {\nthrow new Error(\"Missing bearer token\");"
+  },
+  {
+    "file": "src/oauth.ts",
+    "anchor": "if (!protectedHeader.kid) {\nthrow new Error(\"JWT kid is required\");\n}\nif (!protectedHeader.alg || !algorithms.includes(protectedHeader.alg)) {\nthrow new Error(\"Unsupported JWT algorithm\");"
+  },
+  {
+    "file": "src/remote/control-plane-agent-operations.ts",
+    "anchor": "revokeAgent(principal: RemotePrincipal, agent: RemoteAgentRecord): RemoteAgentRecord {\nif (!hasCapability(principal.capabilities, \"agents.admin\")) {\nthrow safeError(\"INVALID_SCOPE\", \"agents:admin scope is required\", 403);\n}\nconst updated = { ...agent, status: \"revoked\" as const, updatedAt: nowIso() };"
+  },
+  {
+    "file": "src/remote/control-plane-agent-operations.ts",
+    "anchor": "const agent = this.requireAgent(principal, args);\nif (Object.getOwnPropertyDescriptor(agent.policy.capabilities, capability)?.value !== true) {"
+  },
+  {
+    "file": "src/remote/control-plane-agent-operations.ts",
+    "anchor": "if (\ntool === \"file_manage\" &&\nargs.operation === \"copy\" &&\n!hasCapability(principal.capabilities, \"files.read\")\n) {\nthrow safeError(\"INVALID_SCOPE\", \"Copy requires files.read and files.write\", 403);\n}"
+  },
+  {
+    "file": "src/remote/crypto.ts",
+    "anchor": "const token = extractBearerToken(authorization);\nif (!token) {\nthrow new Error(\"Missing bearer token\");\n}\nconst { payload } = await jwtVerify(token, keyPair.publicKey, {\nissuer: config.publicBaseUrl,\naudience: config.mcpResourceUrl,\nalgorithms: [\"EdDSA\"],\nrequiredClaims: [\"iss\", \"aud\", \"exp\", \"iat\", \"sub\", \"jti\"],"
+  },
+  {
+    "file": "src/remote/policy.ts",
+    "anchor": "const denied = policy.denyPaths.some((rawPrefix) => {\nconst prefix = normalizePolicyPath(rawPrefix);\nif (prefix === \"/\") {\nreturn normalized === \"/\";\n}\nreturn normalized === prefix || normalized.startsWith(`${prefix}/`);\n});\nif (denied) {\nreturn false;"
+  },
+  {
+    "file": "src/remote/policy.ts",
+    "anchor": "return policy.allowPaths.some((rawPrefix) => {\nif (rawPrefix === \"*\")\nreturn path.posix.isAbsolute(filePath) || path.win32.isAbsolute(filePath);\nconst prefix = normalizePolicyPath(rawPrefix);\nreturn prefix === \"/\"\n? normalized === \"/\"\n: normalized === prefix || normalized.startsWith(`${prefix}/`);\n});"
+  },
+  {
+    "file": "src/remote/scopes.ts",
+    "anchor": "export function parseScopes(scope: string | undefined): RemoteScope[] {\nif (!scope) {\nreturn [];\n}\nconst requested = scope.split(/\\s+/u).filter(Boolean);\nreturn requested.filter((item): item is RemoteScope =>\nREMOTE_SCOPES.includes(item as RemoteScope),\n);"
+  },
+  {
+    "file": "src/remote/scopes.ts",
+    "anchor": "): boolean {\nreturn capabilities.includes(capability);\n}"
+  }
+]

@@ -27,19 +27,27 @@ these tests with a coverage exclusion when adding routes or lifecycle branches.
 ## Mutation testing
 
 Mutation testing is configured for policy-critical security surfaces only. The
-line-range allowlist lives in `stryker.conf.mjs` and covers the allow/deny
+line-range allowlist lives in `scripts/mutation-targets.json`, resolved by
+`stryker.conf.mjs` against its fixed source-file allowlist. Exact source anchors resolve
+the ranges when configuration loads, and missing or duplicate anchors fail
+clearly instead of silently mutating the wrong lines. It covers the allow/deny
 branches in `src/policy.ts`, `src/safety.ts`, `src/config.ts`,
 `src/session.ts`, `src/http-security.ts`, and the auth and remote control-plane
 policy modules. Whole-file mutation targets are intentionally avoided so the
 scheduled gate stays bounded. Stryker uses `vitest.mutation.config.ts` so the
 advisory gate runs only unit-level security regression tests and does not
-require integration, E2E, or performance fixtures. Static file-load mutants are
+require integration, E2E, or performance fixtures. Configuration-contract tests
+run in the normal unit suite, not against mutated sources. Static file-load mutants are
 ignored with Stryker's `ignoreStatic` setting to keep the scheduled gate runtime
 predictable while the mutation score is advisory.
 
 The CI mutation job is advisory while the score is calibrated. It runs on
 `schedule` and `workflow_dispatch`, uses `continue-on-error: true`, and uploads
-`reports/mutation` for review.
+`reports/mutation` for review. The summary counts actual per-file mutants, reports compile
+errors separately from the score, and rejects missing reports or zero-test
+killed/survived results as invalid evidence. A low score is still advisory.
+Stryker's core, Vitest runner and TypeScript checker are pinned together at a
+version supporting Vitest 5.
 
 Promotion criteria:
 
