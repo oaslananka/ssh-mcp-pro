@@ -2,8 +2,13 @@ export function parseJson<T>(value: string): T {
   return JSON.parse(value) as T;
 }
 
+// SQLite returns own data properties, not inherited values or accessors.
+function ownColumnValue(row: Record<string, unknown>, key: string): unknown {
+  return Object.getOwnPropertyDescriptor(row, key)?.value;
+}
+
 export function rowString(row: Record<string, unknown>, key: string): string {
-  const value = row[key];
+  const value = ownColumnValue(row, key);
   if (value === null || value === undefined) {
     return "";
   }
@@ -14,7 +19,7 @@ export function rowString(row: Record<string, unknown>, key: string): string {
 }
 
 export function optionalRowString(row: Record<string, unknown>, key: string): string | undefined {
-  const value = row[key];
+  const value = ownColumnValue(row, key);
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
