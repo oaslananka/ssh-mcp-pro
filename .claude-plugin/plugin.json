@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "ssh-mcp-pro",
-  "version": "1.18.0",
+  "version": "1.19.0",
   "description": "SSH MCP Pro plugin for controlled SSH operations, remote host workflows, command execution guardrails, and infrastructure automation.",
   "author": {
     "name": "oaslananka",

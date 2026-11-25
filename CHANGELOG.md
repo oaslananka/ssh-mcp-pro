@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.18.0...ssh-mcp-pro-v1.19.0) (2026-11-25)
+
+
+### Features
+
+* **http:** deprecate legacy HTTP/SSE and guide migration ([#359](https://github.com/oaslananka/ssh-mcp-pro/issues/359)) ([60bb29a](https://github.com/oaslananka/ssh-mcp-pro/commit/60bb29ad9aa1968f145299a968b4ee4b46e9b8d5))
+
 ## [1.18.0](https://github.com/oaslananka/ssh-mcp-pro/compare/ssh-mcp-pro-v1.17.1...ssh-mcp-pro-v1.18.0) (2026-11-25)
 
 
