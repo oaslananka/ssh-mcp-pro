@@ -73,38 +73,71 @@ describe("mutation testing gate", () => {
       vitest: { configFile: "vitest.mutation.config.ts" },
       thresholds: { high: 80, low: 60, break: null },
     });
-    const expectedRanges = [
-      "src/auth.ts:38-42",
-      "src/policy.ts:281-285",
-      "src/policy.ts:293-297",
-      "src/policy.ts:361-370",
-      "src/policy.ts:404-405",
-      "src/policy.ts:434-435",
-      "src/policy.ts:457-458",
-      "src/policy.ts:483-484",
-      "src/policy.ts:496-500",
-      "src/safety.ts:156-157",
-      "src/config.ts:468-469",
-      "src/session.ts:175-187",
-      "src/session.ts:222-236",
-      "src/http-security.ts:90-94",
-      "src/oauth.ts:48-49",
-      "src/oauth.ts:61-65",
-      "src/remote/control-plane.ts:599-605",
-      "src/remote/control-plane.ts:1163-1172",
-      "src/remote/control-plane.ts:1264-1276",
-      "src/remote/crypto.ts:176-184",
-      "src/remote/policy.ts:92-100",
-      "src/remote/policy.ts:102-107",
-      "src/remote/scopes.ts:8-16",
-      "src/remote/scopes.ts:28-32",
+    expect(configModule.default.mutate).toHaveLength(24);
+    const selected = configModule.default.mutate.map((target) => {
+      const match = /^([^:]+):(\d+)-(\d+)$/u.exec(target);
+      if (!match?.[1] || !match[2] || !match[3]) throw new Error("Invalid range: " + target);
+      const first = Number(match[2]);
+      const last = Number(match[3]);
+      const lines = read(match[1]).split(/\r?\n/u);
+      expect(first).toBeGreaterThan(0);
+      expect(last).toBeGreaterThanOrEqual(first);
+      expect(last).toBeLessThanOrEqual(lines.length);
+      expect(last - first + 1).toBeLessThanOrEqual(20);
+      return { file: match[1], source: lines.slice(first - 1, last).join("\n") };
+    });
+    expect(new Set(configModule.default.mutate).size).toBe(24);
+    const criticalTargets = [
+      ["src/policy.ts", "!this.config.allowRootLogin"],
+      ["src/policy.ts", "!this.config.allowRawSudo"],
+      ["src/policy.ts", "!this.config.allowDestructiveCommands"],
+      ["src/policy.ts", "this.config.tunnelDenyBindHosts"],
+      ["src/policy.ts", "this.config.tunnelAllowBindHosts"],
+      ["src/policy.ts", "this.localPathDenyPrefixes.some"],
+      ["src/policy.ts", "this.pathDenyPrefixes.some"],
+      ["src/session-connection-config.ts", "this.verifyKnownHostKey("],
+      ["src/http-security.ts", '!== "strict"'],
+      ["src/remote/control-plane-agent-operations.ts", 'status: "revoked"'],
+      ["src/remote/control-plane-agent-operations.ts", "?.value !== true"],
+      ["src/remote/control-plane-agent-operations.ts", "Copy requires files.read and files.write"],
+      ["src/remote/crypto.ts", 'algorithms: ["EdDSA"]'],
+      ["src/remote/policy.ts", "policy.denyPaths.some"],
+      ["src/remote/policy.ts", "policy.allowPaths.some"],
     ];
-
-    expect(configModule.default.mutate).toEqual(expectedRanges);
-    expect(
-      configModule.default.mutate.every((target) => /^src\/.+\.ts:\d+-\d+$/u.test(target)),
-    ).toBe(true);
+    for (const [file, anchor] of criticalTargets) {
+      expect(
+        selected.some((range) => range.file === file && range.source.includes(anchor ?? "")),
+        file + ": " + anchor,
+      ).toBe(true);
+    }
     expect(configModule.default.mutate).not.toContain("src/policy.ts");
+  });
+
+  test("resolves source anchors after line shifts and rejects missing or ambiguous anchors", async () => {
+    const configPath = path.join(repoRoot, "stryker.conf.mjs");
+    const { resolveMutationRange } = (await import(pathToFileURL(configPath).href)) as {
+      resolveMutationRange: (file: string, source: string, anchor: string) => string;
+    };
+    const file = "src/fixture.ts";
+    const snippet = "if (!allowed) {\nreturn false;";
+    expect(resolveMutationRange(file, "if (!allowed) {\n  return false;\n}", snippet)).toBe(
+      file + ":1-2",
+    );
+    expect(
+      resolveMutationRange(
+        file,
+        "// inserted\r\n  if (!allowed) {\r\n    return false;\r\n}",
+        snippet,
+      ),
+    ).toBe(file + ":2-3");
+    expect(() => resolveMutationRange(file, "return true;", snippet)).toThrow("exactly one");
+    expect(() => resolveMutationRange(file, snippet + "\n" + snippet, snippet)).toThrow(
+      "exactly one",
+    );
+    expect(() => resolveMutationRange(file, "", "")).toThrow("bounded");
+    expect(() => resolveMutationRange(file, "x\n".repeat(21), "x\n".repeat(21).trimEnd())).toThrow(
+      "bounded",
+    );
   });
 
   test("uses a dedicated mutation Vitest config without fixture-dependent projects", () => {
@@ -113,6 +146,8 @@ describe("mutation testing gate", () => {
     expect(mutationConfig).toContain("test/unit/policy*.test.ts");
     expect(mutationConfig).toContain("test/unit/remote-control-plane.test.ts");
     expect(mutationConfig).toContain("test/unit/auth.test.ts");
+    expect(mutationConfig).toContain("test/unit/session-connection-config.test.ts");
+    expect(mutationConfig).not.toContain("test/unit/mutation-gate.test.ts");
     expect(mutationConfig).not.toContain("test/perf");
     expect(mutationConfig).not.toContain("test/integration");
     expect(mutationConfig).not.toContain("test/e2e");
