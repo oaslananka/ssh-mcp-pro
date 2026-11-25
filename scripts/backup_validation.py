@@ -7,6 +7,7 @@ import sqlite3
 import subprocess  # nosec B404
 from urllib.parse import quote
 
+OPENSSL = "/usr/bin/openssl"
 MIB = 1024 * 1024
 DEFAULT_MAX_BACKUP_MIB = 128
 MAX_BACKUP_MIB = 1024
@@ -53,16 +54,16 @@ def openssl_public_der(pem, private):
     try:
         # Only fixed executable/flags; PEM enters via stdin.
         if private:
-            result = subprocess.run(
-                ["/usr/bin/openssl", "pkey", "-outform", "DER", "-pubout"],
+            result = subprocess.run(  # nosec B603 - fixed executable/flags, PEM via stdin
+                [OPENSSL, "pkey", "-outform", "DER", "-pubout"],
                 input=pem.encode("utf-8"), stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL, timeout=10, check=False,
+                stderr=subprocess.DEVNULL, timeout=10, check=False, shell=False,
             )
         else:
-            result = subprocess.run(
-                ["/usr/bin/openssl", "pkey", "-outform", "DER", "-pubin"],
+            result = subprocess.run(  # nosec B603 - fixed executable/flags, PEM via stdin
+                [OPENSSL, "pkey", "-outform", "DER", "-pubin"],
                 input=pem.encode("utf-8"), stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL, timeout=10, check=False,
+                stderr=subprocess.DEVNULL, timeout=10, check=False, shell=False,
             )
     except (OSError, subprocess.SubprocessError):
         reject("KEY_PAIR_MISMATCH")
@@ -72,7 +73,7 @@ def openssl_public_der(pem, private):
 
 
 def validate_signing_keys(restore):
-    if not os.access("/usr/bin/openssl", os.X_OK):
+    if not os.access(OPENSSL, os.X_OK):
         reject("OPENSSL_NOT_INSTALLED")
     for filename in KEYS:
         try:

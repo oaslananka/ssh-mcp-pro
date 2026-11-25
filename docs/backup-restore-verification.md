@@ -21,18 +21,21 @@ process. Keep its private identity on the separate recovery host; it must not
 be copied to the source host. Run, for example:
 
 ~~~bash
-python3 scripts/create-encrypted-backup.py \
+cd /secure/staging
+python3 /path/to/ssh-mcp-pro/scripts/create-encrypted-backup.py \
   --source-dir /secure/source-data \
   --recipient "$AGE_PUBLIC_RECIPIENT" \
-  --output /secure/staging/ssh-mcp-pro-backup.tar.gz.age \
+  --output ssh-mcp-pro-backup.tar.gz.age \
   --max-backup-mib 512
 ~~~
 
 The source and output directories must be trusted, service-owned or restricted
 to the authorized operator. Use a local filesystem that supports hard links
-for the output directory. Use a single output filename ending in `.age` with
+for the output directory. The current working directory selects the destination;
+absolute paths and directory components are rejected by `--output`. Use a single
+output filename ending in `.age` with
 ASCII letters, digits, dots, underscores or hyphens, starting with a letter or
-digit. Parent traversal components (`..`) are rejected. Use a private temporary filesystem with sufficient
+digit. Use a private temporary filesystem with sufficient
 free space (at least three times the selected capacity, plus overhead). The
 command checks the snapshot database and signing-key pairs, encrypts with the
 public recipient, and publishes only complete ciphertext without overwriting

@@ -78,10 +78,10 @@ def fixture(root, mode="valid", gz=False):
     return encrypted, identity
 
 
-def invoke(script, *arguments):
+def invoke(script, *arguments, cwd=None):
     outcome = subprocess.run(  # nosec B603 - fixed local verifier path, shell=False
         [sys.executable, str(script), *arguments],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20, cwd=cwd,
     )
     data = json.loads(outcome.stdout.decode()) if outcome.stdout else None
     return outcome.returncode, data, outcome.stderr
@@ -154,7 +154,8 @@ class OfflineRestoreVerifierTests(unittest.TestCase):
     def create_snapshot(self, root, identity, output, *options):
         recipient = run("age-keygen", "-y", str(identity)).decode().strip()
         return invoke(CREATOR, "--source-dir", str(root / "data"),
-                      "--recipient", recipient, "--output", str(output), *options)
+                      "--recipient", recipient, "--output", str(output.relative_to(root)),
+                      *options, cwd=root)
 
     def test_creates_recoverable_snapshot_with_committed_wal_data(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -211,6 +212,21 @@ class OfflineRestoreVerifierTests(unittest.TestCase):
             self.assertFalse((root / "escaped.age").exists())
             self.assertEqual(stderr, b"")
 
+    def test_creation_rejects_absolute_output_outside_working_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            _, identity = fixture(root)
+            recipient = run("age-keygen", "-y", str(identity)).decode().strip()
+            output = root / "data" / "outside.age"
+            code, data, stderr = invoke(
+                CREATOR, "--source-dir", str(root / "data"), "--recipient", recipient,
+                "--output", str(output), cwd=root,
+            )
+            self.assertEqual(code, 2)
+            self.assertEqual(data, {"status": "fail", "code": "INVALID_OUTPUT_PATH"})
+            self.assertFalse(output.exists())
+            self.assertEqual(stderr, b"")
+
     def test_creation_never_overwrites_existing_output(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = pathlib.Path(tmp)
@@ -229,7 +245,7 @@ class OfflineRestoreVerifierTests(unittest.TestCase):
             fixture(root)
             output = root / "invalid.age"
             code, data, stderr = invoke(CREATOR, "--source-dir", str(root / "data"),
-                                       "--recipient", "invalid", "--output", str(output))
+                                       "--recipient", "invalid", "--output", output.name, cwd=root)
             self.assertNotEqual(code, 0)
             self.assertEqual(data, {"status": "fail", "code": "INVALID_RECIPIENT"})
             self.assertFalse(output.exists())
