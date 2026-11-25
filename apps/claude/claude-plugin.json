@@ -1,6 +1,6 @@
 {
   "name": "ssh-mcp-pro",
-  "version": "1.17.1",
+  "version": "1.18.0",
   "description": "Secure SSH automation and infrastructure inspection connector for Claude",
   "author": {
     "name": "Osman Aslan"
