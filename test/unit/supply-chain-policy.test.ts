@@ -63,12 +63,13 @@ describe("supply-chain policy", () => {
     expect(manager.customType).toBe("regex");
     expect(manager.datasourceTemplate).toBe("npm");
     expect([...manager.managerFilePatterns].sort()).toEqual([...activeFiles].sort());
+    const pnpmPin =
+      /(?:pnpm@|PNPM_VERSION:[ \t]+|pnpm(?: must satisfy)?[ \t]+`?\^?)(?<currentValue>\d+\.\d+\.\d+)/gu;
+    expect(manager.matchStrings).toEqual([pnpmPin.source]);
     for (const file of activeFiles) {
       const source = readText(file);
       expect(source, `Current pnpm pin in ${file}`).toContain(pinnedVersion);
-      const versions = manager.matchStrings.flatMap((pattern) =>
-        [...source.matchAll(new RegExp(pattern, "gu"))].map((match) => match.groups?.currentValue),
-      );
+      const versions = [...source.matchAll(pnpmPin)].map((match) => match.groups?.currentValue);
       expect(versions.length, file).toBeGreaterThan(0);
       expect(
         versions.every((pin) => pin === pinnedVersion),
