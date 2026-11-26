@@ -463,7 +463,13 @@ describe("SessionManager", () => {
         password: "secret",
         auth: "password",
       }),
-    ).rejects.toMatchObject({ code: "EPOLICY" });
+    ).rejects.toMatchObject({
+      code: "EPOLICY",
+      message: "Root SSH login is disabled by policy",
+      hint: "Connect as an unprivileged user and use approved privilege escalation workflows.",
+      recoverable: false,
+    });
+    expect(NodeSSH.prototype.connect).toHaveBeenCalledTimes(1);
 
     await expect(
       manager.openSession({

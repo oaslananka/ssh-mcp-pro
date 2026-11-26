@@ -13,6 +13,13 @@ describe("remote scope helpers", () => {
     expect(parseScopes("hosts:read unknown agents:admin")).toEqual(["hosts:read", "agents:admin"]);
   });
 
+  test("accepts repeated whitespace without merging or granting unknown scopes", () => {
+    expect(parseScopes("  hosts:read\t\tunknown\n\nfiles:read  ")).toEqual([
+      "hosts:read",
+      "files:read",
+    ]);
+  });
+
   test("new OAuth clients see generic device permissions, while legacy scopes still parse", () => {
     expect(PUBLIC_REMOTE_SCOPES).not.toContain("docker:manage");
     expect(PUBLIC_REMOTE_SCOPES).toContain("files:read");
